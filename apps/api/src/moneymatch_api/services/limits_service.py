@@ -27,9 +27,6 @@ from ..models.wallet import LedgerEntry, Limit, Wallet
 WINDOW = timedelta(hours=24)
 RAISE_COOLDOWN = timedelta(hours=24)
 
-# Caps that are protective (a raise is delayed); more-restrictive edits apply now.
-COOLDOWN_FIELDS = ("daily_loss_cap_cents", "daily_entry_cap_cents")
-
 
 class StakeBlockedError(APIError):
     """A stake was refused by a limit check (RFC-7807 via APIError)."""
