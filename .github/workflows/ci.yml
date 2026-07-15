@@ -66,9 +66,8 @@ jobs:
       VITE_SUPABASE_ANON_KEY: ci-anon-key
     steps:
       - uses: actions/checkout@v4
+      # Version comes from package.json "packageManager" — do not also set it here.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
