@@ -27,7 +27,8 @@ import { createApiClient } from '@moneymatch/api-client';
 
 const api = createApiClient({
   baseUrl: import.meta.env.VITE_API_BASE_URL,
-  getToken: () => supabase.auth.getSession().then((s) => s.data.session?.access_token ?? null),
+  getToken: () =>
+    supabase.auth.getSession().then((s) => s.data.session?.access_token ?? null),
 });
 
 const { data, error } = await api.GET('/api/v1/me');

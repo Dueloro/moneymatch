@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  // Read env from the repo root so a single .env drives both api and web.
+  envDir: '../../',
   server: {
     port: 5173,
   },
