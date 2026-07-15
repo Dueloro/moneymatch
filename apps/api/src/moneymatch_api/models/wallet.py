@@ -134,8 +134,14 @@ class LedgerEntry(Base):
     balance_after_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # clock_timestamp() (not now()) so every append gets its true insertion
+    # instant — appends within one transaction stay totally ordered for audit
+    # and cursor pagination.
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+        DateTime(timezone=True),
+        server_default=func.clock_timestamp(),
+        nullable=False,
+        index=True,
     )
 
 
@@ -166,8 +172,14 @@ class PlatformLedgerEntry(Base):
     )
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # clock_timestamp() (not now()) so every append gets its true insertion
+    # instant — appends within one transaction stay totally ordered for audit
+    # and cursor pagination.
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+        DateTime(timezone=True),
+        server_default=func.clock_timestamp(),
+        nullable=False,
+        index=True,
     )
 
 

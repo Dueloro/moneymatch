@@ -31,6 +31,7 @@ os.environ["ENV"] = "local"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from moneymatch_api.config import get_settings  # noqa: E402
 from moneymatch_api.db.append_only import install_statements  # noqa: E402
@@ -106,6 +107,21 @@ async def client(app) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+
+@pytest_asyncio.fixture
+async def session() -> AsyncIterator[AsyncSession]:
+    """A committing session for exercising services directly (no HTTP layer)."""
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as s:
+        yield s
+        await s.commit()
+
+
+def new_sessionmaker():
+    """Fresh sessionmaker for tests that need independent transactions/connections
+    (e.g. the FOR UPDATE concurrency harness)."""
+    return get_sessionmaker()
 
 
 def auth_headers(sub: str, **kwargs) -> dict[str, str]:
