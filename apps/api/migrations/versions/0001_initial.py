@@ -52,7 +52,7 @@ def upgrade() -> None:
             primary_key=True,
         ),
         sa.Column("auth_id", sa.String(255), nullable=False),
-        sa.Column("username", postgresql.CITEXT(), nullable=False),
+        sa.Column("username", postgresql.CITEXT(), nullable=True),
         sa.Column("email", sa.String(320), nullable=True),
         sa.Column("residence_state", sa.String(2), nullable=True),
         sa.Column(

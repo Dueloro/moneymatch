@@ -31,7 +31,8 @@ class User(Base, TimestampMixin):
 
     id = uuid_pk()
     auth_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    username: Mapped[str] = mapped_column(CITEXT(), unique=True, nullable=False)
+    # Null until the user completes onboarding step 2; set once, then immutable.
+    username: Mapped[str | None] = mapped_column(CITEXT(), unique=True, nullable=True)
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     residence_state: Mapped[str | None] = mapped_column(String(2), nullable=True)
     dob_attested_18plus: Mapped[bool] = mapped_column(
