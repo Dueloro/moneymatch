@@ -4,6 +4,8 @@
 from ..db.base import Base
 from .admin_audit import AdminAudit
 from .feature_flag import FeatureFlag
+from .linked_account import LinkedAccount
+from .skill import MetricModel, RawPayload
 from .user import User
 from .wallet import LedgerEntry, Limit, PlatformLedgerEntry, Wallet
 
@@ -16,4 +18,7 @@ __all__ = [
     "LedgerEntry",
     "PlatformLedgerEntry",
     "Limit",
+    "LinkedAccount",
+    "MetricModel",
+    "RawPayload",
 ]

@@ -34,7 +34,10 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from moneymatch_api.config import get_settings  # noqa: E402
-from moneymatch_api.db.append_only import install_statements  # noqa: E402
+from moneymatch_api.db.append_only import (  # noqa: E402
+    ALL_APPEND_ONLY_TABLES,
+    install_statements,
+)
 from moneymatch_api.db.session import get_engine, get_sessionmaker  # noqa: E402
 from moneymatch_api.main import create_app  # noqa: E402
 from moneymatch_api.models import Base  # noqa: E402
@@ -66,7 +69,7 @@ async def _schema() -> AsyncIterator[None]:
         await conn.run_sync(Base.metadata.create_all)
         # `create_all` doesn't carry raw-SQL triggers; install the append-only
         # guard so tests exercise the same immutability as the migrated schema.
-        for statement in install_statements():
+        for statement in install_statements(ALL_APPEND_ONLY_TABLES):
             await conn.execute(text(statement))
     yield
     await engine.dispose()
@@ -77,11 +80,13 @@ async def _clean(_schema: None) -> AsyncIterator[None]:
     """Reset user-owned tables and reseed feature flags before each test."""
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
-        # CASCADE from users clears wallets/limits/ledger_entries; platform_ledger
-        # has no user FK, so name it explicitly.
+        # CASCADE from users clears wallets/limits/ledger_entries/linked_accounts/
+        # metric_models; platform_ledger and raw_payloads have no user FK, so name
+        # them explicitly.
         await session.execute(
             text(
-                "TRUNCATE admin_audit, platform_ledger, users RESTART IDENTITY CASCADE"
+                "TRUNCATE admin_audit, platform_ledger, raw_payloads, users "
+                "RESTART IDENTITY CASCADE"
             )
         )
         await session.execute(text("DELETE FROM feature_flags"))
