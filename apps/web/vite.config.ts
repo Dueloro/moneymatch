@@ -12,5 +12,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    env: {
+      VITE_API_BASE_URL: 'http://localhost:8000',
+      VITE_SUPABASE_URL: 'http://localhost:54321',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+    },
   },
 });
