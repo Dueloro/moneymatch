@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens — 02-design-system §1. Tailwind colors map to these vars. */
+:root {
+  --bg: #000000; /* page canvas */
+  --panel: #0e0f0e; /* right-slip / card panels */
+  --panel-raised: #161716; /* selected nav item, avatar chips */
+  --hairline: #1e201e; /* 1px separators, card borders */
+  --text: #ffffff;
+  --text-secondary: #8b9089; /* labels, sublines */
+  --text-tertiary: #565b55; /* footer breadcrumbs, disabled */
+  --green: #00d632; /* brand + money + CTAs */
+  --green-dim: #0a3d16; /* green outline/glow on selected cards */
+  --red: #ff4d2e; /* BLOCKED, self-exclude, losses */
+  --radius-pill: 999px;
+  --radius-card: 12px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Footer breadcrumb: uppercase, letter-spaced, mono — doubles as a QA locator. */
+.footer-breadcrumb {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
