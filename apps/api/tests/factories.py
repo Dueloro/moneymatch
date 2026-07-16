@@ -11,8 +11,11 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from moneymatch_api.models.linked_account import LinkedAccount
+from moneymatch_api.models.skill import MetricModel
 from moneymatch_api.models.user import User
 from moneymatch_api.models.wallet import Limit, Wallet
+from moneymatch_api.schemas.profile import FormatStat, ProfileSnapshot
 
 
 async def create_user(
@@ -61,3 +64,73 @@ async def create_limit(session: AsyncSession, user: User, **overrides) -> Limit:
     session.add(limit)
     await session.flush()
     return limit
+
+
+def chess_profile(
+    username: str, *, rating: int = 1500, speed: str = "blitz", total_games: int = 100
+) -> ProfileSnapshot:
+    return ProfileSnapshot(
+        username=username,
+        display_name=username,
+        url=f"https://lichess.org/@/{username}",
+        link_method="username",
+        game="chess.lichess",
+        win_rate=0.5,
+        total_games=total_games,
+        formats=[FormatStat(speed=speed, rating=rating, games=total_games)],
+        primary_speed=speed,
+    )
+
+
+def cs2_profile(
+    username: str, *, rating: int = 1500, total_games: int = 60
+) -> ProfileSnapshot:
+    return ProfileSnapshot(
+        username=username,
+        display_name=username,
+        url=f"https://faceit.com/players/{username}",
+        link_method="username",
+        game="cs2.faceit",
+        win_rate=0.5,
+        total_games=total_games,
+        rating=rating,
+    )
+
+
+async def create_linked_account(
+    session: AsyncSession,
+    user: User,
+    game: str,
+    *,
+    host_account_id: str | None = None,
+    profile: ProfileSnapshot | None = None,
+) -> LinkedAccount:
+    host = host_account_id or f"host_{uuid.uuid4().hex[:10]}"
+    link = LinkedAccount(
+        user_id=user.id,
+        game=game,
+        host_account_id=host,
+        host_username=host,
+        profile_snapshot=profile.model_dump() if profile else {},
+    )
+    session.add(link)
+    await session.flush()
+    return link
+
+
+async def create_metric_model(
+    session: AsyncSession,
+    user: User,
+    game: str,
+    metric: str,
+    *,
+    mu: float,
+    sigma: float,
+    n: int,
+) -> MetricModel:
+    model = MetricModel(
+        user_id=user.id, game=game, metric=metric, mu=mu, sigma=sigma, n=n
+    )
+    session.add(model)
+    await session.flush()
+    return model
