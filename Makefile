@@ -49,6 +49,10 @@ test-api: ## Run API tests (needs Postgres up)
 test-web: ## Run web tests
 	pnpm --filter @moneymatch/web test
 
+e2e: ## Run the Playwright H2H e2e (needs the stack up — see apps/web/e2e/README.md)
+	pnpm --filter @moneymatch/web exec playwright install --with-deps chromium
+	pnpm --filter @moneymatch/web test:e2e
+
 lint: ## Lint everything
 	cd apps/api && uv run ruff check src tests && uv run ruff format --check src tests
 	pnpm --filter @moneymatch/web lint

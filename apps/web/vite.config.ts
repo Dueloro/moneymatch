@@ -14,6 +14,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Unit tests live under src/; e2e/ belongs to Playwright (run via `make e2e`).
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['e2e/**', 'node_modules/**'],
     env: {
       VITE_API_BASE_URL: 'http://localhost:8000',
       VITE_SUPABASE_URL: 'http://localhost:54321',

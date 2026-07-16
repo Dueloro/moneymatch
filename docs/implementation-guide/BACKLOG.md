@@ -55,4 +55,31 @@ Discovered during Phase 2 (identity & linking):
   Until then, models only move when a user links/refreshes.
 - **Raw-payload back-reference from derived records** — `raw_payloads` retains
   link/profile evidence now; the FK from grading records (matches/entries →
-  `raw_payload_id`) lands with those tables in Phase 3/4.
+  `raw_payload_id`) lands with those tables in Phase 3/4. *(Done in Phase 3:
+  `matches.raw_payload_id` FK + the worker persists grading evidence and links it.)*
+
+Discovered during Phase 3 (head-to-head flow):
+
+- **Browser e2e test-auth seam** — the two-context Playwright spec
+  (`apps/web/e2e/h2h.spec.ts`) is written but can't run in CI because auth is
+  Supabase-JWT and each context needs a real session. Add a local sign-in bypass
+  that mints a session for a seeded user (dev/e2e only) so the flow runs headless
+  without a live Supabase project. Until then the exact settlement math is proven
+  by `test_settlement_worker.py` (winner +$18 / loser −$10 / rake $2, invariant
+  asserted). Rationale: unblocks automated end-to-end coverage of exit criterion #1.
+- **Settlement-time metric-model refresh** — Phase 2 backlog noted the *nightly*
+  recompute needs the worker; the *per-settlement* refresh (recompute the two
+  players' `metric_models` after a match settles) is likewise deferred. Fairness
+  is unaffected: in-flight matches use frozen baselines, and models still refresh
+  on link / profile-refresh. Rationale: avoids a host round-trip per settlement
+  until the nightly job lands; pair the two.
+- **Raw pre-normalization payload retention at settlement** — grading persists a
+  normalized evidence record (the win/stat inputs + decision) to `raw_payloads`
+  and back-refs it from the match. Retaining the *raw* host JSON from the
+  settlement poll (as linking already does for profiles) is a stronger audit
+  artifact. Rationale: full grading replay from untouched host bytes.
+- **Chess grading needs `matched_at`-anchored brokered game only** — `win_h2h`
+  settles the stored `host_game_id`; if a Lichess open challenge is never taken,
+  it CANCELs at the window with a refund. A friendlier "re-broker on expiry"
+  (offer a fresh link before canceling) is a nicety. Rationale: reduce dead
+  challenges without changing the money-safe default.
