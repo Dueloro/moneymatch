@@ -76,8 +76,9 @@ class GameAdapter(abc.ABC):
 
     # --- Phase-3 brokering/settlement seams (implemented per-adapter later) ---
 
-    async def create_match(self, speed: str) -> dict | None:
-        """Broker a game between two players. Brokered adapters only (Phase 3)."""
+    async def create_match(self, speed: str, users: list[str]) -> dict | None:
+        """Broker a game between two players, restricting the seats to ``users``
+        (their host handles). Brokered adapters only (Phase 3)."""
         raise NotImplementedError
 
     async def match_winner(self, game_id: str, players: list[str]) -> str | None:

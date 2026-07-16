@@ -122,3 +122,8 @@ SELECT_W_VARIANCE = 0.10
 # Two accounts that just played can't be re-paired within this window
 # (anti-collusion `can_pair` seam — Phase 3 deliverable 2).
 REPAIR_COOLDOWN_SECONDS = 24 * 3600
+
+# Stamped on every settlement (`matches.engine_version`) so a dispute knows
+# exactly which matchmaking/grading rules produced the result (01-architecture §2).
+# Bump when pairing or grading logic changes.
+GRADING_ENGINE_VERSION = "h2h-1"

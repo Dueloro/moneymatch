@@ -92,18 +92,23 @@ async def get_user_games(
 
 
 async def create_open_challenge(
-    clock_limit: int, clock_increment: int = 0
+    clock_limit: int, clock_increment: int = 0, *, users: list[str] | None = None
 ) -> dict | None:
     """Create a Lichess **open challenge** (no auth) so the platform can pair two
     specific players into one game. ``None`` on error.
 
-    Used by Phase-3 chess brokering; kept here so the seam ports with the client.
+    When ``users`` is given (the two linked handles), the challenge is restricted
+    so only those two accounts can take the seats (`users=a,b` — 01-architecture
+    §3.1). Used by Phase-3 chess brokering; kept here so the seam ports with the
+    client.
     """
     data = {
         "clock.limit": str(clock_limit),
         "clock.increment": str(clock_increment),
         "name": "Money Match",
     }
+    if users:
+        data["users"] = ",".join(users)
     try:
         response = await request_json(
             HOST,

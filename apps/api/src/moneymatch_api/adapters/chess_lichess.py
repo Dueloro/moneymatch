@@ -72,8 +72,14 @@ class ChessLichessAdapter(GameAdapter):
 
     # --- Phase-3 brokering seams ------------------------------------------- #
 
-    async def create_match(self, speed: str) -> dict | None:
-        return await lichess.create_open_challenge(_CLOCK_FOR_SPEED.get(speed, 300))
+    async def create_match(self, speed: str, users: list[str]) -> dict | None:
+        # A Lichess **open challenge restricted to the two linked usernames**
+        # (users=a,b): both get the same link but only those accounts can occupy
+        # the seats, and settlement grades that specific game id (no OAuth needed
+        # at MVP — 01-architecture §3.1).
+        return await lichess.create_open_challenge(
+            _CLOCK_FOR_SPEED.get(speed, 300), users=users
+        )
 
     async def match_winner(self, game_id: str, players: list[str]) -> str | None:
         """Grade a brokered game once finished, verifying both accounts played it.
