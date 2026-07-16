@@ -41,3 +41,18 @@ From the [production launch plan](../proposals/production-launch-plan-v3.md)
   dispersion cap; decide with data.
 - **Same-lobby CS2 friend duels** — friends who can join one FaceIt lobby get
   the cleaner same-match objective (no cross-lobby variance) as a fast-follow.
+
+Discovered during Phase 2 (identity & linking):
+
+- **Bind by stable host id, not handle** — MVP stores `host_account_id` as the
+  casefolded username/nickname (FaceIt nickname, Lichess username, Dota Steam32
+  id). FaceIt nicknames and Lichess usernames are mutable, so a rename breaks
+  the binding + settlement poll key. Store the immutable host id (FaceIt
+  `player_id`, Lichess canonical id) — lands naturally with OAuth binding.
+- **Nightly metric-model refresh job** — Phase 2 refreshes `metric_models` at
+  link time and on the `/links/{game}/profile` refresh; the settlement-time
+  refresh is Phase 3 and the *nightly* recompute needs the worker (Phase 3+).
+  Until then, models only move when a user links/refreshes.
+- **Raw-payload back-reference from derived records** — `raw_payloads` retains
+  link/profile evidence now; the FK from grading records (matches/entries →
+  `raw_payload_id`) lands with those tables in Phase 3/4.
