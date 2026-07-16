@@ -127,3 +127,15 @@ REPAIR_COOLDOWN_SECONDS = 24 * 3600
 # exactly which matchmaking/grading rules produced the result (01-architecture §2).
 # Bump when pairing or grading logic changes.
 GRADING_ENGINE_VERSION = "h2h-1"
+
+# Absolute ceiling on a match's life from `matched_at`: the settlement window
+# (24 h) plus the outage ceiling (24 h). A host outage extends `window_ends_at`
+# up to here; past it the match is CANCELED + refunded (failure matrix,
+# 01-architecture §3.4 · "24 h hard ceiling").
+MATCH_MAX_LIFETIME_SECONDS = MATCH_SETTLE_WINDOW_SECONDS + 24 * 3600
+
+# Clock-skew tolerance when deciding a host match landed "after" `matched_at`.
+GRADE_MATCH_SKEW_MS = 60_000
+
+# The settlement worker's poll cadence (01-architecture §3.3 · "every ~15 s").
+WORKER_POLL_INTERVAL_SECONDS = 15

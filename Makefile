@@ -34,9 +34,12 @@ api: ## Run the API (reload) on :8000
 web: ## Run the web app (Vite) on :5173
 	cd apps/web && pnpm dev
 
-dev: db migrate ## Start db + api + web together
-	@echo "starting api + web (Ctrl-C to stop)..."
-	@$(MAKE) -j2 api web
+worker: ## Run the settlement worker (polls Postgres; separate process)
+	cd apps/api && uv run --env-file ../../.env python -m moneymatch_api.workers.settlement_worker
+
+dev: db migrate ## Start db + api + worker + web together
+	@echo "starting api + worker + web (Ctrl-C to stop)..."
+	@$(MAKE) -j3 api worker web
 
 test: test-api test-web ## Run all tests
 
