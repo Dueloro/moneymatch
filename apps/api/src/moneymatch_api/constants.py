@@ -216,3 +216,30 @@ METRIC_LABELS: dict[str, str] = {
 
 def metric_label(metric: str) -> str:
     return METRIC_LABELS.get(metric, metric)
+
+
+# --------------------------------------------------------------------------- #
+# Social & retention config (08-phase-5). Caps and windows live here, never
+# inline in the friends/challenge services.
+# --------------------------------------------------------------------------- #
+
+# Friendship caps (08-phase-5 · deliverable 2).
+MAX_FRIENDS = 500
+MAX_PENDING_OUTBOUND = 20
+
+# Presence-lite: "active" (green dot) if the heartbeat landed within this window.
+PRESENCE_WINDOW_SECONDS = 5 * 60
+
+# Direct challenge / invite link expiry (08-phase-5 · deliverable 3).
+CHALLENGE_TTL_SECONDS = 24 * 3600
+
+# Anti-collusion pair caps on **rake-bearing** contests between the same two
+# accounts (friends included). Past the cap a challenge becomes a zero-rake
+# friendly instead of being blocked (08-phase-5 · collusion posture for friends).
+PAIR_RAKE_CONTESTS_PER_DAY = 3
+PAIR_RAKE_CONTESTS_PER_WEEK = 10
+
+# Leaderboard: rank real users by ROI over a rolling window; a minimum number of
+# settled rake-bearing contests qualifies you (08-phase-5 · deliverable 5).
+LEADERBOARD_WINDOW_DAYS = 30
+LEADERBOARD_MIN_CONTESTS = 3
