@@ -31,12 +31,24 @@ from ..constants import (
     FLAG_SETTLEMENT_PAUSED,
     GRADING_ENGINE_VERSION,
     MATCH_MAX_LIFETIME_SECONDS,
+    TOURNAMENT_STANDINGS_REFRESH_SECONDS,
     WORKER_POLL_INTERVAL_SECONDS,
 )
 from ..db.session import get_sessionmaker
 from ..models.feature_flag import FeatureFlag
 from ..models.play import Match
-from ..services import grading, match_lifecycle, matchmaking, raw_payload_service
+from ..models.pools import SoloEntry, SoloPool
+from ..models.tournaments import Tournament, TournamentEntry
+from ..models.user import User
+from ..services import (
+    grading,
+    match_lifecycle,
+    matchmaking,
+    pool_engine,
+    raw_payload_service,
+    telemetry_fetch,
+    tournament_engine,
+)
 from ..services.feature_flags import get_boolean_flags
 from ..services.match_lifecycle import (
     CANCEL,
@@ -63,6 +75,9 @@ class CycleReport:
     expired_pending: int = 0
     expired_tickets: int = 0
     drained_tickets: int = 0
+    pools_settled: int = 0
+    tournaments_settled: int = 0
+    standings_refreshed: int = 0
     paused: bool = False
 
 
@@ -258,6 +273,150 @@ async def _drain_queue_if_paused(
 
 
 # --------------------------------------------------------------------------- #
+# Pool & tournament window settlement (server-fetched telemetry).
+# --------------------------------------------------------------------------- #
+
+
+async def _process_due_pools(
+    sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
+) -> None:
+    async with sm() as session:
+        ids = list(
+            await session.scalars(
+                select(SoloPool.id).where(
+                    SoloPool.state == "LOCKED", SoloPool.window_ends_at <= now
+                )
+            )
+        )
+    for pool_id in ids:
+        async with sm() as session:
+            pool = await session.scalar(
+                select(SoloPool)
+                .where(SoloPool.id == pool_id, SoloPool.state == "LOCKED")
+                .with_for_update(skip_locked=True)
+            )
+            if pool is None:
+                continue
+            entries = list(
+                await session.scalars(
+                    select(SoloEntry).where(SoloEntry.pool_id == pool_id)
+                )
+            )
+            grades = await telemetry_fetch.grade_pool(session, pool, entries)
+            try:
+                await pool_engine.settle_pool(session, pool, grades)
+                await session.commit()
+            except ReconciliationError as exc:
+                await session.rollback()
+                await _halt_on_breach(sm, report, "solo_pool", pool_id, exc)
+                raise SettlementHalted from exc
+            report.pools_settled += 1
+
+
+async def _process_due_tournaments(
+    sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
+) -> None:
+    async with sm() as session:
+        ids = list(
+            await session.scalars(
+                select(Tournament.id).where(
+                    Tournament.state == "LOCKED", Tournament.window_ends_at <= now
+                )
+            )
+        )
+    for tid in ids:
+        async with sm() as session:
+            tournament = await session.scalar(
+                select(Tournament)
+                .where(Tournament.id == tid, Tournament.state == "LOCKED")
+                .with_for_update(skip_locked=True)
+            )
+            if tournament is None:
+                continue
+            entries = list(
+                await session.scalars(
+                    select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
+                )
+            )
+            grades = await telemetry_fetch.grade_tournament(
+                session, tournament, entries
+            )
+            try:
+                await tournament_engine.settle_tournament(session, tournament, grades)
+                await session.commit()
+            except ReconciliationError as exc:
+                await session.rollback()
+                await _halt_on_breach(sm, report, "tournament", tid, exc)
+                raise SettlementHalted from exc
+            report.tournaments_settled += 1
+
+
+async def _refresh_tournament_standings(
+    sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
+) -> None:
+    """Refresh live standings for in-window tournaments on a slow cadence."""
+    async with sm() as session:
+        ids = list(
+            await session.scalars(
+                select(Tournament.id).where(
+                    Tournament.state == "LOCKED", Tournament.window_ends_at > now
+                )
+            )
+        )
+    for tid in ids:
+        async with sm() as session:
+            tournament = await session.get(Tournament, tid)
+            if tournament is None or tournament.state != "LOCKED":
+                continue
+            fresh_enough = (
+                tournament.standings_updated_at is not None
+                and (now - tournament.standings_updated_at).total_seconds()
+                < TOURNAMENT_STANDINGS_REFRESH_SECONDS
+            )
+            if fresh_enough:
+                continue
+            entries = list(
+                await session.scalars(
+                    select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
+                )
+            )
+            names = await _usernames(session, [e.user_id for e in entries])
+            standings = await telemetry_fetch.live_standings(
+                session, tournament, entries, names
+            )
+            tournament.standings_cache = {"rows": standings}
+            tournament.standings_updated_at = now
+            await session.commit()
+            report.standings_refreshed += 1
+
+
+async def _usernames(
+    session: AsyncSession, ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    if not ids:
+        return {}
+    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
+    return {uid: uname for uid, uname in rows}
+
+
+async def _halt_on_breach(
+    sm: async_sessionmaker[AsyncSession],
+    report: CycleReport,
+    ref_type: str,
+    ref_id: uuid.UUID,
+    exc: ReconciliationError,
+) -> None:
+    log.error(
+        "settlement.reconciliation_breach",
+        ref_type=ref_type,
+        ref_id=str(ref_id),
+        violations=exc.detail,
+    )
+    await _set_flag(sm, FLAG_SETTLEMENT_PAUSED, True)
+    report.paused = True
+
+
+# --------------------------------------------------------------------------- #
 # The cycle + the loop.
 # --------------------------------------------------------------------------- #
 
@@ -279,8 +438,11 @@ async def run_cycle(
 
     try:
         await _process_due_matches(sm, now, report)
+        await _process_due_pools(sm, now, report)
+        await _process_due_tournaments(sm, now, report)
     except SettlementHalted:
         return report
+    await _refresh_tournament_standings(sm, now, report)
     await _expire_pending_matches(sm, now, report)
     await _expire_tickets(sm, now, report)
     await _drain_queue_if_paused(sm, report)
