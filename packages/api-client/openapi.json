@@ -1149,6 +1149,648 @@
         }
       }
     },
+    "/api/v1/pools/markets": {
+      "get": {
+        "tags": [
+          "pools"
+        ],
+        "summary": "Get Markets",
+        "operationId": "get_markets_api_v1_pools_markets_get",
+        "parameters": [
+          {
+            "name": "game",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Game"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolMarketsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pools/queue": {
+      "post": {
+        "tags": [
+          "pools"
+        ],
+        "summary": "Enter Pool",
+        "operationId": "enter_pool_api_v1_pools_queue_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoolEnterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "pools"
+        ],
+        "summary": "Leave Queue",
+        "operationId": "leave_queue_api_v1_pools_queue_delete",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pools/queue/status": {
+      "get": {
+        "tags": [
+          "pools"
+        ],
+        "summary": "Queue Status",
+        "operationId": "queue_status_api_v1_pools_queue_status_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pools": {
+      "get": {
+        "tags": [
+          "pools"
+        ],
+        "summary": "List Pools",
+        "operationId": "list_pools_api_v1_pools_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolsListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pools/{pool_id}": {
+      "get": {
+        "tags": [
+          "pools"
+        ],
+        "summary": "Get Pool",
+        "operationId": "get_pool_api_v1_pools__pool_id__get",
+        "parameters": [
+          {
+            "name": "pool_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pool Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tournaments/markets": {
+      "get": {
+        "tags": [
+          "tournaments"
+        ],
+        "summary": "Get Markets",
+        "operationId": "get_markets_api_v1_tournaments_markets_get",
+        "parameters": [
+          {
+            "name": "game",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Game"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentMarketsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tournaments/queue": {
+      "post": {
+        "tags": [
+          "tournaments"
+        ],
+        "summary": "Enter",
+        "operationId": "enter_api_v1_tournaments_queue_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TournamentEnterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "tournaments"
+        ],
+        "summary": "Leave Queue",
+        "operationId": "leave_queue_api_v1_tournaments_queue_delete",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tournaments/queue/status": {
+      "get": {
+        "tags": [
+          "tournaments"
+        ],
+        "summary": "Queue Status",
+        "operationId": "queue_status_api_v1_tournaments_queue_status_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tournaments": {
+      "get": {
+        "tags": [
+          "tournaments"
+        ],
+        "summary": "List Tournaments",
+        "operationId": "list_tournaments_api_v1_tournaments_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentsListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tournaments/{tournament_id}": {
+      "get": {
+        "tags": [
+          "tournaments"
+        ],
+        "summary": "Get Tournament",
+        "operationId": "get_tournament_api_v1_tournaments__tournament_id__get",
+        "parameters": [
+          {
+            "name": "tournament_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tournament Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/activity": {
       "get": {
         "tags": [
@@ -1248,6 +1890,17 @@
             "type": "integer",
             "title": "Entry Cents"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
           "net_cents": {
             "anyOf": [
               {
@@ -1330,7 +1983,7 @@
           "resolved_at"
         ],
         "title": "ActivityItem",
-        "description": "One row in the unified Activity feed (H2H now; pools/tournaments in Phase 4)."
+        "description": "One row in the unified Activity feed (H2H matches, pools, tournaments)."
       },
       "ActivityResponse": {
         "properties": {
@@ -1398,6 +2051,35 @@
           "amount_cents"
         ],
         "title": "DemoWithdrawalRequest"
+      },
+      "DifficultyCard": {
+        "properties": {
+          "difficulty": {
+            "type": "string",
+            "title": "Difficulty"
+          },
+          "bar": {
+            "type": "number",
+            "title": "Bar"
+          },
+          "clear_rate": {
+            "type": "number",
+            "title": "Clear Rate"
+          },
+          "est_multiplier_bps": {
+            "type": "integer",
+            "title": "Est Multiplier Bps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "difficulty",
+          "bar",
+          "clear_rate",
+          "est_multiplier_bps"
+        ],
+        "title": "DifficultyCard",
+        "description": "One difficulty quoted from the viewer's own baseline (design PDF p.4)."
       },
       "Forecast": {
         "properties": {
@@ -2068,6 +2750,361 @@
         "title": "MeResponse",
         "description": "`/me` payload: the user, a computed onboarding flag, and staking limits."
       },
+      "PoolEnterRequest": {
+        "properties": {
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "difficulty": {
+            "type": "string",
+            "title": "Difficulty"
+          },
+          "entry_preset_cents": {
+            "type": "integer",
+            "title": "Entry Preset Cents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game",
+          "metric",
+          "difficulty",
+          "entry_preset_cents"
+        ],
+        "title": "PoolEnterRequest",
+        "description": "Enter a pool = enqueue. Ids + preset only \u2014 no bar, no amount."
+      },
+      "PoolMarketsResponse": {
+        "properties": {
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "linked": {
+            "type": "boolean",
+            "title": "Linked"
+          },
+          "entry_presets_cents": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Entry Presets Cents"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/PoolMetric"
+            },
+            "type": "array",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game",
+          "linked",
+          "entry_presets_cents",
+          "metrics"
+        ],
+        "title": "PoolMarketsResponse"
+      },
+      "PoolMemberView": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "personal_bar": {
+            "type": "number",
+            "title": "Personal Bar"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "payout_cents": {
+            "type": "integer",
+            "title": "Payout Cents"
+          },
+          "is_you": {
+            "type": "boolean",
+            "title": "Is You"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "personal_bar",
+          "status",
+          "payout_cents",
+          "is_you"
+        ],
+        "title": "PoolMemberView"
+      },
+      "PoolMetric": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "provisional": {
+            "type": "boolean",
+            "title": "Provisional"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/DifficultyCard"
+            },
+            "type": "array",
+            "title": "Cards"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "label",
+          "provisional",
+          "cards"
+        ],
+        "title": "PoolMetric"
+      },
+      "PoolStatusResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoolView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "waited_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waited Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "PoolStatusResponse"
+      },
+      "PoolView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "metric_label": {
+            "type": "string",
+            "title": "Metric Label"
+          },
+          "difficulty": {
+            "type": "string",
+            "title": "Difficulty"
+          },
+          "room_bar": {
+            "type": "number",
+            "title": "Room Bar"
+          },
+          "your_bar": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Bar"
+          },
+          "bar_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Delta"
+          },
+          "entry_cents": {
+            "type": "integer",
+            "title": "Entry Cents"
+          },
+          "pot_cents": {
+            "type": "integer",
+            "title": "Pot Cents"
+          },
+          "prize_cents": {
+            "type": "integer",
+            "title": "Prize Cents"
+          },
+          "rake_cents": {
+            "type": "integer",
+            "title": "Rake Cents"
+          },
+          "room_size": {
+            "type": "integer",
+            "title": "Room Size"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "window_starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Starts At"
+          },
+          "window_ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Ends At"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/PoolMemberView"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "your_payout_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Payout Cents"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "game",
+          "metric",
+          "metric_label",
+          "difficulty",
+          "room_bar",
+          "your_bar",
+          "bar_delta",
+          "entry_cents",
+          "pot_cents",
+          "prize_cents",
+          "rake_cents",
+          "room_size",
+          "state",
+          "window_starts_at",
+          "window_ends_at",
+          "members",
+          "your_payout_cents",
+          "resolved_at"
+        ],
+        "title": "PoolView"
+      },
+      "PoolsListResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PoolStatusResponse"
+          },
+          "rooms": {
+            "items": {
+              "$ref": "#/components/schemas/PoolView"
+            },
+            "type": "array",
+            "title": "Rooms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "rooms"
+        ],
+        "title": "PoolsListResponse",
+        "description": "The \"Open pools\" surface: your in-flight rooms + queue state."
+      },
       "ProfileSnapshot": {
         "properties": {
           "username": {
@@ -2286,6 +3323,387 @@
         ],
         "title": "QueueStatusResponse",
         "description": "Where the viewer stands: idle, searching (band + wait), or matched."
+      },
+      "StandingRow": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "matches": {
+            "type": "integer",
+            "title": "Matches"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "is_you": {
+            "type": "boolean",
+            "title": "Is You"
+          },
+          "payout_cents": {
+            "type": "integer",
+            "title": "Payout Cents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "score",
+          "matches",
+          "rank",
+          "is_you",
+          "payout_cents"
+        ],
+        "title": "StandingRow"
+      },
+      "TournamentEnterRequest": {
+        "properties": {
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "entry_preset_cents": {
+            "type": "integer",
+            "title": "Entry Preset Cents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game",
+          "metric",
+          "entry_preset_cents"
+        ],
+        "title": "TournamentEnterRequest"
+      },
+      "TournamentMarketsResponse": {
+        "properties": {
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "linked": {
+            "type": "boolean",
+            "title": "Linked"
+          },
+          "entry_presets_cents": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Entry Presets Cents"
+          },
+          "prize_split": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Prize Split"
+          },
+          "field_size": {
+            "type": "integer",
+            "title": "Field Size"
+          },
+          "score_matches": {
+            "type": "integer",
+            "title": "Score Matches"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/TournamentMetric"
+            },
+            "type": "array",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game",
+          "linked",
+          "entry_presets_cents",
+          "prize_split",
+          "field_size",
+          "score_matches",
+          "metrics"
+        ],
+        "title": "TournamentMarketsResponse"
+      },
+      "TournamentMetric": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "provisional": {
+            "type": "boolean",
+            "title": "Provisional"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "label",
+          "provisional"
+        ],
+        "title": "TournamentMetric"
+      },
+      "TournamentStatusResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "tournament": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TournamentView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "waited_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waited Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "TournamentStatusResponse"
+      },
+      "TournamentView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "metric_label": {
+            "type": "string",
+            "title": "Metric Label"
+          },
+          "entry_cents": {
+            "type": "integer",
+            "title": "Entry Cents"
+          },
+          "pot_cents": {
+            "type": "integer",
+            "title": "Pot Cents"
+          },
+          "prize_cents": {
+            "type": "integer",
+            "title": "Prize Cents"
+          },
+          "rake_cents": {
+            "type": "integer",
+            "title": "Rake Cents"
+          },
+          "prize_split": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Prize Split"
+          },
+          "field_size": {
+            "type": "integer",
+            "title": "Field Size"
+          },
+          "score_matches": {
+            "type": "integer",
+            "title": "Score Matches"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "window_starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Starts At"
+          },
+          "window_ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Window Ends At"
+          },
+          "field_mu_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Mu Low"
+          },
+          "field_mu_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Mu High"
+          },
+          "standings": {
+            "items": {
+              "$ref": "#/components/schemas/StandingRow"
+            },
+            "type": "array",
+            "title": "Standings"
+          },
+          "your_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Rank"
+          },
+          "your_payout_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Payout Cents"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "game",
+          "metric",
+          "metric_label",
+          "entry_cents",
+          "pot_cents",
+          "prize_cents",
+          "rake_cents",
+          "prize_split",
+          "field_size",
+          "score_matches",
+          "state",
+          "window_starts_at",
+          "window_ends_at",
+          "field_mu_low",
+          "field_mu_high",
+          "standings",
+          "your_rank",
+          "your_payout_cents",
+          "resolved_at"
+        ],
+        "title": "TournamentView"
+      },
+      "TournamentsListResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TournamentStatusResponse"
+          },
+          "tournaments": {
+            "items": {
+              "$ref": "#/components/schemas/TournamentView"
+            },
+            "type": "array",
+            "title": "Tournaments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "tournaments"
+        ],
+        "title": "TournamentsListResponse"
       },
       "UpdateMeRequest": {
         "properties": {

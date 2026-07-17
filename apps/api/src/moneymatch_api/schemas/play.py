@@ -141,9 +141,9 @@ class WaitingResponse(BaseModel):
 
 
 class ActivityItem(BaseModel):
-    """One row in the unified Activity feed (H2H now; pools/tournaments in Phase 4)."""
+    """One row in the unified Activity feed (H2H matches, pools, tournaments)."""
 
-    type: str  # "match"
+    type: str  # "match" | "pool" | "tournament"
     id: UUID
     game: str
     market: str
@@ -151,6 +151,8 @@ class ActivityItem(BaseModel):
     kind: str
     state: str
     entry_cents: int
+    # Pool/tournament rows supply a title (matches build theirs from opponent).
+    title: str | None = None
     # Your realized net once resolved (+prize−entry on a win, −entry on a loss,
     # 0 on push/refund); null while the match is still in flight.
     net_cents: int | None

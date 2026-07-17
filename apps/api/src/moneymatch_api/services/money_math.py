@@ -81,6 +81,20 @@ def h2h_multiplier_bps(rake_bps: int = DEFAULT_RAKE_BPS) -> int:
     return 2 * (BPS_DENOMINATOR - rake_bps)
 
 
+def pool_multiplier_estimate_bps(
+    p_target: float, rake_bps: int = DEFAULT_RAKE_BPS
+) -> int:
+    """Estimated pool tier multiplier ≈ `(1 − rake) / p_target`, in basis points.
+
+    This is an **estimate** for display only (02-design-system §4) — the real
+    payout is the entrant's share of the pool. Never a guaranteed/house-banked
+    multiplier. `p_target` is the difficulty's disclosed clear rate `1 − Φ(k)`.
+    """
+    if p_target <= 0:
+        return 0
+    return round((BPS_DENOMINATOR - rake_bps) / p_target)
+
+
 def split_weighted(
     pot_cents: int, weights: tuple[int, ...], rake_bps: int = DEFAULT_RAKE_BPS
 ) -> Split:

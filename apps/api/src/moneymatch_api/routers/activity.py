@@ -11,9 +11,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..constants import metric_label
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..models.play import Match, MatchPlayer
+from ..models.pools import SoloEntry, SoloPool
+from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..schemas.play import ActivityItem, ActivityResponse
 from ..services.markets import get as get_market
@@ -94,4 +97,77 @@ async def get_activity(
                 resolved_at=match.resolved_at,
             )
         )
-    return ActivityResponse(items=items)
+
+    await _append_pools(session, user, items, limit)
+    await _append_tournaments(session, user, items, limit)
+    items.sort(key=lambda i: i.created_at, reverse=True)
+    return ActivityResponse(items=items[:limit])
+
+
+async def _append_pools(
+    session: AsyncSession, user: User, items: list[ActivityItem], limit: int
+) -> None:
+    rows = await session.execute(
+        select(SoloEntry, SoloPool)
+        .join(SoloPool, SoloPool.id == SoloEntry.pool_id)
+        .where(SoloEntry.user_id == user.id)
+        .order_by(SoloPool.created_at.desc())
+        .limit(limit)
+    )
+    for entry, pool in rows:
+        terminal = pool.state in ("SETTLED", "CANCELED")
+        net = (entry.payout_cents - pool.entry_cents) if terminal else None
+        items.append(
+            ActivityItem(
+                type="pool",
+                id=pool.id,
+                game=pool.game,
+                market=pool.metric,
+                market_label=metric_label(pool.metric),
+                kind="pool",
+                state=pool.state,
+                entry_cents=pool.entry_cents,
+                title=f"{metric_label(pool.metric)} · {pool.difficulty.title()} pool",
+                net_cents=net,
+                opponent_username=None,
+                your_stat_line=entry.telemetry,
+                opponent_stat_line=None,
+                created_at=pool.created_at,
+                resolved_at=pool.resolved_at,
+            )
+        )
+
+
+async def _append_tournaments(
+    session: AsyncSession, user: User, items: list[ActivityItem], limit: int
+) -> None:
+    rows = await session.execute(
+        select(TournamentEntry, Tournament)
+        .join(Tournament, Tournament.id == TournamentEntry.tournament_id)
+        .where(TournamentEntry.user_id == user.id)
+        .order_by(Tournament.created_at.desc())
+        .limit(limit)
+    )
+    for entry, tournament in rows:
+        terminal = tournament.state in ("SETTLED", "CANCELED")
+        net = (entry.payout_cents - tournament.entry_cents) if terminal else None
+        rank = f" · #{entry.rank}" if entry.rank else ""
+        items.append(
+            ActivityItem(
+                type="tournament",
+                id=tournament.id,
+                game=tournament.game,
+                market=tournament.ranking_metric,
+                market_label=metric_label(tournament.ranking_metric),
+                kind="tournament",
+                state=tournament.state,
+                entry_cents=tournament.entry_cents,
+                title=f"{metric_label(tournament.ranking_metric)} tournament{rank}",
+                net_cents=net,
+                opponent_username=None,
+                your_stat_line=entry.telemetry,
+                opponent_stat_line=None,
+                created_at=tournament.created_at,
+                resolved_at=tournament.resolved_at,
+            )
+        )

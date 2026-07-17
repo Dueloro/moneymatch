@@ -203,3 +203,16 @@ TOURNAMENT_ENGINE_VERSION = "tourney-1"
 # lifetime mean (tanking a baseline is the attack the personal bar invites).
 SANDBAG_RECENT_N = 10
 SANDBAG_Z_THRESHOLD = -1.5
+
+# Human labels for rate metrics (pool/tournament market rows + standings).
+METRIC_LABELS: dict[str, str] = {
+    "cs2_kd_ratio": "K/D ratio",
+    "cs2_adr": "ADR",
+    "cs2_headshot_pct": "Headshot %",
+    "dota2_kda_ratio": "KDA ratio",
+    "dota2_gpm": "GPM",
+}
+
+
+def metric_label(metric: str) -> str:
+    return METRIC_LABELS.get(metric, metric)

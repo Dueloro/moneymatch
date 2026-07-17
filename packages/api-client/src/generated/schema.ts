@@ -313,6 +313,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pools/markets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Markets */
+        get: operations["get_markets_api_v1_pools_markets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pools/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enter Pool */
+        post: operations["enter_pool_api_v1_pools_queue_post"];
+        /** Leave Queue */
+        delete: operations["leave_queue_api_v1_pools_queue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pools/queue/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue Status */
+        get: operations["queue_status_api_v1_pools_queue_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pools */
+        get: operations["list_pools_api_v1_pools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pools/{pool_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pool */
+        get: operations["get_pool_api_v1_pools__pool_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tournaments/markets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Markets */
+        get: operations["get_markets_api_v1_tournaments_markets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tournaments/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enter */
+        post: operations["enter_api_v1_tournaments_queue_post"];
+        /** Leave Queue */
+        delete: operations["leave_queue_api_v1_tournaments_queue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tournaments/queue/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue Status */
+        get: operations["queue_status_api_v1_tournaments_queue_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tournaments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tournaments */
+        get: operations["list_tournaments_api_v1_tournaments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tournaments/{tournament_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Tournament */
+        get: operations["get_tournament_api_v1_tournaments__tournament_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/activity": {
         parameters: {
             query?: never;
@@ -336,7 +508,7 @@ export interface components {
     schemas: {
         /**
          * ActivityItem
-         * @description One row in the unified Activity feed (H2H now; pools/tournaments in Phase 4).
+         * @description One row in the unified Activity feed (H2H matches, pools, tournaments).
          */
         ActivityItem: {
             /** Type */
@@ -358,6 +530,8 @@ export interface components {
             state: string;
             /** Entry Cents */
             entry_cents: number;
+            /** Title */
+            title?: string | null;
             /** Net Cents */
             net_cents: number | null;
             /** Opponent Username */
@@ -412,6 +586,20 @@ export interface components {
              * @description Cents; must be ≤ available
              */
             amount_cents: number;
+        };
+        /**
+         * DifficultyCard
+         * @description One difficulty quoted from the viewer's own baseline (design PDF p.4).
+         */
+        DifficultyCard: {
+            /** Difficulty */
+            difficulty: string;
+            /** Bar */
+            bar: number;
+            /** Clear Rate */
+            clear_rate: number;
+            /** Est Multiplier Bps */
+            est_multiplier_bps: number;
         };
         /**
          * Forecast
@@ -659,6 +847,131 @@ export interface components {
             limits?: components["schemas"]["LimitsResponse"] | null;
         };
         /**
+         * PoolEnterRequest
+         * @description Enter a pool = enqueue. Ids + preset only — no bar, no amount.
+         */
+        PoolEnterRequest: {
+            /** Game */
+            game: string;
+            /** Metric */
+            metric: string;
+            /** Difficulty */
+            difficulty: string;
+            /** Entry Preset Cents */
+            entry_preset_cents: number;
+        };
+        /** PoolMarketsResponse */
+        PoolMarketsResponse: {
+            /** Game */
+            game: string;
+            /** Linked */
+            linked: boolean;
+            /** Entry Presets Cents */
+            entry_presets_cents: number[];
+            /** Metrics */
+            metrics: components["schemas"]["PoolMetric"][];
+        };
+        /** PoolMemberView */
+        PoolMemberView: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Personal Bar */
+            personal_bar: number;
+            /** Status */
+            status: string;
+            /** Payout Cents */
+            payout_cents: number;
+            /** Is You */
+            is_you: boolean;
+        };
+        /** PoolMetric */
+        PoolMetric: {
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Provisional */
+            provisional: boolean;
+            /** Cards */
+            cards: components["schemas"]["DifficultyCard"][];
+        };
+        /** PoolStatusResponse */
+        PoolStatusResponse: {
+            /** Status */
+            status: string;
+            pool?: components["schemas"]["PoolView"] | null;
+            /** Difficulty */
+            difficulty?: string | null;
+            /** Metric */
+            metric?: string | null;
+            /** Waited Seconds */
+            waited_seconds?: number | null;
+        };
+        /** PoolView */
+        PoolView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Game */
+            game: string;
+            /** Metric */
+            metric: string;
+            /** Metric Label */
+            metric_label: string;
+            /** Difficulty */
+            difficulty: string;
+            /** Room Bar */
+            room_bar: number;
+            /** Your Bar */
+            your_bar: number | null;
+            /** Bar Delta */
+            bar_delta: number | null;
+            /** Entry Cents */
+            entry_cents: number;
+            /** Pot Cents */
+            pot_cents: number;
+            /** Prize Cents */
+            prize_cents: number;
+            /** Rake Cents */
+            rake_cents: number;
+            /** Room Size */
+            room_size: number;
+            /** State */
+            state: string;
+            /**
+             * Window Starts At
+             * Format: date-time
+             */
+            window_starts_at: string;
+            /**
+             * Window Ends At
+             * Format: date-time
+             */
+            window_ends_at: string;
+            /** Members */
+            members: components["schemas"]["PoolMemberView"][];
+            /** Your Payout Cents */
+            your_payout_cents: number | null;
+            /** Resolved At */
+            resolved_at: string | null;
+        };
+        /**
+         * PoolsListResponse
+         * @description The "Open pools" surface: your in-flight rooms + queue state.
+         */
+        PoolsListResponse: {
+            status: components["schemas"]["PoolStatusResponse"];
+            /** Rooms */
+            rooms: components["schemas"]["PoolView"][];
+        };
+        /**
          * ProfileSnapshot
          * @description Verified skill profile for one linked host account.
          *
@@ -741,6 +1054,129 @@ export interface components {
              * @default true
              */
             can_cancel: boolean;
+        };
+        /** StandingRow */
+        StandingRow: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Score */
+            score: number | null;
+            /** Matches */
+            matches: number;
+            /** Rank */
+            rank: number | null;
+            /** Is You */
+            is_you: boolean;
+            /** Payout Cents */
+            payout_cents: number;
+        };
+        /** TournamentEnterRequest */
+        TournamentEnterRequest: {
+            /** Game */
+            game: string;
+            /** Metric */
+            metric: string;
+            /** Entry Preset Cents */
+            entry_preset_cents: number;
+        };
+        /** TournamentMarketsResponse */
+        TournamentMarketsResponse: {
+            /** Game */
+            game: string;
+            /** Linked */
+            linked: boolean;
+            /** Entry Presets Cents */
+            entry_presets_cents: number[];
+            /** Prize Split */
+            prize_split: number[];
+            /** Field Size */
+            field_size: number;
+            /** Score Matches */
+            score_matches: number;
+            /** Metrics */
+            metrics: components["schemas"]["TournamentMetric"][];
+        };
+        /** TournamentMetric */
+        TournamentMetric: {
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Provisional */
+            provisional: boolean;
+        };
+        /** TournamentStatusResponse */
+        TournamentStatusResponse: {
+            /** Status */
+            status: string;
+            tournament?: components["schemas"]["TournamentView"] | null;
+            /** Metric */
+            metric?: string | null;
+            /** Waited Seconds */
+            waited_seconds?: number | null;
+        };
+        /** TournamentView */
+        TournamentView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Game */
+            game: string;
+            /** Metric */
+            metric: string;
+            /** Metric Label */
+            metric_label: string;
+            /** Entry Cents */
+            entry_cents: number;
+            /** Pot Cents */
+            pot_cents: number;
+            /** Prize Cents */
+            prize_cents: number;
+            /** Rake Cents */
+            rake_cents: number;
+            /** Prize Split */
+            prize_split: number[];
+            /** Field Size */
+            field_size: number;
+            /** Score Matches */
+            score_matches: number;
+            /** State */
+            state: string;
+            /**
+             * Window Starts At
+             * Format: date-time
+             */
+            window_starts_at: string;
+            /**
+             * Window Ends At
+             * Format: date-time
+             */
+            window_ends_at: string;
+            /** Field Mu Low */
+            field_mu_low: number | null;
+            /** Field Mu High */
+            field_mu_high: number | null;
+            /** Standings */
+            standings: components["schemas"]["StandingRow"][];
+            /** Your Rank */
+            your_rank: number | null;
+            /** Your Payout Cents */
+            your_payout_cents: number | null;
+            /** Resolved At */
+            resolved_at: string | null;
+        };
+        /** TournamentsListResponse */
+        TournamentsListResponse: {
+            status: components["schemas"]["TournamentStatusResponse"];
+            /** Tournaments */
+            tournaments: components["schemas"]["TournamentView"][];
         };
         /**
          * UpdateMeRequest
@@ -1537,6 +1973,394 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_markets_api_v1_pools_markets_get: {
+        parameters: {
+            query: {
+                game: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolMarketsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enter_pool_api_v1_pools_queue_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PoolEnterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_queue_api_v1_pools_queue_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    queue_status_api_v1_pools_queue_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pools_api_v1_pools_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pool_api_v1_pools__pool_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                pool_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_markets_api_v1_tournaments_markets_get: {
+        parameters: {
+            query: {
+                game: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TournamentMarketsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enter_api_v1_tournaments_queue_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TournamentEnterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TournamentStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_queue_api_v1_tournaments_queue_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TournamentStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    queue_status_api_v1_tournaments_queue_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TournamentStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tournaments_api_v1_tournaments_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TournamentsListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tournament_api_v1_tournaments__tournament_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                tournament_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TournamentView"];
                 };
             };
             /** @description Validation Error */
