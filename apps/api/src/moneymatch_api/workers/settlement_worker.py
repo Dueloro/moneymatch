@@ -41,6 +41,7 @@ from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..services import (
+    challenge_service,
     grading,
     match_lifecycle,
     matchmaking,
@@ -78,6 +79,7 @@ class CycleReport:
     pools_settled: int = 0
     tournaments_settled: int = 0
     standings_refreshed: int = 0
+    expired_challenges: int = 0
     paused: bool = False
 
 
@@ -263,6 +265,16 @@ async def _expire_tickets(
         await session.commit()
 
 
+async def _expire_challenges(
+    sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
+) -> None:
+    async with sm() as session:
+        report.expired_challenges += await challenge_service.expire_due(
+            session, now=now
+        )
+        await session.commit()
+
+
 async def _drain_queue_if_paused(
     sm: async_sessionmaker[AsyncSession], report: CycleReport
 ) -> None:
@@ -445,6 +457,7 @@ async def run_cycle(
     await _refresh_tournament_standings(sm, now, report)
     await _expire_pending_matches(sm, now, report)
     await _expire_tickets(sm, now, report)
+    await _expire_challenges(sm, now, report)
     await _drain_queue_if_paused(sm, report)
     return report
 

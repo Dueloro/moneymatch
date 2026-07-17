@@ -27,7 +27,9 @@ _FRIEND_CODE_LEN = 6
 
 
 def gen_friend_code() -> str:
-    body = "".join(secrets.choice(_FRIEND_CODE_ALPHABET) for _ in range(_FRIEND_CODE_LEN))
+    body = "".join(
+        secrets.choice(_FRIEND_CODE_ALPHABET) for _ in range(_FRIEND_CODE_LEN)
+    )
     return f"MM-{body}"
 
 

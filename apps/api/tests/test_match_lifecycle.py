@@ -5,6 +5,7 @@ decline/expiry refunds, and settle (win/push/cancel) with the money invariants.
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from moneymatch_api.services import (
     match_lifecycle,
@@ -22,11 +23,19 @@ from moneymatch_api.services.match_lifecycle import (
 )
 
 from .factories import create_wallet
-from .test_matchmaking import chess_player, cs2_player, enq_chess, enq_cs2
+from .test_matchmaking import CS2, chess_player, cs2_player, enq_chess, enq_cs2
 
 pytestmark = pytest.mark.asyncio
 
 ENTRY = 1000
+
+
+async def _link(session, user):
+    from moneymatch_api.models.linked_account import LinkedAccount
+
+    return await session.scalar(
+        select(LinkedAccount).where(LinkedAccount.user_id == user.id).limit(1)
+    )
 
 
 async def fund(session, user, amount_cents):
@@ -172,6 +181,42 @@ async def test_settle_win_pays_winner_and_books_rake(session):
     assert recon.totals["rake"] == 200  # $2 platform fee
     # sum(payouts) + rake == sum(entries): 1800 + 200 == 2000.
     assert recon.totals["distributed"] + recon.totals["rake"] == recon.totals["entries"]
+    assert (await reconciliation_service.check_all(session)).ok
+
+
+async def test_settle_friendly_win_refunds_both_records_winner(session):
+    """A friendly (pair past the rake cap) grades a winner but refunds both
+    entries with zero rake — the leaderboard-excluded, fun-only path (08-phase-5)."""
+    from moneymatch_api.services import markets, matchmaking
+
+    a = await cs2_player(session, "alice", mu=1.0, sigma=0.3)
+    b = await cs2_player(session, "bob", mu=1.0, sigma=0.3)
+    await fund(session, a, 10_000)
+    await fund(session, b, 10_000)
+    market = markets.get(CS2, "kd_ratio")
+    match = await matchmaking.create_challenge_match(
+        session,
+        market=market,
+        challenger=a,
+        challenger_link=await _link(session, a),
+        challengee=b,
+        challengee_link=await _link(session, b),
+        entry_cents=ENTRY,
+        speed=None,
+        friendly=True,
+    )
+    assert match.friendly is True and match.rake_bps == 0
+    await _activate(session, match, a, b)
+
+    await match_lifecycle.settle(
+        session, match, SettlementResult(kind=WIN, winner_user_id=a.id)
+    )
+    assert match.state == "SETTLED" and match.winner_user_id == a.id  # recorded
+    # Both fully refunded, zero net, zero rake.
+    assert (await _balances(session, a)) == (10000, 0, 0)
+    assert (await _balances(session, b)) == (10000, 0, 0)
+    recon = await reconciliation_service.check(session, "match", match.id)
+    assert recon.ok and recon.totals["rake"] == 0
     assert (await reconciliation_service.check_all(session)).ok
 
 

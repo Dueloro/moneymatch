@@ -242,7 +242,22 @@ async def settle(
     match_states.assert_transition(match.state, target)
     seats = await players(session, match.id)
 
-    if result.kind == WIN:
+    # A friendly is zero-rake and refunds both entries regardless of who won —
+    # only the record is kept (08-phase-5 · collusion posture). We still stamp the
+    # graded winner + stat lines, but the money flow is neutralized to refunds.
+    if match.friendly and result.kind == WIN:
+        match.winner_user_id = result.winner_user_id
+        for seat in seats:
+            await wallet_service.refund(
+                session,
+                seat.user_id,
+                match.entry_cents,
+                ref_type=REF_MATCH,
+                ref_id=match.id,
+                memo="friendly refund",
+            )
+            seat.payout_cents = match.entry_cents
+    elif result.kind == WIN:
         if result.winner_user_id is None:
             raise LifecycleError(
                 "winner_required", "A win needs a winner.", status_code=422

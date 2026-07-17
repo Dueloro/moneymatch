@@ -88,6 +88,12 @@ async def _relationship(
     )
 
 
+async def are_friends(session: AsyncSession, a: uuid.UUID, b: uuid.UUID) -> bool:
+    """Whether two users are accepted friends (either direction)."""
+    rel = await _relationship(session, a, b)
+    return rel is not None and rel.state == "accepted"
+
+
 async def _accepted_count(session: AsyncSession, user_id: uuid.UUID) -> int:
     return int(
         await session.scalar(

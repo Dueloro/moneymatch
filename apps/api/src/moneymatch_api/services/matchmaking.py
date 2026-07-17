@@ -394,64 +394,80 @@ async def _get_or_create_ticket(
     return ticket
 
 
-async def _form_match(
+@dataclass
+class MatchSide:
+    """One seat's frozen inputs — the shared shape the ticket-paired and the
+    challenge-formed paths both assemble a match from."""
+
+    user_id: uuid.UUID
+    linked_account_id: uuid.UUID
+    host_account_id: str
+    rating: int | None
+    baseline_snapshot: dict
+
+
+async def _assemble_match(
     session: AsyncSession,
     market: MarketDef,
-    me: QueueTicket,
-    opp: QueueTicket,
+    entry_cents: int,
+    sides: list[MatchSide],
     now: datetime,
+    *,
+    speed: str | None,
+    friendly: bool = False,
 ) -> Match:
-    """Create the PENDING match + both seats from two tickets and retire the tickets."""
-    pot = me.entry_cents * 2
-    split = money_math.split_pot(pot, 1, market.rake_bps)
+    """Create a PENDING match + both seats from two frozen sides.
+
+    `sides[0]` takes white (chess), `sides[1]` black. A `friendly` match books
+    **zero rake** and refunds both entries on settle (the pair is past its
+    rake-bearing cap — 08-phase-5); the winner is still graded for the record.
+    """
+    pot = entry_cents * 2
+    rake_bps = 0 if friendly else market.rake_bps
+    split = money_math.split_pot(pot, 1, rake_bps)
     match = Match(
         game=market.game,
         market=market.key,
-        speed=me.speed,
-        entry_cents=me.entry_cents,
-        rake_bps=market.rake_bps,
+        speed=speed,
+        entry_cents=entry_cents,
+        rake_bps=rake_bps,
         pot_cents=pot,
         prize_cents=split.payouts_cents[0],
         rake_cents=split.rake_cents,
         state=PENDING,
         brokered=market.brokered,
+        friendly=friendly,
         window_ends_at=now + timedelta(seconds=MATCH_CONFIRM_TTL_SECONDS),
     )
     session.add(match)
     await session.flush()
 
-    # Chess assigns colors (the older waiting ticket = white, the newcomer = black).
-    seats = (
-        [(opp, "white"), (me, "black")]
-        if market.brokered
-        else [(opp, None), (me, None)]
-    )
-    for ticket, color in seats:
+    colors = ["white", "black"] if market.brokered else [None, None]
+    for side, color in zip(sides, colors, strict=True):
         session.add(
             MatchPlayer(
                 match_id=match.id,
-                user_id=ticket.user_id,
-                linked_account_id=ticket.linked_account_id,
-                host_account_id=ticket.baseline_snapshot["host_account_id"],
+                user_id=side.user_id,
+                linked_account_id=side.linked_account_id,
+                host_account_id=side.host_account_id,
                 color=color,
-                rating=ticket.baseline_snapshot.get("rating"),
-                baseline_snapshot=ticket.baseline_snapshot,
+                rating=side.rating,
+                baseline_snapshot=side.baseline_snapshot,
             )
         )
-        ticket.state = "matched"
-        ticket.match_id = match.id
     await session.flush()
 
-    for ticket in (me, opp):
+    for side in sides:
         await notifications_service.emit(
             session,
-            ticket.user_id,
+            side.user_id,
             "match_found",
             {
                 "match_id": str(match.id),
                 "game": market.game,
                 "market": market.key,
                 "entry_cents": match.entry_cents,
+                "friendly": friendly,
             },
         )
     log.info(
@@ -460,8 +476,90 @@ async def _form_match(
         game=market.game,
         market=market.key,
         entry_cents=match.entry_cents,
+        friendly=friendly,
     )
     return match
+
+
+def _ticket_side(ticket: QueueTicket) -> MatchSide:
+    return MatchSide(
+        user_id=ticket.user_id,
+        linked_account_id=ticket.linked_account_id,
+        host_account_id=ticket.baseline_snapshot["host_account_id"],
+        rating=ticket.baseline_snapshot.get("rating"),
+        baseline_snapshot=ticket.baseline_snapshot,
+    )
+
+
+async def _form_match(
+    session: AsyncSession,
+    market: MarketDef,
+    me: QueueTicket,
+    opp: QueueTicket,
+    now: datetime,
+) -> Match:
+    """Create the PENDING match + both seats from two tickets and retire the tickets."""
+    # Chess assigns colors (the older waiting ticket = white, the newcomer = black).
+    match = await _assemble_match(
+        session,
+        market,
+        me.entry_cents,
+        [_ticket_side(opp), _ticket_side(me)],
+        now,
+        speed=me.speed,
+    )
+    for ticket in (me, opp):
+        ticket.state = "matched"
+        ticket.match_id = match.id
+    await session.flush()
+    return match
+
+
+async def create_challenge_match(
+    session: AsyncSession,
+    *,
+    market: MarketDef,
+    challenger: User,
+    challenger_link: LinkedAccount,
+    challengee: User,
+    challengee_link: LinkedAccount,
+    entry_cents: int,
+    speed: str | None,
+    friendly: bool,
+) -> Match:
+    """Form a PENDING match from an accepted challenge (no queue tickets).
+
+    Runs the same assembly as a paired match — same escrow-at-confirm lifecycle,
+    same server-owned economics — but the two sides come from a direct challenge
+    rather than the forecast matcher (fairness is by consent here, 08-phase-5).
+    The challenger takes seat 0 (white, for chess).
+    """
+    now = _now()
+    challenger_baseline = await _build_baseline(
+        session, challenger, market, challenger_link, speed
+    )
+    challengee_baseline = await _build_baseline(
+        session, challengee, market, challengee_link, speed
+    )
+    sides = [
+        MatchSide(
+            user_id=challenger.id,
+            linked_account_id=challenger_link.id,
+            host_account_id=challenger_link.host_account_id,
+            rating=challenger_baseline.get("rating"),
+            baseline_snapshot=challenger_baseline,
+        ),
+        MatchSide(
+            user_id=challengee.id,
+            linked_account_id=challengee_link.id,
+            host_account_id=challengee_link.host_account_id,
+            rating=challengee_baseline.get("rating"),
+            baseline_snapshot=challengee_baseline,
+        ),
+    ]
+    return await _assemble_match(
+        session, market, entry_cents, sides, now, speed=speed, friendly=friendly
+    )
 
 
 async def _pair_ticket(
