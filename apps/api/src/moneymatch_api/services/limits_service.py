@@ -236,3 +236,20 @@ async def assert_can_stake(
                 "current": usage.concurrent,
             },
         )
+
+
+async def can_stake(
+    session: AsyncSession,
+    user: User,
+    amount_cents: int,
+    *,
+    currency: str = "DEMO",
+    now: datetime | None = None,
+) -> bool:
+    """Non-raising `assert_can_stake` — used by room/field formation to decide
+    which candidates can be escrowed before committing to a group."""
+    try:
+        await assert_can_stake(session, user, amount_cents, currency=currency, now=now)
+        return True
+    except StakeBlockedError:
+        return False

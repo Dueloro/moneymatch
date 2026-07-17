@@ -83,10 +83,12 @@ async def _clean(_schema: None) -> AsyncIterator[None]:
         # CASCADE from users clears wallets/limits/ledger_entries/linked_accounts/
         # metric_models; platform_ledger and raw_payloads have no user FK, so name
         # them explicitly.
+        # `users` CASCADE clears everything with a user FK; solo_pools /
+        # tournaments have no user FK (their entries do), so name them explicitly.
         await session.execute(
             text(
-                "TRUNCATE admin_audit, platform_ledger, raw_payloads, users "
-                "RESTART IDENTITY CASCADE"
+                "TRUNCATE admin_audit, platform_ledger, raw_payloads, "
+                "solo_pools, tournaments, users RESTART IDENTITY CASCADE"
             )
         )
         await session.execute(text("DELETE FROM feature_flags"))
