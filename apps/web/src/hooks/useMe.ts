@@ -16,6 +16,7 @@ export interface Me {
     id: string;
     username: string | null;
     email: string | null;
+    friend_code: string;
     residence_state: string | null;
     dob_attested_18plus: boolean;
     role: string;
@@ -24,6 +25,7 @@ export interface Me {
   };
   needs_onboarding: boolean;
   limits: Limits | null;
+  unread_notifications: number;
 }
 
 /** Fetches `/me` once the user is authenticated. Provisions the row server-side. */

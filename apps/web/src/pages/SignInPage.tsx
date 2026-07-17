@@ -36,11 +36,22 @@ export function SignInPage() {
         ) : linkStep ? (
           <LinkGameStep />
         ) : (
-          <Navigate to="/play" replace />
+          <PostAuthRedirect />
         )}
       </div>
     </div>
   );
+}
+
+/** After auth + onboarding, resume an invite-link accept if one was pending
+ * (the acquisition funnel), otherwise land on Play. */
+function PostAuthRedirect() {
+  const returnTo = sessionStorage.getItem('mm.returnTo');
+  if (returnTo) {
+    sessionStorage.removeItem('mm.returnTo');
+    return <Navigate to={returnTo} replace />;
+  }
+  return <Navigate to="/play" replace />;
 }
 
 function AuthStep() {

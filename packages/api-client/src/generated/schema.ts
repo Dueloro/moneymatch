@@ -502,6 +502,248 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Friends */
+        get: operations["list_friends_api_v1_friends_get"];
+        put?: never;
+        /** Add Friend */
+        post: operations["add_friend_api_v1_friends_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{friendship_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Friend */
+        post: operations["accept_friend_api_v1_friends__friendship_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{friendship_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Friend */
+        post: operations["decline_friend_api_v1_friends__friendship_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{friendship_id}/block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Block Friend */
+        post: operations["block_friend_api_v1_friends__friendship_id__block_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{friendship_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Friend */
+        delete: operations["remove_friend_api_v1_friends__friendship_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/challenges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Challenge */
+        post: operations["create_challenge_api_v1_challenges_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/challenges/token/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Invite
+         * @description Public: the invite-link preview shown before sign-in (funnel step 1).
+         */
+        get: operations["preview_invite_api_v1_challenges_token__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/challenges/token/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Invite */
+        post: operations["accept_invite_api_v1_challenges_token__token__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/challenges/{challenge_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Challenge */
+        get: operations["get_challenge_api_v1_challenges__challenge_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/challenges/{challenge_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Challenge */
+        post: operations["accept_challenge_api_v1_challenges__challenge_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/challenges/{challenge_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Challenge */
+        post: operations["decline_challenge_api_v1_challenges__challenge_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Leaderboard */
+        get: operations["get_leaderboard_api_v1_leaderboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Notifications */
+        get: operations["get_notifications_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Read */
+        post: operations["mark_read_api_v1_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -556,6 +798,131 @@ export interface components {
         ActivityResponse: {
             /** Items */
             items: components["schemas"]["ActivityItem"][];
+        };
+        /**
+         * AddFriendRequest
+         * @description Add by exact MoneyMatch username or immutable friend code (`MM-7F3K2Q`).
+         */
+        AddFriendRequest: {
+            /** Username Or Code */
+            username_or_code: string;
+        };
+        /**
+         * ChallengeAcceptResponse
+         * @description Accepting forms a PENDING match; the client navigates to it to confirm.
+         */
+        ChallengeAcceptResponse: {
+            /**
+             * Match Id
+             * Format: uuid
+             */
+            match_id: string;
+        };
+        /**
+         * ChallengeCreatedResponse
+         * @description The created challenge, plus the shareable path for invite links.
+         */
+        ChallengeCreatedResponse: {
+            challenge: components["schemas"]["ChallengeView"];
+            /** Invite Token */
+            invite_token?: string | null;
+            /** Invite Path */
+            invite_path?: string | null;
+        };
+        /**
+         * ChallengePreviewResponse
+         * @description Public invite-link preview (no auth) — market, entry, challenger name.
+         */
+        ChallengePreviewResponse: {
+            /** Game */
+            game: string;
+            /** Market */
+            market: string;
+            /** Market Label */
+            market_label: string;
+            /** Kind */
+            kind: string;
+            /** Speed */
+            speed: string | null;
+            /** Entry Cents */
+            entry_cents: number;
+            /** Challenger Username */
+            challenger_username: string | null;
+            /** State */
+            state: string;
+            /** Valid */
+            valid: boolean;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /**
+         * ChallengeView
+         * @description A challenge as a party sees it (the Respond slip / sent list).
+         */
+        ChallengeView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Challenger Id
+             * Format: uuid
+             */
+            challenger_id: string;
+            /** Challenger Username */
+            challenger_username: string | null;
+            /** Challengee Id */
+            challengee_id: string | null;
+            /** Game */
+            game: string;
+            /** Market */
+            market: string;
+            /** Market Label */
+            market_label: string;
+            /** Kind */
+            kind: string;
+            /** Speed */
+            speed: string | null;
+            /** Entry Cents */
+            entry_cents: number;
+            /** Friendly */
+            friendly: boolean;
+            /** State */
+            state: string;
+            /** Match Id */
+            match_id: string | null;
+            /** Is Invite */
+            is_invite: boolean;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /**
+         * CreateChallengeRequest
+         * @description One shape for all three flows (the server picks based on which fields are
+         *     set): direct (`challengee_id`), rematch (`rematch_of`), or invite link
+         *     (neither). game/market/entry are ignored for a rematch (copied from the
+         *     original match). Entry is a preset choice — the server owns the cents.
+         */
+        CreateChallengeRequest: {
+            /** Challengee Id */
+            challengee_id?: string | null;
+            /** Rematch Of */
+            rematch_of?: string | null;
+            /** Game */
+            game?: string | null;
+            /** Market */
+            market?: string | null;
+            /** Speed */
+            speed?: string | null;
+            /** Entry Preset Cents */
+            entry_preset_cents?: number | null;
         };
         /**
          * CreateLinkRequest
@@ -635,6 +1002,37 @@ export interface components {
             provisional: boolean;
         };
         /**
+         * FriendItem
+         * @description One person in the friends list or a pending request (design PDF p.8).
+         */
+        FriendItem: {
+            /**
+             * Friendship Id
+             * Format: uuid
+             */
+            friendship_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Online */
+            online: boolean;
+        };
+        /** FriendsResponse */
+        FriendsResponse: {
+            /** Your Friend Code */
+            your_friend_code: string;
+            /** Friends */
+            friends: components["schemas"]["FriendItem"][];
+            /** Incoming */
+            incoming: components["schemas"]["FriendItem"][];
+            /** Outgoing */
+            outgoing: components["schemas"]["FriendItem"][];
+        };
+        /**
          * GameLink
          * @description One game's row on Profile: linked snapshot or an empty/blocked slot.
          *
@@ -676,6 +1074,38 @@ export interface components {
             flags: {
                 [key: string]: boolean;
             };
+        };
+        /** LeaderboardResponse */
+        LeaderboardResponse: {
+            /** Rows */
+            rows: components["schemas"]["LeaderboardRowView"][];
+            you: components["schemas"]["YouSummaryView"];
+            /** Window Days */
+            window_days: number;
+            /** Min Contests */
+            min_contests: number;
+        };
+        /** LeaderboardRowView */
+        LeaderboardRowView: {
+            /** Rank */
+            rank: number;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Roi Bps */
+            roi_bps: number;
+            /** Net Cents */
+            net_cents: number;
+            /** Staked Cents */
+            staked_cents: number;
+            /** Contests */
+            contests: number;
+            /** Is You */
+            is_you: boolean;
         };
         /** LedgerEntryResponse */
         LedgerEntryResponse: {
@@ -726,6 +1156,19 @@ export interface components {
         LinksResponse: {
             /** Games */
             games: components["schemas"]["GameLink"][];
+        };
+        /**
+         * MarkReadRequest
+         * @description Mark specific notifications read, or all of them when `ids` is omitted.
+         */
+        MarkReadRequest: {
+            /** Ids */
+            ids?: string[] | null;
+        };
+        /** MarkReadResponse */
+        MarkReadResponse: {
+            /** Unread */
+            unread: number;
         };
         /**
          * MarketRow
@@ -845,6 +1288,39 @@ export interface components {
             /** Needs Onboarding */
             needs_onboarding: boolean;
             limits?: components["schemas"]["LimitsResponse"] | null;
+            /**
+             * Unread Notifications
+             * @default 0
+             */
+            unread_notifications: number;
+        };
+        /** NotificationItem */
+        NotificationItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Read */
+            read: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** NotificationsResponse */
+        NotificationsResponse: {
+            /** Unread */
+            unread: number;
+            /** Items */
+            items: components["schemas"]["NotificationItem"][];
         };
         /**
          * PoolEnterRequest
@@ -1214,6 +1690,8 @@ export interface components {
             username: string | null;
             /** Email */
             email: string | null;
+            /** Friend Code */
+            friend_code: string;
             /** Residence State */
             residence_state: string | null;
             /** Dob Attested 18Plus */
@@ -1298,6 +1776,16 @@ export interface components {
             lifetime_net_cents: number;
             /** Recent */
             recent: components["schemas"]["LedgerEntryResponse"][];
+        };
+        /** YouSummaryView */
+        YouSummaryView: {
+            /** Qualified */
+            qualified: boolean;
+            /** Contests */
+            contests: number;
+            /** Contests Needed */
+            contests_needed: number;
+            row: components["schemas"]["LeaderboardRowView"] | null;
         };
     };
     responses: never;
@@ -2394,6 +2882,499 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_friends_api_v1_friends_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_friend_api_v1_friends_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddFriendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_friend_api_v1_friends__friendship_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                friendship_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_friend_api_v1_friends__friendship_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                friendship_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    block_friend_api_v1_friends__friendship_id__block_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                friendship_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_friend_api_v1_friends__friendship_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                friendship_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_challenge_api_v1_challenges_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_invite_api_v1_challenges_token__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invite_api_v1_challenges_token__token__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeAcceptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_challenge_api_v1_challenges__challenge_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                challenge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_challenge_api_v1_challenges__challenge_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                challenge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeAcceptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_challenge_api_v1_challenges__challenge_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                challenge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_leaderboard_api_v1_leaderboard_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaderboardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_v1_notifications_read_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkReadResponse"];
                 };
             };
             /** @description Validation Error */

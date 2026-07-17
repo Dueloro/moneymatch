@@ -4,6 +4,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { AppShell } from './components/AppShell';
 import { ActivityPage } from './pages/ActivityPage';
 import { InboxPage } from './pages/InboxPage';
+import { InvitePage } from './pages/InvitePage';
 import { PlayPage } from './pages/PlayPage';
 import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -15,6 +16,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/signin" element={<SignInPage />} />
+      <Route path="/i/:token" element={<InvitePage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/play" replace />} />

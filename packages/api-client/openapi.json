@@ -1851,6 +1851,842 @@
           }
         }
       }
+    },
+    "/api/v1/friends": {
+      "get": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "List Friends",
+        "operationId": "list_friends_api_v1_friends_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Add Friend",
+        "operationId": "add_friend_api_v1_friends_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddFriendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friends/{friendship_id}/accept": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Accept Friend",
+        "operationId": "accept_friend_api_v1_friends__friendship_id__accept_post",
+        "parameters": [
+          {
+            "name": "friendship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friendship Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friends/{friendship_id}/decline": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Decline Friend",
+        "operationId": "decline_friend_api_v1_friends__friendship_id__decline_post",
+        "parameters": [
+          {
+            "name": "friendship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friendship Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friends/{friendship_id}/block": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Block Friend",
+        "operationId": "block_friend_api_v1_friends__friendship_id__block_post",
+        "parameters": [
+          {
+            "name": "friendship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friendship Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friends/{friendship_id}": {
+      "delete": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Remove Friend",
+        "operationId": "remove_friend_api_v1_friends__friendship_id__delete",
+        "parameters": [
+          {
+            "name": "friendship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friendship Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges": {
+      "post": {
+        "tags": [
+          "challenges"
+        ],
+        "summary": "Create Challenge",
+        "operationId": "create_challenge_api_v1_challenges_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChallengeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeCreatedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/token/{token}": {
+      "get": {
+        "tags": [
+          "challenges"
+        ],
+        "summary": "Preview Invite",
+        "description": "Public: the invite-link preview shown before sign-in (funnel step 1).",
+        "operationId": "preview_invite_api_v1_challenges_token__token__get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengePreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/token/{token}/accept": {
+      "post": {
+        "tags": [
+          "challenges"
+        ],
+        "summary": "Accept Invite",
+        "operationId": "accept_invite_api_v1_challenges_token__token__accept_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeAcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/{challenge_id}": {
+      "get": {
+        "tags": [
+          "challenges"
+        ],
+        "summary": "Get Challenge",
+        "operationId": "get_challenge_api_v1_challenges__challenge_id__get",
+        "parameters": [
+          {
+            "name": "challenge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Challenge Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/{challenge_id}/accept": {
+      "post": {
+        "tags": [
+          "challenges"
+        ],
+        "summary": "Accept Challenge",
+        "operationId": "accept_challenge_api_v1_challenges__challenge_id__accept_post",
+        "parameters": [
+          {
+            "name": "challenge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Challenge Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeAcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/{challenge_id}/decline": {
+      "post": {
+        "tags": [
+          "challenges"
+        ],
+        "summary": "Decline Challenge",
+        "operationId": "decline_challenge_api_v1_challenges__challenge_id__decline_post",
+        "parameters": [
+          {
+            "name": "challenge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Challenge Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/leaderboard": {
+      "get": {
+        "tags": [
+          "leaderboard"
+        ],
+        "summary": "Get Leaderboard",
+        "operationId": "get_leaderboard_api_v1_leaderboard_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Get Notifications",
+        "operationId": "get_notifications_api_v1_notifications_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark Read",
+        "operationId": "mark_read_api_v1_notifications_read_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkReadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2001,6 +2837,336 @@
         ],
         "title": "ActivityResponse"
       },
+      "AddFriendRequest": {
+        "properties": {
+          "username_or_code": {
+            "type": "string",
+            "title": "Username Or Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username_or_code"
+        ],
+        "title": "AddFriendRequest",
+        "description": "Add by exact MoneyMatch username or immutable friend code (`MM-7F3K2Q`)."
+      },
+      "ChallengeAcceptResponse": {
+        "properties": {
+          "match_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Match Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "match_id"
+        ],
+        "title": "ChallengeAcceptResponse",
+        "description": "Accepting forms a PENDING match; the client navigates to it to confirm."
+      },
+      "ChallengeCreatedResponse": {
+        "properties": {
+          "challenge": {
+            "$ref": "#/components/schemas/ChallengeView"
+          },
+          "invite_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Token"
+          },
+          "invite_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "challenge"
+        ],
+        "title": "ChallengeCreatedResponse",
+        "description": "The created challenge, plus the shareable path for invite links."
+      },
+      "ChallengePreviewResponse": {
+        "properties": {
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "market_label": {
+            "type": "string",
+            "title": "Market Label"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "speed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed"
+          },
+          "entry_cents": {
+            "type": "integer",
+            "title": "Entry Cents"
+          },
+          "challenger_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenger Username"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game",
+          "market",
+          "market_label",
+          "kind",
+          "speed",
+          "entry_cents",
+          "challenger_username",
+          "state",
+          "valid",
+          "expires_at"
+        ],
+        "title": "ChallengePreviewResponse",
+        "description": "Public invite-link preview (no auth) \u2014 market, entry, challenger name."
+      },
+      "ChallengeView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "challenger_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenger Id"
+          },
+          "challenger_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenger Username"
+          },
+          "challengee_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challengee Id"
+          },
+          "game": {
+            "type": "string",
+            "title": "Game"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "market_label": {
+            "type": "string",
+            "title": "Market Label"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "speed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed"
+          },
+          "entry_cents": {
+            "type": "integer",
+            "title": "Entry Cents"
+          },
+          "friendly": {
+            "type": "boolean",
+            "title": "Friendly"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "match_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Id"
+          },
+          "is_invite": {
+            "type": "boolean",
+            "title": "Is Invite"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "challenger_id",
+          "challenger_username",
+          "challengee_id",
+          "game",
+          "market",
+          "market_label",
+          "kind",
+          "speed",
+          "entry_cents",
+          "friendly",
+          "state",
+          "match_id",
+          "is_invite",
+          "expires_at"
+        ],
+        "title": "ChallengeView",
+        "description": "A challenge as a party sees it (the Respond slip / sent list)."
+      },
+      "CreateChallengeRequest": {
+        "properties": {
+          "challengee_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challengee Id"
+          },
+          "rematch_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rematch Of"
+          },
+          "game": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "speed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed"
+          },
+          "entry_preset_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Preset Cents"
+          }
+        },
+        "type": "object",
+        "title": "CreateChallengeRequest",
+        "description": "One shape for all three flows (the server picks based on which fields are\nset): direct (`challengee_id`), rematch (`rematch_of`), or invite link\n(neither). game/market/entry are ignored for a rematch (copied from the\noriginal match). Entry is a preset choice \u2014 the server owns the cents."
+      },
       "CreateLinkRequest": {
         "properties": {
           "game": {
@@ -2135,6 +3301,81 @@
         "title": "FormatStat",
         "description": "A single chess time-control's verified stats, sourced from the host."
       },
+      "FriendItem": {
+        "properties": {
+          "friendship_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Friendship Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "online": {
+            "type": "boolean",
+            "title": "Online"
+          }
+        },
+        "type": "object",
+        "required": [
+          "friendship_id",
+          "user_id",
+          "username",
+          "online"
+        ],
+        "title": "FriendItem",
+        "description": "One person in the friends list or a pending request (design PDF p.8)."
+      },
+      "FriendsResponse": {
+        "properties": {
+          "your_friend_code": {
+            "type": "string",
+            "title": "Your Friend Code"
+          },
+          "friends": {
+            "items": {
+              "$ref": "#/components/schemas/FriendItem"
+            },
+            "type": "array",
+            "title": "Friends"
+          },
+          "incoming": {
+            "items": {
+              "$ref": "#/components/schemas/FriendItem"
+            },
+            "type": "array",
+            "title": "Incoming"
+          },
+          "outgoing": {
+            "items": {
+              "$ref": "#/components/schemas/FriendItem"
+            },
+            "type": "array",
+            "title": "Outgoing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "your_friend_code",
+          "friends",
+          "incoming",
+          "outgoing"
+        ],
+        "title": "FriendsResponse"
+      },
       "GameLink": {
         "properties": {
           "game": {
@@ -2248,6 +3489,92 @@
           "flags"
         ],
         "title": "HealthResponse"
+      },
+      "LeaderboardResponse": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardRowView"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "you": {
+            "$ref": "#/components/schemas/YouSummaryView"
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
+          "min_contests": {
+            "type": "integer",
+            "title": "Min Contests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "you",
+          "window_days",
+          "min_contests"
+        ],
+        "title": "LeaderboardResponse"
+      },
+      "LeaderboardRowView": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "roi_bps": {
+            "type": "integer",
+            "title": "Roi Bps"
+          },
+          "net_cents": {
+            "type": "integer",
+            "title": "Net Cents"
+          },
+          "staked_cents": {
+            "type": "integer",
+            "title": "Staked Cents"
+          },
+          "contests": {
+            "type": "integer",
+            "title": "Contests"
+          },
+          "is_you": {
+            "type": "boolean",
+            "title": "Is You"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "user_id",
+          "username",
+          "roi_bps",
+          "net_cents",
+          "staked_cents",
+          "contests",
+          "is_you"
+        ],
+        "title": "LeaderboardRowView"
       },
       "LedgerEntryResponse": {
         "properties": {
@@ -2384,6 +3711,41 @@
         ],
         "title": "LinksResponse",
         "description": "Every registered game with the viewer's link state \u2014 drives Profile."
+      },
+      "MarkReadRequest": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "title": "MarkReadRequest",
+        "description": "Mark specific notifications read, or all of them when `ids` is omitted."
+      },
+      "MarkReadResponse": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread"
+        ],
+        "title": "MarkReadResponse"
       },
       "MarketRow": {
         "properties": {
@@ -2740,6 +4102,11 @@
                 "type": "null"
               }
             ]
+          },
+          "unread_notifications": {
+            "type": "integer",
+            "title": "Unread Notifications",
+            "default": 0
           }
         },
         "type": "object",
@@ -2749,6 +4116,63 @@
         ],
         "title": "MeResponse",
         "description": "`/me` payload: the user, a computed onboarding flag, and staking limits."
+      },
+      "NotificationItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "payload",
+          "read",
+          "created_at"
+        ],
+        "title": "NotificationItem"
+      },
+      "NotificationsResponse": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread",
+          "items"
+        ],
+        "title": "NotificationsResponse"
       },
       "PoolEnterRequest": {
         "properties": {
@@ -3800,6 +5224,10 @@
             ],
             "title": "Email"
           },
+          "friend_code": {
+            "type": "string",
+            "title": "Friend Code"
+          },
           "residence_state": {
             "anyOf": [
               {
@@ -3834,6 +5262,7 @@
           "id",
           "username",
           "email",
+          "friend_code",
           "residence_state",
           "dob_attested_18plus",
           "role",
@@ -4039,6 +5468,40 @@
         ],
         "title": "WalletResponse",
         "description": "Balances + the most recent ledger rows (the Wallet screen's first paint)."
+      },
+      "YouSummaryView": {
+        "properties": {
+          "qualified": {
+            "type": "boolean",
+            "title": "Qualified"
+          },
+          "contests": {
+            "type": "integer",
+            "title": "Contests"
+          },
+          "contests_needed": {
+            "type": "integer",
+            "title": "Contests Needed"
+          },
+          "row": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeaderboardRowView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "qualified",
+          "contests",
+          "contests_needed",
+          "row"
+        ],
+        "title": "YouSummaryView"
       }
     }
   }

@@ -3,10 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AmountText } from '../components/ui/AmountText';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ListRow } from '../components/ui/ListRow';
+import { PillButton } from '../components/ui/PillButton';
 import { formatCurrency, formatRelativeTime } from '../lib/format';
 import { statValue, useActivity, type ActivityItem } from '../hooks/useActivity';
+import { useCreateChallenge } from '../hooks/useChallenges';
 
 const LIVE_STATES = new Set(['ACTIVE', 'AWAITING_RESULT']);
+const TERMINAL_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 
 /** A win or a live contest gets the green dot; everything settled is gray. */
 function dotClass(item: ActivityItem): string {
@@ -65,6 +68,35 @@ function toastFor(item: ActivityItem): string {
   }
   if (item.state === 'PUSHED') return `Push ${what} — entry refunded`;
   return `Refunded — ${what}`;
+}
+
+/** One-tap rematch on a settled H2H row → challenge the same opponent
+ * (08-phase-5 · deliverable 6). */
+function RematchButton({
+  item,
+  onSent,
+}: {
+  item: ActivityItem;
+  onSent: (msg: string) => void;
+}) {
+  const rematch = useCreateChallenge();
+  if (item.type !== 'match' || !TERMINAL_STATES.has(item.state)) return null;
+  return (
+    <PillButton
+      variant="outline"
+      disabled={rematch.isPending}
+      onClick={async () => {
+        try {
+          await rematch.mutateAsync({ rematch_of: item.id });
+          onSent(`Rematch sent to ${item.opponent_username ?? 'opponent'}`);
+        } catch (e) {
+          onSent((e as Error).message);
+        }
+      }}
+    >
+      Rematch
+    </PillButton>
+  );
 }
 
 export function ActivityPage() {
@@ -133,13 +165,16 @@ export function ActivityPage() {
                   </>
                 }
                 right={
-                  item.net_cents != null ? (
-                    <AmountText cents={item.net_cents} win={item.net_cents > 0} />
-                  ) : (
-                    <span className="text-xs text-text-secondary">
-                      {formatCurrency(item.entry_cents)} in play
-                    </span>
-                  )
+                  <div className="flex items-center gap-3">
+                    {item.net_cents != null ? (
+                      <AmountText cents={item.net_cents} win={item.net_cents > 0} />
+                    ) : (
+                      <span className="text-xs text-text-secondary">
+                        {formatCurrency(item.entry_cents)} in play
+                      </span>
+                    )}
+                    <RematchButton item={item} onSent={setToast} />
+                  </div>
                 }
               />
             );

@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
+import { FriendsPanel } from '../components/FriendsPanel';
+import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
+import { SubTabs } from '../components/ui/SubTabs';
 import { AmountText } from '../components/ui/AmountText';
 import { formatCurrency } from '../lib/format';
 import {
@@ -17,7 +20,33 @@ import {
   type TournamentView,
 } from '../hooks/useTournaments';
 
+type SectionTab = 'tournaments' | 'leaderboard' | 'friends';
+
+/** The Tournament section: sub-tabs across Tournaments / Leaderboard / Friends
+ * (design p.6, p.7, p.8). */
 export function TournamentPage() {
+  const [tab, setTab] = useState<SectionTab>('tournaments');
+  return (
+    <div>
+      <div className="mb-6">
+        <SubTabs<SectionTab>
+          tabs={[
+            { key: 'tournaments', label: 'Tournaments' },
+            { key: 'leaderboard', label: 'Leaderboard' },
+            { key: 'friends', label: 'Friends' },
+          ]}
+          active={tab}
+          onSelect={setTab}
+        />
+      </div>
+      {tab === 'tournaments' && <TournamentsTab />}
+      {tab === 'leaderboard' && <LeaderboardPanel />}
+      {tab === 'friends' && <FriendsPanel />}
+    </div>
+  );
+}
+
+function TournamentsTab() {
   const { data: markets } = useTournamentMarkets();
   const { data: status } = useTournamentStatus();
   const enter = useEnterTournament();

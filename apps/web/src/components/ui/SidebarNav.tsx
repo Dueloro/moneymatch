@@ -14,6 +14,7 @@ const NAV = [
 export function SidebarNav() {
   const me = useMe();
   const username = me.data?.user.username ?? '…';
+  const unread = me.data?.unread_notifications ?? 0;
 
   return (
     <nav className="flex h-full w-[184px] shrink-0 flex-col bg-bg px-3 py-5">
@@ -46,10 +47,16 @@ export function SidebarNav() {
       <div className="mt-4 flex items-center gap-2 px-1">
         <NavLink
           to="/inbox"
-          aria-label="Inbox"
-          className="grid h-8 w-8 place-items-center rounded-lg text-text-secondary hover:text-text"
+          aria-label={unread > 0 ? `Inbox (${unread} unread)` : 'Inbox'}
+          className="relative grid h-8 w-8 place-items-center rounded-lg text-text-secondary hover:text-text"
         >
           <span aria-hidden>🔔</span>
+          {unread > 0 && (
+            <span
+              data-testid="inbox-unread-dot"
+              className="absolute right-1 top-1 h-2 w-2 rounded-full bg-green"
+            />
+          )}
         </NavLink>
         <NavLink
           to="/profile"

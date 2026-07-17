@@ -14,7 +14,15 @@ export type TelemetryEvent =
   | 'contest_settled'
   | 'rake_collected'
   | 'collusion_flagged'
-  | 'limit_changed';
+  | 'limit_changed'
+  // Phase 5 acquisition funnel (08-phase-5 · exit criterion 2) + social.
+  | 'friend_added'
+  | 'challenge_sent'
+  | 'challenge_accepted'
+  | 'rematch_sent'
+  | 'invite_created'
+  | 'invite_viewed'
+  | 'invite_accepted';
 
 export function track(
   event: TelemetryEvent,
