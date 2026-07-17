@@ -1,0 +1,37 @@
+# Local infrastructure. `make dev` uses the `db` service; `api`/`web`/`worker`
+# run on the host for fast reloads. The api/worker containers exist behind the
+# `full` profile for a container-only full-stack run (`docker compose --profile full up`).
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: moneymatch
+      POSTGRES_PASSWORD: moneymatch
+      POSTGRES_DB: moneymatch
+    ports:
+      # Override DB_PORT if 5432 is taken locally; keep DATABASE_URL's port in sync.
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U moneymatch']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    profiles: ['full']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://moneymatch:moneymatch@db:5432/moneymatch
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '8000:8000'
+
+volumes:
+  pgdata:

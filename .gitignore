@@ -1,0 +1,36 @@
+# deps
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pnpm-store/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# builds & caches
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.tsbuildinfo
+coverage/
+.coverage
+
+# tooling
+.DS_Store
+.idea/
+.vscode/
+playwright-report/
+test-results/
+
+#other
+.claude
+
+# agent tooling (Claude Code skills) — local only, never published
+.agents/
+skills-lock.json

@@ -1,0 +1,21 @@
+{
+  "name": "moneymatch",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MoneyMatch MVP — peer-to-peer skill wagering on games you already play.",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "web": "pnpm --filter @moneymatch/web dev",
+    "build": "pnpm --filter @moneymatch/web build",
+    "lint": "pnpm --filter @moneymatch/web lint",
+    "typecheck": "pnpm --filter @moneymatch/web typecheck",
+    "test": "pnpm --filter @moneymatch/web test",
+    "gen:api": "curl -sf ${API_BASE_URL:-http://localhost:8000}/openapi.json -o packages/api-client/openapi.json && pnpm --filter @moneymatch/api-client gen"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  }
+}

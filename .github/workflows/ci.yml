@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api (ruff · mypy · pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: moneymatch
+          POSTGRES_PASSWORD: moneymatch
+          POSTGRES_DB: moneymatch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U moneymatch"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://moneymatch:moneymatch@localhost:5432/moneymatch
+      TEST_DATABASE_URL: postgresql+asyncpg://moneymatch:moneymatch@localhost:5432/moneymatch_test
+      SUPABASE_URL: https://ci.supabase.co
+      SUPABASE_JWT_SECRET: ci-secret
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: uv sync --extra dev
+      - name: Ruff lint
+        run: uv run ruff check src tests
+      - name: Ruff format check
+        run: uv run ruff format --check src tests
+      - name: Mypy
+        run: uv run mypy src
+      - name: Create test database
+        run: PGPASSWORD=moneymatch psql -h localhost -U moneymatch -c 'CREATE DATABASE moneymatch_test;'
+      - name: Migrate + check drift
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+      - name: Pytest
+        run: uv run pytest
+
+  web:
+    name: web (eslint · prettier · tsc · vitest · build)
+    runs-on: ubuntu-latest
+    env:
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_SUPABASE_URL: http://localhost:54321
+      VITE_SUPABASE_ANON_KEY: ci-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      # Version comes from package.json "packageManager" — do not also set it here.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Generate API client
+        run: pnpm --filter @moneymatch/api-client gen
+      - name: Prettier check
+        run: pnpm exec prettier --check "**/*.{ts,tsx,css,json,md}"
+      - name: API client typecheck
+        run: pnpm --filter @moneymatch/api-client typecheck
+      - name: ESLint
+        run: pnpm --filter @moneymatch/web lint
+      - name: Typecheck
+        run: pnpm --filter @moneymatch/web typecheck
+      - name: Vitest
+        run: pnpm --filter @moneymatch/web test
+      - name: Build
+        run: pnpm --filter @moneymatch/web build
