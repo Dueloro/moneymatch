@@ -39,7 +39,7 @@ from ..services import (
     wallet_service,
 )
 from ..services.hosts.errors import HostUnavailable
-from . import match_states
+from . import analytics, match_states
 from .match_states import ACTIVE, CANCELED, PENDING, PUSHED, SETTLED
 
 log = structlog.get_logger(__name__)
@@ -325,6 +325,42 @@ async def settle(
                 "match_id": str(match.id),
                 "outcome": result.kind,
                 "payout_cents": seat.payout_cents,
+            },
+        )
+        analytics.capture(
+            analytics.CONTEST_SETTLED,
+            seat.user_id,
+            {
+                "ref_type": REF_MATCH,
+                "ref_id": str(match.id),
+                "game": match.game,
+                "market": match.market,
+                "outcome": result.kind,
+                "payout_cents": seat.payout_cents,
+            },
+        )
+        # Refund on a push/cancel/friendly is a liquidity event of its own.
+        if kind == "refund" or (match.friendly and result.kind == WIN):
+            analytics.capture(
+                analytics.REFUND_ISSUED,
+                seat.user_id,
+                {
+                    "ref_type": REF_MATCH,
+                    "ref_id": str(match.id),
+                    "amount_cents": seat.payout_cents,
+                },
+            )
+    # Rake is booked once per settled match (winner-take-all, non-friendly).
+    if result.kind == WIN and not match.friendly and match.rake_cents > 0:
+        analytics.capture(
+            analytics.RAKE_COLLECTED,
+            match.winner_user_id or match.id,
+            {
+                "ref_type": REF_MATCH,
+                "ref_id": str(match.id),
+                "rake_cents": match.rake_cents,
+                "game": match.game,
+                "market": match.market,
             },
         )
 

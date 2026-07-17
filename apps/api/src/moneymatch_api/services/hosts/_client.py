@@ -37,6 +37,12 @@ _MAX_ATTEMPTS = 3
 _DEFAULT_TIMEOUT = 8.0
 
 
+def _slow_host_ms() -> int:
+    from ...config import get_settings
+
+    return get_settings().slow_host_ms
+
+
 async def request_json(
     host: str,
     method: str,
@@ -73,6 +79,7 @@ async def request_json(
             except httpx.HTTPError as exc:
                 raise HostUnavailable(host, f"request failed: {exc}") from exc
             finally:
+                latency_ms = round((time.perf_counter() - started) * 1000, 1)
                 log.info(
                     "host.request",
                     host=host,
@@ -80,8 +87,18 @@ async def request_json(
                     url=url,
                     status=status_code,
                     attempt=attempt,
-                    latency_ms=round((time.perf_counter() - started) * 1000, 1),
+                    latency_ms=latency_ms,
                 )
+                # Ops signal: a slow host is the first sign of an outage or a
+                # settlement-latency regression (09-phase-6 · deliverable 4).
+                if latency_ms > _slow_host_ms():
+                    log.warning(
+                        "host.slow",
+                        host=host,
+                        url=url,
+                        latency_ms=latency_ms,
+                        threshold_ms=_slow_host_ms(),
+                    )
             if response.status_code == 404:
                 raise HostNotFound(host, f"{method} {url} → 404")
             if response.status_code >= 500:

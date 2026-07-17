@@ -49,6 +49,16 @@ class Settings(BaseSettings):
 
     # Observability.
     sentry_dsn: str | None = None
+    # Release tag applied to Sentry events + PostHog captures (git SHA in deploy).
+    release: str | None = None
+
+    # Product analytics (PostHog). With no key the server capture seam is a
+    # no-op — tests and local runs never touch the network (09-phase-6 · d.3).
+    posthog_api_key: str | None = None
+    posthog_host: str = Field(default="https://us.i.posthog.com")
+
+    # Warn when a host-API call exceeds this (ops signal — 09-phase-6 · d.4).
+    slow_host_ms: int = Field(default=2_000)
 
     @field_validator("database_url")
     @classmethod

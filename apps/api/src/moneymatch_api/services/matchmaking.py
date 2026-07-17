@@ -41,7 +41,7 @@ from ..models.skill import MetricModel
 from ..models.user import User
 from ..schemas.play import Forecast
 from ..schemas.profile import ProfileSnapshot
-from . import money_math, notifications_service, pairing, skill_rating
+from . import analytics, money_math, notifications_service, pairing, skill_rating
 from .feature_flags import get_boolean_flags
 from .markets import (
     KIND_STAT_RACE,
@@ -470,6 +470,17 @@ async def _assemble_match(
                 "friendly": friendly,
             },
         )
+        analytics.capture(
+            analytics.MATCH_FOUND,
+            side.user_id,
+            {
+                "match_id": str(match.id),
+                "game": market.game,
+                "market": market.key,
+                "entry_cents": match.entry_cents,
+                "friendly": friendly,
+            },
+        )
     log.info(
         "match.formed",
         match_id=str(match.id),
@@ -652,6 +663,16 @@ async def enqueue(
     baseline = await _build_baseline(session, user, market, link, speed)
     ticket = await _get_or_create_ticket(
         session, user, market, entry_cents, speed, baseline, link, now
+    )
+    analytics.capture(
+        analytics.ENTRY_QUEUED,
+        user.id,
+        {
+            "game": game,
+            "market": market.key,
+            "entry_cents": entry_cents,
+            "product": "duel",
+        },
     )
 
     match = await _pair_ticket(session, ticket, market, now)

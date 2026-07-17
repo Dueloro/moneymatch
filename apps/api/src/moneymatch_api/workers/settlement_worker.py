@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ..constants import (
     FLAG_QUEUE_PAUSED,
     FLAG_SETTLEMENT_PAUSED,
+    FLAG_WORKER_HEARTBEAT,
     GRADING_ENGINE_VERSION,
     MATCH_MAX_LIFETIME_SECONDS,
     TOURNAMENT_STANDINGS_REFRESH_SECONDS,
@@ -97,6 +98,21 @@ async def _set_flag(
     async with sm() as session:
         await session.execute(
             update(FeatureFlag).where(FeatureFlag.key == key).values(enabled=value)
+        )
+        await session.commit()
+
+
+async def _write_heartbeat(sm: async_sessionmaker[AsyncSession], now: datetime) -> None:
+    """Record the worker's liveness (`feature_flags.worker_heartbeat`) each cycle;
+    /health and the admin reconciliation view redden when it goes stale."""
+    from ..services import feature_flags
+
+    async with sm() as session:
+        await feature_flags.set_flag(
+            session,
+            FLAG_WORKER_HEARTBEAT,
+            enabled=True,
+            payload={"ts": now.isoformat()},
         )
         await session.commit()
 
@@ -448,6 +464,10 @@ async def run_cycle(
     sm = sm or get_sessionmaker()
     now = now or _now()
     report = CycleReport()
+
+    # Liveness first — the worker is alive even when settlement is paused, so the
+    # heartbeat is written before the pause short-circuit (09-phase-6 · d.4).
+    await _write_heartbeat(sm, now)
 
     async with sm() as session:
         if await _flag(session, FLAG_SETTLEMENT_PAUSED):

@@ -17,6 +17,7 @@ from .config import Settings, get_settings
 from .db.session import dispose_engine
 from .errors import register_error_handlers
 from .logging import configure_logging
+from .middleware import RequestLogMiddleware
 from .routers import (
     activity,
     admin,
@@ -46,6 +47,7 @@ def _init_sentry(settings: Settings) -> None:
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.env,
+        release=settings.release,
         traces_sample_rate=0.0,
     )
 
@@ -69,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(RequestLogMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

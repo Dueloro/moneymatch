@@ -23,6 +23,9 @@ async def get_current_user(
     identity = verify_token(_bearer(authorization))
     user = await get_or_create_user(session, identity)
     request.state.user = user
+    # A plain-string copy the request-log middleware can read after the session
+    # has closed (the ORM instance is detached by then).
+    request.state.user_id = str(user.id)
     return user
 
 
