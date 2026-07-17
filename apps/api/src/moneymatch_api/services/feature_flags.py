@@ -9,6 +9,7 @@ so a flip takes effect on the very next call with no restart (09-phase-6 · the
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..constants import (
     FLAG_QUEUE_PAUSED,
     FLAG_SETTLEMENT_PAUSED,
+    FLAG_WORKER_HEARTBEAT,
     REGISTERED_GAMES,
     game_flag_key,
 )
@@ -93,3 +95,21 @@ async def set_flag(
     row = await get_flag(session, key)
     assert row is not None
     return row
+
+
+async def get_worker_heartbeat(session: AsyncSession) -> datetime | None:
+    """The settlement worker's last-cycle timestamp, or None if never written."""
+    try:
+        flag = await get_flag(session, FLAG_WORKER_HEARTBEAT)
+    except SQLAlchemyError as exc:
+        log.warning("worker_heartbeat.read_failed", error=str(exc))
+        return None
+    if flag is None:
+        return None
+    ts = (flag.payload or {}).get("ts")
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts)
+    except (TypeError, ValueError):
+        return None

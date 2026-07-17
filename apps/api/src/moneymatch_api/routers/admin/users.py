@@ -225,9 +225,7 @@ async def user_ledger(
             tuple_(LedgerEntry.created_at, LedgerEntry.id) < (ts, last_id)
         )
     rows = list(await session.scalars(stmt))
-    next_cursor = (
-        _encode_cursor(rows[PAGE_SIZE - 1]) if len(rows) > PAGE_SIZE else None
-    )
+    next_cursor = _encode_cursor(rows[PAGE_SIZE - 1]) if len(rows) > PAGE_SIZE else None
     return AdminLedgerPage(
         entries=[LedgerEntryResponse.model_validate(r) for r in rows[:PAGE_SIZE]],
         next_cursor=next_cursor,

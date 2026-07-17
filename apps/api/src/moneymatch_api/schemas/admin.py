@@ -133,3 +133,136 @@ class ActionResult(BaseModel):
 class AdminLedgerPage(BaseModel):
     entries: list[LedgerEntryResponse]
     next_cursor: str | None
+
+
+# --------------------------------------------------------------------------- #
+# Contests
+# --------------------------------------------------------------------------- #
+
+
+class AdminContestListItem(BaseModel):
+    ref_type: str
+    ref_id: UUID
+    game: str
+    market: str
+    state: str
+    entry_cents: int
+    pot_cents: int
+    participants: int
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+class AdminContestListResponse(BaseModel):
+    contests: list[AdminContestListItem]
+
+
+class AdminContestDetail(BaseModel):
+    ref_type: str
+    ref_id: UUID
+    game: str
+    market: str
+    state: str
+    entry_cents: int
+    pot_cents: int
+    prize_cents: int
+    rake_cents: int
+    engine_version: str | None
+    outcome_detail: dict[str, Any] | None
+    created_at: datetime
+    resolved_at: datetime | None
+    participants: list[dict[str, Any]]
+    ledger: list[dict[str, Any]]
+    platform_ledger: list[dict[str, Any]]
+    reconciliation: dict[str, Any]
+
+
+class VoidRequest(BaseModel):
+    reason: str = Field(..., min_length=1)
+
+
+class ResettleResult(BaseModel):
+    outcome: str
+    state: str
+
+
+# --------------------------------------------------------------------------- #
+# Queue
+# --------------------------------------------------------------------------- #
+
+
+class QueueDepthRow(BaseModel):
+    game: str
+    market: str
+    entry_cents: int
+    waiting: int
+    avg_wait_seconds: float
+
+
+class QueueResponse(BaseModel):
+    waiting: int
+    matched: int
+    expired: int
+    canceled: int
+    expiry_rate: float
+    depth: list[QueueDepthRow]
+
+
+# --------------------------------------------------------------------------- #
+# Reconciliation
+# --------------------------------------------------------------------------- #
+
+
+class ReconViolationRow(BaseModel):
+    ref_type: str
+    ref_id: UUID
+    violations: list[str]
+    totals: dict[str, int]
+
+
+class WorkerStatus(BaseModel):
+    heartbeat_at: datetime | None
+    stale: bool
+
+
+class ReconciliationResponse(BaseModel):
+    ok: bool
+    solvency_ok: bool
+    solvency_violations: list[str]
+    totals: dict[str, int]
+    contest_violations: list[ReconViolationRow]
+    worker: WorkerStatus
+
+
+# --------------------------------------------------------------------------- #
+# Risk
+# --------------------------------------------------------------------------- #
+
+
+class RiskRateRow(BaseModel):
+    game: str
+    market: str
+    offered: int
+    accepted: int
+    settled: int
+    expected_rate: float | None
+    actual_rate: float | None
+    rake_cents: int
+    dispute_count: int
+    alert: bool
+
+
+class RiskFlagRow(BaseModel):
+    id: UUID
+    user_id: UUID
+    username: str | None
+    game: str
+    metric: str
+    kind: str
+    detail: dict[str, Any]
+    created_at: datetime
+
+
+class RiskResponse(BaseModel):
+    rates: list[RiskRateRow]
+    flags: list[RiskFlagRow]

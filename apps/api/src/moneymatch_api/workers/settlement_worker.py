@@ -106,6 +106,12 @@ async def _set_flag(
 # --------------------------------------------------------------------------- #
 
 
+async def resolve_match(session: AsyncSession, match: Match, now: datetime) -> str:
+    """Public entry to the grade+settle path for one match (admin re-settle reuses
+    the exact worker logic — 09-phase-6 · "force re-settle re-runs the worker path")."""
+    return await _resolve_match(session, match, now)
+
+
 async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> str:
     """Grade + settle (or extend/expire) one claimed ACTIVE/AWAITING_RESULT match."""
     seats = await match_lifecycle.players(session, match.id)

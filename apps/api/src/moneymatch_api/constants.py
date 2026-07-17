@@ -33,6 +33,12 @@ FLAG_QUEUE_PAUSED = "queue_paused"
 FLAG_SETTLEMENT_PAUSED = "settlement_paused"
 FLAG_GEO_CONFIG = "geo_config"
 
+# The settlement worker writes its liveness here each cycle (payload `{"ts": iso}`);
+# /health and the admin reconciliation view redden when it goes stale (09-phase-6 ·
+# deliverable 4 · worker heartbeat).
+FLAG_WORKER_HEARTBEAT = "worker_heartbeat"
+WORKER_HEARTBEAT_STALE_SECONDS = 120
+
 
 # Per-game enable flags (game:<id>).
 def game_flag_key(game_id: str) -> str:

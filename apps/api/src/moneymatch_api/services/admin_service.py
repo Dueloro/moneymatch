@@ -139,9 +139,7 @@ async def force_unbind(
     return link
 
 
-async def user_contests(
-    session: AsyncSession, user_id: uuid.UUID
-) -> list[ContestRow]:
+async def user_contests(session: AsyncSession, user_id: uuid.UUID) -> list[ContestRow]:
     """A user's contests across matches / pools / tournaments, newest first."""
     rows: list[ContestRow] = []
 
@@ -228,7 +226,8 @@ async def adjust(
         )
     if not reason.strip():
         raise AdminActionError(
-            "reason_required", "A reason is required for a ledger adjustment.",
+            "reason_required",
+            "A reason is required for a ledger adjustment.",
             status_code=422,
         )
     memo = f"admin adjustment: {reason.strip()}"

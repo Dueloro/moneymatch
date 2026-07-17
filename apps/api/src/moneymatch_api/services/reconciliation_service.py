@@ -86,6 +86,32 @@ async def check(session: AsyncSession, ref_type: str, ref_id: uuid.UUID) -> Reco
     return ReconResult(ok=not violations, violations=violations, totals=totals)
 
 
+async def check_contests(
+    session: AsyncSession,
+) -> list[tuple[str, uuid.UUID, ReconResult]]:
+    """Per-contest conservation across every match/pool/tournament.
+
+    Returns only the **violating** refs (with their totals) — the admin view
+    renders each red with its ledger trail (09-phase-6 · deliverable 2). At MVP
+    volume iterating every ref is cheap; a windowed sweep is a later optimization.
+    """
+    from ..models.play import Match
+    from ..models.pools import SoloPool
+    from ..models.tournaments import Tournament
+
+    out: list[tuple[str, uuid.UUID, ReconResult]] = []
+    for ref_type, model in (
+        ("match", Match),
+        ("solo_pool", SoloPool),
+        ("tournament", Tournament),
+    ):
+        for ref_id in await session.scalars(select(model.id)):
+            result = await check(session, ref_type, ref_id)
+            if not result.ok:
+                out.append((ref_type, ref_id, result))
+    return out
+
+
 async def check_all(session: AsyncSession) -> ReconResult:
     """Assert global solvency + per-wallet cache integrity across all wallets."""
     user_total = await _sum(session, Wallet.available_cents + Wallet.escrow_cents)
