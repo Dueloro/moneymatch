@@ -1,0 +1,32 @@
+# Pre-commit hooks. Install with `pre-commit install` (see CONTRIBUTING.md).
+# Mirrors the CI gates in .github/workflows/ci.yml so failures surface locally.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^poc-reference/
+      - id: end-of-file-fixer
+        exclude: ^poc-reference/
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        files: ^apps/api/
+      - id: ruff-format
+        files: ^apps/api/
+
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier
+        entry: pnpm exec prettier --write
+        language: system
+        files: \.(ts|tsx|js|jsx|css|json|md|yaml|yml)$
+        exclude: ^(poc-reference/|packages/api-client/src/generated/|pnpm-lock\.yaml)
