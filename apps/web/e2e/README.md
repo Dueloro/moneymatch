@@ -4,6 +4,12 @@
 queue → match → confirm → play → auto-settlement, and the money lands exactly
 (winner **+$18.00**, loser **−$10.00**, **$2.00** rake).
 
+`pools.spec.ts` drives the Phase-4 exit criterion: four similar-stat users pick
+Medium, enqueue, form a room whose `room_bar` is the rounded mean of their bars,
+clear a (fixture) match, and split the pool from server-fetched telemetry — zero
+client input after enqueue. It reads `E2E_POOL_USERS` (a JSON array of seeded,
+CS2-linked sessions) and **skips** if unset.
+
 This suite is **not** in the unit-test CI job — it needs the whole stack and real
 browsers. Run it with `make e2e`.
 
