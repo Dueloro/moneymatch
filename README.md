@@ -60,6 +60,34 @@ browser never touches the database.
 **Port note:** if `5432` is already taken, set `DB_PORT` in `.env` and update the
 port in `DATABASE_URL` to match.
 
+## Admin & operations
+
+The operator surface lives at **`/admin`** (a dense, plain route tree — not the
+consumer design system): search users and inspect any money trail, freeze users,
+make audited ledger adjustments, re-settle or void a stuck match, flip kill
+switches (`queue_paused`, `settlement_paused`, per-game enable, `geo_config`)
+without a deploy, run reconciliation on demand, and work the risk / sandbagging
+flag queue. Every admin mutation writes an `admin_audit` row.
+
+| Task                        | Command                                                            |
+| --------------------------- | ------------------------------------------------------------------ |
+| Grant admin (audited)       | `cd apps/api && uv run python ../../scripts/grant_admin.py <user>` |
+| Seed a demoable environment | `cd apps/api && uv run python ../../scripts/seed_demo.py`          |
+
+`GET /api/v1/health` reports the settlement worker's heartbeat (`worker.stale`
+reddens if the worker hasn't cycled in > 2 min); the same signal shows on the
+admin **Reconciliation** tab.
+
+**Analytics (PostHog).** With `POSTHOG_API_KEY` (server) and `VITE_POSTHOG_KEY`
+(web) set, money/liquidity events (`entry_queued`, `match_found`,
+`contest_settled`, `rake_collected`, `refund_issued`) are captured server-side
+and the activation funnel (`landing → signup → account_linked →
+first_contest_joined → first_settlement`) client-side. Build two dashboards in
+PostHog and link them here:
+
+- **Activation funnel:** _add your PostHog funnel URL_
+- **Liquidity (queue depth · matches · rake):** _add your PostHog dashboard URL_
+
 ## Repo layout
 
 ```
@@ -72,9 +100,11 @@ poc-reference/      Frozen PoC — reference only, never imported
 
 ## Status
 
-Phase 0 (foundation) complete: monorepo, CI, local Postgres, Supabase auth with
-server-side user provisioning, the app shell, and the sign-in/onboarding flow.
-Next: Phase 1 — wallet & ledger.
+Phases 0–6 complete: foundation, wallet & ledger, identity & game linking,
+head-to-head flow with the settlement worker, pools & tournaments, social &
+retention, and the admin surface + instrumentation (kill switches, PostHog
+events, reconciliation, worker heartbeat). Next: Phase 7 — hardening &
+internal beta.
 
 ## Invariants (memorize these)
 

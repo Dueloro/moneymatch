@@ -145,3 +145,43 @@ Discovered during Phase 5 (social & retention):
 - **Email/push for the social fan-out** — `notifications.channel_sent` is ready;
   friend requests, challenges, and settlements are the first events worth an
   out-of-band nudge (return-trigger layer). Pairs with the backlog email/push item.
+
+Discovered during Phase 6 (admin & instrumentation):
+
+- **Soft-unbind with contest history** — `admin_service.force_unbind` hard-deletes
+  a `linked_accounts` row and returns a clean 409 when a `match_players` /
+  `queue_tickets` FK (RESTRICT) references it, so an account that has *played*
+  can't be rebound. A real rebind needs a soft-unbind (nullable/append-only
+  binding table or a `status='unbound'` + freed unique slot) that preserves
+  history. Lands naturally with OAuth binding. Rationale: MVP covers the common
+  case (wrongly-linked fresh account); history rebind is rare and destructive.
+- **Admin pool/tournament re-settle & void** — the money-fix actions
+  (`resettle` / `void`) are wired for **matches** (the H2H exit-criterion path).
+  Pools/tournaments settle on window end via the worker; a stuck one currently
+  needs a manual adjustment. Add engine-level admin re-settle/void for
+  `solo_pool` / `tournament` refs. Rationale: matches are the representative,
+  tested path; the contest detail (money trail + reconciliation) already covers
+  all three types.
+- **Disputes model for the risk view** — the risk dashboard reports
+  `dispute_count = 0` because there is no dispute entity yet. Add a `disputes`
+  table (ref + reason + state) and a user-facing "flag this result" path, then
+  surface counts + a queue in `/admin/risk`. Rationale: needed before real money;
+  self-report is deliberately absent, so disputes must be operator-mediated.
+- **Derived risk detectors (streaks / pair-cap)** — the flag queue surfaces the
+  persisted sandbagging `risk_flags`; "abnormal win streaks" and "pair-cap
+  breaches" are named in the phase doc but not yet computed as flags. Add
+  detectors (nightly, alongside the metric refresh) that write `risk_flags` rows
+  of new kinds. Rationale: the risk *rates* view already exposes drift; the
+  streak/pair signals are additive and want their own detector + migration.
+- **Reconciliation sweep is O(all contests)** — `check_contests` iterates every
+  match/pool/tournament each call. Fine at MVP volume; add a windowed / incremental
+  sweep (or a materialized per-ref check) before the book is large. Rationale:
+  on-demand admin use today, but the nightly job will want bounded work.
+- **PostHog funnel/liquidity dashboards are manual** — the events are emitted and
+  the README has link placeholders; the dashboards themselves are built in the
+  PostHog UI during the beta (they can't be provisioned from the repo). Rationale:
+  exit-criterion "PostHog shows a complete funnel" is verified live in Phase 7.
+- **Admin nav entry-point** — the `/admin` tree is reachable by URL and guarded by
+  role, but there's no in-app link from the consumer shell for admins. Add a small
+  role-gated "Admin" affordance in `AppShell`. Rationale: operators can bookmark
+  `/admin` meanwhile; keeping the consumer shell clean was the Phase-6 priority.

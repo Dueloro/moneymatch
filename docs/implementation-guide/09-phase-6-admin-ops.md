@@ -69,8 +69,34 @@ switch without a deploy.
 
 ## Exit criteria
 
-- [ ] An operator can find any user/contest, see its complete money trail, and
+- [x] An operator can find any user/contest, see its complete money trail, and
       fix a stuck or wrong settlement — all in the UI, all audited.
-- [ ] `settlement_paused` + `queue_paused` verifiably stop the machinery.
-- [ ] PostHog shows a complete funnel for a fresh demo user session.
-- [ ] `scripts/seed_demo.py` produces a demoable environment in one command.
+      _Evidence: `/admin/users` (search → detail: wallet, ledger, linked, limits,
+      contests) + `/admin/contests` detail (participants, user + platform ledger,
+      adapter evidence, live reconciliation). Fixes: `resettle` (idempotent) and
+      `void` (exact refund). Tests: `test_admin_users.py`, `test_admin_contests.py`
+      (`test_resettle_is_idempotent`, `test_void_refunds_exactly_and_reconciles`),
+      audit rows asserted throughout; `test_admin_authz.py` gates every route._
+- [x] `settlement_paused` + `queue_paused` verifiably stop the machinery.
+      _Evidence: `PUT /admin/flags/{key}` flips are read per-request/cycle
+      (`test_admin_flags.py::test_toggle_takes_effect_without_restart`); the worker
+      honors both (`test_settlement_worker.py::test_settlement_paused_halts_the_loop`,
+      `::test_queue_paused_drains_waiting_tickets`)._
+- [~] PostHog shows a complete funnel for a fresh demo user session.
+      _Instrumented end-to-end: server capture seam emits `entry_queued`,
+      `match_found`, `contest_settled`, `rake_collected`, `refund_issued`
+      (`test_analytics.py`); the client sink + `identify` carry the activation
+      funnel names (`landing → signup → account_linked → first_contest_joined →
+      first_settlement`). The PostHog dashboards themselves are built in the
+      PostHog UI and verified live during the Phase-7 beta (README has the links;
+      backlog note)._
+- [x] `scripts/seed_demo.py` produces a demoable environment in one command.
+      _Evidence: `make seed` / `uv run python scripts/seed_demo.py` — admin +
+      N players (wallets, linked CS2 fixtures, non-provisional metrics), open
+      tickets, an escrowed pool, a tournament; idempotent + solvency-clean on
+      re-run (verified: `check_all` ok, 0 contest breaches)._
+
+Also delivered: ops hygiene — request-log middleware with user id + request id,
+slow-host-API warnings, Sentry release tagging, worker heartbeat
+(`feature_flags.worker_heartbeat`) surfaced on `/health` and the admin
+Reconciliation tab (reddens > 2 min stale; `test_worker_heartbeat.py`).
