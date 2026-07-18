@@ -60,6 +60,21 @@ class Settings(BaseSettings):
     # Warn when a host-API call exceeds this (ops signal — 09-phase-6 · d.4).
     slow_host_ms: int = Field(default=2_000)
 
+    # Payments/KYC readiness (10-phase-7 §1). These are the *only* switches for
+    # real rails, and they are guarded in code: turning either on with no live
+    # provider compiled in raises at the resolver, so a config flip alone can
+    # never move real money or gate on real KYC. Real integration wires a live
+    # provider AND flips the flag — never the flag alone.
+    payments_live: bool = Field(default=False)
+    kyc_live: bool = Field(default=False)
+
+    # Per-request body size cap in bytes (hardening — 10-phase-7 §2 · input caps).
+    max_request_bytes: int = Field(default=64 * 1024)
+
+    # Fixed-window rate limit for write / auth-sensitive endpoints
+    # (10-phase-7 §2). Requests per minute, per (user-or-ip, method+path).
+    rate_limit_writes_per_minute: int = Field(default=60)
+
     @field_validator("database_url")
     @classmethod
     def _require_async_driver(cls, v: str) -> str:

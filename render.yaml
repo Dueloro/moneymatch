@@ -1,0 +1,57 @@
+# Render blueprint (10-phase-7 §4). Declares the two long-running services + a
+# managed Postgres. The web app deploys on Vercel (apps/web/vercel.json).
+#
+# Migrations run as a release step, never at import time: `preDeployCommand`
+# runs `alembic upgrade head` once per deploy before the new instances take
+# traffic. Roll back by redeploying the previous image from the Render dashboard
+# (see docs/runbook.md).
+#
+# Set the sync:false secrets in the dashboard (or an env group named
+# `moneymatch-shared`): DATABASE_URL is wired from the managed DB below;
+# SUPABASE_*, FACEIT_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are per-environment.
+
+databases:
+  - name: moneymatch-postgres
+    plan: standard # PITR-capable plan; Neon is the alternative per the stack doc
+    postgresMajorVersion: '16'
+
+services:
+  - type: web
+    name: moneymatch-api
+    runtime: docker
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    plan: starter
+    preDeployCommand: uv run alembic upgrade head
+    envVars:
+      - key: ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: moneymatch-postgres
+          property: connectionString
+      - key: RELEASE
+        fromService:
+          type: web
+          name: moneymatch-api
+          property: id # replaced with the git SHA in the deploy pipeline
+      - fromGroup: moneymatch-shared
+
+  - type: worker
+    name: moneymatch-worker
+    runtime: docker
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    plan: starter
+    # Same image, worker entrypoint. Migrations are owned by the api service's
+    # preDeploy, so the worker never runs them.
+    dockerCommand: python -m moneymatch_api.workers.settlement_worker
+    envVars:
+      - key: ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: moneymatch-postgres
+          property: connectionString
+      - fromGroup: moneymatch-shared

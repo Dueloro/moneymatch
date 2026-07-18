@@ -33,6 +33,11 @@ from .routers import (
     tournaments,
     wallet,
 )
+from .security import (
+    MaxBodySizeMiddleware,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -71,7 +76,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Middleware wrap inner→outer in add order (last added = outermost). The
+    # target chain, outer→inner, is: CORS → security headers → rate limit →
+    # body-size cap → request log → app, so every response (including an early
+    # 413/429) still carries CORS + security headers (10-phase-7 §2).
     app.add_middleware(RequestLogMiddleware)
+    app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_bytes)
+    app.add_middleware(
+        RateLimitMiddleware, per_minute=settings.rate_limit_writes_per_minute
+    )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

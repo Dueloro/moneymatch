@@ -35,6 +35,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ..caps import CAPS
 from ..db.base import Base, TimestampMixin, uuid_pk
 
 # Currencies. Only DEMO exists at MVP; CASH/GEMS reserve the column shape.
@@ -59,10 +60,11 @@ REF_TYPES = ("match", "solo_pool", "tournament", "admin", "demo_rail")
 # Chart of accounts for the wallet-less platform ledger.
 PLATFORM_ACCOUNTS = ("platform:rake", "platform:promo")
 
-# Default per-user staking limits (01-architecture §2 · limits).
-DEFAULT_DAILY_LOSS_CAP_CENTS = 20_000  # $200.00
-DEFAULT_DAILY_ENTRY_CAP_CENTS = 50_000  # $500.00
-DEFAULT_MAX_CONCURRENT_CONTESTS = 3
+# Default per-user staking limits. Sourced from the single Phase-1 caps table
+# (caps.py) so the `limits` server-defaults and that table can never drift.
+DEFAULT_DAILY_LOSS_CAP_CENTS = CAPS.daily_loss_cap_cents  # $200.00
+DEFAULT_DAILY_ENTRY_CAP_CENTS = CAPS.daily_entry_cap_cents  # $500.00
+DEFAULT_MAX_CONCURRENT_CONTESTS = CAPS.max_concurrent_contests
 
 # Demo signup credit, booked as a real ledger row funded from platform:promo —
 # not a magic starting balance (04-phase-1 · deliverable 3).

@@ -15,14 +15,17 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..caps import CAPS
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
+from ..kyc import KycAction, enforce_kyc
 from ..models.wallet import (
     DEMO_DEPOSIT_PRESETS_CENTS,
     DEMO_WITHDRAWAL_DAILY_LIMIT,
     LedgerEntry,
 )
+from ..payments import get_payment_provider
 from ..schemas.wallet import (
     DemoDepositRequest,
     DemoWithdrawalRequest,
@@ -116,12 +119,13 @@ async def demo_deposit(
             status_code=422,
             detail={"allowed": list(DEMO_DEPOSIT_PRESETS_CENTS)},
         )
-    await wallet_service.demo_deposit(
+    # KYC boundary (inert at MVP; the call site exists + is tested).
+    enforce_kyc(user, KycAction.DEPOSIT, amount_cents=body.amount_preset_cents)
+    await get_payment_provider().create_deposit_intent(
         session,
         user.id,
         body.amount_preset_cents,
         memo="Add funds",
-        created_by=str(user.id),
     )
     return await get_wallet(user, session)
 
@@ -132,6 +136,15 @@ async def demo_withdrawal(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> WalletResponse:
+    if body.amount_cents < CAPS.withdrawal_min_cents:
+        raise APIError(
+            "withdrawal_below_min",
+            f"Minimum withdrawal is {CAPS.withdrawal_min_cents} cents.",
+            status_code=422,
+            detail={"withdrawal_min_cents": CAPS.withdrawal_min_cents},
+        )
+    # KYC boundary (inert at MVP; the call site exists + is tested).
+    enforce_kyc(user, KycAction.WITHDRAWAL, amount_cents=body.amount_cents)
     wallet = await wallet_service.get_wallet(session, user.id)
     since = datetime.now(UTC) - timedelta(hours=24)
     if (
@@ -143,11 +156,10 @@ async def demo_withdrawal(
             f"At most {DEMO_WITHDRAWAL_DAILY_LIMIT} withdrawals per day.",
             status_code=429,
         )
-    await wallet_service.demo_withdrawal(
+    await get_payment_provider().payout(
         session,
         user.id,
         body.amount_cents,
         memo="Withdrawal",
-        created_by=str(user.id),
     )
     return await get_wallet(user, session)

@@ -28,6 +28,10 @@ os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
 os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
 os.environ["SUPABASE_JWT_AUDIENCE"] = "authenticated"
 os.environ["ENV"] = "local"
+# The shared ASGI client fires many writes from one host across a session; keep
+# the global limiter out of its way. The limiter itself is proven in
+# test_security_middleware.py against a purpose-built low-limit app.
+os.environ["RATE_LIMIT_WRITES_PER_MINUTE"] = "100000"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402

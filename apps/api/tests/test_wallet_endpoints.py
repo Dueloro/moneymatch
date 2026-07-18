@@ -57,14 +57,24 @@ async def test_demo_withdrawal_velocity_capped(client):
     h = auth_headers("w5")
     for _ in range(5):
         r = await client.post(
-            "/api/v1/wallet/demo-withdrawal", headers=h, json={"amount_cents": 1_00}
+            "/api/v1/wallet/demo-withdrawal", headers=h, json={"amount_cents": 2_000}
         )
         assert r.status_code == 200
     sixth = await client.post(
-        "/api/v1/wallet/demo-withdrawal", headers=h, json={"amount_cents": 1_00}
+        "/api/v1/wallet/demo-withdrawal", headers=h, json={"amount_cents": 2_000}
     )
     assert sixth.status_code == 429
     assert sixth.json()["code"] == "withdrawal_velocity_exceeded"
+
+
+async def test_demo_withdrawal_below_minimum_refused(client):
+    r = await client.post(
+        "/api/v1/wallet/demo-withdrawal",
+        headers=auth_headers("w6"),
+        json={"amount_cents": 500},  # $5 — under the $20 Phase-1 minimum
+    )
+    assert r.status_code == 422
+    assert r.json()["code"] == "withdrawal_below_min"
 
 
 async def test_ledger_pagination_walks_all_rows(client):
