@@ -56,6 +56,10 @@ jobs:
           uv run alembic check
       - name: Pytest
         run: uv run pytest
+      # Dependency audit (10-phase-7 §2). Gates on the shipped runtime deps; a
+      # new upstream CVE reddens CI so it's triaged, not silently carried.
+      - name: pip-audit
+        run: uv run pip-audit --skip-editable
 
   web:
     name: web (eslint · prettier · tsc · vitest · build)
@@ -74,6 +78,11 @@ jobs:
           cache: pnpm
       - name: Install deps
         run: pnpm install --frozen-lockfile
+      # Dependency audit (10-phase-7 §2). Scoped to production deps: dev-only
+      # build tooling (vite dev server) is not in the shipped bundle. Tightening
+      # to a full audit is tracked in BACKLOG.
+      - name: pnpm audit (prod)
+        run: pnpm audit --prod
       - name: Generate API client
         run: pnpm --filter @moneymatch/api-client gen
       - name: Prettier check
