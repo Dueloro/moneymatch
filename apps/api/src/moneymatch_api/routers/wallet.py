@@ -23,6 +23,7 @@ from ..models.wallet import (
     DEMO_WITHDRAWAL_DAILY_LIMIT,
     LedgerEntry,
 )
+from ..payments import get_payment_provider
 from ..schemas.wallet import (
     DemoDepositRequest,
     DemoWithdrawalRequest,
@@ -116,12 +117,11 @@ async def demo_deposit(
             status_code=422,
             detail={"allowed": list(DEMO_DEPOSIT_PRESETS_CENTS)},
         )
-    await wallet_service.demo_deposit(
+    await get_payment_provider().create_deposit_intent(
         session,
         user.id,
         body.amount_preset_cents,
         memo="Add funds",
-        created_by=str(user.id),
     )
     return await get_wallet(user, session)
 
@@ -143,11 +143,10 @@ async def demo_withdrawal(
             f"At most {DEMO_WITHDRAWAL_DAILY_LIMIT} withdrawals per day.",
             status_code=429,
         )
-    await wallet_service.demo_withdrawal(
+    await get_payment_provider().payout(
         session,
         user.id,
         body.amount_cents,
         memo="Withdrawal",
-        created_by=str(user.id),
     )
     return await get_wallet(user, session)
