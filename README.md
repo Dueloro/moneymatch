@@ -15,6 +15,7 @@ Just skill.
 Money Match is designed to support competitive multiplayer games with verifiable results.
 
 Current integrations include:
+
 - Chess (Lichess)
 - Counter-Strike 2 (FACEIT)
 - Dota 2 (OpenDota)
@@ -22,6 +23,7 @@ Current integrations include:
 Additional games are planned as the platform grows.
 
 ## How It Works
+
 1. Create an account.
 2. Connect your gaming accounts.
 3. Challenge another player or join matchmaking.
@@ -39,29 +41,34 @@ Everything is verified automatically. No screenshots, disputes, or manual report
 Unlike sportsbooks or casino-style games, Money Match never plays against its users.
 
 Every contest is:
+
 - Player vs. Player
 - Equal stakes
 - Winner takes the pot
 - Auto-verified outcomes
 
 #### Secure Wallet & Escrow
+
 Player funds remain locked until the contest concludes.
 
 Every transaction is tracked through an immutable ledger designed to ensure:
+
 - Accurate balances
 - Transparent settlements
 - Reliable payouts
 
 #### Fair by Design
+
 Money Match follows several core principles:
+
 - Results come directly from official game APIs
 - The platform never determines winners
 - Every contest conserves value:
   - Entries = Prize Pool + Platform Fee
 - All monetary values are stored in integer cents to eliminate rounding errors
 
-
 ## Built By Dueloro
+
 Money Match is developed by Dueloro, a startup building infrastructure for the future of competitive skill gaming.
 
 We believe the internet already has millions of highly competitive players—it simply lacks a trusted platform that allows them to compete for real stakes in a fair, transparent, and scalable way.
