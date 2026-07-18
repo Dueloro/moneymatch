@@ -185,3 +185,40 @@ Discovered during Phase 6 (admin & instrumentation):
   role, but there's no in-app link from the consumer shell for admins. Add a small
   role-gated "Admin" affordance in `AppShell`. Rationale: operators can bookmark
   `/admin` meanwhile; keeping the consumer shell clean was the Phase-6 priority.
+
+Discovered during Phase 7 (hardening & internal beta):
+
+- **Real PaymentProvider / KycProvider integration** — the `payments/` and
+  `kyc/` seams + demo implementations exist and the `payments_live` / `kyc_live`
+  flags are code-guarded (a flip alone is inert). The additive work is a live
+  provider (Aeropay/Nuvei/Stripe restricted; a KYC vendor), its webhook →
+  ledger-effect wiring, and the `POST` deposit/withdrawal async (pending-until-
+  webhook) flow. Gated on counsel + underwriting (legal-compliance §4–5).
+- **Multi-instance rate limiter** — `RateLimitMiddleware` is an in-process
+  fixed-window store, correct for the single-instance MVP. Horizontal scaling
+  needs a shared store (Redis) or an edge/WAF limiter so the budget is global.
+  Rationale: the limit is per-process today; fine at beta scale, wrong at N>1.
+- **Tighten the web CSP** — `apps/web/vercel.json` ships `connect-src 'self'
+  https:` and `style-src 'unsafe-inline'` to stay functional without knowing the
+  API/Supabase/PostHog/Sentry origins at build time. Pin `connect-src` to the
+  explicit origins and drop `unsafe-inline` (hash/nonce the few injected styles).
+  Rationale: functional-but-broad now; exact origins are a deploy-time follow-up.
+- **Dev-only dependency advisories** — CI audits production deps (clean). The
+  vite dev-server advisories (`GHSA-fx2h-pf6j-xcff` et al.) affect the local dev
+  server, not the shipped static bundle, so they are scoped out of the gate. Bump
+  vite (major) to clear them once the build is validated on the new major.
+- **e2e suite can't run headless yet** — the Playwright specs
+  (`apps/web/e2e/*.spec.ts`) and the k6 load script both need real Supabase
+  sessions per user; the dev/e2e sign-in bypass (already backlogged as "Browser
+  e2e test-auth seam") is the single blocker. Until it lands, the money paths are
+  proven executably by the API + chaos suites and the e2e run is manual against
+  staging. This is why the "e2e green nightly" exit box is not yet checkable in CI.
+- **Deploy execution + internal beta week + non-author sign-off** — the code-side
+  Phase-7 deliverables (seams, hardening, chaos tests, CI audits, runbook, deploy
+  blueprint) are complete and evidenced. The remaining exit criteria are human/
+  infra steps that cannot be self-completed by the implementer: actually stand up
+  staging + production, run the ≥1-week beta with the seed cohort, capture the
+  weekly PostHog metrics snapshot, do the rollback drill once, and have a
+  non-author validate the runbook + sign off the acceptance checklist
+  (`12-mvp-acceptance.md`). Rationale: acceptance is explicitly checked by someone
+  who is not the implementer, on the live staging deploy.
