@@ -18,6 +18,10 @@ from ..db.base import Base, TimestampMixin, uuid_pk
 
 USER_ROLES = ("user", "admin")
 USER_STATUSES = ("active", "frozen", "self_excluded")
+# KYC verification lifecycle (10-phase-7 §1). `none` at MVP for everyone: the
+# `kyc_required` policy hook returns False, so nothing advances this. The column
+# + protocol exist so real KYC is an additive integration.
+KYC_STATUSES = ("none", "pending", "verified", "failed")
 
 # SQL backfill/backstop for `friend_code` (mirrors migration 0006); Python owns
 # new rows via the `default` below. Postgres normalizes this function expression
@@ -48,6 +52,10 @@ class User(Base, TimestampMixin):
             "status IN ('active', 'frozen', 'self_excluded')",
             name="ck_users_status",
         ),
+        CheckConstraint(
+            "kyc_status IN ('none', 'pending', 'verified', 'failed')",
+            name="ck_users_kyc_status",
+        ),
     )
 
     id = uuid_pk()
@@ -76,6 +84,11 @@ class User(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(
         String(16), default="active", server_default="active", nullable=False
+    )
+    # KYC readiness seam (10-phase-7 §1). `none` for everyone at MVP; a real
+    # KycProvider advances it once integration lands.
+    kyc_status: Mapped[str] = mapped_column(
+        String(16), default="none", server_default="none", nullable=False
     )
     member_since: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

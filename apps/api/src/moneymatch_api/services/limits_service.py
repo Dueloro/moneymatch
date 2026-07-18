@@ -20,7 +20,9 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..caps import CAPS
 from ..errors import APIError
+from ..kyc import KycAction, enforce_kyc
 from ..models.user import User
 from ..models.wallet import LedgerEntry, Limit, Wallet
 
@@ -179,6 +181,21 @@ async def assert_can_stake(
     if amount_cents <= 0:
         raise StakeBlockedError("invalid_amount", "Stake must be positive.")
 
+    # Per-contest entry band (caps.py). Server presets always sit inside it; this
+    # is the boundary guarantee that survives a preset-table change.
+    if amount_cents < CAPS.min_entry_cents:
+        raise StakeBlockedError(
+            "entry_below_min",
+            "Stake is below the minimum entry.",
+            {"min_entry_cents": CAPS.min_entry_cents, "requested_cents": amount_cents},
+        )
+    if amount_cents > CAPS.max_entry_cents:
+        raise StakeBlockedError(
+            "entry_above_max",
+            "Stake is above the maximum entry.",
+            {"max_entry_cents": CAPS.max_entry_cents, "requested_cents": amount_cents},
+        )
+
     if user.status != "active":
         raise StakeBlockedError(
             "account_not_active",
@@ -206,6 +223,15 @@ async def assert_can_stake(
     limit = await get_or_create_limits(session, user.id)
     promote_pending(limit, now=now)
     usage = await daily_usage(session, wallet, now=now)
+
+    # KYC threshold site (inert at MVP): a stake crossing the cumulative-entry
+    # threshold requires verification once kyc_live + a provider are wired.
+    enforce_kyc(
+        user,
+        KycAction.STAKE,
+        amount_cents=amount_cents,
+        cumulative_entries_cents=usage.entry_cents,
+    )
 
     if usage.entry_cents + amount_cents > limit.daily_entry_cap_cents:
         raise StakeBlockedError(
