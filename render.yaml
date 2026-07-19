@@ -1,10 +1,13 @@
 # Render blueprint (10-phase-7 §4). Declares the two long-running services + a
 # managed Postgres. The web app deploys on Vercel (apps/web/vercel.json).
 #
-# Migrations run as a release step, never at import time: `preDeployCommand`
-# runs `alembic upgrade head` once per deploy before the new instances take
-# traffic. Roll back by redeploying the previous image from the Render dashboard
-# (see docs/runbook.md).
+# Migrations run at api startup, never at import time: the api's dockerCommand
+# runs `alembic upgrade head` before uvicorn binds. (Render's preDeployCommand is
+# a paid feature; folding it into the start command keeps free-tier deploys
+# migrating. `alembic upgrade head` is idempotent and the free tier runs a single
+# instance, so there's no multi-instance migration race.) The worker never
+# migrates — it retries its first cycles until the api has applied the schema.
+# Roll back by redeploying the previous image from the dashboard (docs/runbook.md).
 #
 # Set the sync:false secrets in the dashboard (or an env group named
 # `moneymatch-shared`): DATABASE_URL is wired from the managed DB below;
@@ -24,9 +27,10 @@ services:
     healthCheckPath: /api/v1/health
     plan: starter
     # alembic is on PATH (installed system-wide in the image); uv run would
-    # spin up a separate venv and fail. $PORT is Render's dynamic port.
-    dockerCommand: uvicorn moneymatch_api.main:app --host 0.0.0.0 --port $PORT
-    preDeployCommand: alembic upgrade head
+    # spin up a separate venv and fail. $PORT is Render's dynamic port. Migrate
+    # then serve — if the migration fails the process exits and the deploy fails,
+    # so we never serve against a stale schema.
+    dockerCommand: alembic upgrade head && uvicorn moneymatch_api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENV
         value: prod
@@ -45,7 +49,8 @@ services:
     dockerContext: .
     plan: starter
     # Same image, worker entrypoint. Migrations are owned by the api service's
-    # preDeploy, so the worker never runs them.
+    # start command, so the worker never runs them (it retries until the schema
+    # exists — the run_forever loop swallows per-cycle errors).
     dockerCommand: python -m moneymatch_api.workers.settlement_worker
     envVars:
       - key: ENV
