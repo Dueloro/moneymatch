@@ -29,8 +29,9 @@ services:
     # alembic is on PATH (installed system-wide in the image); uv run would
     # spin up a separate venv and fail. $PORT is Render's dynamic port. Migrate
     # then serve — if the migration fails the process exits and the deploy fails,
-    # so we never serve against a stale schema.
-    dockerCommand: alembic upgrade head && uvicorn moneymatch_api.main:app --host 0.0.0.0 --port $PORT
+    # so we never serve against a stale schema. `sh -c` is required: Render execs
+    # the command directly, so `&&` needs a shell to chain (and expand $PORT).
+    dockerCommand: sh -c "alembic upgrade head && uvicorn moneymatch_api.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: ENV
         value: prod
