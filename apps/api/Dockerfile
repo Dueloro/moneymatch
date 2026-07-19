@@ -6,10 +6,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app/apps/api
 
-# Install dependencies first for layer caching.
+# Install deps + package. The editable install records module file locations at
+# build time (PEP 660), so `src/` must be present before it runs — otherwise the
+# redirector maps nothing and `import moneymatch_api` fails at runtime.
 COPY apps/api/pyproject.toml ./
+COPY apps/api/src ./src
 RUN uv pip install --system --no-cache-dir -e .
 
+# Remaining app files (alembic.ini, migrations, tests) — copied after install so
+# edits here don't bust the dependency layer.
 COPY apps/api/ ./
 
 ENV PYTHONUNBUFFERED=1
