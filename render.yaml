@@ -23,7 +23,10 @@ services:
     dockerContext: .
     healthCheckPath: /api/v1/health
     plan: starter
-    preDeployCommand: uv run alembic upgrade head
+    # alembic is on PATH (installed system-wide in the image); uv run would
+    # spin up a separate venv and fail. $PORT is Render's dynamic port.
+    dockerCommand: uvicorn moneymatch_api.main:app --host 0.0.0.0 --port $PORT
+    preDeployCommand: alembic upgrade head
     envVars:
       - key: ENV
         value: prod

@@ -37,7 +37,7 @@ Migrations run as a **release step**, never at import time.
 1. Merge to `main` (squash). CI must be green (ruff · mypy · pytest · eslint ·
    tsc · vitest · build · pip-audit · pnpm audit).
 2. Deploy triggers on Render. The `api` service's `preDeployCommand` runs
-   `uv run alembic upgrade head` **once** before new instances take traffic.
+   `alembic upgrade head` **once** before new instances take traffic.
    The worker never runs migrations.
 3. Vercel builds `apps/web` from the same commit.
 4. Set `RELEASE` to the git SHA so Sentry + PostHog tag events to the build.
