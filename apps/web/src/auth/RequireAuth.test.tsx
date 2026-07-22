@@ -39,6 +39,8 @@ describe('RequireAuth', () => {
       loading: false,
       signInWithGoogle: vi.fn(),
       signInWithEmail: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signUpWithPassword: vi.fn(),
       signOut: vi.fn(),
     });
     renderWithProviders(tree(), { route: '/play' });
@@ -52,6 +54,8 @@ describe('RequireAuth', () => {
       loading: false,
       signInWithGoogle: vi.fn(),
       signInWithEmail: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signUpWithPassword: vi.fn(),
       signOut: vi.fn(),
     });
     mockUseMe.mockReturnValue({

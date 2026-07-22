@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
@@ -55,116 +55,193 @@ function PostAuthRedirect() {
   return <Navigate to="/play" replace />;
 }
 
-function AuthStep() {
-  const { signInWithGoogle, signInWithEmail } = useAuth();
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// Shared demo account for the one-click "enter demo" bypass. Play-money beta —
+// see the sign-in note. Remove or gate this button before a real-money launch.
+const DEMO_EMAIL = 'demo@moneymatch.gg';
+const DEMO_PASSWORD = 'moneymatch-demo-2026';
 
-  if (sent) {
-    return <SentStep email={email} onUseDifferentEmail={() => setSent(false)} />;
+/** Map Supabase auth errors to friendly, actionable copy. */
+function friendlyAuthError(err: unknown, mode: 'signin' | 'signup'): string {
+  const msg = (err as { message?: string })?.message ?? '';
+  if (/invalid login credentials/i.test(msg))
+    return 'Wrong email or password. New here? Create an account below.';
+  if (/user already registered|already been registered/i.test(msg))
+    return 'That email already has an account. Try signing in instead.';
+  if (/email not confirmed/i.test(msg))
+    return 'Confirm your email first (check your inbox), then sign in.';
+  if (/password should be at least/i.test(msg))
+    return 'Use a password of at least 6 characters.';
+  return (
+    msg || (mode === 'signin' ? 'Could not sign in.' : 'Could not create account.')
+  );
+}
+
+function AuthStep() {
+  const { signInWithGoogle, signInWithPassword, signUpWithPassword } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
+
+  if (confirmEmail) {
+    return (
+      <ConfirmStep
+        email={confirmEmail}
+        onBack={() => {
+          setConfirmEmail(null);
+          setMode('signin');
+        }}
+      />
+    );
   }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      if (mode === 'signin') {
+        await signInWithPassword(email, password);
+      } else {
+        const { needsConfirmation } = await signUpWithPassword(email, password);
+        if (needsConfirmation) {
+          setConfirmEmail(email);
+          return;
+        }
+      }
+      // On success the session updates and SignInPage advances automatically.
+    } catch (err) {
+      setError(friendlyAuthError(err, mode));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function enterDemo() {
+    setError(null);
+    setBusy(true);
+    try {
+      try {
+        await signInWithPassword(DEMO_EMAIL, DEMO_PASSWORD);
+      } catch {
+        // First run: the demo account doesn't exist yet — create it, then in.
+        const { needsConfirmation } = await signUpWithPassword(
+          DEMO_EMAIL,
+          DEMO_PASSWORD,
+        );
+        if (needsConfirmation) {
+          toast.error(
+            'Demo needs email confirmation turned off in Supabase (Auth → Providers → Email).',
+          );
+          return;
+        }
+        await signInWithPassword(DEMO_EMAIL, DEMO_PASSWORD).catch(() => undefined);
+      }
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Could not enter the demo.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canSubmit = email.length > 0 && password.length >= 6 && !busy;
 
   return (
     <div>
-      <h1 className="text-center text-xl font-semibold">Sign in</h1>
+      <h1 className="text-center text-xl font-semibold">
+        {mode === 'signin' ? 'Sign in' : 'Create your account'}
+      </h1>
       <p className="mt-2 text-center text-sm text-text-secondary">
         Play skill-based matches for real payouts.
       </p>
 
-      <form
-        className="mt-8 flex flex-col gap-3"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setError(null);
-          try {
-            await signInWithEmail(email);
-            setSent(true);
-          } catch {
-            setError('Could not send the sign-in link. Try again.');
-          }
-        }}
-      >
+      <div className="mt-8 flex flex-col gap-3">
         <PillButton
           type="button"
           variant="outline"
           fullWidth
+          disabled={busy}
           onClick={() => void signInWithGoogle()}
         >
           Continue with Google
         </PillButton>
 
-        <input
-          type="email"
-          required
-          aria-label="Email address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@email.com"
-          className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
-        />
-        <PillButton type="submit" variant="primary" fullWidth disabled={!email}>
-          Continue with email
+        <div className="my-1 flex items-center gap-3 text-xs text-text-tertiary">
+          <span className="h-px flex-1 bg-hairline" />
+          or
+          <span className="h-px flex-1 bg-hairline" />
+        </div>
+
+        <form className="flex flex-col gap-3" onSubmit={submit}>
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            aria-label="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@email.com"
+            className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
+          />
+          <input
+            type="password"
+            required
+            minLength={6}
+            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+            aria-label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password (min 6 characters)"
+            className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
+          />
+          <PillButton type="submit" variant="primary" fullWidth disabled={!canSubmit}>
+            {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+          </PillButton>
+          {error && <p className="text-center text-sm text-red">{error}</p>}
+        </form>
+
+        <button
+          type="button"
+          className="text-center text-sm text-text-secondary hover:text-text"
+          onClick={() => {
+            setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
+            setError(null);
+          }}
+        >
+          {mode === 'signin'
+            ? 'New here? Create an account'
+            : 'Have an account? Sign in'}
+        </button>
+      </div>
+
+      <div className="mt-6 border-t border-hairline pt-4">
+        <PillButton
+          type="button"
+          variant="text"
+          fullWidth
+          disabled={busy}
+          onClick={() => void enterDemo()}
+        >
+          Skip sign-up · enter the demo →
         </PillButton>
-        {error && <p className="text-center text-sm text-red">{error}</p>}
-      </form>
+      </div>
     </div>
   );
 }
 
-function SentStep({
-  email,
-  onUseDifferentEmail,
-}: {
-  email: string;
-  onUseDifferentEmail: () => void;
-}) {
-  const { signInWithEmail } = useAuth();
-  const [cooldown, setCooldown] = useState(30);
-  const [resending, setResending] = useState(false);
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [cooldown]);
-
-  async function resend() {
-    setResending(true);
-    try {
-      await signInWithEmail(email);
-      toast.success('Sign-in link sent again.');
-      setCooldown(30);
-    } catch {
-      toast.error('Could not resend the link. Try again.');
-    } finally {
-      setResending(false);
-    }
-  }
-
+function ConfirmStep({ email, onBack }: { email: string; onBack: () => void }) {
   return (
     <div className="text-center">
-      <h1 className="text-xl font-semibold">Check your email</h1>
+      <h1 className="text-xl font-semibold">Confirm your email</h1>
       <p className="mt-2 text-sm text-text-secondary">
-        We sent a sign-in link to <span className="text-text">{email}</span>. Click it
-        to finish signing in.
+        We sent a confirmation link to <span className="text-text">{email}</span>. Open
+        it, then come back and sign in.
       </p>
-
-      <div className="mt-8 flex flex-col gap-3">
-        <PillButton
-          variant="outline"
-          fullWidth
-          disabled={cooldown > 0 || resending}
-          onClick={() => void resend()}
-        >
-          {resending
-            ? 'Resending…'
-            : cooldown > 0
-              ? `Resend link in ${cooldown}s`
-              : 'Resend link'}
-        </PillButton>
-        <PillButton variant="text" fullWidth onClick={onUseDifferentEmail}>
-          Use a different email
+      <div className="mt-8">
+        <PillButton variant="text" fullWidth onClick={onBack}>
+          Back to sign in
         </PillButton>
       </div>
     </div>

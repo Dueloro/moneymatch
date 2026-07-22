@@ -20,6 +20,8 @@ describe('SignInPage', () => {
       loading: false,
       signInWithGoogle: vi.fn(),
       signInWithEmail: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signUpWithPassword: vi.fn(),
       signOut: vi.fn(),
     });
     mockUseMe.mockReturnValue({ data: undefined, isLoading: false } as ReturnType<
@@ -27,14 +29,15 @@ describe('SignInPage', () => {
     >);
   });
 
-  it('renders the auth step with Google and email options', () => {
+  it('renders the auth step with Google, email + password, and demo options', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
     expect(
       screen.getByRole('button', { name: /continue with google/i }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /continue with email/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Email address')).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /enter the demo/i })).toBeInTheDocument();
   });
 
   it('shows the 3-step progress bar', () => {
