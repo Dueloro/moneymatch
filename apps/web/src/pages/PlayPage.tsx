@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
 import { PlaySlip } from '../components/play/PlaySlip';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
-import { useLinks } from '../hooks/useLinks';
+import { gameMeta } from '../lib/games';
+import { useGameSelection } from '../hooks/useGameSelection';
 import {
   useJoinQueue,
   useMarkets,
@@ -39,16 +41,7 @@ function marketSubline(market: MarketRow): string {
 const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
 export function PlayPage() {
-  const { data: links } = useLinks();
-  const games = useMemo(() => links?.games ?? [], [links]);
-  const [game, setGame] = useState<string | undefined>(undefined);
-
-  // Default to the first linked game (else the first game) once links load.
-  useEffect(() => {
-    if (game || games.length === 0) return;
-    const firstLinked = games.find((g) => g.status === 'LINKED');
-    setGame((firstLinked ?? games[0]).game);
-  }, [games, game]);
+  const { games, selected: game, select: setGame } = useGameSelection();
 
   const {
     data: markets,
@@ -117,25 +110,7 @@ export function PlayPage() {
         <BalanceHeader />
       </div>
 
-      {/* Game tabs */}
-      <div className="mb-6 flex flex-wrap gap-2" role="tablist">
-        {games.map((g) => (
-          <button
-            key={g.game}
-            role="tab"
-            aria-selected={g.game === game}
-            onClick={() => setGame(g.game)}
-            className={[
-              'rounded-pill px-4 py-1.5 text-sm font-semibold transition',
-              g.game === game
-                ? 'bg-text text-black'
-                : 'border border-hairline text-text-secondary hover:text-text',
-            ].join(' ')}
-          >
-            {g.display_name}
-          </button>
-        ))}
-      </div>
+      <GameTabs games={games} selected={game} onSelect={setGame} />
 
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="min-w-0 flex-1">
@@ -148,7 +123,7 @@ export function PlayPage() {
             />
           ) : !linked ? (
             <EmptyState
-              title={`Link your ${selectGame?.display_name ?? 'game'} account`}
+              title={`Link your ${game ? gameMeta(game, selectGame?.display_name).name : 'game'} account`}
               subline="Link a game account to play head-to-head for real payouts."
               action={
                 <Link to="/profile">
@@ -159,7 +134,7 @@ export function PlayPage() {
           ) : (
             <>
               <h2 className="mb-3 label-mono">Markets</h2>
-              <div className="mb-8">
+              <div className="mb-8 -mx-3">
                 {markets?.markets.map((m) => {
                   const selected = m.key === marketKey;
                   return (
@@ -167,7 +142,7 @@ export function PlayPage() {
                       key={m.key}
                       onClick={() => selectMarket(m)}
                       className={[
-                        'block w-full rounded-lg text-left transition',
+                        'block w-full rounded-lg px-3 text-left transition',
                         selected ? 'glow-selected' : 'hover:bg-panel/50',
                       ].join(' ')}
                     >

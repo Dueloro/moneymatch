@@ -7,7 +7,7 @@ import { PillButton } from '../components/ui/PillButton';
 
 /**
  * Public marketing landing at `/`. Gives a cold visitor the context the signed-
- * in app can't (what Dueloro is, how it works, who can play) before asking for
+ * in app can't (what Money Match is, how it works, who can play) before asking for
  * auth. Signed-in users skip straight to Play. The external marketing site can
  * also link directly to `/signin` and bypass this page.
  */
@@ -290,10 +290,11 @@ function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-10 text-sm text-text-tertiary md:flex-row md:items-center md:justify-between md:px-8">
         <Logo />
         <p className="max-w-md">
-          Dueloro is a neutral operator of peer-to-peer skill contests. 18+. Cash play
-          is available in eligible U.S. states only; free play is available everywhere.
+          Money Match is a neutral operator of peer-to-peer skill contests. 18+. Cash
+          play is available in eligible U.S. states only; free play is available
+          everywhere.
         </p>
-        <p>&copy; {new Date().getFullYear()} Dueloro</p>
+        <p>&copy; {new Date().getFullYear()} Money Match</p>
       </div>
     </footer>
   );

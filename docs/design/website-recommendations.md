@@ -1,10 +1,22 @@
 # Marketing website recommendations (dueloro.vercel.app)
 
 **Context.** These are recommendations for the public marketing site at
-`dueloro.vercel.app`, written while aligning the beta app to the Dueloro brand.
-The app now shares the site's identity (acid-lime accent, triangle mark,
-near-black + glow, highlight-marker headlines, live VS card, mono micro-labels),
-so the two finally read as one product. The notes below are about the *site*.
+`dueloro.vercel.app`, written while giving the beta app the same visual language
+(acid-lime accent, triangle mark, near-black + glow, highlight-marker headlines,
+live VS card, mono micro-labels). The app now uses the **Money Match** wordmark
+while the marketing site is branded **Dueloro** — reconcile the two names before
+launch (see recommendation 0). The notes below are about the *site*.
+
+The site was reviewed by rendering it headless (it is a client-rendered SPA).
+Some observations are therefore about how it renders to a first paint / crawler,
+not just how it looks after full hydration + scroll.
+
+## 0. Reconcile the product name (do this first)
+
+The app's wordmark is now **Money Match**; the site is **Dueloro**. Whichever
+name wins, make the site, the app wordmark, the OG titles, and the domain agree —
+a visitor who clicks "Join the beta" should not feel handed to a different
+product. Everything else below assumes one consistent name.
 
 The site was reviewed by rendering it headless (it is a client-rendered SPA).
 Some observations are therefore about how it renders to a first paint / crawler,

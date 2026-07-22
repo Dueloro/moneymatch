@@ -31,6 +31,13 @@ const ICONS: Record<string, JSX.Element> = {
   '/activity': (
     <path d="M3 12h4l2 6 4-14 2 8h6" strokeLinejoin="round" strokeLinecap="round" />
   ),
+  '/social': (
+    <path
+      d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM3 19v-1a4 4 0 0 1 4-4h3a4 4 0 0 1 4 4v1m1-5h1a4 4 0 0 1 4 4v1"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+  ),
   '/wallet': (
     <path
       d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm14 4h-3a2 2 0 0 0 0 4h3"
@@ -41,6 +48,8 @@ const ICONS: Record<string, JSX.Element> = {
 };
 
 const MOBILE_LABEL: Record<string, string> = {
+  '/play': 'H2H',
+  '/pools': 'Pools',
   '/tournament': 'Tourneys',
 };
 
@@ -56,7 +65,7 @@ export function MobileTopBar() {
       <Logo />
       <div className="flex items-center gap-1">
         <NavLink
-          to="/inbox"
+          to="/social?tab=inbox"
           aria-label={unread > 0 ? `Inbox (${unread} unread)` : 'Inbox'}
           className="relative grid h-9 w-9 place-items-center rounded-lg text-text-secondary"
         >

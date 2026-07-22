@@ -9,6 +9,13 @@ vi.mock('../hooks/useWallet', () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
   }),
 }));
+vi.mock('../hooks/useGameSelection', () => ({
+  useGameSelection: () => ({
+    games: [{ game: 'cs2.faceit', display_name: 'Counter Strike 2', status: 'LINKED' }],
+    selected: 'cs2.faceit',
+    select: vi.fn(),
+  }),
+}));
 vi.mock('../hooks/useTournaments', () => ({
   useTournamentMarkets: vi.fn(),
   useTournamentStatus: vi.fn(),

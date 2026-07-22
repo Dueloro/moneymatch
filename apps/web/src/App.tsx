@@ -4,13 +4,13 @@ import { RequireAdmin } from './auth/RequireAdmin';
 import { RequireAuth } from './auth/RequireAuth';
 import { AppShell } from './components/AppShell';
 import { ActivityPage } from './pages/ActivityPage';
-import { InboxPage } from './pages/InboxPage';
 import { InvitePage } from './pages/InvitePage';
 import { LandingPage } from './pages/LandingPage';
 import { PlayPage } from './pages/PlayPage';
 import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SignInPage } from './pages/SignInPage';
+import { SocialPage } from './pages/SocialPage';
 import { TournamentPage } from './pages/TournamentPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminContestsPage } from './pages/admin/AdminContestsPage';
@@ -33,8 +33,9 @@ export function App() {
           <Route path="pools" element={<PoolsPage />} />
           <Route path="tournament" element={<TournamentPage />} />
           <Route path="activity" element={<ActivityPage />} />
+          <Route path="social" element={<SocialPage />} />
           <Route path="wallet" element={<WalletPage />} />
-          <Route path="inbox" element={<InboxPage />} />
+          <Route path="inbox" element={<Navigate to="/social?tab=inbox" replace />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
         {/* Admin tree: separate, dense layout (not the consumer design system). */}

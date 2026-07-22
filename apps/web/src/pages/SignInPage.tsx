@@ -293,7 +293,7 @@ function LinkGameStep() {
       </div>
       <div className="mt-8">
         <PillButton variant="primary" fullWidth onClick={() => navigate('/play')}>
-          Enter Dueloro
+          Enter Money Match
         </PillButton>
       </div>
     </div>
