@@ -75,8 +75,10 @@ function GameRow({ link }: { link: GameLink }) {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium text-text">{link.display_name}</div>
           <div className="truncate text-xs text-text-secondary">
-            {link.status === 'LINKED' && link.profile
-              ? `${link.host_username} · ${profileSummary(link.profile)}`
+            {link.status === 'LINKED'
+              ? link.profile
+                ? `${link.host_username} · ${profileSummary(link.profile)}`
+                : (link.host_username ?? 'Linked')
               : link.status === 'BLOCKED'
                 ? 'Unavailable right now'
                 : 'Not linked'}

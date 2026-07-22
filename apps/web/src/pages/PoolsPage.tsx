@@ -53,7 +53,7 @@ export function PoolsPage() {
         </div>
         <EmptyState
           title="Link your CS2 account"
-          subline="Pools are graded from your real FACEIT matches — link to play."
+          subline="Pools are graded from your real FACEIT matches. Link to play."
           action={
             <Link to="/profile">
               <PillButton>Link a game</PillButton>
@@ -71,7 +71,7 @@ export function PoolsPage() {
       </div>
 
       {/* Metric tabs */}
-      <div className="mb-6 flex gap-2" role="tablist">
+      <div className="mb-6 flex flex-wrap gap-2" role="tablist">
         {markets?.metrics.map((m) => (
           <button
             key={m.metric}
@@ -93,7 +93,7 @@ export function PoolsPage() {
         ))}
       </div>
 
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="min-w-0 flex-1">
           {metric?.provisional ? (
             <p className="py-6 text-sm text-text-secondary">
@@ -101,10 +101,8 @@ export function PoolsPage() {
             </p>
           ) : (
             <>
-              <h2 className="mb-2 text-sm font-semibold text-text-secondary">
-                Difficulty — bars from your baseline
-              </h2>
-              <div className="grid grid-cols-3 gap-3">
+              <h2 className="mb-3 label-mono">Difficulty · bars from your baseline</h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {metric?.cards.map((c) => {
                   const selected = c.difficulty === difficulty;
                   return (
@@ -114,7 +112,7 @@ export function PoolsPage() {
                       className={[
                         'rounded-2xl border p-4 text-left transition',
                         selected
-                          ? 'border-green'
+                          ? 'glow-selected'
                           : 'border-hairline hover:border-text-secondary',
                       ].join(' ')}
                     >
@@ -180,7 +178,7 @@ function PoolSlip({
 
   return (
     <aside
-      className="w-[354px] shrink-0 rounded-2xl bg-panel p-6"
+      className="w-full shrink-0 rounded-2xl bg-panel p-6 md:w-[354px]"
       data-testid="pool-slip"
     >
       {status?.status === 'searching' ? (
@@ -231,7 +229,7 @@ function PoolSlip({
             </p>
           )}
           <p className="mt-2 text-xs text-text-secondary">
-            Estimated — your actual payout is your share of the pool minus rake.
+            Estimated. Your actual payout is your share of the pool minus rake.
           </p>
 
           <div className="mt-5">
@@ -260,7 +258,7 @@ function PoolSlip({
 function RoomCard({ pool }: { pool: PoolView }) {
   return (
     <aside
-      className="w-[354px] shrink-0 rounded-2xl bg-panel p-6"
+      className="w-full shrink-0 rounded-2xl bg-panel p-6 md:w-[354px]"
       data-testid="room-card"
     >
       <p className="text-xs uppercase tracking-wide text-text-secondary">Room formed</p>

@@ -6,6 +6,8 @@ import { renderWithProviders } from '../test/testUtils';
 import { AppShell } from './AppShell';
 
 vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
+// The live ticker depends on auth + query context the shell test doesn't provide.
+vi.mock('./ui/Ticker', () => ({ Ticker: () => null }));
 
 import { useMe } from '../hooks/useMe';
 
@@ -25,9 +27,13 @@ describe('AppShell', () => {
       { route: '/play' },
     );
 
-    for (const label of ['Play', 'Pools', 'Tournament', 'Activity', 'Wallet']) {
-      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+    // Nav renders in two responsive bars (desktop sidebar + mobile tab bar), so
+    // a label can appear more than once; assert it is present at least once.
+    for (const label of ['Play', 'Pools', 'Activity', 'Wallet']) {
+      expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0);
     }
+    // The desktop sidebar uses the full "Tournament" label (mobile abbreviates).
+    expect(screen.getByRole('link', { name: 'Tournament' })).toBeInTheDocument();
     expect(screen.getByText('PLAY CONTENT')).toBeInTheDocument();
     expect(screen.getByTestId('footer-breadcrumb')).toHaveTextContent('PLAY');
     expect(screen.getByText('kvem_')).toBeInTheDocument();

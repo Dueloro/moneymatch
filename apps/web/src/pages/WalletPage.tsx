@@ -1,7 +1,9 @@
 import { AmountText } from '../components/ui/AmountText';
+import { ErrorState } from '../components/ui/ErrorState';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
+import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { StatBar } from '../components/ui/StatBar';
 import { formatCurrency, formatRelativeTime } from '../lib/format';
 import {
@@ -29,7 +31,7 @@ function ledgerLabel(entry: LedgerEntry): string {
 }
 
 export function WalletPage() {
-  const { data: wallet, isLoading } = useWallet();
+  const { data: wallet, isLoading, isError, refetch } = useWallet();
   const ledger = useWalletLedger();
   const deposit = useDemoDeposit();
   const withdraw = useDemoWithdrawal();
@@ -45,11 +47,19 @@ export function WalletPage() {
     <div className="max-w-2xl">
       <h1 className="mb-1 text-2xl font-bold">Wallet</h1>
       <p className="mb-6 text-sm text-text-secondary">
-        Play money — no real deposits yet.
+        Play money used until full launch.
       </p>
 
-      {isLoading ? (
-        <p className="text-sm text-text-secondary">Loading…</p>
+      {isError ? (
+        <ErrorState title="Could not load your wallet" onRetry={() => refetch()} />
+      ) : isLoading ? (
+        <div>
+          <Skeleton className="h-[74px] w-full rounded-card" />
+          <Skeleton className="mt-8 h-9 w-24" />
+          <div className="mt-8">
+            <SkeletonList rows={3} />
+          </div>
+        </div>
       ) : (
         <>
           <StatBar

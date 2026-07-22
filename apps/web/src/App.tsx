@@ -6,6 +6,7 @@ import { AppShell } from './components/AppShell';
 import { ActivityPage } from './pages/ActivityPage';
 import { InboxPage } from './pages/InboxPage';
 import { InvitePage } from './pages/InvitePage';
+import { LandingPage } from './pages/LandingPage';
 import { PlayPage } from './pages/PlayPage';
 import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -23,11 +24,11 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 export function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/i/:token" element={<InvitePage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/play" replace />} />
           <Route path="play" element={<PlayPage />} />
           <Route path="pools" element={<PoolsPage />} />
           <Route path="tournament" element={<TournamentPage />} />
@@ -49,7 +50,7 @@ export function App() {
           </Route>
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/play" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

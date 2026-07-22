@@ -1,4 +1,5 @@
 import { formatCurrency } from '../lib/format';
+import { useCountUp } from '../hooks/useCountUp';
 import { useWallet } from '../hooks/useWallet';
 
 /**
@@ -10,11 +11,14 @@ export function BalanceHeader() {
   const { data: wallet } = useWallet();
   const available = wallet?.available_cents ?? 0;
   const inPlay = wallet?.escrow_cents ?? 0;
+  const shown = useCountUp(available);
 
   return (
     <div data-testid="balance-header">
-      <div className="text-xs text-text-secondary">Balance</div>
-      <div className="text-4xl font-bold tabular-nums">{formatCurrency(available)}</div>
+      <div className="label-mono">Balance</div>
+      <div className="text-[2.75rem] font-bold leading-none tracking-tight tabular-nums">
+        {formatCurrency(shown)}
+      </div>
       {inPlay > 0 && (
         <div className="text-sm text-text-secondary">
           {formatCurrency(inPlay)} in play

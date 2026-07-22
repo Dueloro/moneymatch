@@ -50,7 +50,7 @@ function describe(note: NotificationItem): string {
         ? `${name} accepted your friend request`
         : `${name} sent you a friend request`;
     case 'match_found':
-      return 'You have a match — confirm to play';
+      return 'You have a match. Confirm to play';
     case 'room_filled':
       return 'Your pool room filled';
     case 'settled':

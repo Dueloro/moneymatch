@@ -74,7 +74,7 @@ function TournamentsTab() {
         </div>
         <EmptyState
           title="Link your CS2 account"
-          subline="Tournaments record your best matches automatically — link to play."
+          subline="Tournaments record your best matches automatically. Link to play."
           action={
             <Link to="/profile">
               <PillButton>Link a game</PillButton>
@@ -91,7 +91,7 @@ function TournamentsTab() {
         <BalanceHeader />
       </div>
 
-      <div className="mb-6 flex gap-2" role="tablist">
+      <div className="mb-6 flex flex-wrap gap-2" role="tablist">
         {markets?.metrics.map((m) => (
           <button
             key={m.metric}
@@ -110,10 +110,10 @@ function TournamentsTab() {
         ))}
       </div>
 
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="min-w-0 flex-1">
           <ListRow
-            title={`Best ${metric?.label ?? ''} — first ${markets?.score_matches ?? 3} matches`}
+            title={`Best ${metric?.label ?? ''} · first ${markets?.score_matches ?? 3} matches`}
             subline={`Field of ${markets?.field_size ?? 10} · top 3 split ${(markets?.prize_split ?? [50, 30, 20]).join('/')}`}
             right={
               <span className="text-xs text-text-secondary">
@@ -122,7 +122,7 @@ function TournamentsTab() {
             }
           />
           <p className="mt-4 text-xs text-text-secondary">
-            Your best stat over the window is recorded automatically — no reporting. The
+            Your best stat over the window is recorded automatically, no reporting. The
             field is matched on similar skill.
           </p>
         </div>
@@ -169,7 +169,7 @@ function TournamentSlip({
 
   return (
     <aside
-      className="w-[354px] shrink-0 rounded-2xl bg-panel p-6"
+      className="w-full shrink-0 rounded-2xl bg-panel p-6 md:w-[354px]"
       data-testid="tournament-slip"
     >
       {status?.status === 'searching' ? (
@@ -208,8 +208,8 @@ function TournamentSlip({
             onSelect={onSelectEntry}
           />
           <p className="mt-3 text-xs text-text-secondary">
-            Top 3 split the pool minus rake. Prize is entrants&apos; pooled entries only
-            — never house-funded.
+            Top 3 split the pool minus rake. Prize is entrants&apos; pooled entries
+            only, never house-funded.
           </p>
           <div className="mt-5">
             <PillButton
@@ -230,7 +230,7 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
   const settled = tournament.state === 'SETTLED';
   return (
     <aside
-      className="w-[354px] shrink-0 rounded-2xl bg-panel p-6"
+      className="w-full shrink-0 rounded-2xl bg-panel p-6 md:w-[354px]"
       data-testid="standings-panel"
     >
       <p className="text-xs uppercase tracking-wide text-text-secondary">

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { toast } from '../lib/toast';
 
 // Wire types mirror the FastAPI `schemas/play.py` responses. The server owns
 // every number; the client only sends intents (market + preset choice + ids).
@@ -232,7 +233,14 @@ export function useConfirmMatch() {
       if (error) throw new Error(messageOf(error, 'Could not confirm.'));
       return data as MatchView;
     },
-    onSuccess: invalidate,
+    onSuccess: (match) => {
+      invalidate();
+      toast.success(
+        match.state === 'ACTIVE' || match.state === 'AWAITING_RESULT'
+          ? 'Match confirmed. Go play.'
+          : 'Confirmed. Waiting for your opponent.',
+      );
+    },
   });
 }
 
