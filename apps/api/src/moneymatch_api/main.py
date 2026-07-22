@@ -6,6 +6,8 @@ long-running service (00-README §2); nothing durable lives in process memory.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -61,11 +63,29 @@ def _init_sentry(settings: Settings) -> None:
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("api.startup")
-    yield
-    await dispose_engine()
-    log.info("api.shutdown")
+    settings: Settings = app.state.settings
+
+    worker_task: asyncio.Task[None] | None = None
+    if settings.run_worker_in_process:
+        # Run the settlement loop as a background task in this process (no separate
+        # worker service). Import lazily so this module stays importable without the
+        # worker's deps in every context.
+        from .workers.settlement_worker import run_forever
+
+        worker_task = asyncio.create_task(run_forever())
+        log.info("api.worker_in_process_started")
+
+    try:
+        yield
+    finally:
+        if worker_task is not None:
+            worker_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker_task
+        await dispose_engine()
+        log.info("api.shutdown")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -78,6 +98,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.0.0",
         lifespan=lifespan,
     )
+    # The lifespan reads settings off app.state (it only receives the app instance).
+    app.state.settings = settings
 
     # Middleware wrap inner→outer in add order (last added = outermost). The
     # target chain, outer→inner, is: CORS → security headers → rate limit →

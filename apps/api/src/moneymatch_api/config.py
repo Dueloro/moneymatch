@@ -81,6 +81,14 @@ class Settings(BaseSettings):
     # a live Supabase project. Never mounted in prod; default off everywhere else.
     e2e_auth_enabled: bool = Field(default=False)
 
+    # Run the settlement worker loop *inside* the API process (a background asyncio
+    # task started on lifespan startup) instead of as a separate service. This is
+    # for hosts with no free/available Background Worker (e.g. Render's free tier):
+    # one web service runs both. Safe because the worker claims work with FOR UPDATE
+    # SKIP LOCKED and every transition is idempotent, so N in-process copies don't
+    # double-settle. Default off — the standalone worker process is the norm.
+    run_worker_in_process: bool = Field(default=False)
+
     @field_validator("database_url")
     @classmethod
     def _require_async_driver(cls, v: str) -> str:
