@@ -1,12 +1,15 @@
-# Render blueprint (10-phase-7 §4). Declares the two long-running services + a
-# managed Postgres. The web app deploys on Vercel (apps/web/vercel.json).
+# Render blueprint (10-phase-7 §4). Declares one web service (api + in-process
+# settlement worker) + a managed Postgres. The web app deploys on Vercel
+# (apps/web/vercel.json). The worker runs inside the api process by default
+# (RUN_WORKER_IN_PROCESS=true) because Render's free tier has no Background Worker
+# instance type; a standalone `type: worker` is commented below for paid tiers.
 #
 # Migrations run at api startup, never at import time: the api's dockerCommand
 # runs `alembic upgrade head` before uvicorn binds. (Render's preDeployCommand is
 # a paid feature; folding it into the start command keeps free-tier deploys
 # migrating. `alembic upgrade head` is idempotent and the free tier runs a single
-# instance, so there's no multi-instance migration race.) The worker never
-# migrates — it retries its first cycles until the api has applied the schema.
+# instance, so there's no multi-instance migration race.) The in-process worker
+# loop starts only after uvicorn boots the app — i.e. after migrations apply.
 # Roll back by redeploying the previous image from the dashboard (docs/runbook.md).
 #
 # Set the sync:false secrets in the dashboard (or an env group named
@@ -39,25 +42,34 @@ services:
         fromDatabase:
           name: moneymatch-postgres
           property: connectionString
+      # Run the settlement worker loop *inside* this web service (a background
+      # asyncio task on startup) so no separate Background Worker is needed —
+      # Render's free tier has no free worker instance type. Safe on one instance
+      # (and on N: FOR UPDATE SKIP LOCKED + idempotent transitions prevent double-
+      # settle). To split the worker back out for scale, set this to false and add
+      # the standalone `type: worker` service shown below.
+      - key: RUN_WORKER_IN_PROCESS
+        value: "true"
       - key: RELEASE
         value: "" # Render injects the deploy commit SHA via $RENDER_GIT_COMMIT at runtime
       - fromGroup: moneymatch-shared
 
-  - type: worker
-    name: moneymatch-worker
-    runtime: docker
-    dockerfilePath: apps/api/Dockerfile
-    dockerContext: .
-    plan: starter
-    # Same image, worker entrypoint. Migrations are owned by the api service's
-    # start command, so the worker never runs them (it retries until the schema
-    # exists — the run_forever loop swallows per-cycle errors).
-    dockerCommand: python -m moneymatch_api.workers.settlement_worker
-    envVars:
-      - key: ENV
-        value: prod
-      - key: DATABASE_URL
-        fromDatabase:
-          name: moneymatch-postgres
-          property: connectionString
-      - fromGroup: moneymatch-shared
+  # Optional standalone worker — only for paid tiers that want the loop isolated
+  # from the API. If you enable this, set RUN_WORKER_IN_PROCESS=false on the api
+  # service above so the loop doesn't run in both places. It is NOT a web service:
+  # it binds no port (Render would time out a web service that never opens a port).
+  # - type: worker
+  #   name: moneymatch-worker
+  #   runtime: docker
+  #   dockerfilePath: apps/api/Dockerfile
+  #   dockerContext: .
+  #   plan: starter
+  #   dockerCommand: python -m moneymatch_api.workers.settlement_worker
+  #   envVars:
+  #     - key: ENV
+  #       value: prod
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: moneymatch-postgres
+  #         property: connectionString
+  #     - fromGroup: moneymatch-shared
