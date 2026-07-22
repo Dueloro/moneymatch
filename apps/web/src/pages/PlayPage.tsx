@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
 import { PlaySlip } from '../components/play/PlaySlip';
@@ -11,15 +11,21 @@ import { useLinks } from '../hooks/useLinks';
 import {
   useJoinQueue,
   useMarkets,
+  useMatch,
   useQueueStatus,
   useTakeWaiting,
   useWaiting,
   type MarketRow,
+  type QueueStatus,
 } from '../hooks/useMatchmaking';
 
 function formatMultiplier(bps: number): string {
   return `×${(bps / 10000).toFixed(2)}`;
 }
+
+// States where the slip should show the confirm/active card for a deep-linked
+// match; a terminal match falls through to the normal slip (reachable via Activity).
+const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
 export function PlayPage() {
   const { data: links } = useLinks();
@@ -34,7 +40,25 @@ export function PlayPage() {
   }, [games, game]);
 
   const { data: markets } = useMarkets(game);
-  const { data: status } = useQueueStatus();
+
+  // Inbox "Respond" lands here as /play?match=<id>; open that match's slip
+  // directly (it isn't in the viewer's queue status when it came from a challenge).
+  const [searchParams] = useSearchParams();
+  const deepLinkMatchId = searchParams.get('match') ?? undefined;
+  const { data: deepLinkMatch } = useMatch(deepLinkMatchId);
+
+  const { data: liveStatus } = useQueueStatus();
+  const status: QueueStatus | undefined =
+    deepLinkMatch && DEEP_LINK_STATES.has(deepLinkMatch.state)
+      ? {
+          status: 'matched',
+          match: deepLinkMatch,
+          waited_seconds: null,
+          tolerance_stage: null,
+          can_cancel: false,
+        }
+      : liveStatus;
+
   const waiting = useWaiting(game);
   const join = useJoinQueue();
   const take = useTakeWaiting();

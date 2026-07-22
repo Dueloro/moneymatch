@@ -32,4 +32,36 @@ describe('AppShell', () => {
     expect(screen.getByTestId('footer-breadcrumb')).toHaveTextContent('PLAY');
     expect(screen.getByText('kvem_')).toBeInTheDocument();
   });
+
+  function renderShell() {
+    return renderWithProviders(
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/play" element={<div>PLAY CONTENT</div>} />
+        </Route>
+      </Routes>,
+      { route: '/play' },
+    );
+  }
+
+  it('shows a role-gated Admin link for admins', () => {
+    vi.mocked(useMe).mockReturnValue({
+      data: { user: { username: 'ops', role: 'admin' }, needs_onboarding: false },
+      isLoading: false,
+    } as ReturnType<typeof useMe>);
+    renderShell();
+    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute(
+      'href',
+      '/admin',
+    );
+  });
+
+  it('hides the Admin link from non-admins', () => {
+    vi.mocked(useMe).mockReturnValue({
+      data: { user: { username: 'kvem_', role: 'user' }, needs_onboarding: false },
+      isLoading: false,
+    } as ReturnType<typeof useMe>);
+    renderShell();
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+  });
 });

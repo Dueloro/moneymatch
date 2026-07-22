@@ -28,13 +28,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, uuid_pk
 
-RISK_FLAG_KINDS = ("sandbagging",)
+# `sandbagging` blocks metric wagers until cleared; `win_streak` is an
+# informational derived signal (nightly detector) that only surfaces in the admin
+# risk queue and never blocks play.
+RISK_FLAG_KINDS = ("sandbagging", "win_streak")
 
 
 class RiskFlag(Base):
     __tablename__ = "risk_flags"
     __table_args__ = (
-        CheckConstraint("kind IN ('sandbagging')", name="ck_risk_flags_kind"),
+        CheckConstraint(
+            "kind IN ('sandbagging', 'win_streak')", name="ck_risk_flags_kind"
+        ),
     )
 
     id = uuid_pk()

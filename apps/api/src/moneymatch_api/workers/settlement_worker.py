@@ -27,11 +27,13 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..constants import (
+    FLAG_NIGHTLY_LAST_RUN,
     FLAG_QUEUE_PAUSED,
     FLAG_SETTLEMENT_PAUSED,
     FLAG_WORKER_HEARTBEAT,
     GRADING_ENGINE_VERSION,
     MATCH_MAX_LIFETIME_SECONDS,
+    NIGHTLY_INTERVAL_SECONDS,
     TOURNAMENT_STANDINGS_REFRESH_SECONDS,
     WORKER_POLL_INTERVAL_SECONDS,
 )
@@ -46,6 +48,7 @@ from ..services import (
     grading,
     match_lifecycle,
     matchmaking,
+    metric_models_service,
     pool_engine,
     raw_payload_service,
     telemetry_fetch,
@@ -225,6 +228,35 @@ async def _process_due_matches(
                 report.paused = True
                 raise SettlementHalted from exc
             _tally(report, result)
+            if result in ("settled", "pushed"):
+                # Settlement-time metric refresh (backlog · Phase B): recompute the
+                # two players' models now that a host game finished. Isolated from
+                # the settlement txn — best-effort, never blocks money; nightly is
+                # the backstop.
+                await _refresh_after_settle(sm, match_id)
+
+
+async def _refresh_after_settle(
+    sm: async_sessionmaker[AsyncSession], match_id: uuid.UUID
+) -> None:
+    """Best-effort per-settlement metric refresh for both players. Runs in its own
+    transaction and swallows every error — a refresh hiccup must never affect a
+    committed settlement (bootstrap is a no-op for win-only games like chess)."""
+    try:
+        async with sm() as session:
+            match = await session.get(Match, match_id)
+            if match is None:
+                return
+            seats = await match_lifecycle.players(session, match_id)
+            for seat in seats:
+                await metric_models_service.bootstrap(
+                    session, seat.user_id, match.game, seat.host_account_id
+                )
+            await session.commit()
+    except Exception:  # noqa: BLE001 — refresh is advisory; settlement already landed
+        log.warning(
+            "settlement.metric_refresh_failed", match_id=str(match_id), exc_info=True
+        )
 
 
 async def _claim(session: AsyncSession, match_id: uuid.UUID) -> Match | None:
@@ -488,6 +520,49 @@ async def run_cycle(
     return report
 
 
+async def _nightly_due(sm: async_sessionmaker[AsyncSession], now: datetime) -> bool:
+    """Whether a nightly pass is due (never run, or older than the interval)."""
+    async with sm() as session:
+        flag = await session.scalar(
+            select(FeatureFlag).where(FeatureFlag.key == FLAG_NIGHTLY_LAST_RUN)
+        )
+    if flag is None or not flag.payload or "ts" not in flag.payload:
+        return True
+    last = datetime.fromisoformat(flag.payload["ts"])
+    return (now - last).total_seconds() >= NIGHTLY_INTERVAL_SECONDS
+
+
+async def _mark_nightly_ran(
+    sm: async_sessionmaker[AsyncSession], now: datetime
+) -> None:
+    from ..services import feature_flags
+
+    async with sm() as session:
+        await feature_flags.set_flag(
+            session,
+            FLAG_NIGHTLY_LAST_RUN,
+            enabled=True,
+            payload={"ts": now.isoformat()},
+        )
+        await session.commit()
+
+
+async def maybe_run_nightly(
+    sm: async_sessionmaker[AsyncSession], now: datetime | None = None
+) -> bool:
+    """Run the nightly pass if due, then stamp the last-run flag. Returns whether
+    it ran. Lives in the loop (not `run_cycle`) so the money cycle stays untouched
+    and its tests are unaffected."""
+    now = now or _now()
+    if not await _nightly_due(sm, now):
+        return False
+    from .nightly import run_nightly
+
+    await run_nightly(sm, now=now)
+    await _mark_nightly_ran(sm, now)
+    return True
+
+
 async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
     """Poll forever. `settlement_paused` idles the loop rather than exiting it."""
     sm = get_sessionmaker()
@@ -497,6 +572,8 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
             report = await run_cycle(sm)
             if report.settled or report.pushed or report.canceled or report.paused:
                 log.info("settlement_worker.cycle", **report.__dict__)
+            # The heavier nightly pass is self-throttled to once per interval.
+            await maybe_run_nightly(sm)
         except Exception:  # noqa: BLE001 — never let the loop die on one bad cycle
             log.exception("settlement_worker.cycle_failed")
         await asyncio.sleep(interval)

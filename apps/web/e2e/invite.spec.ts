@@ -1,4 +1,6 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+
+import { e2eAuthConfigured, signInAs } from './auth';
 
 /**
  * Phase-5 required e2e (08-phase-5) + exit criterion #2:
@@ -7,32 +9,22 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
  * both confirm → the fixture settles → both inboxes are correct.
  *
  * Prerequisites (see e2e/README.md): a running stack with a stubbed host adapter
- * and a test-auth seam. This spec needs one seeded, CS2-linked session (A) and
- * one **fresh** session (B) that starts un-onboarded to exercise the funnel end
- * to end:
- *   E2E_USER_A       — seeded, CS2-linked Supabase session (the challenger)
- *   E2E_USER_B_FRESH — a brand-new Supabase session (no username, no linked game)
+ * and the test-auth seam (`E2E_AUTH=1`). A is a seeded, CS2-linked user; B is a
+ * brand-new `auth_id` that has never signed in, so minting a token for it yields
+ * a fresh, un-onboarded user and exercises the full funnel.
  */
 
-async function signIn(context: BrowserContext, sessionJson: string): Promise<Page> {
-  await context.addInitScript((session) => {
-    window.localStorage.setItem('sb-moneymatch-auth-token', session);
-  }, sessionJson);
-  const page = await context.newPage();
-  return page;
-}
+const CHALLENGER = process.env.E2E_AUTH_ID_A ?? 'seed_player1';
+// A never-before-seen auth_id → provisioned fresh (no username, no linked game).
+const FRESH = process.env.E2E_FRESH_AUTH_ID ?? 'e2e_fresh_invitee';
 
 test('invite link → fresh signup accepts → both confirm → settle → inboxes correct', async ({
   browser,
 }) => {
-  test.skip(
-    !process.env.E2E_USER_A || !process.env.E2E_USER_B_FRESH,
-    'Set E2E_USER_A (seeded, CS2-linked) and E2E_USER_B_FRESH (new signup) + run the stack.',
-  );
+  test.skip(!e2eAuthConfigured(), 'Set E2E_AUTH=1 and run the stack with the seam on.');
 
   // --- A mints an invite link for a $10 K/D challenge. --------------------- //
-  const ctxA = await browser.newContext();
-  const pageA = await signIn(ctxA, process.env.E2E_USER_A!);
+  const pageA = await signInAs(browser, CHALLENGER);
   await pageA.goto('/tournament');
   await pageA.getByRole('tab', { name: 'Friends' }).click();
   // (Challenge dialog is reachable from a friend row or the invite entry point;
@@ -49,8 +41,7 @@ test('invite link → fresh signup accepts → both confirm → settle → inbox
   expect(inviteUrl).toContain('/i/');
 
   // --- B (fresh) opens the public preview → funnel. ------------------------ //
-  const ctxB = await browser.newContext();
-  const pageB = await signIn(ctxB, process.env.E2E_USER_B_FRESH!);
+  const pageB = await signInAs(browser, FRESH);
   await pageB.goto(new URL(inviteUrl).pathname);
   await expect(pageB.getByText(/challenged you/)).toBeVisible(); // public preview
 
@@ -76,6 +67,6 @@ test('invite link → fresh signup accepts → both confirm → settle → inbox
     timeout: 30_000,
   });
 
-  await ctxA.close();
-  await ctxB.close();
+  await pageA.context().close();
+  await pageB.context().close();
 });

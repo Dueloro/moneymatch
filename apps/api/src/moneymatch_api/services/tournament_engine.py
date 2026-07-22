@@ -145,7 +145,9 @@ async def _require_link(
 ) -> LinkedAccount:
     link = await session.scalar(
         select(LinkedAccount).where(
-            LinkedAccount.user_id == user_id, LinkedAccount.game == game
+            LinkedAccount.user_id == user_id,
+            LinkedAccount.game == game,
+            LinkedAccount.status != "unbound",  # ignore soft-unbound history rows
         )
     )
     if link is None or link.status != "active":

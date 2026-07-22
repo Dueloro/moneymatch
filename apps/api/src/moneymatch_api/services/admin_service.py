@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import ColumnElement, or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..errors import APIError
@@ -117,25 +116,26 @@ async def unfreeze(session: AsyncSession, user: User) -> User:
 async def force_unbind(
     session: AsyncSession, linked_account_id: uuid.UUID
 ) -> LinkedAccount:
-    """Remove a host-account binding so it can be re-linked (rebind = admin action,
-    audited — 01-architecture §2). Refused with a clean 409 when contest history
-    references it (FK RESTRICT); a soft-unbind with history is backlogged."""
+    """Soft-unbind a host-account binding so it can be re-linked (rebind = admin
+    action, audited — 01-architecture §2). The row is retained with
+    `status='unbound'` — its contest history (match_players / queue_tickets FKs)
+    stays intact — while the partial-unique slots free up for a fresh bind. This
+    replaces the old hard-delete, which FK RESTRICT blocked for played accounts
+    (backlog · soft-unbind with contest history)."""
     link = await session.get(LinkedAccount, linked_account_id)
     if link is None:
         raise AdminActionError(
             "linked_account_not_found", "No such linked account.", status_code=404
         )
-    await session.delete(link)
-    try:
-        await session.flush()
-    except IntegrityError as exc:
-        await session.rollback()
+    if link.status == "unbound":
         raise AdminActionError(
-            "unbind_blocked",
-            "This account has contest history and cannot be hard-unbound.",
+            "already_unbound",
+            "This account is already unbound.",
             status_code=409,
             detail={"linked_account_id": str(linked_account_id)},
-        ) from exc
+        )
+    link.status = "unbound"
+    await session.flush()
     return link
 
 

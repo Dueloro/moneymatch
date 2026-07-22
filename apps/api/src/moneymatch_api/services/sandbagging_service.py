@@ -69,16 +69,31 @@ def sandbag_z(
 async def is_flagged(
     session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
 ) -> bool:
-    """Whether an unresolved sandbagging flag exists for this user/game/metric."""
+    """Whether an unresolved *sandbagging* flag exists for this user/game/metric.
+
+    Filtered to `kind='sandbagging'` so other risk kinds (e.g. the informational
+    `win_streak` detector) never block a wager."""
     flag = await session.scalar(
         select(RiskFlag).where(
             RiskFlag.user_id == user_id,
             RiskFlag.game == game,
             RiskFlag.metric == metric,
+            RiskFlag.kind == "sandbagging",
             RiskFlag.resolved.is_(False),
         )
     )
     return flag is not None
+
+
+async def assert_not_flagged(
+    session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
+) -> None:
+    """Cheap hot-path guard: block a metric wager on an *existing* sandbagging flag
+    without a host call. Proactive detection runs in the nightly sweep (backlog ·
+    "cache the sandbagging evaluation"); this keeps only the DB check on the hot
+    path so H2H and friend stat-duels are gated without a per-enqueue round-trip."""
+    if await is_flagged(session, user_id, game, metric):
+        raise SandbaggingBlockedError(game, metric)
 
 
 async def evaluate(

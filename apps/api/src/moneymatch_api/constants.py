@@ -39,6 +39,12 @@ FLAG_GEO_CONFIG = "geo_config"
 FLAG_WORKER_HEARTBEAT = "worker_heartbeat"
 WORKER_HEARTBEAT_STALE_SECONDS = 120
 
+# The worker runs a heavier nightly pass (metric-model refresh + derived risk
+# detectors) at most once per interval; the last-run timestamp lives in this flag
+# (payload `{"ts": iso}`), same mechanism as the heartbeat (backlog · Phase B).
+FLAG_NIGHTLY_LAST_RUN = "nightly_last_run"
+NIGHTLY_INTERVAL_SECONDS = 24 * 3600
+
 
 # Per-game enable flags (game:<id>).
 def game_flag_key(game_id: str) -> str:
@@ -209,6 +215,11 @@ TOURNAMENT_ENGINE_VERSION = "tourney-1"
 # lifetime mean (tanking a baseline is the attack the personal bar invites).
 SANDBAG_RECENT_N = 10
 SANDBAG_Z_THRESHOLD = -1.5
+
+# Derived risk detector (nightly): an unbroken run of this many settled H2H wins
+# writes an informational `win_streak` risk flag for admin review. Unlike a
+# sandbagging flag it does NOT block wagers — it only surfaces in the risk queue.
+WIN_STREAK_THRESHOLD = 8
 
 # Human labels for rate metrics (pool/tournament market rows + standings).
 METRIC_LABELS: dict[str, str] = {

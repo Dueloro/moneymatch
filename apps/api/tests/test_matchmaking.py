@@ -375,3 +375,17 @@ async def test_two_concurrent_enqueues_one_waiting_ticket_forms_one_match(
     async with sm() as s:
         match_count = await s.scalar(select(func.count()).select_from(Match))
     assert match_count == 1
+
+
+async def test_enqueue_blocked_by_open_sandbagging_flag(session):
+    """A stat-race enqueue honors an existing sandbagging flag (cheap hot-path
+    guard, no host call) — backlog · extend the block to H2H stat duels."""
+    from moneymatch_api.models.risk import RiskFlag
+    from moneymatch_api.services.sandbagging_service import SandbaggingBlockedError
+
+    user = await cs2_player(session, "flagged_duelist")
+    session.add(RiskFlag(user_id=user.id, game=CS2, metric=KD, kind="sandbagging"))
+    await session.flush()
+
+    with pytest.raises(SandbaggingBlockedError):
+        await enq_cs2(session, user, market="kd_ratio")

@@ -17,6 +17,7 @@ vi.mock('../hooks/useMatchmaking', async () => {
   return {
     ...actual,
     useMarkets: vi.fn(),
+    useMatch: vi.fn(),
     useQueueStatus: vi.fn(),
     useWaiting: vi.fn(),
     useJoinQueue: vi.fn(),
@@ -36,6 +37,7 @@ import {
   useJoinQueue,
   useLeaveQueue,
   useMarkets,
+  useMatch,
   useQueueStatus,
   useTakeWaiting,
   useWaiting,
@@ -89,6 +91,9 @@ describe('PlayPage', () => {
       },
     } as unknown as ReturnType<typeof useMarkets>);
     mockStatus({ status: 'idle', match: null, can_cancel: false });
+    vi.mocked(useMatch).mockReturnValue({
+      data: undefined,
+    } as unknown as ReturnType<typeof useMatch>);
     vi.mocked(useWaiting).mockReturnValue({
       data: { waiting: [] },
     } as unknown as ReturnType<typeof useWaiting>);
@@ -193,6 +198,50 @@ describe('PlayPage', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /Confirm & stake/ }));
     expect(confirmMutate).toHaveBeenCalledWith('m1');
+  });
+
+  it('opens the confirm card for a ?match= deep-link (Inbox "Respond")', () => {
+    // Queue is idle — the accepted-challenge match only comes from ?match=.
+    mockStatus({ status: 'idle', match: null, can_cancel: false });
+    vi.mocked(useMatch).mockReturnValue({
+      data: {
+        id: 'deep1',
+        game: 'cs2.faceit',
+        market: 'kd_ratio',
+        market_label: 'K/D ratio',
+        kind: 'stat_race',
+        speed: null,
+        entry_cents: 1000,
+        pot_cents: 2000,
+        prize_cents: 1800,
+        rake_cents: 200,
+        multiplier_bps: 18000,
+        state: 'PENDING',
+        brokered: false,
+        host_game_id: null,
+        matched_at: null,
+        window_ends_at: null,
+        players: [
+          {
+            user_id: 'u3',
+            username: 'friend_',
+            rating: 1750,
+            color: null,
+            confirmed: false,
+            payout_cents: 0,
+            stat_line: null,
+            is_you: false,
+          },
+        ],
+        you_confirmed: false,
+        your_play_url: null,
+        forecast: null,
+      },
+    } as unknown as ReturnType<typeof useMatch>);
+
+    renderWithProviders(<PlayPage />, { route: '/play?match=deep1' });
+    fireEvent.click(screen.getByRole('button', { name: /Confirm & stake/ }));
+    expect(confirmMutate).toHaveBeenCalledWith('deep1');
   });
 });
 

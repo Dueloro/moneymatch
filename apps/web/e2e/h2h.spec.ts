@@ -1,4 +1,6 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+
+import { e2eAuthConfigured, signInAs } from './auth';
 
 /**
  * Phase-3 exit criterion #1 + the required e2e (06-phase-3):
@@ -8,34 +10,21 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
  *
  * Prerequisites (see e2e/README.md): a running stack (`make dev`) with a stubbed
  * host adapter that resolves the two accounts' next match to a fixed winner, and
- * a test-auth seam that lets each context sign in as a seeded, game-linked user.
- * The env supplies two ready sessions:
- *   E2E_USER_A / E2E_USER_B — JSON Supabase sessions to inject.
+ * the test-auth seam (`E2E_AUTH=1`) so each context signs in as a seeded,
+ * CS2-linked user via the API's `/dev/e2e/token` route.
  */
 
-async function signIn(context: BrowserContext, sessionJson: string): Promise<Page> {
-  // The web app keeps only the Supabase session in localStorage (00-README §2),
-  // so injecting it is a valid, deploy-shaped way to authenticate a context.
-  await context.addInitScript((session) => {
-    window.localStorage.setItem('sb-moneymatch-auth-token', session);
-  }, sessionJson);
-  const page = await context.newPage();
-  await page.goto('/play');
-  return page;
-}
+// Seeded, CS2-linked players from scripts/seed_demo.py (auth_id `seed_<handle>`).
+const WINNER = process.env.E2E_AUTH_ID_A ?? 'seed_player1';
+const LOSER = process.env.E2E_AUTH_ID_B ?? 'seed_player2';
 
 test('two users duel on K/D at $10 → winner +$18, loser −$10, rake $2', async ({
   browser,
 }) => {
-  test.skip(
-    !process.env.E2E_USER_A || !process.env.E2E_USER_B,
-    'Set E2E_USER_A / E2E_USER_B (seeded, CS2-linked sessions) and run the stack.',
-  );
+  test.skip(!e2eAuthConfigured(), 'Set E2E_AUTH=1 and run the stack with the seam on.');
 
-  const ctxA = await browser.newContext();
-  const ctxB = await browser.newContext();
-  const pageA = await signIn(ctxA, process.env.E2E_USER_A!);
-  const pageB = await signIn(ctxB, process.env.E2E_USER_B!);
+  const pageA = await signInAs(browser, WINNER, { path: '/play' });
+  const pageB = await signInAs(browser, LOSER, { path: '/play' });
 
   // A picks K/D ratio at $10 and searches.
   await pageA.getByRole('tab', { name: /CS2/ }).click();
@@ -70,6 +59,6 @@ test('two users duel on K/D at $10 → winner +$18, loser −$10, rake $2', asyn
   // Loser: $1000 − $10 = $990.00.
   await expect(pageB.getByText('$990.00')).toBeVisible();
 
-  await ctxA.close();
-  await ctxB.close();
+  await pageA.context().close();
+  await pageB.context().close();
 });

@@ -23,4 +23,7 @@ export const env = {
   posthogHost: optional('VITE_POSTHOG_HOST') ?? 'https://us.i.posthog.com',
   // Optional: with no DSN, Sentry error tracking is disabled.
   sentryDsn: optional('VITE_SENTRY_DSN'),
+  // Dev/e2e only: local sign-in bypass (backlog · "Browser e2e test-auth seam").
+  // Never 'true' in a production build.
+  e2eAuth: optional('VITE_E2E_AUTH') === 'true',
 };

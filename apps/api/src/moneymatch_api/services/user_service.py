@@ -15,9 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import AuthedIdentity
 from ..errors import APIError
-from ..models.user import User
+from ..models.user import User, gen_friend_code
 from ..models.wallet import SIGNUP_GRANT_CENTS, Limit, Wallet
 from . import wallet_service
+
+# A friend_code collision is one-in-a-billion, but a clean signup must never 500
+# on the unique constraint; regenerate and retry a few times (backlog · Phase 5).
+_FRIEND_CODE_ATTEMPTS = 5
 
 
 async def get_or_create_user(session: AsyncSession, identity: AuthedIdentity) -> User:
@@ -26,6 +30,12 @@ async def get_or_create_user(session: AsyncSession, identity: AuthedIdentity) ->
     A freshly created user is provisioned with a DEMO wallet, default limits, and
     the signup grant — all in the caller's transaction, so a new account either
     lands fully set up or not at all.
+
+    A unique-constraint conflict on insert is disambiguated by re-reading the
+    `auth_id`: if the row now exists a concurrent first call created it (use that
+    row); otherwise the collision was on the random `friend_code`, so we retry
+    with a fresh one rather than 500 a clean signup. This is schema-name-agnostic
+    (no constraint-name string matching) and safe for the caller's transaction.
     """
     result = await session.execute(select(User).where(User.auth_id == identity.auth_id))
     user = result.scalar_one_or_none()
@@ -35,20 +45,30 @@ async def get_or_create_user(session: AsyncSession, identity: AuthedIdentity) ->
             user.email = identity.email
         return user
 
-    user = User(auth_id=identity.auth_id, email=identity.email)
-    session.add(user)
-    try:
-        await session.flush()
-    except IntegrityError:
-        # Concurrent first call created it — re-read and use that row.
-        await session.rollback()
-        result = await session.execute(
-            select(User).where(User.auth_id == identity.auth_id)
+    last_exc: IntegrityError | None = None
+    for _ in range(_FRIEND_CODE_ATTEMPTS):
+        user = User(
+            auth_id=identity.auth_id,
+            email=identity.email,
+            friend_code=gen_friend_code(),
         )
-        return result.scalar_one()
+        session.add(user)
+        try:
+            await session.flush()
+        except IntegrityError as exc:
+            await session.rollback()
+            last_exc = exc
+            existing = await session.scalar(
+                select(User).where(User.auth_id == identity.auth_id)
+            )
+            if existing is not None:
+                return existing  # concurrent create won the auth_id race
+            continue  # friend_code collision — retry with a fresh code
+        await provision_new_user(session, user)
+        return user
 
-    await provision_new_user(session, user)
-    return user
+    assert last_exc is not None  # loop only exits early via return
+    raise last_exc
 
 
 async def provision_new_user(session: AsyncSession, user: User) -> Wallet:

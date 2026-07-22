@@ -1,15 +1,38 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { decodeJwtClaims, getE2eToken } from '../lib/e2eAuth';
+import { env } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { identify, resetIdentity } from '../lib/telemetry';
 import { AuthContext, type AuthContextValue } from './authContext';
+
+/** Build a minimal Supabase-shaped session from an e2e access token so the app
+ * routes past RequireAuth without a live Supabase project. */
+function e2eSession(token: string): Session | null {
+  const claims = decodeJwtClaims(token);
+  if (!claims) return null;
+  return {
+    access_token: token,
+    token_type: 'bearer',
+    user: { id: claims.sub, email: claims.email },
+  } as unknown as Session;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // e2e bypass: adopt the injected token as the session, skip Supabase entirely.
+    if (env.e2eAuth) {
+      const token = getE2eToken();
+      const injected = token ? e2eSession(token) : null;
+      setSession(injected);
+      if (injected) identify(injected.user.id);
+      setLoading(false);
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (data.session) identify(data.session.user.id);

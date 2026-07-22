@@ -113,6 +113,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(notifications.router, prefix=API_V1_PREFIX)
     app.include_router(admin.router, prefix=API_V1_PREFIX)
 
+    # Dev/e2e sign-in bypass — mounted only outside prod and only when explicitly
+    # enabled (backlog · "Browser e2e test-auth seam"). Absent entirely otherwise.
+    if settings.e2e_auth_enabled and settings.env != "prod":
+        from .routers import dev
+
+        app.include_router(dev.router, prefix=API_V1_PREFIX)
+        log.warning("api.e2e_auth_enabled")  # loud: this must never fire in prod
+
     return app
 
 

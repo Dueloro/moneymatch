@@ -127,6 +127,25 @@ export function useQueueStatus() {
   });
 }
 
+/** A single match by id — backs the Inbox "Respond" deep-link (`/play?match=`),
+ * where the accepted challenge's match isn't in the viewer's queue status. Polls
+ * every 2 s so the confirm card follows the opponent's confirm live. */
+export function useMatch(matchId: string | undefined) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ['match', matchId],
+    enabled: !!session && !!matchId,
+    refetchInterval: 2000,
+    queryFn: async (): Promise<MatchView> => {
+      const { data, error } = await api.GET('/api/v1/play/matches/{match_id}', {
+        params: { path: { match_id: matchId! } },
+      });
+      if (error) throw new Error('Failed to load match');
+      return data as MatchView;
+    },
+  });
+}
+
 export function useWaiting(game: string | undefined) {
   const { session } = useAuth();
   return useQuery({
@@ -151,6 +170,7 @@ function useQueueInvalidation() {
   return () => {
     qc.invalidateQueries({ queryKey: ['queue-status', session?.user.id] });
     qc.invalidateQueries({ queryKey: ['waiting'] });
+    qc.invalidateQueries({ queryKey: ['match'] });
     qc.invalidateQueries({ queryKey: ['wallet', session?.user.id] });
     qc.invalidateQueries({ queryKey: ['activity'] });
   };

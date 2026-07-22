@@ -41,7 +41,14 @@ from ..models.skill import MetricModel
 from ..models.user import User
 from ..schemas.play import Forecast
 from ..schemas.profile import ProfileSnapshot
-from . import analytics, money_math, notifications_service, pairing, skill_rating
+from . import (
+    analytics,
+    money_math,
+    notifications_service,
+    pairing,
+    sandbagging_service,
+    skill_rating,
+)
 from .feature_flags import get_boolean_flags
 from .markets import (
     KIND_STAT_RACE,
@@ -106,7 +113,9 @@ async def _require_link(
 ) -> LinkedAccount:
     link = await session.scalar(
         select(LinkedAccount).where(
-            LinkedAccount.user_id == user_id, LinkedAccount.game == game
+            LinkedAccount.user_id == user_id,
+            LinkedAccount.game == game,
+            LinkedAccount.status != "unbound",  # ignore soft-unbound history rows
         )
     )
     if link is None:
@@ -166,6 +175,12 @@ async def _assert_eligible(
                 status_code=409,
                 detail={"metric": market.metric, "n": n},
             )
+        # Cheap sandbagging gate for H2H stat duels: honor an existing flag from
+        # the nightly sweep without a per-enqueue host call (backlog · Phase B —
+        # "extend the sandbagging block to H2H stat duels" + "cache the eval").
+        await sandbagging_service.assert_not_flagged(
+            session, user.id, game, market.metric
+        )
 
 
 # --------------------------------------------------------------------------- #

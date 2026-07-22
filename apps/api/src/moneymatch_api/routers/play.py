@@ -169,7 +169,11 @@ async def get_markets(
     linked = await session.scalar(
         select(func.count())
         .select_from(LinkedAccount)
-        .where(LinkedAccount.user_id == user.id, LinkedAccount.game == game)
+        .where(
+            LinkedAccount.user_id == user.id,
+            LinkedAccount.game == game,
+            LinkedAccount.status != "unbound",
+        )
     )
     now = _now()
     depth_rows = await session.execute(

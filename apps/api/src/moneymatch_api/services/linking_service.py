@@ -55,10 +55,14 @@ async def _assert_game_enabled(session: AsyncSession, game: str) -> None:
 
 
 async def get_links(session: AsyncSession, user_id: uuid.UUID) -> list[LinkedAccount]:
-    """Every linked account for a user (newest first)."""
+    """Every live linked account for a user (newest first). Soft-unbound rows are
+    excluded — they are retained only for history/audit, not as a binding."""
     rows = await session.scalars(
         select(LinkedAccount)
-        .where(LinkedAccount.user_id == user_id)
+        .where(
+            LinkedAccount.user_id == user_id,
+            LinkedAccount.status != "unbound",
+        )
         .order_by(LinkedAccount.created_at.desc())
     )
     return list(rows)
@@ -67,9 +71,12 @@ async def get_links(session: AsyncSession, user_id: uuid.UUID) -> list[LinkedAcc
 async def get_link(
     session: AsyncSession, user_id: uuid.UUID, game: str
 ) -> LinkedAccount | None:
+    """The user's live binding for a game (ignores soft-unbound history rows)."""
     return await session.scalar(
         select(LinkedAccount).where(
-            LinkedAccount.user_id == user_id, LinkedAccount.game == game
+            LinkedAccount.user_id == user_id,
+            LinkedAccount.game == game,
+            LinkedAccount.status != "unbound",
         )
     )
 

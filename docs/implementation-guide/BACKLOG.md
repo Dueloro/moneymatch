@@ -3,6 +3,37 @@
 Items discovered mid-phase that are out of that phase's scope land here with a
 one-line rationale. Seeded with known post-MVP work:
 
+## Resolved (autonomous backlog run — 2026-07-20)
+
+Delivered code-side, excluding all KYC/real-money work:
+
+- **Friend-code collision retry** — provisioning retries a fresh code on the
+  unique-constraint conflict (schema-name-agnostic), disambiguated from the
+  auth_id concurrent-create path.
+- **Challenge "Respond" deep-link** — `/play?match=` opens the match confirm card.
+- **Admin nav entry-point** — role-gated "Admin" link in the sidebar.
+- **Browser e2e test-auth seam** — dev-only `POST /dev/e2e/token` mints an HS256
+  JWT for a seeded `auth_id` (never in prod); web reads `mm.e2e.access_token`
+  under `VITE_E2E_AUTH`; the h2h/pool/invite specs now sign in headless without a
+  live Supabase project (unblocks the "e2e green" boxes once the stack is up).
+- **Nightly worker job** — a self-throttled nightly pass (metric-model refresh +
+  sandbagging sweep + derived detectors), plus **settlement-time metric refresh**
+  (best-effort, isolated from the settlement txn).
+- **Sandbagging on H2H + friend stat-duels** — the nightly sweep folds detection
+  off the hot path; enqueue and rake-bearing challenge-accept now honor an
+  existing flag with a cheap `risk_flags` check (no per-enqueue host call).
+- **Derived risk detector** — nightly `win_streak` flag (informational; never
+  blocks play) via a new `risk_flags.kind` + migration 0009.
+- **Soft-unbind with contest history** — `force_unbind` now sets
+  `status='unbound'` (row retained, FK history intact) instead of hard-deleting;
+  the binding-uniqueness indexes are partial on `status <> 'unbound'` (migration
+  0010) so a played account frees its slot and can be rebound. Independent of OAuth.
+
+Deferred by design in this run: OAuth flows (need registered OAuth apps),
+everything KYC/real-money, reconciliation windowing, directional value-flow
+(AML) monitoring, and the Vite major bump (a dev-only advisory needing a
+coordinated vitest/plugin major — validate on the new major first).
+
 - **OAuth account binding** (Lichess OAuth, FaceIt OAuth2, Steam OpenID) —
   replaces username-claim; prerequisite for anything beyond internal beta
   (integrity audit #5, #6). Targeted Lichess challenges bound to both accounts.

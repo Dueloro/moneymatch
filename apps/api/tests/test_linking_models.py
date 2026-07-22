@@ -77,6 +77,55 @@ async def test_concurrent_race_for_host_account_one_winner(session):
     assert sorted(results) == [False, True]  # exactly one winner
 
 
+async def test_soft_unbound_row_frees_the_binding_slot(session):
+    """A soft-unbound row keeps its uniqueness slot released: the same host account
+    rebinds to a fresh active row (the partial index only counts live bindings)."""
+    u1 = await create_user(session)
+    u2 = await create_user(session)
+    first = _link(u1.id, host_account_id="rebindable")
+    session.add(first)
+    await session.flush()
+
+    # Soft-unbind, then a *new* user binds the same host account — allowed.
+    first.status = "unbound"
+    await session.flush()
+    session.add(_link(u2.id, host_account_id="rebindable"))
+    await session.flush()  # no IntegrityError — the slot was freed
+
+
+async def test_two_live_bindings_still_conflict(session):
+    """The partial uniqueness still blocks two *live* bindings of one host."""
+    u1 = await create_user(session)
+    u2 = await create_user(session)
+    session.add(_link(u1.id, host_account_id="still_unique"))
+    await session.flush()
+    session.add(_link(u2.id, host_account_id="still_unique"))  # both active
+    with pytest.raises(IntegrityError):
+        await session.flush()
+    await session.rollback()
+
+
+async def test_get_link_returns_live_binding_over_unbound_history(session):
+    """With an unbound history row *and* a fresh active row for the same
+    (user, game), the wager-path lookup returns the live binding."""
+    from moneymatch_api.services import linking_service
+
+    user = await create_user(session)
+    old = _link(user.id, game="cs2.faceit", host_account_id="old_host")
+    session.add(old)
+    await session.flush()
+    old.status = "unbound"
+    await session.flush()
+    new = _link(user.id, game="cs2.faceit", host_account_id="new_host")
+    session.add(new)
+    await session.flush()
+
+    got = await linking_service.get_link(session, user.id, "cs2.faceit")
+    assert got is not None
+    assert got.host_account_id == "new_host"
+    assert got.status == "active"
+
+
 async def test_raw_payloads_are_append_only(session):
     row = RawPayload(
         source="lichess:user", payload={"a": 1}, content_hash="deadbeef", size_bytes=8

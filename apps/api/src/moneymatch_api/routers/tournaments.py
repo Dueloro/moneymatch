@@ -172,7 +172,9 @@ async def get_markets(
         )
     linked = await session.scalar(
         select(LinkedAccount).where(
-            LinkedAccount.user_id == user.id, LinkedAccount.game == game
+            LinkedAccount.user_id == user.id,
+            LinkedAccount.game == game,
+            LinkedAccount.status != "unbound",
         )
     )
     metrics = []

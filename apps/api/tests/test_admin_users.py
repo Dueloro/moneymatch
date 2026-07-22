@@ -124,7 +124,7 @@ async def test_adjustment_requires_reason(client):
     assert r.status_code == 422
 
 
-async def test_force_unbind_removes_binding(client):
+async def test_force_unbind_soft_unbinds_and_preserves_row(client):
     await _admin(client)
     sm = new_sessionmaker()
     async with sm() as s:
@@ -143,8 +143,16 @@ async def test_force_unbind_removes_binding(client):
     async with sm() as s:
         from moneymatch_api.models.linked_account import LinkedAccount
 
-        gone = await s.get(LinkedAccount, link_id)
-        assert gone is None
+        # Soft-unbind: the row is retained (history intact) but marked unbound.
+        row = await s.get(LinkedAccount, link_id)
+        assert row is not None and row.status == "unbound"
+
+    # A second unbind is a clean 409, not a 500.
+    r2 = await client.post(
+        f"{V1}/admin/linked-accounts/{link_id}/unbind",
+        headers=auth_headers("auth_admin"),
+    )
+    assert r2.status_code == 409, r2.text
 
 
 async def test_ledger_endpoint_returns_rows(client):

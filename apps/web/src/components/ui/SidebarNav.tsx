@@ -15,6 +15,7 @@ export function SidebarNav() {
   const me = useMe();
   const username = me.data?.user.username ?? '…';
   const unread = me.data?.unread_notifications ?? 0;
+  const isAdmin = me.data?.user.role === 'admin';
 
   return (
     <nav className="flex h-full w-[184px] shrink-0 flex-col bg-bg px-3 py-5">
@@ -42,6 +43,21 @@ export function SidebarNav() {
             {item.label}
           </NavLink>
         ))}
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              [
+                'mt-2 rounded-lg px-3 py-2 text-sm transition',
+                isActive
+                  ? 'bg-panel-raised text-text'
+                  : 'text-text-secondary hover:text-text',
+              ].join(' ')
+            }
+          >
+            Admin
+          </NavLink>
+        )}
       </div>
 
       <div className="mt-4 flex items-center gap-2 px-1">

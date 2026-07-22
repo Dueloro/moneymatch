@@ -1,4 +1,6 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+import { e2eAuthConfigured, signInAs } from './auth';
 
 /**
  * Phase-4 exit criterion + required e2e (07-phase-4):
@@ -9,35 +11,28 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
  * after enqueue.
  *
  * Prerequisites (see e2e/README.md): a running stack (`make dev`) with a stubbed
- * FaceIt adapter that resolves each member's next match deterministically, and a
- * test-auth seam that signs in `POOL_ROOM_SIZE` seeded, CS2-linked users. The env
- * supplies their ready sessions as a JSON array in E2E_POOL_USERS.
+ * FaceIt adapter that resolves each member's next match deterministically, and
+ * the test-auth seam (`E2E_AUTH=1`) so four seeded, CS2-linked users sign in via
+ * the API's `/dev/e2e/token` route.
  */
 
-async function signIn(context: BrowserContext, sessionJson: string): Promise<Page> {
-  await context.addInitScript((session) => {
-    window.localStorage.setItem('sb-moneymatch-auth-token', session);
-  }, sessionJson);
-  const page = await context.newPage();
-  await page.goto('/pools');
-  return page;
-}
+// Four seeded, CS2-linked players from scripts/seed_demo.py.
+const POOL_AUTH_IDS: string[] = process.env.E2E_POOL_AUTH_IDS
+  ? (JSON.parse(process.env.E2E_POOL_AUTH_IDS) as string[])
+  : ['seed_player1', 'seed_player2', 'seed_player3', 'seed_player4'];
 
 test('four similar players form a Medium K/D room, clear, and split the pool', async ({
   browser,
 }) => {
-  const raw = process.env.E2E_POOL_USERS;
+  test.skip(!e2eAuthConfigured(), 'Set E2E_AUTH=1 and run the stack with the seam on.');
   test.skip(
-    !raw,
-    'Set E2E_POOL_USERS (JSON array of seeded, CS2-linked sessions) and run the stack.',
+    POOL_AUTH_IDS.length < 4,
+    'Need at least four seeded users to fill a room.',
   );
-  const sessions: string[] = JSON.parse(raw!);
-  test.skip(sessions.length < 4, 'Need at least four seeded sessions to fill a room.');
 
   const pages: Page[] = [];
-  for (const s of sessions.slice(0, 4)) {
-    const ctx = await browser.newContext();
-    pages.push(await signIn(ctx, s));
+  for (const authId of POOL_AUTH_IDS.slice(0, 4)) {
+    pages.push(await signInAs(browser, authId, { path: '/pools' }));
   }
 
   // The first player picks Medium and sees a bar quoted from their own baseline.

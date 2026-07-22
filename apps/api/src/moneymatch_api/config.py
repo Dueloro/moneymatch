@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     # (10-phase-7 §2). Requests per minute, per (user-or-ip, method+path).
     rate_limit_writes_per_minute: int = Field(default=60)
 
+    # Dev/e2e sign-in bypass (backlog · "Browser e2e test-auth seam"). When true
+    # AND env != prod, a `/dev/e2e/token` route mints a short-lived HS256 JWT for
+    # a given auth_id so Playwright can authenticate seeded users headless without
+    # a live Supabase project. Never mounted in prod; default off everywhere else.
+    e2e_auth_enabled: bool = Field(default=False)
+
     @field_validator("database_url")
     @classmethod
     def _require_async_driver(cls, v: str) -> str:

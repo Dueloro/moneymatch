@@ -94,6 +94,28 @@ async def test_existing_flag_blocks_without_re_evaluating(session, monkeypatch):
         )
 
 
+async def test_assert_not_flagged_blocks_on_existing_flag_without_host_call(
+    session, monkeypatch
+):
+    """The cheap hot-path guard raises on an open flag and never touches the host."""
+    user = await create_user(session, username="cheap_flagged")
+    session.add(RiskFlag(user_id=user.id, game=CS2, metric=KD, kind="sandbagging"))
+    await session.flush()
+
+    def _boom(_g):
+        raise AssertionError("assert_not_flagged must not evaluate the adapter")
+
+    monkeypatch.setattr(registry, "get", _boom)
+    with pytest.raises(SandbaggingBlockedError):
+        await sandbagging_service.assert_not_flagged(session, user.id, CS2, KD)
+
+
+async def test_assert_not_flagged_passes_when_clean(session):
+    user = await create_user(session, username="cheap_clean")
+    # No flag → no raise (and no host call is made).
+    await sandbagging_service.assert_not_flagged(session, user.id, CS2, KD)
+
+
 async def test_steady_player_not_blocked(session, monkeypatch):
     user = await create_user(session, username="clean")
     await create_linked_account(
