@@ -9,6 +9,7 @@ import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
 import { useMe } from '../hooks/useMe';
 import { api } from '../lib/api';
+import { enterDemo as demoEnter } from '../lib/demoAuth';
 import { toast } from '../lib/toast';
 import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
@@ -54,11 +55,6 @@ function PostAuthRedirect() {
   }
   return <Navigate to="/play" replace />;
 }
-
-// Shared demo account for the one-click "enter demo" bypass. Play-money beta —
-// see the sign-in note. Remove or gate this button before a real-money launch.
-const DEMO_EMAIL = 'demo@moneymatch.gg';
-const DEMO_PASSWORD = 'moneymatch-demo-2026';
 
 /** Map Supabase auth errors to friendly, actionable copy. */
 function friendlyAuthError(err: unknown, mode: 'signin' | 'signup'): string {
@@ -123,25 +119,10 @@ function AuthStep() {
     setError(null);
     setBusy(true);
     try {
-      try {
-        await signInWithPassword(DEMO_EMAIL, DEMO_PASSWORD);
-      } catch {
-        // First run: the demo account doesn't exist yet — create it, then in.
-        const { needsConfirmation } = await signUpWithPassword(
-          DEMO_EMAIL,
-          DEMO_PASSWORD,
-        );
-        if (needsConfirmation) {
-          toast.error(
-            'Demo needs email confirmation turned off in Supabase (Auth → Providers → Email).',
-          );
-          return;
-        }
-        await signInWithPassword(DEMO_EMAIL, DEMO_PASSWORD).catch(() => undefined);
-      }
+      // Full bypass: mint a demo token from the API and enter (reloads on success).
+      await demoEnter();
     } catch (err) {
       toast.error((err as Error)?.message || 'Could not enter the demo.');
-    } finally {
       setBusy(false);
     }
   }

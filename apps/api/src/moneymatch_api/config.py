@@ -81,6 +81,13 @@ class Settings(BaseSettings):
     # a live Supabase project. Never mounted in prod; default off everywhere else.
     e2e_auth_enabled: bool = Field(default=False)
 
+    # Demo-login bypass. When true, a `/demo/login` route mints a short-lived
+    # token for a single shared demo user that `auth.verify_token` accepts
+    # alongside real Supabase auth (it uses a separate signing key, so real login
+    # keeps working). A complete, email-free sign-in for demos. Play-money only —
+    # never enable on a real-money deployment.
+    demo_login_enabled: bool = Field(default=False)
+
     # Run the settlement worker loop *inside* the API process (a background asyncio
     # task started on lifespan startup) instead of as a separate service. This is
     # for hosts with no free/available Background Worker (e.g. Render's free tier):
