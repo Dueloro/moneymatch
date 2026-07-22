@@ -55,7 +55,7 @@ export function SidebarNav() {
 
       <div className="mt-4 flex items-center gap-2 px-1">
         <NavLink
-          to="/inbox"
+          to="/social?tab=inbox"
           aria-label={unread > 0 ? `Inbox (${unread} unread)` : 'Inbox'}
           className="relative grid h-8 w-8 place-items-center rounded-lg text-text-secondary hover:text-text"
         >

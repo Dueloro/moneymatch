@@ -27,7 +27,7 @@ export function Logo({
   return (
     <div className="flex items-center gap-2">
       <TriangleMark className={markClassName} />
-      <span className={wordClassName}>Dueloro</span>
+      <span className={wordClassName}>Money Match</span>
     </div>
   );
 }

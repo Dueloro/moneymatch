@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
 import { EmptyState } from '../components/ui/EmptyState';
+import { GameTabs } from '../components/ui/GameTabs';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
 import { formatCurrency, formatPct } from '../lib/format';
+import { gameMeta } from '../lib/games';
+import { useGameSelection } from '../hooks/useGameSelection';
 import {
   estPrize,
   useEnterPool,
@@ -22,13 +25,21 @@ function multiplierLabel(bps: number): string {
 }
 
 export function PoolsPage() {
-  const { data: markets } = usePoolMarkets();
+  const { games, selected: game, select: setGame } = useGameSelection();
+  const { data: markets } = usePoolMarkets(game);
   const { data: status } = usePoolStatus();
   const enter = useEnterPool();
 
   const [metricKey, setMetricKey] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<string | null>(null);
   const [entryCents, setEntryCents] = useState<number | null>(null);
+
+  // Reset the selection when the game changes.
+  useEffect(() => {
+    setMetricKey(null);
+    setDifficulty(null);
+    setEntryCents(null);
+  }, [game]);
 
   const metric: PoolMetric | null =
     markets?.metrics.find((m) => m.metric === metricKey) ?? markets?.metrics[0] ?? null;
@@ -51,9 +62,10 @@ export function PoolsPage() {
         <div className="mb-6">
           <BalanceHeader />
         </div>
+        <GameTabs games={games} selected={game} onSelect={setGame} />
         <EmptyState
-          title="Link your CS2 account"
-          subline="Pools are graded from your real FACEIT matches. Link to play."
+          title={`Link your ${game ? gameMeta(game).name : 'game'} account`}
+          subline="Pools are graded from your real matches. Link to play."
           action={
             <Link to="/profile">
               <PillButton>Link a game</PillButton>
@@ -69,6 +81,8 @@ export function PoolsPage() {
       <div className="mb-6">
         <BalanceHeader />
       </div>
+
+      <GameTabs games={games} selected={game} onSelect={setGame} />
 
       {/* Metric tabs */}
       <div className="mb-6 flex flex-wrap gap-2" role="tablist">

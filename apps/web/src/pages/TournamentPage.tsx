@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
-import { FriendsPanel } from '../components/FriendsPanel';
-import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { EmptyState } from '../components/ui/EmptyState';
+import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
-import { SubTabs } from '../components/ui/SubTabs';
 import { AmountText } from '../components/ui/AmountText';
 import { formatCurrency } from '../lib/format';
+import { gameMeta } from '../lib/games';
+import { useGameSelection } from '../hooks/useGameSelection';
 import {
   useEnterTournament,
   useLeaveTournament,
@@ -20,39 +20,26 @@ import {
   type TournamentView,
 } from '../hooks/useTournaments';
 
-type SectionTab = 'tournaments' | 'leaderboard' | 'friends';
-
-/** The Tournament section: sub-tabs across Tournaments / Leaderboard / Friends
- * (design p.6, p.7, p.8). */
+/** The Tournament section: per-game skill fields. Leaderboard and Friends moved
+ * to the Social section. */
 export function TournamentPage() {
-  const [tab, setTab] = useState<SectionTab>('tournaments');
-  return (
-    <div>
-      <div className="mb-6">
-        <SubTabs<SectionTab>
-          tabs={[
-            { key: 'tournaments', label: 'Tournaments' },
-            { key: 'leaderboard', label: 'Leaderboard' },
-            { key: 'friends', label: 'Friends' },
-          ]}
-          active={tab}
-          onSelect={setTab}
-        />
-      </div>
-      {tab === 'tournaments' && <TournamentsTab />}
-      {tab === 'leaderboard' && <LeaderboardPanel />}
-      {tab === 'friends' && <FriendsPanel />}
-    </div>
-  );
+  return <TournamentsTab />;
 }
 
 function TournamentsTab() {
-  const { data: markets } = useTournamentMarkets();
+  const { games, selected: game, select: setGame } = useGameSelection();
+  const { data: markets } = useTournamentMarkets(game);
   const { data: status } = useTournamentStatus();
   const enter = useEnterTournament();
 
   const [metricKey, setMetricKey] = useState<string | null>(null);
   const [entryCents, setEntryCents] = useState<number | null>(null);
+
+  // Reset the selection when the game changes.
+  useEffect(() => {
+    setMetricKey(null);
+    setEntryCents(null);
+  }, [game]);
 
   const metric: TournamentMetric | null =
     markets?.metrics.find((m) => m.metric === metricKey) ?? markets?.metrics[0] ?? null;
@@ -72,8 +59,9 @@ function TournamentsTab() {
         <div className="mb-6">
           <BalanceHeader />
         </div>
+        <GameTabs games={games} selected={game} onSelect={setGame} />
         <EmptyState
-          title="Link your CS2 account"
+          title={`Link your ${game ? gameMeta(game).name : 'game'} account`}
           subline="Tournaments record your best matches automatically. Link to play."
           action={
             <Link to="/profile">
@@ -90,6 +78,8 @@ function TournamentsTab() {
       <div className="mb-6">
         <BalanceHeader />
       </div>
+
+      <GameTabs games={games} selected={game} onSelect={setGame} />
 
       <div className="mb-6 flex flex-wrap gap-2" role="tablist">
         {markets?.metrics.map((m) => (

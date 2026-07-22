@@ -9,12 +9,12 @@ import { SidebarNav } from './ui/SidebarNav';
 import { Ticker } from './ui/Ticker';
 
 const BREADCRUMB: Record<string, string[]> = {
-  '/play': ['PLAY'],
-  '/pools': ['POOLS'],
+  '/play': ['HEAD-TO-HEAD'],
+  '/pools': ['SOLO POOLS'],
   '/tournament': ['TOURNAMENT'],
   '/activity': ['ACTIVITY'],
+  '/social': ['SOCIAL'],
   '/wallet': ['WALLET'],
-  '/inbox': ['INBOX'],
   '/profile': ['PROFILE'],
 };
 

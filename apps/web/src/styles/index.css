@@ -66,12 +66,10 @@ body {
   -webkit-box-decoration-break: clone;
 }
 
-/* Green glow for the selected/active surface (markets, tiers, presets). */
+/* Selected/active surface: a crisp lime edge, no blurred outer glow. */
 .glow-selected {
   border-color: var(--green) !important;
-  box-shadow:
-    0 0 0 1px var(--green),
-    0 0 26px -6px var(--green);
+  box-shadow: 0 0 0 1px var(--green);
 }
 
 /* Marquee crawl for the live ticker. Content is duplicated, so -50% loops. */

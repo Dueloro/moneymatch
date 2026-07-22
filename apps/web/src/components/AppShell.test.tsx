@@ -29,13 +29,15 @@ describe('AppShell', () => {
 
     // Nav renders in two responsive bars (desktop sidebar + mobile tab bar), so
     // a label can appear more than once; assert it is present at least once.
-    for (const label of ['Play', 'Pools', 'Activity', 'Wallet']) {
+    for (const label of ['Activity', 'Social', 'Wallet']) {
       expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0);
     }
-    // The desktop sidebar uses the full "Tournament" label (mobile abbreviates).
-    expect(screen.getByRole('link', { name: 'Tournament' })).toBeInTheDocument();
+    // The desktop sidebar uses full labels; the mobile bar abbreviates these.
+    for (const label of ['Head-to-Head', 'Solo Pools', 'Tournament']) {
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+    }
     expect(screen.getByText('PLAY CONTENT')).toBeInTheDocument();
-    expect(screen.getByTestId('footer-breadcrumb')).toHaveTextContent('PLAY');
+    expect(screen.getByTestId('footer-breadcrumb')).toHaveTextContent('HEAD-TO-HEAD');
     expect(screen.getByText('kvem_')).toBeInTheDocument();
   });
 
