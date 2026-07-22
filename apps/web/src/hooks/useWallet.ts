@@ -7,6 +7,8 @@ import {
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { formatCurrency } from '../lib/format';
+import { toast } from '../lib/toast';
 
 export interface LedgerEntry {
   id: string;
@@ -90,7 +92,10 @@ export function useDemoDeposit() {
       if (error) throw new Error('Deposit failed');
       return data as Wallet;
     },
-    onSuccess: invalidate,
+    onSuccess: (_data, amountPresetCents) => {
+      invalidate();
+      toast.success(`Added ${formatCurrency(amountPresetCents)}`);
+    },
   });
 }
 
@@ -104,6 +109,9 @@ export function useDemoWithdrawal() {
       if (error) throw new Error('Withdrawal failed');
       return data as Wallet;
     },
-    onSuccess: invalidate,
+    onSuccess: (_data, amountCents) => {
+      invalidate();
+      toast.success(`Cashed out ${formatCurrency(amountCents)}`);
+    },
   });
 }

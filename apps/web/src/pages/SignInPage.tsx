@@ -1,14 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
 import { LinkGames } from '../components/LinkGames';
+import { GlowBackdrop, TriangleMark } from '../components/ui/brand';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
 import { useMe } from '../hooks/useMe';
 import { api } from '../lib/api';
-import { US_STATES } from '../lib/usStates';
+import { toast } from '../lib/toast';
+import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -20,12 +22,11 @@ export function SignInPage() {
   if (loading || (session && me.isLoading)) return <Centered>Loading…</Centered>;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm">
+    <div className="relative flex min-h-screen items-center justify-center bg-bg px-4">
+      <GlowBackdrop />
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-4">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-green text-black">
-            <span className="font-bold">M</span>
-          </div>
+          <TriangleMark className="h-11 w-11" />
           <StepProgress step={!session ? 1 : me.data?.needs_onboarding ? 2 : 3} />
         </div>
 
@@ -61,14 +62,7 @@ function AuthStep() {
   const [error, setError] = useState<string | null>(null);
 
   if (sent) {
-    return (
-      <div className="text-center">
-        <h1 className="text-xl font-semibold">Check your email</h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          We sent a sign-in link to {email}.
-        </p>
-      </div>
-    );
+    return <SentStep email={email} onUseDifferentEmail={() => setSent(false)} />;
   }
 
   return (
@@ -103,6 +97,7 @@ function AuthStep() {
         <input
           type="email"
           required
+          aria-label="Email address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@email.com"
@@ -113,6 +108,65 @@ function AuthStep() {
         </PillButton>
         {error && <p className="text-center text-sm text-red">{error}</p>}
       </form>
+    </div>
+  );
+}
+
+function SentStep({
+  email,
+  onUseDifferentEmail,
+}: {
+  email: string;
+  onUseDifferentEmail: () => void;
+}) {
+  const { signInWithEmail } = useAuth();
+  const [cooldown, setCooldown] = useState(30);
+  const [resending, setResending] = useState(false);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  async function resend() {
+    setResending(true);
+    try {
+      await signInWithEmail(email);
+      toast.success('Sign-in link sent again.');
+      setCooldown(30);
+    } catch {
+      toast.error('Could not resend the link. Try again.');
+    } finally {
+      setResending(false);
+    }
+  }
+
+  return (
+    <div className="text-center">
+      <h1 className="text-xl font-semibold">Check your email</h1>
+      <p className="mt-2 text-sm text-text-secondary">
+        We sent a sign-in link to <span className="text-text">{email}</span>. Click it
+        to finish signing in.
+      </p>
+
+      <div className="mt-8 flex flex-col gap-3">
+        <PillButton
+          variant="outline"
+          fullWidth
+          disabled={cooldown > 0 || resending}
+          onClick={() => void resend()}
+        >
+          {resending
+            ? 'Resending…'
+            : cooldown > 0
+              ? `Resend link in ${cooldown}s`
+              : 'Resend link'}
+        </PillButton>
+        <PillButton variant="text" fullWidth onClick={onUseDifferentEmail}>
+          Use a different email
+        </PillButton>
+      </div>
     </div>
   );
 }
@@ -155,7 +209,7 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
     <div>
       <h1 className="text-center text-xl font-semibold">Create your profile</h1>
       <p className="mt-2 text-center text-sm text-text-secondary">
-        Your username is your public handle — choose carefully, it can't change.
+        Your username is your public handle. Choose carefully, it can't change.
       </p>
 
       <form
@@ -193,6 +247,12 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
               </option>
             ))}
           </select>
+          {isExcludedState(state) && (
+            <span className="text-xs text-text-secondary">
+              Cash play is not available in {stateName(state)} yet. You can still sign
+              up and play every match for free.
+            </span>
+          )}
         </label>
 
         <label className="flex items-start gap-2 text-sm text-text-secondary">
@@ -225,7 +285,7 @@ function LinkGameStep() {
     <div>
       <h1 className="text-center text-xl font-semibold">Link your first game</h1>
       <p className="mt-2 text-center text-sm text-text-secondary">
-        Connect Chess, CS2, or Dota 2 to start playing — or do it later from your
+        Connect Chess, CS2, or Dota 2 to start playing, or do it later from your
         profile.
       </p>
       <div className="mt-8">
@@ -233,7 +293,7 @@ function LinkGameStep() {
       </div>
       <div className="mt-8">
         <PillButton variant="primary" fullWidth onClick={() => navigate('/play')}>
-          Enter Money Match
+          Enter Dueloro
         </PillButton>
       </div>
     </div>

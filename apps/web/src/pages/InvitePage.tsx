@@ -87,7 +87,7 @@ export function InvitePage() {
                 </PillButton>
                 {needsLink && (
                   <p className="mt-3 text-xs text-red">
-                    Link your {preview.game} account first —{' '}
+                    Link your {preview.game} account first.{' '}
                     <button className="underline" onClick={() => navigate('/profile')}>
                       go to Profile
                     </button>

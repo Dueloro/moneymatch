@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { AmountText } from '../components/ui/AmountText';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency, formatRelativeTime } from '../lib/format';
+import { toast } from '../lib/toast';
 import { statValue, useActivity, type ActivityItem } from '../hooks/useActivity';
 import { useCreateChallenge } from '../hooks/useChallenges';
 
@@ -64,21 +67,15 @@ function toastFor(item: ActivityItem): string {
   if (item.state === 'SETTLED') {
     if (net > 0) return `You won ${formatCurrency(net)} ${what}`;
     if (net < 0) return `You lost ${formatCurrency(Math.abs(net))} ${what}`;
-    return `Settled — ${what}`;
+    return `Settled · ${what}`;
   }
-  if (item.state === 'PUSHED') return `Push ${what} — entry refunded`;
-  return `Refunded — ${what}`;
+  if (item.state === 'PUSHED') return `Push ${what} · entry refunded`;
+  return `Refunded · ${what}`;
 }
 
 /** One-tap rematch on a settled H2H row → challenge the same opponent
  * (08-phase-5 · deliverable 6). */
-function RematchButton({
-  item,
-  onSent,
-}: {
-  item: ActivityItem;
-  onSent: (msg: string) => void;
-}) {
+function RematchButton({ item }: { item: ActivityItem }) {
   const rematch = useCreateChallenge();
   if (item.type !== 'match' || !TERMINAL_STATES.has(item.state)) return null;
   return (
@@ -88,9 +85,9 @@ function RematchButton({
       onClick={async () => {
         try {
           await rematch.mutateAsync({ rematch_of: item.id });
-          onSent(`Rematch sent to ${item.opponent_username ?? 'opponent'}`);
-        } catch (e) {
-          onSent((e as Error).message);
+          toast.success(`Rematch sent to ${item.opponent_username ?? 'opponent'}`);
+        } catch {
+          // The failure is surfaced by the global mutation-error toast.
         }
       }}
     >
@@ -100,13 +97,12 @@ function RematchButton({
 }
 
 export function ActivityPage() {
-  const { data, isLoading } = useActivity();
+  const { data, isLoading, isError, refetch } = useActivity();
   const items = useMemo(() => data?.items ?? [], [data]);
 
   // Settlement toast: track which resolved matches we've already shown, seeding
   // from the first load so we only pop for transitions that happen live.
   const seen = useRef<Set<string> | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     const resolved = items.filter((i) => i.resolved_at != null);
@@ -117,22 +113,18 @@ export function ActivityPage() {
     const fresh = resolved.find((i) => !seen.current!.has(i.id));
     if (fresh) {
       resolved.forEach((i) => seen.current!.add(i.id));
-      setToast(toastFor(fresh));
+      toast.info(toastFor(fresh));
     }
   }, [items]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 5000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   return (
     <div className="max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold">Activity</h1>
 
-      {isLoading ? (
-        <p className="text-sm text-text-secondary">Loading…</p>
+      {isError ? (
+        <ErrorState title="Could not load your activity" onRetry={() => refetch()} />
+      ) : isLoading ? (
+        <SkeletonList rows={5} />
       ) : items.length === 0 ? (
         <EmptyState
           title="Nothing here yet"
@@ -173,22 +165,12 @@ export function ActivityPage() {
                         {formatCurrency(item.entry_cents)} in play
                       </span>
                     )}
-                    <RematchButton item={item} onSent={setToast} />
+                    <RematchButton item={item} />
                   </div>
                 }
               />
             );
           })}
-        </div>
-      )}
-
-      {toast && (
-        <div
-          role="status"
-          data-testid="settlement-toast"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-pill bg-panel-raised px-5 py-3 text-sm font-semibold text-text shadow-lg"
-        >
-          {toast}
         </div>
       )}
     </div>

@@ -1,16 +1,12 @@
 import { NavLink } from 'react-router-dom';
 
 import { useMe } from '../../hooks/useMe';
+import { Logo } from './brand';
+import { BellIcon } from './icons';
+import { NAV } from './nav';
 
-const NAV = [
-  { to: '/play', label: 'Play' },
-  { to: '/pools', label: 'Pools' },
-  { to: '/tournament', label: 'Tournament' },
-  { to: '/activity', label: 'Activity' },
-  { to: '/wallet', label: 'Wallet' },
-];
-
-/** Left sidebar (~184px): logo, primary nav, bottom bell + avatar chip. */
+/** Left sidebar (~184px): logo, primary nav, bottom bell + avatar chip. Desktop
+ * only; on small screens the MobileNav bars take over. */
 export function SidebarNav() {
   const me = useMe();
   const username = me.data?.user.username ?? '…';
@@ -18,12 +14,9 @@ export function SidebarNav() {
   const isAdmin = me.data?.user.role === 'admin';
 
   return (
-    <nav className="flex h-full w-[184px] shrink-0 flex-col bg-bg px-3 py-5">
-      <div className="mb-8 flex items-center gap-2 px-2">
-        <div className="grid h-7 w-7 place-items-center rounded-lg bg-green text-black">
-          <span className="text-sm font-bold">M</span>
-        </div>
-        <span className="text-sm font-semibold">Money Match</span>
+    <nav className="hidden h-full w-[184px] shrink-0 flex-col px-3 py-5 md:flex">
+      <div className="mb-8 px-2">
+        <Logo />
       </div>
 
       <div className="flex flex-1 flex-col gap-1">
@@ -66,7 +59,7 @@ export function SidebarNav() {
           aria-label={unread > 0 ? `Inbox (${unread} unread)` : 'Inbox'}
           className="relative grid h-8 w-8 place-items-center rounded-lg text-text-secondary hover:text-text"
         >
-          <span aria-hidden>🔔</span>
+          <BellIcon />
           {unread > 0 && (
             <span
               data-testid="inbox-unread-dot"

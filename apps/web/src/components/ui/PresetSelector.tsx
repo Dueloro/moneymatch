@@ -29,7 +29,7 @@ export function PresetSelector({
               'rounded-pill border px-4 py-2 text-sm font-semibold transition',
               'disabled:cursor-not-allowed disabled:opacity-40',
               active
-                ? 'border-green text-green'
+                ? 'glow-selected text-green'
                 : 'border-hairline text-text hover:border-text-secondary',
             ].join(' ')}
           >

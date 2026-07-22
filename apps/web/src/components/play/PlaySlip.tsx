@@ -1,5 +1,6 @@
 import { PillButton } from '../ui/PillButton';
 import { PresetSelector } from '../ui/PresetSelector';
+import { VersusCard } from './VersusCard';
 import { formatCurrency, formatPct } from '../../lib/format';
 import {
   prizeForEntry,
@@ -56,10 +57,10 @@ export function PlaySlip({
   }
   return (
     <SlipShell>
-      <p className="text-sm font-semibold text-text">Pick a stat to start</p>
+      <p className="text-sm font-semibold text-text">Pick a market to start</p>
       <p className="mt-1 text-xs text-text-secondary">
-        Choose a market on the left, set your entry, and we&apos;ll find a fair,
-        evenly-matched opponent.
+        Choose a market, set your entry, and we&apos;ll find a fair, evenly-matched
+        opponent.
       </p>
     </SlipShell>
   );
@@ -68,7 +69,7 @@ export function PlaySlip({
 function SlipShell({ children }: { children: React.ReactNode }) {
   return (
     <aside
-      className="w-[354px] shrink-0 rounded-2xl bg-panel p-6"
+      className="w-full shrink-0 rounded-2xl bg-panel p-6 md:w-[354px]"
       data-testid="play-slip"
     >
       {children}
@@ -194,29 +195,26 @@ function SearchingSlip({ status }: { status: QueueStatus }) {
 function MatchedSlip({ match }: { match: MatchView }) {
   const confirm = useConfirmMatch();
   const decline = useDeclineMatch();
+  const you = match.players.find((p) => p.is_you);
   const opponent = match.players.find((p) => !p.is_you);
   const active = match.state === 'ACTIVE' || match.state === 'AWAITING_RESULT';
 
   return (
     <SlipShell>
-      <p className="text-xs uppercase tracking-wide text-text-secondary">
-        {active ? 'Match on' : 'Opponent found'}
-      </p>
-      <h3 className="text-lg font-bold text-text">{match.market_label}</h3>
+      <VersusCard
+        marketLabel={match.market_label}
+        status={active ? 'Match on' : 'Opponent found'}
+        you={{ name: you?.username ?? 'You', rating: you?.rating }}
+        opponent={{ name: opponent?.username ?? 'Opponent', rating: opponent?.rating }}
+        potCents={match.pot_cents}
+        prizeCents={match.prize_cents}
+      />
 
-      <div className="mt-3 rounded-lg bg-bg p-3">
-        <p className="text-sm font-medium text-text">
-          vs {opponent?.username ?? 'opponent'}
-          {opponent?.rating != null && (
-            <span className="text-text-secondary"> · {opponent.rating}</span>
-          )}
+      {match.forecast && (
+        <p className="mt-3 text-xs text-green" data-testid="forecast">
+          {match.forecast.label}
         </p>
-        {match.forecast && (
-          <p className="mt-1 text-xs text-green" data-testid="forecast">
-            {match.forecast.label}
-          </p>
-        )}
-      </div>
+      )}
 
       <RakeLine entryCents={match.entry_cents} multiplierBps={match.multiplier_bps} />
 
@@ -270,7 +268,7 @@ function GoPlay({ match }: { match: MatchView }) {
       <p className="text-sm font-medium text-text">Play your next match now</p>
       <p className="mt-1 text-xs text-text-secondary">
         Jump into {match.game.split('.')[0].toUpperCase()} and play. We grade your next
-        finished match automatically — no reporting needed.
+        finished match automatically, no reporting needed.
       </p>
       {match.forecast && (
         <p className="mt-2 text-xs text-text-secondary">

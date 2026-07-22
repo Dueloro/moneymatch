@@ -4,8 +4,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { BalanceHeader } from '../components/BalanceHeader';
 import { PlaySlip } from '../components/play/PlaySlip';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
 import { useLinks } from '../hooks/useLinks';
 import {
@@ -21,6 +23,15 @@ import {
 
 function formatMultiplier(bps: number): string {
   return `×${(bps / 10000).toFixed(2)}`;
+}
+
+/** The market's headline resolution note (the part before the first "·"), with
+ * the live queue depth appended when anyone is waiting. */
+function marketSubline(market: MarketRow): string {
+  const headline = market.resolution_note.split('·')[0]?.trim() ?? '';
+  return market.queue_depth > 0
+    ? `${headline} · ${market.queue_depth} waiting`
+    : headline;
 }
 
 // States where the slip should show the confirm/active card for a deep-linked
@@ -39,7 +50,12 @@ export function PlayPage() {
     setGame((firstLinked ?? games[0]).game);
   }, [games, game]);
 
-  const { data: markets } = useMarkets(game);
+  const {
+    data: markets,
+    isLoading: marketsLoading,
+    isError: marketsError,
+    refetch: refetchMarkets,
+  } = useMarkets(game);
 
   // Inbox "Respond" lands here as /play?match=<id>; open that match's slip
   // directly (it isn't in the viewer's queue status when it came from a challenge).
@@ -102,7 +118,7 @@ export function PlayPage() {
       </div>
 
       {/* Game tabs */}
-      <div className="mb-6 flex gap-2" role="tablist">
+      <div className="mb-6 flex flex-wrap gap-2" role="tablist">
         {games.map((g) => (
           <button
             key={g.game}
@@ -121,9 +137,16 @@ export function PlayPage() {
         ))}
       </div>
 
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="min-w-0 flex-1">
-          {!linked ? (
+          {marketsLoading ? (
+            <SkeletonList rows={4} />
+          ) : marketsError ? (
+            <ErrorState
+              title="Could not load markets"
+              onRetry={() => refetchMarkets()}
+            />
+          ) : !linked ? (
             <EmptyState
               title={`Link your ${selectGame?.display_name ?? 'game'} account`}
               subline="Link a game account to play head-to-head for real payouts."
@@ -135,9 +158,7 @@ export function PlayPage() {
             />
           ) : (
             <>
-              <h2 className="mb-2 text-sm font-semibold text-text-secondary">
-                Markets
-              </h2>
+              <h2 className="mb-3 label-mono">Markets</h2>
               <div className="mb-8">
                 {markets?.markets.map((m) => {
                   const selected = m.key === marketKey;
@@ -145,7 +166,10 @@ export function PlayPage() {
                     <button
                       key={m.key}
                       onClick={() => selectMarket(m)}
-                      className="block w-full text-left"
+                      className={[
+                        'block w-full rounded-lg text-left transition',
+                        selected ? 'glow-selected' : 'hover:bg-panel/50',
+                      ].join(' ')}
                     >
                       <ListRow
                         left={
@@ -162,11 +186,7 @@ export function PlayPage() {
                           </span>
                         }
                         title={m.label}
-                        subline={
-                          m.queue_depth > 0
-                            ? `${m.resolution_note.split('·')[0].trim()} · ${m.queue_depth} waiting`
-                            : m.resolution_note.split('·')[0].trim()
-                        }
+                        subline={marketSubline(m)}
                         right={
                           <span className="font-semibold text-text">
                             {formatMultiplier(m.multiplier_bps)}
@@ -198,9 +218,7 @@ export function PlayPage() {
                 </div>
               )}
 
-              <h2 className="mb-2 text-sm font-semibold text-text-secondary">
-                Waiting to play
-              </h2>
+              <h2 className="mb-3 label-mono">Waiting to play</h2>
               {waiting.data && waiting.data.waiting.length > 0 ? (
                 waiting.data.waiting.map((w) => (
                   <ListRow
@@ -220,7 +238,7 @@ export function PlayPage() {
                 ))
               ) : (
                 <p className="py-4 text-sm text-text-secondary">
-                  No one waiting yet — start a search and we&apos;ll pair you.
+                  No one waiting yet. Start a search and we&apos;ll pair you.
                 </p>
               )}
             </>

@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Toaster } from '../components/ui/Toaster';
 import { renderWithProviders } from '../test/testUtils';
 import { ActivityPage } from './ActivityPage';
 
@@ -97,10 +98,19 @@ describe('ActivityPage', () => {
   });
 
   it('pops a settlement toast when a match newly resolves', () => {
+    // The settlement toast now goes through the global bus, rendered by <Toaster />.
+    // A fresh element each render avoids React's same-reference bailout.
+    const view = () => (
+      <>
+        <ActivityPage />
+        <Toaster />
+      </>
+    );
+
     // First paint: the match is still live (seeds the "seen" set as empty).
     mockItems([item({ id: 'm9', state: 'ACTIVE', net_cents: null })]);
-    const { rerender } = renderWithProviders(<ActivityPage />);
-    expect(screen.queryByTestId('settlement-toast')).not.toBeInTheDocument();
+    const { rerender } = renderWithProviders(view());
+    expect(screen.queryByText(/You won/)).not.toBeInTheDocument();
 
     // Next poll: it settled as a win → the toast pops.
     mockItems([
@@ -111,9 +121,7 @@ describe('ActivityPage', () => {
         resolved_at: new Date().toISOString(),
       }),
     ]);
-    rerender(<ActivityPage />);
-    expect(screen.getByTestId('settlement-toast')).toHaveTextContent(
-      'You won $8.00 vs kvem_',
-    );
+    rerender(view());
+    expect(screen.getByText('You won $8.00 vs kvem_')).toBeInTheDocument();
   });
 });

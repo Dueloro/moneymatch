@@ -1,7 +1,9 @@
 // US states for the onboarding residence dropdown. The excluded ("Any Chance")
-// states are NOT filtered here — blocked users can still sign in (free-play-
+// states are NOT filtered here: blocked users can still sign in (free-play-
 // everywhere posture); the geo-fence is enforced server-side at escrow time
-// (03-phase-0 · 01-architecture §3.2).
+// (03-phase-0 · 01-architecture §3.2). The client mirrors the list below so we
+// can tell a user up front that cash play is not available in their state,
+// rather than only bouncing them at escrow.
 export const US_STATES: { code: string; name: string }[] = [
   { code: 'AL', name: 'Alabama' },
   { code: 'AK', name: 'Alaska' },
@@ -55,3 +57,33 @@ export const US_STATES: { code: string; name: string }[] = [
   { code: 'WI', name: 'Wisconsin' },
   { code: 'WY', name: 'Wyoming' },
 ];
+
+// The 14 "Any Chance" states where cash skill contests are not offered
+// (docs/product/overview.md §9.2). Free play is available everywhere.
+export const EXCLUDED_STATES = new Set([
+  'AZ',
+  'AR',
+  'CT',
+  'DE',
+  'FL',
+  'IN',
+  'LA',
+  'MD',
+  'MN',
+  'MT',
+  'SC',
+  'SD',
+  'TN',
+  'WY',
+]);
+
+/** True when cash play is not available in the given state code. */
+export function isExcludedState(code: string | null | undefined): boolean {
+  return !!code && EXCLUDED_STATES.has(code);
+}
+
+/** Full state name for a code, or the code itself if unknown. */
+export function stateName(code: string | null | undefined): string {
+  if (!code) return '';
+  return US_STATES.find((s) => s.code === code)?.name ?? code;
+}

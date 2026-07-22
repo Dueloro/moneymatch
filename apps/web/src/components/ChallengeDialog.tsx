@@ -173,7 +173,7 @@ export function ChallengeDialog({
             {inviteUrl ? (
               <div className="mt-5">
                 <p className="mb-2 text-xs text-text-secondary">
-                  Share this link — it&apos;s single-use and expires in 24h.
+                  Share this link. It&apos;s single-use and expires in 24h.
                 </p>
                 <div className="flex items-center gap-2">
                   <input
