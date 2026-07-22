@@ -17,6 +17,7 @@ import jwt
 from jwt import PyJWKClient
 
 from .config import Settings, get_settings
+from .constants import DEMO_JWT_SECRET
 from .errors import APIError
 
 
@@ -47,9 +48,36 @@ def extract_bearer_token(authorization: str | None) -> str:
     return parts[1].strip()
 
 
+def _try_demo_token(token: str, settings: Settings) -> AuthedIdentity | None:
+    """Accept a demo-login token (its own signing key) when demo mode is on.
+
+    Returns None for anything that isn't a valid demo token, so a real Supabase
+    JWT falls through to normal verification below.
+    """
+    try:
+        claims = jwt.decode(
+            token,
+            DEMO_JWT_SECRET,
+            algorithms=["HS256"],
+            audience=settings.supabase_jwt_audience,
+        )
+    except jwt.InvalidTokenError:
+        return None
+    if claims.get("demo") is not True:
+        return None
+    sub = claims.get("sub")
+    if not sub:
+        return None
+    return AuthedIdentity(auth_id=str(sub), email=claims.get("email"))
+
+
 def verify_token(token: str, settings: Settings | None = None) -> AuthedIdentity:
     """Verify a Supabase JWT and return the identity, or raise AuthError."""
     settings = settings or get_settings()
+    if settings.demo_login_enabled:
+        demo = _try_demo_token(token, settings)
+        if demo is not None:
+            return demo
     try:
         if settings.supabase_jwt_secret:
             claims = jwt.decode(

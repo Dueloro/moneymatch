@@ -1,15 +1,16 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { clearDemoToken, getDemoToken } from '../lib/demoAuth';
 import { decodeJwtClaims, getE2eToken } from '../lib/e2eAuth';
 import { env } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { identify, resetIdentity } from '../lib/telemetry';
 import { AuthContext, type AuthContextValue } from './authContext';
 
-/** Build a minimal Supabase-shaped session from an e2e access token so the app
- * routes past RequireAuth without a live Supabase project. */
-function e2eSession(token: string): Session | null {
+/** Build a minimal Supabase-shaped session from an injected access token (demo
+ * or e2e) so the app routes past RequireAuth without a live Supabase session. */
+function sessionFromToken(token: string): Session | null {
   const claims = decodeJwtClaims(token);
   if (!claims) return null;
   return {
@@ -24,10 +25,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Demo bypass: adopt the demo token as the session, skip Supabase entirely.
+    // The token is only in localStorage after a successful /demo/login, and the
+    // backend only honours it while demo mode is on.
+    const demoToken = getDemoToken();
+    if (demoToken) {
+      const injected = sessionFromToken(demoToken);
+      if (injected) {
+        setSession(injected);
+        identify(injected.user.id);
+        setLoading(false);
+        return;
+      }
+    }
     // e2e bypass: adopt the injected token as the session, skip Supabase entirely.
     if (env.e2eAuth) {
       const token = getE2eToken();
-      const injected = token ? e2eSession(token) : null;
+      const injected = token ? sessionFromToken(token) : null;
       setSession(injected);
       if (injected) identify(injected.user.id);
       setLoading(false);
@@ -81,7 +95,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { needsConfirmation: !data.session };
       },
       signOut: async () => {
-        await supabase.auth.signOut();
+        // A demo session isn't a Supabase session, so clear the token and reset
+        // locally; a real session signs out through Supabase as usual.
+        const wasDemo = getDemoToken() != null;
+        clearDemoToken();
+        await supabase.auth.signOut().catch(() => undefined);
+        if (wasDemo) {
+          resetIdentity();
+          setSession(null);
+          window.location.assign('/signin');
+        }
       },
     }),
     [session, loading],

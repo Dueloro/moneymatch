@@ -28,6 +28,17 @@ def game_display_name(game_id: str) -> str:
     return GAME_DISPLAY_NAMES.get(game_id, game_id)
 
 
+# Demo-login bypass (see routers/demo.py + config.demo_login_enabled). One shared
+# demo user, provisioned + onboarded on first login. The signing key is not a
+# real secret: a demo token only ever grants this demo user, and is only minted
+# or accepted when demo_login_enabled is on. Play-money demos only.
+DEMO_AUTH_ID = "demo-user"
+DEMO_EMAIL = "demo@dueloro.com"
+DEMO_USERNAME = "demo"
+DEMO_RESIDENCE_STATE = "MA"
+DEMO_JWT_SECRET = "moneymatch-demo-login-signing-key-not-a-secret"  # noqa: S105 (see above)
+
+
 # Feature-flag keys seeded in the first migration and readable/writable by admin.
 FLAG_QUEUE_PAUSED = "queue_paused"
 FLAG_SETTLEMENT_PAUSED = "settlement_paused"

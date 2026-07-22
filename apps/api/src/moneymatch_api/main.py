@@ -143,6 +143,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.include_router(dev.router, prefix=API_V1_PREFIX)
         log.warning("api.e2e_auth_enabled")  # loud: this must never fire in prod
 
+    # Demo-login bypass — a complete, Supabase-free sign-in for demos. Gated on an
+    # explicit flag (so it can be enabled wherever a demo runs) and loud, since it
+    # lets anyone in as the shared demo user. Play-money only.
+    if settings.demo_login_enabled:
+        from .routers import demo
+
+        app.include_router(demo.router, prefix=API_V1_PREFIX)
+        log.warning("api.demo_login_enabled")
+
     return app
 
 
