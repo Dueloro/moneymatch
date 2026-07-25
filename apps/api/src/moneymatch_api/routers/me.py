@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,12 +58,24 @@ async def update_me(
             dob_attested_18plus=body.dob_attested_18plus,
         )
 
-    if body.daily_loss_cap_cents is not None or body.daily_entry_cap_cents is not None:
+    if (
+        body.daily_loss_cap_cents is not None
+        or body.daily_entry_cap_cents is not None
+        or body.daily_deposit_cap_cents is not None
+        or body.cooloff_days is not None
+    ):
+        timeout_until = (
+            datetime.now(UTC) + timedelta(days=body.cooloff_days)
+            if body.cooloff_days is not None
+            else None
+        )
         await limits_service.request_limit_change(
             session,
             user.id,
             daily_loss_cap_cents=body.daily_loss_cap_cents,
             daily_entry_cap_cents=body.daily_entry_cap_cents,
+            daily_deposit_cap_cents=body.daily_deposit_cap_cents,
+            timeout_until=timeout_until,
         )
 
     if body.active_games is not None:

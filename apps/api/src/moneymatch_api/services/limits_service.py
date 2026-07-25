@@ -82,18 +82,28 @@ async def request_limit_change(
     *,
     daily_loss_cap_cents: int | None = None,
     daily_entry_cap_cents: int | None = None,
+    daily_deposit_cap_cents: int | None = None,
+    timeout_until: datetime | None = None,
     now: datetime | None = None,
 ) -> Limit:
     """Apply limit edits: lowering (more protective) is instant; raising a cap
     is staged behind a 24 h cooldown (`pending_limits` + `pending_effective_at`).
+    A cool-off (`timeout_until`) is a protective break — applied instantly and
+    only ever extended, never shortened.
     """
     now = now or datetime.now(UTC)
     limit = await get_or_create_limits(session, user_id)
     promote_pending(limit, now=now)
 
+    if timeout_until is not None and (
+        limit.timeout_until is None or timeout_until > limit.timeout_until
+    ):
+        limit.timeout_until = timeout_until
+
     requested = {
         "daily_loss_cap_cents": daily_loss_cap_cents,
         "daily_entry_cap_cents": daily_entry_cap_cents,
+        "daily_deposit_cap_cents": daily_deposit_cap_cents,
     }
     pending = dict(limit.pending_limits or {})
     for field, value in requested.items():
@@ -165,6 +175,53 @@ async def daily_usage(
     )
 
 
+async def assert_can_deposit(
+    session: AsyncSession,
+    user: User,
+    amount_cents: int,
+    *,
+    currency: str = "DEMO",
+    now: datetime | None = None,
+) -> None:
+    """Raise `StakeBlockedError` if `amount_cents` would breach the trailing-24 h
+    deposit cap — the responsible-gaming guard on funding velocity."""
+    now = now or datetime.now(UTC)
+    if amount_cents <= 0:
+        raise StakeBlockedError("invalid_amount", "Deposit must be positive.")
+
+    limit = await get_or_create_limits(session, user.id)
+    promote_pending(limit, now=now)
+
+    wallet = await session.scalar(
+        select(Wallet).where(
+            and_(Wallet.user_id == user.id, Wallet.currency == currency)
+        )
+    )
+    deposited = 0
+    if wallet is not None:
+        deposited = int(
+            await session.scalar(
+                select(func.coalesce(func.sum(LedgerEntry.amount_cents), 0)).where(
+                    LedgerEntry.wallet_id == wallet.id,
+                    LedgerEntry.entry_type == "demo_deposit",
+                    LedgerEntry.created_at >= now - WINDOW,
+                )
+            )
+            or 0
+        )
+
+    if deposited + amount_cents > limit.daily_deposit_cap_cents:
+        raise StakeBlockedError(
+            "daily_deposit_cap_exceeded",
+            "This deposit would exceed your daily deposit cap.",
+            {
+                "cap_cents": limit.daily_deposit_cap_cents,
+                "used_cents": deposited,
+                "requested_cents": amount_cents,
+            },
+        )
+
+
 async def assert_can_stake(
     session: AsyncSession,
     user: User,
@@ -222,6 +279,16 @@ async def assert_can_stake(
 
     limit = await get_or_create_limits(session, user.id)
     promote_pending(limit, now=now)
+
+    # Self-imposed cool-off: staking is refused until the break ends.
+    _now = now or datetime.now(UTC)
+    if limit.timeout_until is not None and limit.timeout_until > _now:
+        raise StakeBlockedError(
+            "account_timeout",
+            "You're on a self-imposed break. Staking resumes when it ends.",
+            {"until": limit.timeout_until.isoformat()},
+        )
+
     usage = await daily_usage(session, wallet, now=now)
 
     # KYC threshold site (inert at MVP): a stake crossing the cumulative-entry

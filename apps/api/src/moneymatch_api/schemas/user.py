@@ -33,9 +33,11 @@ class LimitsResponse(BaseModel):
 
     daily_loss_cap_cents: int
     daily_entry_cap_cents: int
+    daily_deposit_cap_cents: int
     max_concurrent_contests: int
     pending_limits: dict | None
     pending_effective_at: datetime | None
+    timeout_until: datetime | None
 
 
 class MeResponse(BaseModel):
@@ -59,6 +61,9 @@ class UpdateMeRequest(BaseModel):
     dob_attested_18plus: bool | None = None
     daily_loss_cap_cents: int | None = Field(default=None, gt=0)
     daily_entry_cap_cents: int | None = Field(default=None, gt=0)
+    daily_deposit_cap_cents: int | None = Field(default=None, gt=0)
+    # Start a self-imposed cool-off of N days (protective; extend-only).
+    cooloff_days: int | None = Field(default=None, gt=0, le=365)
     active_games: list[str] | None = Field(
         default=None, description="Catalog game ids the player has chosen to play"
     )

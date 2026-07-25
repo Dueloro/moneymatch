@@ -124,3 +124,54 @@ def test_promote_pending_respects_cooldown():
     assert limit.daily_loss_cap_cents == 40_000  # promoted
     assert limit.pending_limits is None
     assert limit.pending_effective_at is None
+
+
+# --- responsible-gaming depth: cool-off + deposit cap ---------------------- #
+
+
+async def test_cooloff_blocks_staking_until_it_ends(session):
+    user = await create_user(session)
+    await create_wallet(session, user, available_cents=100_00)
+    # Start a 7-day self-imposed break.
+    until = datetime.now(UTC) + timedelta(days=7)
+    await ls.request_limit_change(session, user.id, timeout_until=until)
+
+    with pytest.raises(ls.StakeBlockedError) as ei:
+        await ls.assert_can_stake(session, user, 10_00)
+    assert ei.value.code == "account_timeout"
+
+    # Once the break has passed, staking resumes (check with a past `now`).
+    await ls.assert_can_stake(session, user, 10_00, now=until + timedelta(seconds=1))
+
+
+async def test_cooloff_is_extend_only(session):
+    user = await create_user(session)
+    far = datetime.now(UTC) + timedelta(days=30)
+    near = datetime.now(UTC) + timedelta(days=1)
+    await ls.request_limit_change(session, user.id, timeout_until=far)
+    # A shorter break can't shorten an active one.
+    await ls.request_limit_change(session, user.id, timeout_until=near)
+    limit = await ls.get_or_create_limits(session, user.id)
+    assert limit.timeout_until == far
+
+
+async def test_deposit_cap_blocks_over_cap(session):
+    user = await create_user(session)
+    await create_wallet(session, user, available_cents=0)
+    # Lower the deposit cap to $50, then a $60 deposit is refused.
+    await ls.request_limit_change(session, user.id, daily_deposit_cap_cents=5_000)
+    with pytest.raises(ls.StakeBlockedError) as ei:
+        await ls.assert_can_deposit(session, user, 6_000)
+    assert ei.value.code == "daily_deposit_cap_exceeded"
+    # A within-cap deposit passes.
+    await ls.assert_can_deposit(session, user, 4_000)
+
+
+async def test_deposit_cap_counts_trailing_window(session):
+    user = await create_user(session)
+    await create_wallet(session, user, available_cents=0)
+    await ls.request_limit_change(session, user.id, daily_deposit_cap_cents=10_000)
+    await ws.demo_deposit(session, user.id, 7_000)  # already deposited $70 today
+    with pytest.raises(ls.StakeBlockedError) as ei:
+        await ls.assert_can_deposit(session, user, 4_000)  # +$40 > $100 cap
+    assert ei.value.code == "daily_deposit_cap_exceeded"

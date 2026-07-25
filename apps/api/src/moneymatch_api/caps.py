@@ -30,6 +30,7 @@ class Caps:
     # Per-user trailing-24h caps (the `limits` table's defaults come from here).
     daily_loss_cap_cents: int = 20_000  # $200
     daily_entry_cap_cents: int = 50_000  # $500
+    daily_deposit_cap_cents: int = 100_000  # $1,000 — responsible-gaming deposit cap
     max_concurrent_contests: int = 3
 
     # Cumulative trailing-24h entries at/above which real KYC would be required

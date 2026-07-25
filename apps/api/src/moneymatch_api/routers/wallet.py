@@ -33,7 +33,7 @@ from ..schemas.wallet import (
     WalletLedgerPage,
     WalletResponse,
 )
-from ..services import wallet_service
+from ..services import limits_service, wallet_service
 
 router = APIRouter(prefix="/wallet", tags=["wallet"])
 
@@ -119,6 +119,8 @@ async def demo_deposit(
             status_code=422,
             detail={"allowed": list(DEMO_DEPOSIT_PRESETS_CENTS)},
         )
+    # Responsible-gaming deposit cap (trailing-24h funding velocity).
+    await limits_service.assert_can_deposit(session, user, body.amount_preset_cents)
     # KYC boundary (inert at MVP; the call site exists + is tested).
     enforce_kyc(user, KycAction.DEPOSIT, amount_cents=body.amount_preset_cents)
     await get_payment_provider().create_deposit_intent(
