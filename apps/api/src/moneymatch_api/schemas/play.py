@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Bracket(BaseModel):
@@ -110,7 +110,7 @@ class MatchView(BaseModel):
 
 
 class GradingExplanation(BaseModel):
-    """"Why this result" — the transparent grading record for a contest the
+    """ "Why this result" — the transparent grading record for a contest the
     viewer was in: the rule, what each side produced, and the decision."""
 
     match_id: UUID
@@ -125,6 +125,24 @@ class GradingExplanation(BaseModel):
     your_stat_line: dict | None
     opponent_stat_line: dict | None
     outcome_detail: dict | None  # the raw grading decision (audit back-ref)
+
+
+class FileDisputeRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=1000)
+
+
+class DisputeView(BaseModel):
+    """A dispute as its filer sees it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    match_id: UUID
+    reason: str
+    status: str  # open | resolved | rejected
+    admin_note: str | None
+    created_at: datetime
+    resolved_at: datetime | None
 
 
 class QueueStatusResponse(BaseModel):

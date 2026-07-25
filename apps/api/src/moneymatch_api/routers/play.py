@@ -24,6 +24,8 @@ from ..models.play import Match, MatchPlayer, QueueTicket
 from ..models.skill import MetricModel
 from ..models.user import User
 from ..schemas.play import (
+    DisputeView,
+    FileDisputeRequest,
     GradingExplanation,
     MarketRow,
     MarketsResponse,
@@ -34,7 +36,7 @@ from ..schemas.play import (
     WaitingResponse,
     WaitingRow,
 )
-from ..services import matchmaking, money_math
+from ..services import dispute_service, matchmaking, money_math
 from ..services.markets import (
     KIND_STAT_RACE,
     KIND_WIN_H2H,
@@ -328,6 +330,30 @@ async def get_match_grading(
         opponent_stat_line=opp_seat.stat_line if opp_seat else None,
         outcome_detail=match.outcome_detail,
     )
+
+
+@router.post("/matches/{match_id}/dispute", response_model=DisputeView, status_code=201)
+async def file_dispute(
+    match_id: UUID,
+    body: FileDisputeRequest,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> DisputeView:
+    """Contest how a settled match was graded (participant-only, once)."""
+    match = await _load_match(session, match_id)
+    dispute = await dispute_service.file_dispute(session, user, match, body.reason)
+    return DisputeView.model_validate(dispute)
+
+
+@router.get("/matches/{match_id}/dispute", response_model=DisputeView | None)
+async def get_dispute(
+    match_id: UUID,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> DisputeView | None:
+    """The viewer's dispute for this match, if any."""
+    dispute = await dispute_service.get_for(session, match_id, user.id)
+    return DisputeView.model_validate(dispute) if dispute else None
 
 
 @router.post("/matches/{match_id}/confirm", response_model=MatchView)
