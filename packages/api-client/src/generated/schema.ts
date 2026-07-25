@@ -245,6 +245,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/play/matches/{match_id}/grading": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Match Grading
+         * @description Transparent grading record: the rule, each side's stat line, the decision.
+         *     Only a participant can read it.
+         */
+        get: operations["get_match_grading_api_v1_play_matches__match_id__grading_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/play/matches/{match_id}/dispute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dispute
+         * @description The viewer's dispute for this match, if any.
+         */
+        get: operations["get_dispute_api_v1_play_matches__match_id__dispute_get"];
+        put?: never;
+        /**
+         * File Dispute
+         * @description Contest how a settled match was graded (participant-only, once).
+         */
+        post: operations["file_dispute_api_v1_play_matches__match_id__dispute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/play/matches/{match_id}/confirm": {
         parameters: {
             query?: never;
@@ -744,6 +789,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/push/public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Push Public Key */
+        get: operations["push_public_key_api_v1_notifications_push_public_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Push Subscribe */
+        post: operations["push_subscribe_api_v1_notifications_push_subscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Push Unsubscribe */
+        post: operations["push_unsubscribe_api_v1_notifications_push_unsubscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/flags": {
         parameters: {
             query?: never;
@@ -1033,6 +1129,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/disputes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Open Disputes */
+        get: operations["list_open_disputes_api_v1_admin_disputes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/disputes/{dispute_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Dispute */
+        post: operations["resolve_dispute_api_v1_admin_disputes__dispute_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/login": {
         parameters: {
             query?: never;
@@ -1248,6 +1378,37 @@ export interface components {
             entry_cents: number;
             /** Payout Cents */
             payout_cents: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Resolved At */
+            resolved_at: string | null;
+        };
+        /** AdminDisputeItem */
+        AdminDisputeItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Match Id
+             * Format: uuid
+             */
+            match_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Reason */
+            reason: string;
+            /** Status */
+            status: string;
+            /** Admin Note */
+            admin_note: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1547,6 +1708,40 @@ export interface components {
             /** Est Multiplier Bps */
             est_multiplier_bps: number;
         };
+        /**
+         * DisputeView
+         * @description A dispute as its filer sees it.
+         */
+        DisputeView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Match Id
+             * Format: uuid
+             */
+            match_id: string;
+            /** Reason */
+            reason: string;
+            /** Status */
+            status: string;
+            /** Admin Note */
+            admin_note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Resolved At */
+            resolved_at: string | null;
+        };
+        /** FileDisputeRequest */
+        FileDisputeRequest: {
+            /** Reason */
+            reason: string;
+        };
         /** FlagItem */
         FlagItem: {
             /** Key */
@@ -1655,6 +1850,61 @@ export interface components {
              */
             win_streak: number;
         };
+        /**
+         * GettingStarted
+         * @description First-match funnel progress — drives the "getting started" checklist that
+         *     nudges a new player from signup to their first wager.
+         */
+        GettingStarted: {
+            /** Picked Games */
+            picked_games: boolean;
+            /** Linked Game */
+            linked_game: boolean;
+            /** Placed Wager */
+            placed_wager: boolean;
+            /** Complete */
+            complete: boolean;
+        };
+        /**
+         * GradingExplanation
+         * @description "Why this result" — the transparent grading record for a contest the
+         *     viewer was in: the rule, what each side produced, and the decision.
+         */
+        GradingExplanation: {
+            /**
+             * Match Id
+             * Format: uuid
+             */
+            match_id: string;
+            /** State */
+            state: string;
+            /** Settled */
+            settled: boolean;
+            /** Result */
+            result: string;
+            /** Market Label */
+            market_label: string;
+            /** Rule */
+            rule: string;
+            /** Engine Version */
+            engine_version: string | null;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Winner Username */
+            winner_username: string | null;
+            /** Your Stat Line */
+            your_stat_line: {
+                [key: string]: unknown;
+            } | null;
+            /** Opponent Stat Line */
+            opponent_stat_line: {
+                [key: string]: unknown;
+            } | null;
+            /** Outcome Detail */
+            outcome_detail: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1741,6 +1991,8 @@ export interface components {
             daily_loss_cap_cents: number;
             /** Daily Entry Cap Cents */
             daily_entry_cap_cents: number;
+            /** Daily Deposit Cap Cents */
+            daily_deposit_cap_cents: number;
             /** Max Concurrent Contests */
             max_concurrent_contests: number;
             /** Pending Limits */
@@ -1749,6 +2001,8 @@ export interface components {
             } | null;
             /** Pending Effective At */
             pending_effective_at: string | null;
+            /** Timeout Until */
+            timeout_until: string | null;
         };
         /**
          * LinksResponse
@@ -1894,6 +2148,7 @@ export interface components {
              * @default 0
              */
             unread_notifications: number;
+            getting_started?: components["schemas"]["GettingStarted"] | null;
         };
         /** NotificationItem */
         NotificationItem: {
@@ -2100,6 +2355,29 @@ export interface components {
             /** Avatar Url */
             avatar_url?: string | null;
         };
+        /** PushKeys */
+        PushKeys: {
+            /** P256Dh */
+            p256dh: string;
+            /** Auth */
+            auth: string;
+        };
+        /** PushPublicKeyResponse */
+        PushPublicKeyResponse: {
+            /** Public Key */
+            public_key: string | null;
+        };
+        /** PushSubscribeRequest */
+        PushSubscribeRequest: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["PushKeys"];
+        };
+        /** PushUnsubscribeRequest */
+        PushUnsubscribeRequest: {
+            /** Endpoint */
+            endpoint: string;
+        };
         /** QueueDepthRow */
         QueueDepthRow: {
             /** Game */
@@ -2198,6 +2476,13 @@ export interface components {
             outcome: string;
             /** State */
             state: string;
+        };
+        /** ResolveDisputeRequest */
+        ResolveDisputeRequest: {
+            /** Status */
+            status: string;
+            /** Note */
+            note?: string | null;
         };
         /** RiskFlagRow */
         RiskFlagRow: {
@@ -2419,6 +2704,10 @@ export interface components {
             daily_loss_cap_cents?: number | null;
             /** Daily Entry Cap Cents */
             daily_entry_cap_cents?: number | null;
+            /** Daily Deposit Cap Cents */
+            daily_deposit_cap_cents?: number | null;
+            /** Cooloff Days */
+            cooloff_days?: number | null;
             /**
              * Active Games
              * @description Catalog game ids the player has chosen to play
@@ -3096,6 +3385,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_match_grading_api_v1_play_matches__match_id__grading_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradingExplanation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dispute_api_v1_play_matches__match_id__dispute_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeView"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    file_dispute_api_v1_play_matches__match_id__dispute_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileDisputeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeView"];
                 };
             };
             /** @description Validation Error */
@@ -4155,6 +4547,103 @@ export interface operations {
             };
         };
     };
+    push_public_key_api_v1_notifications_push_public_key_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushPublicKeyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_subscribe_api_v1_notifications_push_subscribe_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_unsubscribe_api_v1_notifications_push_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushUnsubscribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_flags_api_v1_admin_flags_get: {
         parameters: {
             query?: never;
@@ -4712,6 +5201,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_open_disputes_api_v1_admin_disputes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDisputeItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_dispute_api_v1_admin_disputes__dispute_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dispute_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveDisputeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDisputeItem"];
                 };
             };
             /** @description Validation Error */

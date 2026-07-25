@@ -6,6 +6,7 @@ import { FooterBreadcrumb } from '../components/ui/FooterBreadcrumb';
 import { PillButton } from '../components/ui/PillButton';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
 import { formatCurrency } from '../lib/format';
+import { disablePush, enablePush, isPushSupported, isSubscribed } from '../lib/push';
 
 export function ProfilePage() {
   const { signOut, isDemo } = useAuth();
@@ -45,6 +46,10 @@ export function ProfilePage() {
 
       <Section title="Limits">
         {limits ? <LimitsEditor limits={limits} /> : <p className="text-sm">—</p>}
+      </Section>
+
+      <Section title="Notifications">
+        <PushToggle />
       </Section>
 
       {!isDemo && (
@@ -258,6 +263,66 @@ function ChangePassword() {
   );
 }
 
+/** Enable/disable browser push notifications (match found, settled, disputes…). */
+function PushToggle() {
+  const supported = isPushSupported();
+  const [on, setOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (supported) void isSubscribed().then(setOn);
+  }, [supported]);
+
+  if (!supported) {
+    return (
+      <p className="text-sm text-text-secondary">
+        This browser doesn't support push notifications.
+      </p>
+    );
+  }
+
+  const toggle = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      if (on) {
+        await disablePush();
+        setOn(false);
+      } else {
+        const ok = await enablePush();
+        setOn(ok);
+        if (!ok) setError('Notifications are blocked or unavailable.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-text-secondary">
+        Get a push when your match is found, a contest settles, or a dispute updates.
+      </p>
+      <div className="flex items-center gap-3">
+        <PillButton
+          variant={on ? 'outline' : 'primary'}
+          onClick={() => void toggle()}
+          disabled={busy}
+        >
+          {busy
+            ? 'Working…'
+            : on
+              ? 'Turn off notifications'
+              : 'Enable notifications'}
+        </PillButton>
+        {on && <span className="text-sm text-green">On</span>}
+        {error && <span className="text-sm text-red">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
 /** Editable protective caps. Lowering applies instantly; raising is staged 24 h
  * server-side and surfaced here as a pending note. Max-concurrent is
  * system-owned, shown read-only. */
@@ -265,6 +330,7 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   const update = useUpdateLimits();
   const [loss, setLoss] = useState('');
   const [entry, setEntry] = useState('');
+  const [deposit, setDeposit] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -272,15 +338,22 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   useEffect(() => {
     setLoss(dollars(limits.daily_loss_cap_cents));
     setEntry(dollars(limits.daily_entry_cap_cents));
-  }, [limits.daily_loss_cap_cents, limits.daily_entry_cap_cents]);
+    setDeposit(dollars(limits.daily_deposit_cap_cents));
+  }, [
+    limits.daily_loss_cap_cents,
+    limits.daily_entry_cap_cents,
+    limits.daily_deposit_cap_cents,
+  ]);
 
   const lossCents = toCents(loss);
   const entryCents = toCents(entry);
-  const valid = lossCents != null && entryCents != null;
+  const depositCents = toCents(deposit);
+  const valid = lossCents != null && entryCents != null && depositCents != null;
   const changed =
     valid &&
     (lossCents !== limits.daily_loss_cap_cents ||
-      entryCents !== limits.daily_entry_cap_cents);
+      entryCents !== limits.daily_entry_cap_cents ||
+      depositCents !== limits.daily_deposit_cap_cents);
 
   const pending = limits.pending_limits ?? null;
   const effectiveAt = limits.pending_effective_at
@@ -292,7 +365,11 @@ function LimitsEditor({ limits }: { limits: Limits }) {
     setError(null);
     setSaved(false);
     update.mutate(
-      { daily_loss_cap_cents: lossCents, daily_entry_cap_cents: entryCents },
+      {
+        daily_loss_cap_cents: lossCents,
+        daily_entry_cap_cents: entryCents,
+        daily_deposit_cap_cents: depositCents,
+      },
       {
         onSuccess: () => setSaved(true),
         onError: () => setError('Could not update your limits. Try again.'),
@@ -314,6 +391,10 @@ function LimitsEditor({ limits }: { limits: Limits }) {
         <DollarField label="Daily entries cap" value={entry} onChange={setEntry} />
         {pending?.daily_entry_cap_cents != null && effectiveAt && (
           <PendingNote cents={pending.daily_entry_cap_cents} at={effectiveAt} />
+        )}
+        <DollarField label="Daily deposit cap" value={deposit} onChange={setDeposit} />
+        {pending?.daily_deposit_cap_cents != null && effectiveAt && (
+          <PendingNote cents={pending.daily_deposit_cap_cents} at={effectiveAt} />
         )}
       </div>
 
@@ -337,6 +418,64 @@ function LimitsEditor({ limits }: { limits: Limits }) {
         )}
         {error && <span className="text-sm text-red">{error}</span>}
       </div>
+
+      <CoolOff timeoutUntil={limits.timeout_until} />
+    </div>
+  );
+}
+
+/** A self-imposed break: staking is refused until it ends (extend-only). */
+function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
+  const update = useUpdateLimits();
+  const [confirming, setConfirming] = useState<number | null>(null);
+  const active =
+    timeoutUntil != null && new Date(timeoutUntil).getTime() > Date.now();
+
+  const start = (days: number) => {
+    update.mutate({ cooloff_days: days }, { onSuccess: () => setConfirming(null) });
+  };
+
+  return (
+    <div className="mt-6 border-t border-hairline pt-4">
+      <p className="text-sm font-medium text-text">Take a break</p>
+      <p className="mt-1 text-xs text-text-secondary">
+        Pause all staking for a set time. A break can be extended but not shortened.
+      </p>
+      {active ? (
+        <p className="mt-2 text-sm text-red">
+          You're on a break until {new Date(timeoutUntil!).toLocaleString()}.
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {[1, 7, 30].map((days) => (
+            <span key={days}>
+              {confirming === days ? (
+                <span className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => start(days)}
+                    disabled={update.isPending}
+                    className="text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
+                  >
+                    Confirm {days}-day break
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(null)}
+                    className="text-sm text-text-secondary hover:text-text"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <PillButton variant="outline" onClick={() => setConfirming(days)}>
+                  {days} day{days > 1 ? 's' : ''}
+                </PillButton>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

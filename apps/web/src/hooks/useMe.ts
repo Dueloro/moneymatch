@@ -6,9 +6,20 @@ import { api } from '../lib/api';
 export interface Limits {
   daily_loss_cap_cents: number;
   daily_entry_cap_cents: number;
+  daily_deposit_cap_cents: number;
   max_concurrent_contests: number;
   pending_limits: Record<string, number> | null;
   pending_effective_at: string | null;
+  /** Self-imposed cool-off end (ISO); staking is refused until it passes. */
+  timeout_until: string | null;
+}
+
+/** First-match funnel progress — drives the getting-started checklist. */
+export interface GettingStarted {
+  picked_games: boolean;
+  linked_game: boolean;
+  placed_wager: boolean;
+  complete: boolean;
 }
 
 export interface Me {
@@ -28,6 +39,7 @@ export interface Me {
   needs_onboarding: boolean;
   limits: Limits | null;
   unread_notifications: number;
+  getting_started: GettingStarted | null;
 }
 
 /** Fetches `/me` once the user is authenticated. Provisions the row server-side. */
@@ -88,6 +100,8 @@ export function useUpdateLimits() {
     mutationFn: async (caps: {
       daily_loss_cap_cents?: number;
       daily_entry_cap_cents?: number;
+      daily_deposit_cap_cents?: number;
+      cooloff_days?: number;
     }): Promise<void> => {
       const { error } = await api.PATCH('/api/v1/me', { body: caps });
       if (error) throw new Error('Could not update your limits');
