@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth import AuthedIdentity
 from ..errors import APIError
 from ..models.user import User, gen_friend_code
-from ..models.wallet import SIGNUP_GRANT_CENTS, Limit, Wallet
+from ..models.wallet import SIGNUP_GRANT_CENTS, SIGNUP_GRANT_MEMO, Limit, Wallet
 from . import wallet_service
 
 # A friend_code collision is one-in-a-billion, but a clean signup must never 500
@@ -87,7 +87,7 @@ async def provision_new_user(session: AsyncSession, user: User) -> Wallet:
         session,
         user.id,
         SIGNUP_GRANT_CENTS,
-        memo="signup grant",
+        memo=SIGNUP_GRANT_MEMO,
         created_by=wallet_service.SYSTEM,
     )
     return wallet

@@ -68,8 +68,11 @@ DEFAULT_DAILY_DEPOSIT_CAP_CENTS = CAPS.daily_deposit_cap_cents  # $1,000.00
 DEFAULT_MAX_CONCURRENT_CONTESTS = CAPS.max_concurrent_contests
 
 # Demo signup credit, booked as a real ledger row funded from platform:promo —
-# not a magic starting balance (04-phase-1 · deliverable 3).
+# not a magic starting balance (04-phase-1 · deliverable 3). The grant is a
+# platform gift, so it's excluded from the responsible-gaming deposit-velocity
+# cap (which meters the player's *own* funding).
 SIGNUP_GRANT_CENTS = 100_000  # $1,000.00
+SIGNUP_GRANT_MEMO = "signup grant"
 
 # Server-defined "Add funds" presets (no arbitrary client amounts — 04-phase-1
 # design rules). $10 / $25 / $50 / $100.

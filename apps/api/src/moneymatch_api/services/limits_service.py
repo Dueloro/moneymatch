@@ -24,7 +24,7 @@ from ..caps import CAPS
 from ..errors import APIError
 from ..kyc import KycAction, enforce_kyc
 from ..models.user import User
-from ..models.wallet import LedgerEntry, Limit, Wallet
+from ..models.wallet import SIGNUP_GRANT_MEMO, LedgerEntry, Limit, Wallet
 
 WINDOW = timedelta(hours=24)
 RAISE_COOLDOWN = timedelta(hours=24)
@@ -204,6 +204,10 @@ async def assert_can_deposit(
                 select(func.coalesce(func.sum(LedgerEntry.amount_cents), 0)).where(
                     LedgerEntry.wallet_id == wallet.id,
                     LedgerEntry.entry_type == "demo_deposit",
+                    # The signup grant is a platform gift, not the player's own
+                    # funding — exclude it from the deposit-velocity cap.
+                    # (IS DISTINCT FROM so NULL-memo deposits still count.)
+                    LedgerEntry.memo.is_distinct_from(SIGNUP_GRANT_MEMO),
                     LedgerEntry.created_at >= now - WINDOW,
                 )
             )
