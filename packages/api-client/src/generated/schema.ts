@@ -1033,6 +1033,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Demo Login */
+        post: operations["demo_login_api_v1_demo_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1493,6 +1510,21 @@ export interface components {
              */
             amount_preset_cents: number;
         };
+        /** DemoLoginResponse */
+        DemoLoginResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /**
+             * Email
+             * @default demo@dueloro.com
+             */
+            email: string;
+        };
         /** DemoWithdrawalRequest */
         DemoWithdrawalRequest: {
             /**
@@ -1600,7 +1632,7 @@ export interface components {
          * @description One game's row on Profile: linked snapshot or an empty/blocked slot.
          *
          *     `status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),
-         *     UNLINKED (available to link).
+         *     UNLINKED (available to link), COMING_SOON (in the catalog, no adapter yet).
          */
         GameLink: {
             /** Game */
@@ -1611,12 +1643,17 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "LINKED" | "BLOCKED" | "UNLINKED";
+            status: "LINKED" | "BLOCKED" | "UNLINKED" | "COMING_SOON";
             /** Host Username */
             host_username?: string | null;
             /** Linked At */
             linked_at?: string | null;
             profile?: components["schemas"]["ProfileSnapshot"] | null;
+            /**
+             * Win Streak
+             * @default 0
+             */
+            win_streak: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2382,6 +2419,11 @@ export interface components {
             daily_loss_cap_cents?: number | null;
             /** Daily Entry Cap Cents */
             daily_entry_cap_cents?: number | null;
+            /**
+             * Active Games
+             * @description Catalog game ids the player has chosen to play
+             */
+            active_games?: string[] | null;
         };
         /** UserResponse */
         UserResponse: {
@@ -2409,6 +2451,8 @@ export interface components {
              * Format: date-time
              */
             member_since: string;
+            /** Active Games */
+            active_games: string[];
         };
         /** ValidationError */
         ValidationError: {
@@ -4677,6 +4721,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_login_api_v1_demo_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoLoginResponse"];
                 };
             };
         };

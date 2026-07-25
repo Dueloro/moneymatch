@@ -1,10 +1,15 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '../test/testUtils';
 import { PlayPage } from './PlayPage';
 
 vi.mock('../hooks/useLinks', () => ({ useLinks: vi.fn() }));
+// useGameSelection reads the play set from /me; empty → the switcher falls back
+// to every game, which is what these fixtures expect.
+vi.mock('../hooks/useMe', () => ({
+  useMe: () => ({ data: { user: { active_games: [] } } }),
+}));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
@@ -119,20 +124,22 @@ describe('PlayPage', () => {
     } as unknown as ReturnType<typeof useLeaveQueue>);
   });
 
-  it('renders a market with its derived ×1.80 multiplier', () => {
+  it('renders a joinable 1v1 card per entry with the derived "You\'d win"', () => {
     renderWithProviders(<PlayPage />);
-    expect(screen.getByText('K/D ratio')).toBeInTheDocument();
-    expect(screen.getByText('×1.80')).toBeInTheDocument();
+    // 1 market × 3 entry presets = 3 cards.
+    expect(screen.getAllByText('K/D ratio')).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(3);
+    // 2 × $10 × (1 − 0.10) = $18.00, derived — never an odds line.
+    expect(screen.getByText("You'd win ≈ $18.00")).toBeInTheDocument();
   });
 
-  it('pick market + entry surfaces the derived "You\'d win" and finds a match', () => {
+  it('joining a card finds a match with its preset params', () => {
     renderWithProviders(<PlayPage />);
-    fireEvent.click(screen.getByText('K/D ratio'));
-    fireEvent.click(screen.getByRole('button', { name: '$10.00' }));
-    // 2 × $10 × (1 − 0.10) = $18.00, derived — never an odds line.
-    expect(screen.getByText('$18.00')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Find match' }));
+    // The $10 card is identifiable by its unique estimated payout.
+    const card = screen.getByText("You'd win ≈ $18.00").closest('.rounded-2xl')!;
+    fireEvent.click(
+      within(card as HTMLElement).getByRole('button', { name: 'Find Match' }),
+    );
     expect(joinMutate).toHaveBeenCalledWith({
       game: 'cs2.faceit',
       market: 'kd_ratio',

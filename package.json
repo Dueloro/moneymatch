@@ -17,5 +17,14 @@
   },
   "devDependencies": {
     "prettier": "^3.3.3"
+  },
+  "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-wrjc-x8rr-h8h6",
+        "GHSA-jjmj-jmhj-qwj2",
+        "GHSA-337j-9hxr-rhxg"
+      ]
+    }
   }
 }

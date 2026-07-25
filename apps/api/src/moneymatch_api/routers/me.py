@@ -64,6 +64,10 @@ async def update_me(
             daily_entry_cap_cents=body.daily_entry_cap_cents,
         )
 
+    if body.active_games is not None:
+        user.active_games = body.active_games
+        await session.flush()
+
     return await _me(session, user)
 
 

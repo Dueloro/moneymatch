@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '../test/testUtils';
@@ -63,11 +63,20 @@ describe('TournamentPage', () => {
     } as unknown as ReturnType<typeof useLeaveTournament>);
   });
 
-  it('shows the 50/30/20 field format and enters on a preset', () => {
+  it('renders joinable tournament cards (10-20 players) and joins with the preset', () => {
     renderWithProviders(<TournamentPage />);
-    expect(screen.getByText(/top 3 split 50\/30\/20/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '$10.00' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Enter' }));
+    // 1 metric × 3 entry presets = 3 cards at advertised sizes 10 / 16 / 20.
+    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(3);
+    expect(screen.getByText('10 players')).toBeInTheDocument();
+    expect(screen.getByText('16 players')).toBeInTheDocument();
+    expect(screen.getByText('20 players')).toBeInTheDocument();
+    expect(screen.getAllByText('Best 3 matches · top 3 split the pot').length).toBe(3);
+
+    // Join the $10 card (its entry amount is unique across cards).
+    const card = screen.getByText('$10.00').closest('.rounded-2xl')!;
+    fireEvent.click(
+      within(card as HTMLElement).getByRole('button', { name: 'Join Tournament' }),
+    );
     expect(enterMutate).toHaveBeenCalledWith({
       game: 'cs2.faceit',
       metric: 'cs2_kd_ratio',
@@ -75,7 +84,7 @@ describe('TournamentPage', () => {
     });
   });
 
-  it('renders the field μ-spread and live standings when formed', () => {
+  it('shows live standings when a field is formed', () => {
     mockStatus({
       status: 'formed',
       tournament: {
@@ -113,7 +122,7 @@ describe('TournamentPage', () => {
     });
     renderWithProviders(<TournamentPage />);
     expect(screen.getByTestId('standings-panel')).toBeInTheDocument();
-    expect(screen.getByText(/Field: K\/D ratio 1.42–1.58/)).toBeInTheDocument();
     expect(screen.getByText(/#1 you/)).toBeInTheDocument();
+    expect(screen.getByText(/Pot \$100.00/)).toBeInTheDocument();
   });
 });

@@ -4,9 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/testUtils';
 import { ProfilePage } from './ProfilePage';
 
-vi.mock('../auth/useAuth', () => ({
-  useAuth: () => ({ signOut: vi.fn() }),
-}));
+vi.mock('../auth/useAuth', () => ({ useAuth: vi.fn() }));
 
 vi.mock('../hooks/useMe', async () => {
   const actual =
@@ -25,6 +23,7 @@ vi.mock('../hooks/useLinks', async () => {
   };
 });
 
+import { useAuth } from '../auth/useAuth';
 import { useMe, useSelfExclude } from '../hooks/useMe';
 import {
   useCreateLink,
@@ -35,6 +34,8 @@ import {
 
 const createMutate = vi.fn();
 const selfExcludeMutate = vi.fn();
+const verifyCurrentPassword = vi.fn();
+const changePassword = vi.fn();
 
 function gameLink(over: Partial<GameLink>): GameLink {
   return {
@@ -44,6 +45,7 @@ function gameLink(over: Partial<GameLink>): GameLink {
     host_username: null,
     linked_at: null,
     profile: null,
+    win_streak: 0,
     ...over,
   };
 }
@@ -51,6 +53,15 @@ function gameLink(over: Partial<GameLink>): GameLink {
 describe('ProfilePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    verifyCurrentPassword.mockResolvedValue(true);
+    changePassword.mockResolvedValue(undefined);
+    vi.mocked(useAuth).mockReturnValue({
+      signOut: vi.fn(),
+      isDemo: false,
+      verifyCurrentPassword,
+      sendPasswordReset: vi.fn(),
+      changePassword,
+    } as unknown as ReturnType<typeof useAuth>);
     vi.mocked(useMe).mockReturnValue({
       data: {
         user: {
@@ -95,6 +106,7 @@ describe('ProfilePage', () => {
             display_name: 'CS2 — FACEIT',
             status: 'LINKED',
             host_username: 's1mple',
+            win_streak: 5,
             profile: {
               username: 's1mple',
               display_name: 's1mple',
@@ -124,12 +136,14 @@ describe('ProfilePage', () => {
     } as unknown as ReturnType<typeof useLinks>);
   });
 
-  it('renders LINKED / BLOCKED / limits', () => {
+  it('renders LINKED / BLOCKED, the skill badge + win streak, and editable limits', () => {
     renderWithProviders(<ProfilePage />);
     expect(screen.getByText('Linked')).toBeInTheDocument();
     expect(screen.getByText('Blocked')).toBeInTheDocument();
-    expect(screen.getByText('s1mple · Level 10 · 100 games')).toBeInTheDocument();
-    expect(screen.getByText('$200.00')).toBeInTheDocument(); // daily loss cap
+    expect(screen.getByText('s1mple · 100 games')).toBeInTheDocument();
+    expect(screen.getByText('Level 10')).toBeInTheDocument(); // skill badge
+    expect(screen.getByText('🔥 5W streak')).toBeInTheDocument(); // win streak
+    expect(screen.getByDisplayValue('200')).toBeInTheDocument(); // daily loss cap ($)
   });
 
   it('runs the link flow for an unlinked game', () => {
@@ -150,5 +164,52 @@ describe('ProfilePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Self-exclude' }));
     fireEvent.click(screen.getByRole('button', { name: 'Yes, self-exclude' }));
     expect(selfExcludeMutate).toHaveBeenCalled();
+  });
+
+  it('changes password: current-password step (with email fallback) then new password', async () => {
+    renderWithProviders(<ProfilePage />);
+
+    // Collapsed until the button is pressed.
+    expect(
+      screen.queryByPlaceholderText('Enter current password'),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
+
+    // Step 1: confirm current password, with the forgot-password email fallback.
+    expect(screen.getByPlaceholderText('Enter current password')).toBeInTheDocument();
+    expect(
+      screen.getByText('Forgot your password? Verify with email.'),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Enter current password'), {
+      target: { value: 'oldpass1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(verifyCurrentPassword).toHaveBeenCalledWith('oldpass1');
+
+    // Step 2: set + confirm the new password, which calls changePassword.
+    await screen.findByPlaceholderText('New password');
+    fireEvent.change(screen.getByPlaceholderText('New password'), {
+      target: { value: 'newpass1' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Confirm new password'), {
+      target: { value: 'newpass1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+    expect(changePassword).toHaveBeenCalledWith('newpass1');
+  });
+
+  it('hides the security section for a demo session', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      signOut: vi.fn(),
+      isDemo: true,
+      verifyCurrentPassword,
+      sendPasswordReset: vi.fn(),
+      changePassword,
+    } as unknown as ReturnType<typeof useAuth>);
+    renderWithProviders(<ProfilePage />);
+    expect(
+      screen.queryByRole('button', { name: 'Change password' }),
+    ).not.toBeInTheDocument();
   });
 });

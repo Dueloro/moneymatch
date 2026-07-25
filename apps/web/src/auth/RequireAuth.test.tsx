@@ -41,6 +41,10 @@ describe('RequireAuth', () => {
       signInWithEmail: vi.fn(),
       signInWithPassword: vi.fn(),
       signUpWithPassword: vi.fn(),
+      verifyCurrentPassword: vi.fn(),
+      sendPasswordReset: vi.fn(),
+      changePassword: vi.fn(),
+      isDemo: false,
       signOut: vi.fn(),
     });
     renderWithProviders(tree(), { route: '/play' });
@@ -56,6 +60,10 @@ describe('RequireAuth', () => {
       signInWithEmail: vi.fn(),
       signInWithPassword: vi.fn(),
       signUpWithPassword: vi.fn(),
+      verifyCurrentPassword: vi.fn(),
+      sendPasswordReset: vi.fn(),
+      changePassword: vi.fn(),
+      isDemo: false,
       signOut: vi.fn(),
     });
     mockUseMe.mockReturnValue({

@@ -3,9 +3,11 @@ import { useCountUp } from '../hooks/useCountUp';
 import { useWallet } from '../hooks/useWallet';
 
 /**
- * Play-screen balance header (02-design §2): tiny "Balance" label, the huge
- * available figure, and a gray "$X in play" subline. Reads the same `useWallet`
- * query as the Wallet screen, so both stay in sync.
+ * Compact balance readout. Deliberately understated and right-aligned: a muted
+ * "Balance" label with the available figure, plus an inline "$X in play" note.
+ * The balance is reference information, not the product's focus, so it sits on
+ * the top-right in line with the game tabs rather than headlining the screen.
+ * Reads the same `useWallet` query as the Wallet screen, so both stay in sync.
  */
 export function BalanceHeader() {
   const { data: wallet } = useWallet();
@@ -14,15 +16,18 @@ export function BalanceHeader() {
   const shown = useCountUp(available);
 
   return (
-    <div data-testid="balance-header">
-      <div className="label-mono">Balance</div>
-      <div className="text-[2.75rem] font-bold leading-none tracking-tight tabular-nums">
+    <div
+      data-testid="balance-header"
+      className="ml-auto shrink-0 whitespace-nowrap text-right text-sm leading-tight"
+    >
+      <span className="label-mono mr-2 align-middle">Balance</span>
+      <span className="align-middle font-semibold tabular-nums">
         {formatCurrency(shown)}
-      </div>
+      </span>
       {inPlay > 0 && (
-        <div className="text-sm text-text-secondary">
-          {formatCurrency(inPlay)} in play
-        </div>
+        <span className="ml-2 align-middle text-xs text-text-secondary">
+          · {formatCurrency(inPlay)} in play
+        </span>
       )}
     </div>
   );

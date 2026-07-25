@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       loading,
+      isDemo: getDemoToken() != null,
       signInWithGoogle: async () => {
         await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -93,6 +94,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // With email confirmation disabled, signUp returns a live session and we
         // are signed in immediately; otherwise the user must confirm by email.
         return { needsConfirmation: !data.session };
+      },
+      verifyCurrentPassword: async (currentPassword: string) => {
+        const email = session?.user.email;
+        if (!email) return false;
+        // Re-authenticate to confirm the password; on success Supabase returns a
+        // fresh session for the same user (no disruption).
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password: currentPassword,
+        });
+        return !error;
+      },
+      sendPasswordReset: async () => {
+        const email = session?.user.email;
+        if (!email) throw new Error('No email on file for this account.');
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
+      },
+      changePassword: async (newPassword: string) => {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
       },
       signOut: async () => {
         // A demo session isn't a Supabase session, so clear the token and reset

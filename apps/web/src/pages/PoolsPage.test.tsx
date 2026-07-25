@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '../test/testUtils';
@@ -77,23 +77,24 @@ describe('PoolsPage', () => {
     } as unknown as ReturnType<typeof useLeavePool>);
   });
 
-  it('quotes difficulty bars from the viewer baseline with a disclosed estimate', () => {
+  it('renders a joinable card per difficulty × entry with bar + estimated payout', () => {
     renderWithProviders(<PoolsPage />);
-    expect(screen.getByText('1.8')).toBeInTheDocument(); // medium bar
-    expect(screen.getByText('clears ≈ 16%')).toBeInTheDocument();
-    // Estimated multiplier is disclosed as an estimate (≈), not a fixed line.
-    expect(screen.getByText('≈ ×5.63')).toBeInTheDocument();
+    // 3 difficulties × 3 entry presets = 9 cards, each with a Join Pool button.
+    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(9);
+    // The medium-bar cards show the bar and disclosed clear rate.
+    expect(screen.getAllByText('K/D ratio ≥ 1.8').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Clears ≈ 16%/).length).toBeGreaterThan(0);
+    // Estimated payout is disclosed per card (medium @ $10 → $56.25).
+    expect(screen.getByText('Est. payout ≈ $56.25')).toBeInTheDocument();
   });
 
-  it('pick difficulty + entry shows the estimated share-of-pool copy and enters', () => {
+  it('joining a pool card enters the queue with its preset params', () => {
     renderWithProviders(<PoolsPage />);
-    fireEvent.click(screen.getByText('medium'));
-    fireEvent.click(screen.getByRole('button', { name: '$10.00' }));
-    expect(
-      screen.getByText(/actual payout is your share of the pool/),
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Enter pool' }));
+    // medium @ $10 is the only card with this exact estimated payout.
+    const card = screen.getByText('Est. payout ≈ $56.25').closest('.rounded-2xl')!;
+    fireEvent.click(
+      within(card as HTMLElement).getByRole('button', { name: 'Join Pool' }),
+    );
     expect(enterMutate).toHaveBeenCalledWith({
       game: 'cs2.faceit',
       metric: 'cs2_kd_ratio',
@@ -102,7 +103,7 @@ describe('PoolsPage', () => {
     });
   });
 
-  it('shows the formed room card with the room bar and delta', () => {
+  it('shows the formed room banner with the room bar', () => {
     mockStatus({
       status: 'formed',
       pool: {
@@ -129,7 +130,7 @@ describe('PoolsPage', () => {
     });
     renderWithProviders(<PoolsPage />);
     expect(screen.getByTestId('room-card')).toBeInTheDocument();
-    expect(screen.getByText('1.75')).toBeInTheDocument(); // room bar
-    expect(screen.getByText(/Your bar was 1.8/)).toBeInTheDocument();
+    expect(screen.getByText(/bar 1.75/)).toBeInTheDocument(); // room bar
+    expect(screen.getByText(/4 players · pot \$40.00/)).toBeInTheDocument();
   });
 });
