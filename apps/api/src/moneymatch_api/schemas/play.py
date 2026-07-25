@@ -109,6 +109,24 @@ class MatchView(BaseModel):
     forecast: Forecast | None  # honest matched-card disclosure, from your view
 
 
+class GradingExplanation(BaseModel):
+    """"Why this result" — the transparent grading record for a contest the
+    viewer was in: the rule, what each side produced, and the decision."""
+
+    match_id: UUID
+    state: str
+    settled: bool
+    result: str  # you_won | you_lost | push | canceled | pending
+    market_label: str
+    rule: str  # how the winner is decided (the market's resolution note)
+    engine_version: str | None
+    resolved_at: datetime | None
+    winner_username: str | None
+    your_stat_line: dict | None
+    opponent_stat_line: dict | None
+    outcome_detail: dict | None  # the raw grading decision (audit back-ref)
+
+
 class QueueStatusResponse(BaseModel):
     """Where the viewer stands: idle, searching (band + wait), or matched."""
 
