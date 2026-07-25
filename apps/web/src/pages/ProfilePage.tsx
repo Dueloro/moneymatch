@@ -310,11 +310,7 @@ function PushToggle() {
           onClick={() => void toggle()}
           disabled={busy}
         >
-          {busy
-            ? 'Working…'
-            : on
-              ? 'Turn off notifications'
-              : 'Enable notifications'}
+          {busy ? 'Working…' : on ? 'Turn off notifications' : 'Enable notifications'}
         </PillButton>
         {on && <span className="text-sm text-green">On</span>}
         {error && <span className="text-sm text-red">{error}</span>}
@@ -428,8 +424,7 @@ function LimitsEditor({ limits }: { limits: Limits }) {
 function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
   const update = useUpdateLimits();
   const [confirming, setConfirming] = useState<number | null>(null);
-  const active =
-    timeoutUntil != null && new Date(timeoutUntil).getTime() > Date.now();
+  const active = timeoutUntil != null && new Date(timeoutUntil).getTime() > Date.now();
 
   const start = (days: number) => {
     update.mutate({ cooloff_days: days }, { onSuccess: () => setConfirming(null) });
