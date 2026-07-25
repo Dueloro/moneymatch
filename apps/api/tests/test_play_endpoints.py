@@ -29,6 +29,7 @@ async def setup_player(client, auth_id, name, *, mu=1.0, n=15, host=None):
     async with sm() as s:
         user = await s.scalar(select(User).where(User.auth_id == auth_id))
         user.username = name
+        user.residence_state = "MA"  # onboarded resident (the geo-fence needs a state)
         await create_linked_account(
             s, user, CS2, host_account_id=host, profile=cs2_profile(name)
         )
