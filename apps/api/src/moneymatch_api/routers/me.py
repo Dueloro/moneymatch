@@ -5,17 +5,51 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
+from ..models.linked_account import LinkedAccount
 from ..models.user import User
-from ..schemas.user import LimitsResponse, MeResponse, UpdateMeRequest, UserResponse
+from ..models.wallet import LedgerEntry, Wallet
+from ..schemas.user import (
+    GettingStarted,
+    LimitsResponse,
+    MeResponse,
+    UpdateMeRequest,
+    UserResponse,
+)
 from ..services import limits_service, notifications_service
 from ..services.user_service import complete_onboarding, self_exclude
 
 router = APIRouter(tags=["me"])
+
+
+async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
+    """First-match funnel progress for the getting-started checklist."""
+    linked = await session.scalar(
+        select(LinkedAccount.id)
+        .where(LinkedAccount.user_id == user.id, LinkedAccount.status != "unbound")
+        .limit(1)
+    )
+    # Any escrow ever held = they've entered a contest (H2H / pool / tournament).
+    wagered = await session.scalar(
+        select(LedgerEntry.id)
+        .join(Wallet, Wallet.id == LedgerEntry.wallet_id)
+        .where(Wallet.user_id == user.id, LedgerEntry.entry_type == "escrow_hold")
+        .limit(1)
+    )
+    picked = bool(user.active_games)
+    linked_game = linked is not None
+    placed_wager = wagered is not None
+    return GettingStarted(
+        picked_games=picked,
+        linked_game=linked_game,
+        placed_wager=placed_wager,
+        complete=picked and linked_game and placed_wager,
+    )
 
 
 async def _me(session: AsyncSession, user: User) -> MeResponse:
@@ -27,6 +61,7 @@ async def _me(session: AsyncSession, user: User) -> MeResponse:
         needs_onboarding=user.username is None,
         limits=LimitsResponse.model_validate(limit),
         unread_notifications=unread,
+        getting_started=await _getting_started(session, user),
     )
 
 

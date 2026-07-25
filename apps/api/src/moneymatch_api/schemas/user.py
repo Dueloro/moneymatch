@@ -40,6 +40,16 @@ class LimitsResponse(BaseModel):
     timeout_until: datetime | None
 
 
+class GettingStarted(BaseModel):
+    """First-match funnel progress — drives the "getting started" checklist that
+    nudges a new player from signup to their first wager."""
+
+    picked_games: bool  # chose games to play (active_games non-empty)
+    linked_game: bool  # linked at least one host account
+    placed_wager: bool  # entered at least one contest (any escrow held)
+    complete: bool
+
+
 class MeResponse(BaseModel):
     """`/me` payload: the user, a computed onboarding flag, and staking limits."""
 
@@ -47,6 +57,7 @@ class MeResponse(BaseModel):
     needs_onboarding: bool
     limits: LimitsResponse | None = None
     unread_notifications: int = 0  # sidebar bell dot (08-phase-5)
+    getting_started: GettingStarted | None = None
 
 
 class UpdateMeRequest(BaseModel):
