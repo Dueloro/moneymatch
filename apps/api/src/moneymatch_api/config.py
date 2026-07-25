@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # lookups fail soft (link "can't right now") rather than crash.
     pubg_api_key: str | None = None
 
+    # Web Push (VAPID). Without a keypair, push is disabled (no-op) — the app
+    # degrades to in-app notifications only.
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str = Field(default="mailto:ops@example.com")
+
     # Observability.
     sentry_dsn: str | None = None
     # Release tag applied to Sentry events + PostHog captures (git SHA in deploy).

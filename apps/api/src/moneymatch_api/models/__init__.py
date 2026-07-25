@@ -9,6 +9,7 @@ from .linked_account import LinkedAccount
 from .notification import Notification
 from .play import Match, MatchPlayer, QueueTicket
 from .pools import SoloEntry, SoloPool
+from .push import PushSubscription
 from .risk import RiskFlag
 from .skill import MetricModel, RawPayload
 from .social import Challenge, Friendship
@@ -35,6 +36,7 @@ __all__ = [
     "Notification",
     "SoloPool",
     "SoloEntry",
+    "PushSubscription",
     "Tournament",
     "TournamentEntry",
     "RiskFlag",

@@ -18,6 +18,7 @@ dependencies = [
     "pyjwt[crypto]>=2.9",
     "sentry-sdk[fastapi]>=2.16",
     "posthog>=7.26.0",
+    "pywebpush>=2.0.0",
 ]
 
 [project.optional-dependencies]
