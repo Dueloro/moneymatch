@@ -11,14 +11,19 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..constants import REGISTERED_GAMES, game_display_name, game_flag_key
+from ..constants import (
+    CATALOG_GAMES,
+    game_display_name,
+    game_flag_key,
+    is_coming_soon,
+)
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
 from ..schemas.links import CreateLinkRequest, GameLink, LinksResponse
 from ..schemas.profile import ProfileSnapshot
-from ..services import linking_service
+from ..services import game_stats_service, linking_service
 from ..services.feature_flags import get_boolean_flags
 
 router = APIRouter(prefix="/links", tags=["links"])
@@ -31,9 +36,17 @@ def _profile_of(link: LinkedAccount) -> ProfileSnapshot | None:
         return None
 
 
-def _game_link(game: str, link: LinkedAccount | None, flag_enabled: bool) -> GameLink:
+def _game_link(
+    game: str,
+    link: LinkedAccount | None,
+    flag_enabled: bool,
+    win_streak: int = 0,
+) -> GameLink:
     blocked = (not flag_enabled) or (link is not None and link.status == "frozen")
-    if blocked:
+    if is_coming_soon(game):
+        # No adapter yet: selectable in the catalog but not linkable.
+        status = "COMING_SOON"
+    elif blocked:
         status = "BLOCKED"
     elif link is not None:
         status = "LINKED"
@@ -46,16 +59,23 @@ def _game_link(game: str, link: LinkedAccount | None, flag_enabled: bool) -> Gam
         host_username=link.host_username if link else None,
         linked_at=link.created_at if link else None,
         profile=_profile_of(link) if link else None,
+        win_streak=win_streak,
     )
 
 
 async def _links_response(session: AsyncSession, user_id) -> LinksResponse:
     links = {la.game: la for la in await linking_service.get_links(session, user_id)}
     flags = await get_boolean_flags(session)
+    streaks = await game_stats_service.current_win_streaks(session, user_id)
     return LinksResponse(
         games=[
-            _game_link(game, links.get(game), flags.get(game_flag_key(game), True))
-            for game in REGISTERED_GAMES
+            _game_link(
+                game,
+                links.get(game),
+                flags.get(game_flag_key(game), True),
+                streaks.get(game, 0),
+            )
+            for game in CATALOG_GAMES
         ]
     )
 

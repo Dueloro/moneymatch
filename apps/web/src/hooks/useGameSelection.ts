@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { isComingSoon } from '../lib/games';
 import { useLinks, type GameLink } from './useLinks';
+import { useMe } from './useMe';
 
 // The current game and the recency order are shared across Head-to-Head, Solo
 // Pools, and Tournament (persisted), so a pick carries between sections and the
@@ -34,7 +36,23 @@ export function useGameSelection(): {
   select: (id: string) => void;
 } {
   const { data } = useLinks();
-  const games = useMemo(() => data?.games ?? [], [data]);
+  const me = useMe();
+  const catalog = useMemo(() => data?.games ?? [], [data]);
+  const activeGames = me.data?.user.active_games;
+
+  // The switcher shows the player's chosen "play set". Until they've picked any
+  // (empty set — legacy accounts, or a skipped onboarding), fall back to every
+  // playable game so the bar is never empty. Coming-soon games only appear when
+  // explicitly added to the set.
+  const games = useMemo(() => {
+    const active = activeGames ?? [];
+    if (active.length > 0) {
+      const chosen = new Set(active);
+      return catalog.filter((g) => chosen.has(g.game));
+    }
+    return catalog.filter((g) => !isComingSoon(g.game));
+  }, [catalog, activeGames]);
+
   const [order, setOrder] = useState<string[]>(() => readList(ORDER_KEY));
   const [selected, setSelected] = useState<string | null>(() => readStr(SELECTED_KEY));
 

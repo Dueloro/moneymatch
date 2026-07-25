@@ -28,7 +28,7 @@ export interface ProfileSnapshot {
   avatar_url: string | null;
 }
 
-export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED';
+export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED' | 'COMING_SOON';
 
 export interface GameLink {
   game: string;
@@ -37,6 +37,8 @@ export interface GameLink {
   host_username: string | null;
   linked_at: string | null;
   profile: ProfileSnapshot | null;
+  /** Current consecutive-win streak on this game (0 = none; losses reset it). */
+  win_streak: number;
 }
 
 export interface LinksResponse {

@@ -3767,6 +3767,27 @@
           }
         }
       }
+    },
+    "/api/v1/demo/login": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Demo Login",
+        "operationId": "demo_login_api_v1_demo_login_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoLoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4938,6 +4959,29 @@
         "title": "DemoDepositRequest",
         "description": "Server-defined preset only \u2014 never an arbitrary client amount."
       },
+      "DemoLoginResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "default": "demo@dueloro.com"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "DemoLoginResponse"
+      },
       "DemoWithdrawalRequest": {
         "properties": {
           "amount_cents": {
@@ -5165,7 +5209,8 @@
             "enum": [
               "LINKED",
               "BLOCKED",
-              "UNLINKED"
+              "UNLINKED",
+              "COMING_SOON"
             ],
             "title": "Status"
           },
@@ -5201,6 +5246,11 @@
                 "type": "null"
               }
             ]
+          },
+          "win_streak": {
+            "type": "integer",
+            "title": "Win Streak",
+            "default": 0
           }
         },
         "type": "object",
@@ -5210,7 +5260,7 @@
           "status"
         ],
         "title": "GameLink",
-        "description": "One game's row on Profile: linked snapshot or an empty/blocked slot.\n\n`status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),\nUNLINKED (available to link)."
+        "description": "One game's row on Profile: linked snapshot or an empty/blocked slot.\n\n`status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),\nUNLINKED (available to link), COMING_SOON (in the catalog, no adapter yet)."
       },
       "HTTPValidationError": {
         "properties": {
@@ -7325,6 +7375,21 @@
               }
             ],
             "title": "Daily Entry Cap Cents"
+          },
+          "active_games": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Games",
+            "description": "Catalog game ids the player has chosen to play"
           }
         },
         "type": "object",
@@ -7391,6 +7456,13 @@
             "type": "string",
             "format": "date-time",
             "title": "Member Since"
+          },
+          "active_games": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Active Games"
           }
         },
         "type": "object",
@@ -7403,7 +7475,8 @@
           "dob_attested_18plus",
           "role",
           "status",
-          "member_since"
+          "member_since",
+          "active_games"
         ],
         "title": "UserResponse"
       },

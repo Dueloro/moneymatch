@@ -9,23 +9,41 @@ from __future__ import annotations
 GAME_CHESS_LICHESS = "chess.lichess"
 GAME_CS2_FACEIT = "cs2.faceit"
 GAME_DOTA2_OPENDOTA = "dota2.opendota"
+GAME_PUBG_STEAM = "pubg.steam"
 
+# Games with a verification adapter + skill model — the fully playable set. All
+# matchmaking / skill / linking code keys off this tuple, so a game only belongs
+# here once its adapter and metrics exist.
 REGISTERED_GAMES: tuple[str, ...] = (
     GAME_CHESS_LICHESS,
     GAME_CS2_FACEIT,
     GAME_DOTA2_OPENDOTA,
 )
 
-# Human labels for the Profile "Linked games" rows (design PDF p.12).
+# Announced games with no adapter yet: selectable in the catalog (a player can
+# add them to their play set) but not linkable or playable — the UI shows
+# "coming soon". Kept out of REGISTERED_GAMES so nothing downstream tries to
+# match or skill-model them. As each adapter lands, move its id up.
+COMING_SOON_GAMES: tuple[str, ...] = (GAME_PUBG_STEAM,)
+
+# The full selectable catalog surfaced by /links and the games bar.
+CATALOG_GAMES: tuple[str, ...] = REGISTERED_GAMES + COMING_SOON_GAMES
+
+# Human labels for the Profile "Games" rows (design PDF p.12).
 GAME_DISPLAY_NAMES: dict[str, str] = {
     GAME_CHESS_LICHESS: "Chess — Lichess",
     GAME_CS2_FACEIT: "CS2 — FACEIT",
     GAME_DOTA2_OPENDOTA: "Dota 2 — OpenDota",
+    GAME_PUBG_STEAM: "PUBG: Battlegrounds",
 }
 
 
 def game_display_name(game_id: str) -> str:
     return GAME_DISPLAY_NAMES.get(game_id, game_id)
+
+
+def is_coming_soon(game_id: str) -> bool:
+    return game_id in COMING_SOON_GAMES
 
 
 # Demo-login bypass (see routers/demo.py + config.demo_login_enabled). One shared

@@ -45,6 +45,13 @@ const DotIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const PubgIcon: FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+    <path d="M3 7.5 12 4l9 3.5-2 2.2-7-2.7-7 2.7L3 7.5Z" />
+    <path d="M6.5 12.2 12 10l5.5 2.2-1.4 6.3L12 20l-4.1-1.5-1.4-6.3Z" />
+  </svg>
+);
+
 const GAMES: Record<string, GameMeta> = {
   'chess.lichess': {
     id: 'chess.lichess',
@@ -67,6 +74,13 @@ const GAMES: Record<string, GameMeta> = {
     accent: '#e15b4c',
     Icon: ShieldIcon,
   },
+  'pubg.steam': {
+    id: 'pubg.steam',
+    name: 'PUBG',
+    short: 'PUBG',
+    accent: '#e8a13a',
+    Icon: PubgIcon,
+  },
 };
 
 /** Presentation for a game id. Falls back to a passed-in display name (with the
@@ -76,4 +90,15 @@ export function gameMeta(id: string, fallbackName?: string): GameMeta {
   if (known) return known;
   const name = (fallbackName ?? id).split(/[·—-]/)[0].trim() || id;
   return { id, name, short: name, accent: 'var(--text-secondary)', Icon: DotIcon };
+}
+
+/**
+ * Games in the catalog but not yet linkable/playable (no adapter). The server is
+ * the source of truth via the `COMING_SOON` link status; this mirror lets the
+ * switcher and Play screens flag a game without waiting on a /links round-trip.
+ */
+const COMING_SOON_GAMES = new Set<string>(['pubg.steam']);
+
+export function isComingSoon(id: string): boolean {
+  return COMING_SOON_GAMES.has(id);
 }

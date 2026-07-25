@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..constants import CATALOG_GAMES
+
 USERNAME_PATTERN = r"^[a-z0-9_]{3,20}$"
 STATE_PATTERN = r"^[A-Za-z]{2}$"
 
@@ -23,6 +25,7 @@ class UserResponse(BaseModel):
     role: str
     status: str
     member_since: datetime
+    active_games: list[str]
 
 
 class LimitsResponse(BaseModel):
@@ -56,6 +59,22 @@ class UpdateMeRequest(BaseModel):
     dob_attested_18plus: bool | None = None
     daily_loss_cap_cents: int | None = Field(default=None, gt=0)
     daily_entry_cap_cents: int | None = Field(default=None, gt=0)
+    active_games: list[str] | None = Field(
+        default=None, description="Catalog game ids the player has chosen to play"
+    )
+
+    @field_validator("active_games")
+    @classmethod
+    def _validate_active_games(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        seen: list[str] = []
+        for game in v:
+            if game not in CATALOG_GAMES:
+                raise ValueError(f"Unknown game id: {game}")
+            if game not in seen:
+                seen.append(game)
+        return seen
 
     @field_validator("username")
     @classmethod

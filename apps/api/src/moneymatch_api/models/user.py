@@ -11,7 +11,7 @@ import secrets
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, String, func, text
-from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, TimestampMixin, uuid_pk
@@ -92,4 +92,12 @@ class User(Base, TimestampMixin):
     )
     member_since: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # The player's "play set": catalog game ids they've chosen to play. Drives
+    # which games show in the switcher; decoupled from linking, so a game can be
+    # selected (and shown) before its account is linked, and a coming-soon game
+    # can be added ahead of its adapter. Empty means "not chosen yet" — the
+    # client falls back to showing every registered game.
+    active_games: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
     )

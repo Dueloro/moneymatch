@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
 import { PlaySlip } from '../components/play/PlaySlip';
+import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SkeletonList } from '../components/ui/Skeleton';
+import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
-import { gameMeta } from '../lib/games';
+import { gameMeta, isComingSoon } from '../lib/games';
 import { useGameSelection } from '../hooks/useGameSelection';
 import {
+  prizeForEntry,
   useJoinQueue,
   useMarkets,
   useMatch,
@@ -23,17 +25,15 @@ import {
   type QueueStatus,
 } from '../hooks/useMatchmaking';
 
-function formatMultiplier(bps: number): string {
-  return `×${(bps / 10000).toFixed(2)}`;
+/** The market's headline resolution note (the part before the first "·"). */
+function marketHeadline(market: MarketRow): string {
+  return market.resolution_note.split('·')[0]?.trim() ?? '';
 }
 
-/** The market's headline resolution note (the part before the first "·"), with
- * the live queue depth appended when anyone is waiting. */
-function marketSubline(market: MarketRow): string {
-  const headline = market.resolution_note.split('·')[0]?.trim() ?? '';
-  return market.queue_depth > 0
-    ? `${headline} · ${market.queue_depth} waiting`
-    : headline;
+/** Default speed for a speed-gated market (chess): the middle option if present. */
+function defaultSpeed(market: MarketRow): string | undefined {
+  if (!market.requires_speed) return undefined;
+  return market.speeds[1] ?? market.speeds[0] ?? undefined;
 }
 
 // States where the slip should show the confirm/active card for a deep-linked
@@ -42,13 +42,15 @@ const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
 export function PlayPage() {
   const { games, selected: game, select: setGame } = useGameSelection();
+  // Coming-soon games have no markets endpoint — don't fetch for them.
+  const playableGame = game && !isComingSoon(game) ? game : undefined;
 
   const {
     data: markets,
     isLoading: marketsLoading,
     isError: marketsError,
     refetch: refetchMarkets,
-  } = useMarkets(game);
+  } = useMarkets(playableGame);
 
   // Inbox "Respond" lands here as /play?match=<id>; open that match's slip
   // directly (it isn't in the viewer's queue status when it came from a challenge).
@@ -68,168 +70,138 @@ export function PlayPage() {
         }
       : liveStatus;
 
-  const waiting = useWaiting(game);
+  const waiting = useWaiting(playableGame);
   const join = useJoinQueue();
   const take = useTakeWaiting();
 
-  const [marketKey, setMarketKey] = useState<string | null>(null);
-  const [speed, setSpeed] = useState<string | null>(null);
-  const [entryCents, setEntryCents] = useState<number | null>(null);
-
-  // Reset the local slip selection when the game changes.
-  useEffect(() => {
-    setMarketKey(null);
-    setSpeed(null);
-    setEntryCents(null);
-  }, [game]);
-
-  const selectedMarket: MarketRow | null =
-    markets?.markets.find((m) => m.key === marketKey) ?? null;
-
   const selectGame = games.find((g) => g.game === game);
   const linked = markets?.linked ?? false;
+  const meta = game ? gameMeta(game, selectGame?.display_name) : null;
+  const presets = markets?.entry_presets_cents ?? [];
+  // A match is in flight — surface the slip and freeze new joins.
+  const inFlight = status?.status === 'searching' || status?.status === 'matched';
 
-  function selectMarket(m: MarketRow) {
-    setMarketKey(m.key);
-    setSpeed(m.requires_speed ? (m.speeds[1] ?? m.speeds[0] ?? null) : null);
-  }
+  const header = (
+    <div className="mb-6 flex items-center gap-4">
+      <GameTabs games={games} selected={game} onSelect={setGame} />
+      <BalanceHeader />
+    </div>
+  );
 
-  function findMatch() {
-    if (!game || !selectedMarket || entryCents == null) return;
-    join.mutate({
-      game,
-      market: selectedMarket.key,
-      speed: selectedMarket.requires_speed ? (speed ?? undefined) : undefined,
-      entry_preset_cents: entryCents,
-    });
+  if (game && isComingSoon(game)) {
+    return (
+      <div>
+        {header}
+        <ComingSoonPanel name={gameMeta(game, selectGame?.display_name).name} />
+      </div>
+    );
   }
 
   return (
     <div>
-      <div className="mb-6">
-        <BalanceHeader />
-      </div>
+      {header}
 
-      <GameTabs games={games} selected={game} onSelect={setGame} />
+      {marketsLoading ? (
+        <SkeletonList rows={4} />
+      ) : marketsError ? (
+        <ErrorState title="Could not load markets" onRetry={() => refetchMarkets()} />
+      ) : !linked ? (
+        <EmptyState
+          title={`Link your ${meta?.name ?? 'game'} account`}
+          subline="Link a game account to play head-to-head for real payouts."
+          action={
+            <Link to="/profile">
+              <PillButton>Link a game</PillButton>
+            </Link>
+          }
+        />
+      ) : (
+        <>
+          <p className="mb-6 max-w-2xl text-sm text-text-secondary">
+            Head-to-head puts you 1v1 against an evenly-matched opponent for a preset
+            stake. Pick what to wager on and we&apos;ll find your match.
+          </p>
 
-      <div className="flex flex-col gap-6 md:flex-row md:gap-8">
-        <div className="min-w-0 flex-1">
-          {marketsLoading ? (
-            <SkeletonList rows={4} />
-          ) : marketsError ? (
-            <ErrorState
-              title="Could not load markets"
-              onRetry={() => refetchMarkets()}
-            />
-          ) : !linked ? (
-            <EmptyState
-              title={`Link your ${game ? gameMeta(game, selectGame?.display_name).name : 'game'} account`}
-              subline="Link a game account to play head-to-head for real payouts."
-              action={
-                <Link to="/profile">
-                  <PillButton>Link a game</PillButton>
-                </Link>
-              }
-            />
-          ) : (
-            <>
-              <h2 className="mb-3 label-mono">Markets</h2>
-              <div className="mb-8 -mx-3">
-                {markets?.markets.map((m) => {
-                  const selected = m.key === marketKey;
-                  return (
-                    <button
-                      key={m.key}
-                      onClick={() => selectMarket(m)}
-                      className={[
-                        'block w-full rounded-lg px-3 text-left transition',
-                        selected ? 'glow-selected' : 'hover:bg-panel/50',
-                      ].join(' ')}
-                    >
-                      <ListRow
-                        left={
-                          <span
-                            aria-hidden
-                            className={[
-                              'grid h-4 w-4 place-items-center rounded-full border',
-                              selected ? 'border-green' : 'border-hairline',
-                            ].join(' ')}
-                          >
-                            {selected && (
-                              <span className="h-2 w-2 rounded-full bg-green" />
-                            )}
-                          </span>
-                        }
+          {inFlight && (
+            <div className="mb-8">
+              <PlaySlip
+                status={status}
+                market={null}
+                entryCents={null}
+                presetsCents={presets}
+                onSelectEntry={() => {}}
+                onFindMatch={() => {}}
+                finding={false}
+              />
+            </div>
+          )}
+
+          {!inFlight && (
+            <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {(markets?.markets ?? [])
+                .filter((m) => !m.provisional)
+                .flatMap((m) => {
+                  const speed = defaultSpeed(m);
+                  const speedTag = speed ? speed.toUpperCase() : undefined;
+                  return presets.map((entry) => {
+                    const key = `${game}:${m.key}:${speed ?? ''}:${entry}`;
+                    return (
+                      <WagerCard
+                        key={key}
+                        accent={meta?.accent ?? 'var(--text-secondary)'}
+                        gameName={meta?.short ?? 'Game'}
+                        tag={speedTag}
                         title={m.label}
-                        subline={marketSubline(m)}
-                        right={
-                          <span className="font-semibold text-text">
-                            {formatMultiplier(m.multiplier_bps)}
-                          </span>
+                        subtitle={marketHeadline(m)}
+                        entryCents={entry}
+                        capacity={2}
+                        filled={1}
+                        oneVsOne
+                        footnote={`You'd win ≈ ${formatCurrency(
+                          prizeForEntry(entry, m.multiplier_bps),
+                        )}`}
+                        buttonLabel="Find Match"
+                        joining={join.isPending}
+                        onJoin={() =>
+                          join.mutate({
+                            game: game!,
+                            market: m.key,
+                            speed,
+                            entry_preset_cents: entry,
+                          })
                         }
                       />
-                    </button>
-                  );
+                    );
+                  });
                 })}
-              </div>
-
-              {/* Speed sub-selector for chess */}
-              {selectedMarket?.requires_speed && (
-                <div className="mb-8 flex gap-2">
-                  {selectedMarket.speeds.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSpeed(s)}
-                      className={[
-                        'rounded-pill border px-3 py-1 text-xs font-semibold capitalize',
-                        s === speed
-                          ? 'border-green text-green'
-                          : 'border-hairline text-text-secondary hover:text-text',
-                      ].join(' ')}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <h2 className="mb-3 label-mono">Waiting to play</h2>
-              {waiting.data && waiting.data.waiting.length > 0 ? (
-                waiting.data.waiting.map((w) => (
-                  <ListRow
-                    key={w.ticket_id}
-                    title={w.username ?? 'Player'}
-                    subline={`${w.market_label} · ${formatCurrency(w.entry_cents)}`}
-                    right={
-                      <PillButton
-                        variant="secondary"
-                        onClick={() => take.mutate(w.ticket_id)}
-                        disabled={take.isPending || status?.status === 'matched'}
-                      >
-                        Match
-                      </PillButton>
-                    }
-                  />
-                ))
-              ) : (
-                <p className="py-4 text-sm text-text-secondary">
-                  No one waiting yet. Start a search and we&apos;ll pair you.
-                </p>
-              )}
-            </>
+            </div>
           )}
-        </div>
 
-        <PlaySlip
-          status={status}
-          market={selectedMarket}
-          entryCents={entryCents}
-          presetsCents={markets?.entry_presets_cents ?? []}
-          onSelectEntry={setEntryCents}
-          onFindMatch={findMatch}
-          finding={join.isPending}
-        />
-      </div>
+          <h2 className="mb-3 label-mono">Waiting to play</h2>
+          {waiting.data && waiting.data.waiting.length > 0 ? (
+            waiting.data.waiting.map((w) => (
+              <ListRow
+                key={w.ticket_id}
+                title={w.username ?? 'Player'}
+                subline={`${w.market_label} · ${formatCurrency(w.entry_cents)}`}
+                right={
+                  <PillButton
+                    variant="secondary"
+                    onClick={() => take.mutate(w.ticket_id)}
+                    disabled={take.isPending || inFlight}
+                  >
+                    Match
+                  </PillButton>
+                }
+              />
+            ))
+          ) : (
+            <p className="py-4 text-sm text-text-secondary">
+              No one waiting yet. Start a search and we&apos;ll pair you.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

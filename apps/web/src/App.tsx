@@ -2,10 +2,10 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { RequireAdmin } from './auth/RequireAdmin';
 import { RequireAuth } from './auth/RequireAuth';
+import { useAuth } from './auth/useAuth';
 import { AppShell } from './components/AppShell';
 import { ActivityPage } from './pages/ActivityPage';
 import { InvitePage } from './pages/InvitePage';
-import { LandingPage } from './pages/LandingPage';
 import { PlayPage } from './pages/PlayPage';
 import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -24,7 +24,7 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<RootRedirect />} />
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/i/:token" element={<InvitePage />} />
       <Route element={<RequireAuth />}>
@@ -54,4 +54,20 @@ export function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+/**
+ * The bare domain has no marketing page: send visitors straight into the app.
+ * Authenticated → Solo Pools (the default mode); everyone else → sign-in.
+ */
+function RootRedirect() {
+  const { session, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-bg text-text-secondary">
+        Loading…
+      </div>
+    );
+  }
+  return <Navigate to={session ? '/pools' : '/signin'} replace />;
 }
