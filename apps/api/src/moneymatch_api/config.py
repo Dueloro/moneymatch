@@ -46,6 +46,9 @@ class Settings(BaseSettings):
 
     # Host game APIs (used from Phase 2).
     faceit_api_key: str | None = None
+    # PUBG — direct to the official PUBG (gamelocker) API. Without it, PUBG
+    # lookups fail soft (link "can't right now") rather than crash.
+    pubg_api_key: str | None = None
 
     # Observability.
     sentry_dsn: str | None = None
