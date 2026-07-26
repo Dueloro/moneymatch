@@ -26,7 +26,11 @@ const POOL_CAPACITY = 4;
 export function PoolsPage() {
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
-  const { data: markets } = usePoolMarkets(playableGame);
+  const {
+    data: markets,
+    isError: marketsUnavailable,
+    isLoading: marketsLoading,
+  } = usePoolMarkets(playableGame);
   const { data: status } = usePoolStatus();
   const enter = useEnterPool();
 
@@ -42,6 +46,19 @@ export function PoolsPage() {
       <div>
         {header}
         <ComingSoonPanel name={gameMeta(game).name} />
+      </div>
+    );
+  }
+
+  // The markets endpoint 404s for a game that doesn't offer pools yet.
+  if (game && marketsUnavailable) {
+    return (
+      <div>
+        {header}
+        <EmptyState
+          title={`Pools aren't available for ${gameMeta(game).name} yet`}
+          subline="Solo pools are Counter-Strike 2 only for now — more games soon."
+        />
       </div>
     );
   }
@@ -87,7 +104,9 @@ export function PoolsPage() {
 
       {openMetrics.length === 0 ? (
         <p className="py-8 text-sm text-text-secondary">
-          No pools on this game yet — play a match on it and its pools appear here.
+          {marketsLoading
+            ? 'Loading pools…'
+            : 'No pools on this game yet — play a match on it and its pools appear here.'}
         </p>
       ) : (
         openMetrics.map((m) => (

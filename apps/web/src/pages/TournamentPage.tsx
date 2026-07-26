@@ -28,7 +28,11 @@ const FIELD_SIZES = [10, 16, 20];
 export function TournamentPage() {
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
-  const { data: markets } = useTournamentMarkets(playableGame);
+  const {
+    data: markets,
+    isError: marketsUnavailable,
+    isLoading: marketsLoading,
+  } = useTournamentMarkets(playableGame);
   const { data: status } = useTournamentStatus();
   const enter = useEnterTournament();
 
@@ -44,6 +48,19 @@ export function TournamentPage() {
       <div>
         {header}
         <ComingSoonPanel name={gameMeta(game).name} />
+      </div>
+    );
+  }
+
+  // The markets endpoint 404s for a game that doesn't offer tournaments yet.
+  if (game && marketsUnavailable) {
+    return (
+      <div>
+        {header}
+        <EmptyState
+          title={`Tournaments aren't available for ${gameMeta(game).name} yet`}
+          subline="Tournaments are Counter-Strike 2 only for now — more games soon."
+        />
       </div>
     );
   }
@@ -88,7 +105,9 @@ export function TournamentPage() {
 
       {openMetrics.length === 0 ? (
         <p className="py-8 text-sm text-text-secondary">
-          No tournaments on this game yet — play a match on it and they appear here.
+          {marketsLoading
+            ? 'Loading tournaments…'
+            : 'No tournaments on this game yet — play a match on it and they appear here.'}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
