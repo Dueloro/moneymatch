@@ -98,9 +98,15 @@ GAME_RATE_METRICS: dict[str, tuple[str, ...]] = {
 # EWMA recency weighting expressed as a half-life in matches.
 METRIC_EWMA_HALF_LIFE = 10
 
-# Below this per-metric sample size the metric is **provisional** — no stat
-# duels / pool entries on it (challenge-engine proposal §3/§6).
+# Below this per-metric sample size a Head-to-Head **stat duel** is provisional
+# (challenge-engine proposal §3/§6).
 METRIC_PROVISIONAL_MIN_N = 10
+
+# Solo pools / tournaments no longer gate on a "play more matches to unlock"
+# sample floor — they're available as soon as there's a baseline to quote a bar
+# from, i.e. at least one graded match on the stat. (Zero samples has no μ/σ, so
+# a stat you've never produced simply isn't offered — that's math, not a rule.)
+STAT_BASELINE_MIN_N = 1
 
 # Per-game finished-history floor. An account below it gets H2H `win` markets
 # only (no stat duels), regardless of any single metric's n.

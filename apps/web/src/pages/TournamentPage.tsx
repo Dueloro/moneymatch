@@ -88,8 +88,7 @@ export function TournamentPage() {
 
       {openMetrics.length === 0 ? (
         <p className="py-8 text-sm text-text-secondary">
-          No tournaments available on this game yet — play a few more matches to unlock
-          them.
+          No tournaments on this game yet — play a match on it and they appear here.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

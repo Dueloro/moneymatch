@@ -87,7 +87,7 @@ export function PoolsPage() {
 
       {openMetrics.length === 0 ? (
         <p className="py-8 text-sm text-text-secondary">
-          No pools available on this game yet — play a few more matches to unlock them.
+          No pools on this game yet — play a match on it and its pools appear here.
         </p>
       ) : (
         openMetrics.map((m) => (

@@ -86,11 +86,21 @@ async def test_preview_quotes_bars_from_own_baseline(session):
     )
 
 
-async def test_provisional_metric_cannot_enter(session):
+async def test_sparse_history_can_now_enter(session):
+    # No "play more matches to unlock": a single graded match is baseline enough.
     user, _ = await pool_player(session, "rookie", mu=1.50, n=4)
+    preview = await pool_engine.preview_bars(session, user, CS2, KD)
+    assert preview["provisional"] is False and preview["cards"]
+    result = await enq(session, user)  # does not raise
+    assert result.status in ("searching", "formed")
+
+
+async def test_no_baseline_cannot_enter(session):
+    # A stat you've never produced (no samples) has no bar to quote — that's math.
+    user, _ = await pool_player(session, "blank", mu=1.50, n=0)
     with pytest.raises(PoolError) as exc:
         await enq(session, user)
-    assert exc.value.code == "metric_provisional"
+    assert exc.value.code == "no_stat_baseline"
 
 
 # --- room formation ------------------------------------------------------- #

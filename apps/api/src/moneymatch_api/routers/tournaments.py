@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..constants import (
     ENTRY_PRESETS_CENTS,
-    METRIC_PROVISIONAL_MIN_N,
+    STAT_BASELINE_MIN_N,
     TOURNAMENT_FIELD_SIZE,
     TOURNAMENT_GAMES,
     TOURNAMENT_METRICS,
@@ -191,7 +191,7 @@ async def get_markets(
             TournamentMetric(
                 metric=metric,
                 label=metric_label(metric),
-                provisional=n < METRIC_PROVISIONAL_MIN_N,
+                provisional=n < STAT_BASELINE_MIN_N,
             )
         )
     return TournamentMarketsResponse(
