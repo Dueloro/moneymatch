@@ -24,6 +24,9 @@ from ..models.play import Match, MatchPlayer, QueueTicket
 from ..models.skill import MetricModel
 from ..models.user import User
 from ..schemas.play import (
+    DisputeView,
+    FileDisputeRequest,
+    GradingExplanation,
     MarketRow,
     MarketsResponse,
     MatchPlayerView,
@@ -33,7 +36,7 @@ from ..schemas.play import (
     WaitingResponse,
     WaitingRow,
 )
-from ..services import matchmaking, money_math
+from ..services import dispute_service, matchmaking, money_math
 from ..services.markets import (
     KIND_STAT_RACE,
     KIND_WIN_H2H,
@@ -284,6 +287,73 @@ async def get_match(
     if not any(s.user_id == user.id for s in seats):
         raise APIError("not_a_player", "You are not in this match.", status_code=403)
     return await _match_view(session, match, user)
+
+
+_RESULT_BY_STATE = {"PUSHED": "push", "CANCELED": "canceled"}
+
+
+@router.get("/matches/{match_id}/grading", response_model=GradingExplanation)
+async def get_match_grading(
+    match_id: UUID,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> GradingExplanation:
+    """Transparent grading record: the rule, each side's stat line, the decision.
+    Only a participant can read it."""
+    match = await _load_match(session, match_id)
+    seats = await players(session, match.id)
+    your_seat = next((s for s in seats if s.user_id == user.id), None)
+    if your_seat is None:
+        raise APIError("not_a_player", "You are not in this match.", status_code=403)
+    opp_seat = next((s for s in seats if s.user_id != user.id), None)
+    market = get_market(match.game, match.market)
+    names = await _usernames(session, [s.user_id for s in seats])
+
+    if match.state == "SETTLED":
+        result = "you_won" if match.winner_user_id == user.id else "you_lost"
+    else:
+        result = _RESULT_BY_STATE.get(match.state, "pending")
+
+    return GradingExplanation(
+        match_id=match.id,
+        state=match.state,
+        settled=match.state in ("SETTLED", "PUSHED"),
+        result=result,
+        market_label=market.label if market else match.market,
+        rule=_resolution_note(market) if market else "",
+        engine_version=match.engine_version,
+        resolved_at=match.resolved_at,
+        winner_username=(
+            names.get(match.winner_user_id) if match.winner_user_id else None
+        ),
+        your_stat_line=your_seat.stat_line,
+        opponent_stat_line=opp_seat.stat_line if opp_seat else None,
+        outcome_detail=match.outcome_detail,
+    )
+
+
+@router.post("/matches/{match_id}/dispute", response_model=DisputeView, status_code=201)
+async def file_dispute(
+    match_id: UUID,
+    body: FileDisputeRequest,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> DisputeView:
+    """Contest how a settled match was graded (participant-only, once)."""
+    match = await _load_match(session, match_id)
+    dispute = await dispute_service.file_dispute(session, user, match, body.reason)
+    return DisputeView.model_validate(dispute)
+
+
+@router.get("/matches/{match_id}/dispute", response_model=DisputeView | None)
+async def get_dispute(
+    match_id: UUID,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> DisputeView | None:
+    """The viewer's dispute for this match, if any."""
+    dispute = await dispute_service.get_for(session, match_id, user.id)
+    return DisputeView.model_validate(dispute) if dispute else None
 
 
 @router.post("/matches/{match_id}/confirm", response_model=MatchView)

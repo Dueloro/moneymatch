@@ -28,6 +28,7 @@ NOTIFICATION_KINDS = (
     "challenge_accepted",
     "friend_request",
     "room_filled",
+    "dispute_resolved",
     "system",
 )
 

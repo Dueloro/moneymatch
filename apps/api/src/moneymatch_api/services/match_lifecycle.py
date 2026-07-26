@@ -33,6 +33,7 @@ from ..errors import APIError
 from ..models.play import Match, MatchPlayer
 from ..models.user import User
 from ..services import (
+    geo_service,
     limits_service,
     notifications_service,
     reconciliation_service,
@@ -122,6 +123,10 @@ async def confirm(session: AsyncSession, match: Match, user: User) -> Match:
             status_code=409,
         )
 
+    # Geo-fence before money moves: a resident who became geo-blocked (or a match
+    # formed via a challenge that skipped the queue) is refused at the escrow gate,
+    # leaving the match PENDING with no ledger row.
+    await geo_service.assert_can_enter(session, user.residence_state)
     # Server-side gate (balance, daily caps, concurrency) — the PoC's `canJoin`
     # tautology dies here. Raises cleanly and leaves the match PENDING.
     await limits_service.assert_can_stake(session, user, match.entry_cents)

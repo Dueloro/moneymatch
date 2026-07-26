@@ -2,18 +2,54 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
+from ..models.linked_account import LinkedAccount
 from ..models.user import User
-from ..schemas.user import LimitsResponse, MeResponse, UpdateMeRequest, UserResponse
+from ..models.wallet import LedgerEntry, Wallet
+from ..schemas.user import (
+    GettingStarted,
+    LimitsResponse,
+    MeResponse,
+    UpdateMeRequest,
+    UserResponse,
+)
 from ..services import limits_service, notifications_service
 from ..services.user_service import complete_onboarding, self_exclude
 
 router = APIRouter(tags=["me"])
+
+
+async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
+    """First-match funnel progress for the getting-started checklist."""
+    linked = await session.scalar(
+        select(LinkedAccount.id)
+        .where(LinkedAccount.user_id == user.id, LinkedAccount.status != "unbound")
+        .limit(1)
+    )
+    # Any escrow ever held = they've entered a contest (H2H / pool / tournament).
+    wagered = await session.scalar(
+        select(LedgerEntry.id)
+        .join(Wallet, Wallet.id == LedgerEntry.wallet_id)
+        .where(Wallet.user_id == user.id, LedgerEntry.entry_type == "escrow_hold")
+        .limit(1)
+    )
+    picked = bool(user.active_games)
+    linked_game = linked is not None
+    placed_wager = wagered is not None
+    return GettingStarted(
+        picked_games=picked,
+        linked_game=linked_game,
+        placed_wager=placed_wager,
+        complete=picked and linked_game and placed_wager,
+    )
 
 
 async def _me(session: AsyncSession, user: User) -> MeResponse:
@@ -25,6 +61,7 @@ async def _me(session: AsyncSession, user: User) -> MeResponse:
         needs_onboarding=user.username is None,
         limits=LimitsResponse.model_validate(limit),
         unread_notifications=unread,
+        getting_started=await _getting_started(session, user),
     )
 
 
@@ -56,12 +93,24 @@ async def update_me(
             dob_attested_18plus=body.dob_attested_18plus,
         )
 
-    if body.daily_loss_cap_cents is not None or body.daily_entry_cap_cents is not None:
+    if (
+        body.daily_loss_cap_cents is not None
+        or body.daily_entry_cap_cents is not None
+        or body.daily_deposit_cap_cents is not None
+        or body.cooloff_days is not None
+    ):
+        timeout_until = (
+            datetime.now(UTC) + timedelta(days=body.cooloff_days)
+            if body.cooloff_days is not None
+            else None
+        )
         await limits_service.request_limit_change(
             session,
             user.id,
             daily_loss_cap_cents=body.daily_loss_cap_cents,
             daily_entry_cap_cents=body.daily_entry_cap_cents,
+            daily_deposit_cap_cents=body.daily_deposit_cap_cents,
+            timeout_until=timeout_until,
         )
 
     if body.active_games is not None:

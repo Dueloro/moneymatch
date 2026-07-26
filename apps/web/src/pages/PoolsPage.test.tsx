@@ -9,6 +9,10 @@ vi.mock('../hooks/useWallet', () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
   }),
 }));
+// GettingStarted (rendered by PoolsPage) reads /me; null = checklist hidden.
+vi.mock('../hooks/useMe', () => ({
+  useMe: () => ({ data: { getting_started: null } }),
+}));
 vi.mock('../hooks/useGameSelection', () => ({
   useGameSelection: () => ({
     games: [{ game: 'cs2.faceit', display_name: 'Counter Strike 2', status: 'LINKED' }],

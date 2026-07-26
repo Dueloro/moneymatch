@@ -78,9 +78,11 @@ describe('ProfilePage', () => {
         limits: {
           daily_loss_cap_cents: 20_000,
           daily_entry_cap_cents: 50_000,
+          daily_deposit_cap_cents: 100_000,
           max_concurrent_contests: 3,
           pending_limits: null,
           pending_effective_at: null,
+          timeout_until: null,
         },
       },
     } as unknown as ReturnType<typeof useMe>);

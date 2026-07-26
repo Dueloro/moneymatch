@@ -43,6 +43,7 @@ from ..schemas.play import Forecast
 from ..schemas.profile import ProfileSnapshot
 from . import (
     analytics,
+    geo_service,
     money_math,
     notifications_service,
     pairing,
@@ -666,6 +667,11 @@ async def enqueue(
         raise MatchmakingError(
             "queue_paused", "Matchmaking is paused right now.", status_code=503
         )
+
+    # Geo-fence H2H the same as pools/tournaments — fail fast before we queue or
+    # pair anyone (the escrow gate at confirm is the backstop). A blocked resident
+    # never enters the queue.
+    await geo_service.assert_can_enter(session, user.residence_state)
 
     market = _resolve_market(game, market_key, speed)
     link = await _require_link(session, user.id, game)

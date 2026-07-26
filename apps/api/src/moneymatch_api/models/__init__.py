@@ -3,11 +3,13 @@
 
 from ..db.base import Base
 from .admin_audit import AdminAudit
+from .dispute import Dispute
 from .feature_flag import FeatureFlag
 from .linked_account import LinkedAccount
 from .notification import Notification
 from .play import Match, MatchPlayer, QueueTicket
 from .pools import SoloEntry, SoloPool
+from .push import PushSubscription
 from .risk import RiskFlag
 from .skill import MetricModel, RawPayload
 from .social import Challenge, Friendship
@@ -18,6 +20,7 @@ from .wallet import LedgerEntry, Limit, PlatformLedgerEntry, Wallet
 __all__ = [
     "Base",
     "AdminAudit",
+    "Dispute",
     "FeatureFlag",
     "User",
     "Wallet",
@@ -33,6 +36,7 @@ __all__ = [
     "Notification",
     "SoloPool",
     "SoloEntry",
+    "PushSubscription",
     "Tournament",
     "TournamentEntry",
     "RiskFlag",

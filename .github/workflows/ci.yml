@@ -36,8 +36,8 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.12'
       - name: Install deps
@@ -69,10 +69,10 @@ jobs:
       VITE_SUPABASE_URL: http://localhost:54321
       VITE_SUPABASE_ANON_KEY: ci-anon-key
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Version comes from package.json "packageManager" — do not also set it here.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: pnpm

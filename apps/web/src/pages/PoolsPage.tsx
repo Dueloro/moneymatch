@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
+import { GettingStarted } from '../components/GettingStarted';
 import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { GameTabs } from '../components/ui/GameTabs';
@@ -71,6 +72,8 @@ export function PoolsPage() {
   return (
     <div>
       {header}
+
+      <GettingStarted />
 
       <p className="mb-6 max-w-2xl text-sm text-text-secondary">
         Solo pools put 3–4 similar-skill players against a personal bar quoted from your

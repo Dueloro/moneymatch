@@ -64,11 +64,15 @@ PLATFORM_ACCOUNTS = ("platform:rake", "platform:promo")
 # (caps.py) so the `limits` server-defaults and that table can never drift.
 DEFAULT_DAILY_LOSS_CAP_CENTS = CAPS.daily_loss_cap_cents  # $200.00
 DEFAULT_DAILY_ENTRY_CAP_CENTS = CAPS.daily_entry_cap_cents  # $500.00
+DEFAULT_DAILY_DEPOSIT_CAP_CENTS = CAPS.daily_deposit_cap_cents  # $1,000.00
 DEFAULT_MAX_CONCURRENT_CONTESTS = CAPS.max_concurrent_contests
 
 # Demo signup credit, booked as a real ledger row funded from platform:promo —
-# not a magic starting balance (04-phase-1 · deliverable 3).
+# not a magic starting balance (04-phase-1 · deliverable 3). The grant is a
+# platform gift, so it's excluded from the responsible-gaming deposit-velocity
+# cap (which meters the player's *own* funding).
 SIGNUP_GRANT_CENTS = 100_000  # $1,000.00
+SIGNUP_GRANT_MEMO = "signup grant"
 
 # Server-defined "Add funds" presets (no arbitrary client amounts — 04-phase-1
 # design rules). $10 / $25 / $50 / $100.
@@ -225,11 +229,22 @@ class Limit(Base, TimestampMixin):
         server_default=str(DEFAULT_DAILY_ENTRY_CAP_CENTS),
         nullable=False,
     )
+    daily_deposit_cap_cents: Mapped[int] = mapped_column(
+        BigInteger,
+        default=DEFAULT_DAILY_DEPOSIT_CAP_CENTS,
+        server_default=str(DEFAULT_DAILY_DEPOSIT_CAP_CENTS),
+        nullable=False,
+    )
     max_concurrent_contests: Mapped[int] = mapped_column(
         Integer,
         default=DEFAULT_MAX_CONCURRENT_CONTESTS,
         server_default=str(DEFAULT_MAX_CONCURRENT_CONTESTS),
         nullable=False,
+    )
+    # Self-imposed cool-off: staking is refused until this time (a protective
+    # "take a break"; can be extended, never shortened). Null = no timeout.
+    timeout_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     # A raise awaiting its 24h cooldown; promoted into the live caps once
     # `pending_effective_at` has passed (01-architecture §4 · PATCH /me).

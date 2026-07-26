@@ -389,3 +389,29 @@ async def test_enqueue_blocked_by_open_sandbagging_flag(session):
 
     with pytest.raises(SandbaggingBlockedError):
         await enq_cs2(session, user, market="kd_ratio")
+
+
+async def test_excluded_state_is_geo_blocked_from_h2h(session):
+    """A resident of a geo-fenced state is refused before queueing (parity with
+    pools/tournaments)."""
+    from sqlalchemy import text
+
+    from moneymatch_api.services.geo_service import RegionBlockedError
+
+    await session.execute(text("DELETE FROM feature_flags WHERE key = 'geo_config'"))
+    await session.execute(
+        text(
+            "INSERT INTO feature_flags (key, enabled, payload) "
+            "VALUES ('geo_config', true, cast(:p as jsonb))"
+        ),
+        {"p": '{"excluded_states": ["FL"]}'},
+    )
+    await session.flush()
+
+    user = await create_user(session, username="flguy", residence_state="FL")
+    await create_linked_account(session, user, CS2, profile=cs2_profile("flguy"))
+    for metric in ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"):
+        await create_metric_model(session, user, CS2, metric, mu=1.0, sigma=0.5, n=15)
+
+    with pytest.raises(RegionBlockedError):
+        await enq_cs2(session, user)
