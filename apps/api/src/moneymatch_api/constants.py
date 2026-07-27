@@ -18,13 +18,13 @@ REGISTERED_GAMES: tuple[str, ...] = (
     GAME_CHESS_LICHESS,
     GAME_CS2_FACEIT,
     GAME_DOTA2_OPENDOTA,
+    GAME_PUBG_STEAM,
 )
 
-# Announced games with no adapter yet: selectable in the catalog (a player can
-# add them to their play set) but not linkable or playable — the UI shows
-# "coming soon". Kept out of REGISTERED_GAMES so nothing downstream tries to
-# match or skill-model them. As each adapter lands, move its id up.
-COMING_SOON_GAMES: tuple[str, ...] = (GAME_PUBG_STEAM,)
+# Announced games with no adapter yet: selectable in the catalog but not linkable
+# or playable — the UI shows "coming soon". Empty now that PUBG is live; keep the
+# seam so the next announced-but-unbuilt game can slot in here.
+COMING_SOON_GAMES: tuple[str, ...] = ()
 
 # The full selectable catalog surfaced by /links and the games bar.
 CATALOG_GAMES: tuple[str, ...] = REGISTERED_GAMES + COMING_SOON_GAMES
@@ -89,10 +89,15 @@ def game_flag_key(game_id: str) -> str:
 
 # Rate metrics we build EWMA skill models for, per game. Chess settles on `win`
 # only, so it models no per-metric skill here.
+# Metrics we build EWMA skill models for from host history (bootstrap polls
+# these on link). Chess has no per-match rate stat we fetch, so it models none
+# here — its `chess_accuracy` pool metric is a demo-seeded baseline (see the demo
+# fixture), not a live-polled one.
 GAME_RATE_METRICS: dict[str, tuple[str, ...]] = {
     GAME_CHESS_LICHESS: (),
     GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
     GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
+    GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
 
 # EWMA recency weighting expressed as a half-life in matches.
@@ -114,6 +119,7 @@ GAME_HISTORY_FLOOR: dict[str, int] = {
     GAME_CHESS_LICHESS: 20,  # rated games
     GAME_CS2_FACEIT: 25,  # matches
     GAME_DOTA2_OPENDOTA: 25,  # matches
+    GAME_PUBG_STEAM: 20,  # matches
 }
 
 
@@ -196,16 +202,18 @@ WORKER_POLL_INTERVAL_SECONDS = 15
 
 # Which games offer pools/tournaments (config, not code — the engine is
 # game-agnostic; chess/dota wait for richer/validated telemetry).
-POOL_GAMES: tuple[str, ...] = (GAME_CS2_FACEIT,)
-TOURNAMENT_GAMES: tuple[str, ...] = (GAME_CS2_FACEIT,)
+# Solo pools & tournaments run on every playable game's rate metrics.
+POOL_GAMES: tuple[str, ...] = REGISTERED_GAMES
+TOURNAMENT_GAMES: tuple[str, ...] = REGISTERED_GAMES
 
 # Metrics offered for pools/tournaments per game (rate-based allowlist only).
 POOL_METRICS: dict[str, tuple[str, ...]] = {
+    GAME_CHESS_LICHESS: ("chess_accuracy",),
     GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
+    GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
+    GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
-TOURNAMENT_METRICS: dict[str, tuple[str, ...]] = {
-    GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
-}
+TOURNAMENT_METRICS: dict[str, tuple[str, ...]] = POOL_METRICS
 
 # Personal-bar difficulty multipliers: bar = round(μ + k·σ). Implied clear rate
 # is 1 − Φ(k) (≈31% / 16% / 4%) — disclosed difficulty, never an odds line.
@@ -214,9 +222,15 @@ POOL_DIFFICULTY_K: dict[str, float] = {"easy": 0.5, "medium": 1.0, "hard": 1.75}
 # Rounding increment for a personal/room bar, per metric (bars are quoted to a
 # clean step so two players' bars are comparable and reproducible).
 METRIC_BAR_INCREMENT: dict[str, float] = {
+    "chess_accuracy": 1.0,
     "cs2_kd_ratio": 0.05,
     "cs2_adr": 1.0,
     "cs2_headshot_pct": 1.0,
+    "dota2_kda_ratio": 0.1,
+    "dota2_gpm": 10.0,
+    "pubg_kills": 1.0,
+    "pubg_damage": 10.0,
+    "pubg_headshot_pct": 1.0,
 }
 
 # Room formation. A full room is `POOL_ROOM_SIZE`; at ladder end we form down to
@@ -258,11 +272,15 @@ WIN_STREAK_THRESHOLD = 8
 
 # Human labels for rate metrics (pool/tournament market rows + standings).
 METRIC_LABELS: dict[str, str] = {
+    "chess_accuracy": "Accuracy",
     "cs2_kd_ratio": "K/D ratio",
     "cs2_adr": "ADR",
     "cs2_headshot_pct": "Headshot %",
     "dota2_kda_ratio": "KDA ratio",
     "dota2_gpm": "GPM",
+    "pubg_kills": "Kills",
+    "pubg_damage": "Damage",
+    "pubg_headshot_pct": "Headshot %",
 }
 
 

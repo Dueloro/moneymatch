@@ -3,26 +3,14 @@
 Same surface as the other adapters (identity/profile/history → `ProfileSnapshot`
 / `NormGame`), sourced directly from the PUBG (gamelocker) API through
 `services.hosts.pubg`. Battle-royale has no head-to-head "draw"; a match "win" is
-a #1 finish (`winPlace == 1`). Per-match rate metrics (kills, damage, headshot %)
-feed the metric-model bootstrap and Phase-4 solo/tournament grading — never raw
-lifetime totals.
+a #1 finish (`winPlace == 1`). Per-match rate metrics (`pubg_kills`,
+`pubg_damage`, `pubg_headshot_pct`) feed the metric-model bootstrap and the
+solo/tournament grading — never raw lifetime totals.
 
-STATUS: DORMANT. This adapter is complete and unit-tested but intentionally NOT
-wired in yet, so it has zero effect on the running API (`/links` still reports
-`pubg.steam` as COMING_SOON and linking is refused). The codebase enforces
-`registry.all_ids() == REGISTERED_GAMES`, so activation is one atomic change once
-the matching frontend lands:
-
-  1. adapters/registry.py — add `PubgAdapter.id: PubgAdapter()` to `_ADAPTERS`.
-  2. constants.py — move `GAME_PUBG_STEAM` from `COMING_SOON_GAMES` into
-     `REGISTERED_GAMES`.
-  3. constants.py — add PUBG's metric config so pools/tournaments/stat-duels
-     light up: `GAME_RATE_METRICS`, `POOL_METRICS`, `TOURNAMENT_METRICS`,
-     `GAME_HISTORY_FLOOR`, and `METRIC_BAR_INCREMENT` for the keys below.
-  4. tests — update `test_adapter_registry` / `test_health` (the invariant set).
-
-Metric keys produced here (for step 3): `pubg_kills`, `pubg_damage`,
-`pubg_headshot_pct`.
+PUBG is a fully registered, playable game: it's in `REGISTERED_GAMES`, this
+adapter is in the registry, and its metrics drive pools / tournaments / stat
+duels (constants: `GAME_RATE_METRICS`, `POOL_METRICS`, `TOURNAMENT_METRICS`,
+`GAME_HISTORY_FLOOR`, `METRIC_BAR_INCREMENT`).
 """
 
 from __future__ import annotations

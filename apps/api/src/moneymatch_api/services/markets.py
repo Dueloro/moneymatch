@@ -26,6 +26,7 @@ from ..constants import (
     GAME_CHESS_LICHESS,
     GAME_CS2_FACEIT,
     GAME_DOTA2_OPENDOTA,
+    GAME_PUBG_STEAM,
 )
 from . import money_math
 
@@ -114,6 +115,34 @@ MARKETS: tuple[MarketDef, ...] = (
         label="GPM",
         kind=KIND_STAT_RACE,
         metric="dota2_gpm",
+    ),
+    # PUBG — next-match win + stat duels.
+    MarketDef(
+        game=GAME_PUBG_STEAM,
+        key="win_next",
+        label="Win your next match",
+        kind=KIND_WIN_NEXT,
+    ),
+    MarketDef(
+        game=GAME_PUBG_STEAM,
+        key="kills",
+        label="Kills",
+        kind=KIND_STAT_RACE,
+        metric="pubg_kills",
+    ),
+    MarketDef(
+        game=GAME_PUBG_STEAM,
+        key="damage",
+        label="Damage",
+        kind=KIND_STAT_RACE,
+        metric="pubg_damage",
+    ),
+    MarketDef(
+        game=GAME_PUBG_STEAM,
+        key="headshot_pct",
+        label="Headshot %",
+        kind=KIND_STAT_RACE,
+        metric="pubg_headshot_pct",
     ),
 )
 

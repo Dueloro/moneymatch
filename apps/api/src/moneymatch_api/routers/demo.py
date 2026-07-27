@@ -25,9 +25,10 @@ from ..constants import (
     DEMO_JWT_SECRET,
     DEMO_RESIDENCE_STATE,
     DEMO_USERNAME,
-    GAME_CS2_FACEIT,
     POOL_METRICS,
+    REGISTERED_GAMES,
     TOURNAMENT_METRICS,
+    game_display_name,
 )
 from ..db.session import get_session
 from ..errors import APIError
@@ -40,65 +41,68 @@ router = APIRouter(prefix="/demo", tags=["demo"])
 
 _TOKEN_TTL = timedelta(hours=12)
 
-# Plausible baselines (μ, σ) per CS2 metric so the demo user's pool/tournament
-# bars and head-to-head duels are all non-provisional out of the box.
+# Plausible baselines (μ, σ) per metric so the demo user's pool/tournament bars
+# and head-to-head duels are all non-provisional out of the box, on every game.
 _DEMO_METRIC_FIXTURE: dict[str, tuple[float, float]] = {
+    "chess_accuracy": (85.0, 6.0),
     "cs2_kd_ratio": (1.15, 0.22),
     "cs2_adr": (78.0, 12.0),
     "cs2_headshot_pct": (47.0, 8.0),
+    "dota2_kda_ratio": (3.2, 0.8),
+    "dota2_gpm": (520.0, 90.0),
+    "pubg_kills": (4.5, 2.0),
+    "pubg_damage": (380.0, 120.0),
+    "pubg_headshot_pct": (22.0, 8.0),
 }
 
 
 async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
-    """Give the demo user a linked CS2 account + non-provisional metric models so
-    the Solo Pools, Tournament, and Head-to-Head pages are populated with joinable
-    cards on first login. Idempotent — reuses whatever already exists."""
-    link = await session.scalar(
-        select(LinkedAccount).where(
-            LinkedAccount.user_id == user.id,
-            LinkedAccount.game == GAME_CS2_FACEIT,
-        )
-    )
-    if link is None:
-        session.add(
-            LinkedAccount(
-                user_id=user.id,
-                game=GAME_CS2_FACEIT,
-                host_account_id=f"faceit_{DEMO_USERNAME}",
-                host_username=DEMO_USERNAME,
-                profile_snapshot={
-                    "username": DEMO_USERNAME,
-                    "game": GAME_CS2_FACEIT,
-                    "total_games": 120,
-                    "rank_label": "Level 8",
-                    "rating": 1850,
-                },
-            )
-        )
-
-    wanted = set(POOL_METRICS.get(GAME_CS2_FACEIT, ())) | set(
-        TOURNAMENT_METRICS.get(GAME_CS2_FACEIT, ())
-    )
-    have = set(
+    """Link the demo user to every playable game + seed non-provisional metric
+    models, so Solo Pools, Tournaments, and Head-to-Head are populated with
+    joinable cards on every game out of the box. Idempotent."""
+    linked = set(
         await session.scalars(
-            select(MetricModel.metric).where(
-                MetricModel.user_id == user.id,
-                MetricModel.game == GAME_CS2_FACEIT,
-            )
+            select(LinkedAccount.game).where(LinkedAccount.user_id == user.id)
         )
     )
-    for metric in wanted - have:
-        mu, sigma = _DEMO_METRIC_FIXTURE.get(metric, (1.0, 0.2))
-        session.add(
-            MetricModel(
-                user_id=user.id,
-                game=GAME_CS2_FACEIT,
-                metric=metric,
-                mu=mu,
-                sigma=sigma,
-                n=25,  # non-provisional (>= METRIC_PROVISIONAL_MIN_N)
+    have_models = {
+        (g, m)
+        for g, m in await session.execute(
+            select(MetricModel.game, MetricModel.metric).where(
+                MetricModel.user_id == user.id
             )
         )
+    }
+    for game in REGISTERED_GAMES:
+        if game not in linked:
+            session.add(
+                LinkedAccount(
+                    user_id=user.id,
+                    game=game,
+                    host_account_id=f"{game}_{DEMO_USERNAME}",
+                    host_username=DEMO_USERNAME,
+                    profile_snapshot={
+                        "username": DEMO_USERNAME,
+                        "display_name": DEMO_USERNAME,
+                        "game": game,
+                        "total_games": 120,
+                        "win_rate": 0.55,
+                        "rank_label": game_display_name(game).split(" — ")[-1],
+                    },
+                )
+            )
+        metrics = set(POOL_METRICS.get(game, ())) | set(
+            TOURNAMENT_METRICS.get(game, ())
+        )
+        for metric in metrics:
+            if (game, metric) in have_models:
+                continue
+            mu, sigma = _DEMO_METRIC_FIXTURE.get(metric, (1.0, 0.2))
+            session.add(
+                MetricModel(
+                    user_id=user.id, game=game, metric=metric, mu=mu, sigma=sigma, n=25
+                )
+            )
     await session.flush()
 
 
