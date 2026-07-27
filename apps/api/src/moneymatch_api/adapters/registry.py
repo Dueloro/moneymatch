@@ -15,11 +15,13 @@ from .base import GameAdapter
 from .chess_lichess import ChessLichessAdapter
 from .cs2_faceit import CS2FaceitAdapter
 from .dota2_opendota import Dota2OpenDotaAdapter
+from .pubg import PubgAdapter
 
 _ADAPTERS: dict[str, GameAdapter] = {
     ChessLichessAdapter.id: ChessLichessAdapter(),
     CS2FaceitAdapter.id: CS2FaceitAdapter(),
     Dota2OpenDotaAdapter.id: Dota2OpenDotaAdapter(),
+    PubgAdapter.id: PubgAdapter(),
 }
 
 DEFAULT_GAME = ChessLichessAdapter.id

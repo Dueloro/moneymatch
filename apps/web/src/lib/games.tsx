@@ -97,7 +97,7 @@ export function gameMeta(id: string, fallbackName?: string): GameMeta {
  * the source of truth via the `COMING_SOON` link status; this mirror lets the
  * switcher and Play screens flag a game without waiting on a /links round-trip.
  */
-const COMING_SOON_GAMES = new Set<string>(['pubg.steam']);
+const COMING_SOON_GAMES = new Set<string>([]);
 
 export function isComingSoon(id: string): boolean {
   return COMING_SOON_GAMES.has(id);

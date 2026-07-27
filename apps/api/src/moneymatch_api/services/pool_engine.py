@@ -33,7 +33,6 @@ from ..constants import (
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
     METRIC_BAR_INCREMENT,
-    METRIC_PROVISIONAL_MIN_N,
     POOL_BAR_SPREAD_CAP_SIGMA,
     POOL_DIFFICULTY_K,
     POOL_ENGINE_VERSION,
@@ -43,6 +42,7 @@ from ..constants import (
     POOL_ROOM_SIZE,
     POOL_WINDOW_SECONDS,
     QUEUE_TICKET_TTL_SECONDS,
+    STAT_BASELINE_MIN_N,
     game_flag_key,
 )
 from ..errors import APIError
@@ -162,7 +162,7 @@ async def preview_bars(
     disclosed clear rates. Provisional metrics return no bars (can't duel)."""
     model = await _metric_model(session, user.id, game, metric)
     n = model.n if model else 0
-    provisional = n < METRIC_PROVISIONAL_MIN_N
+    provisional = n < STAT_BASELINE_MIN_N
     increment = METRIC_BAR_INCREMENT.get(metric, 0.01)
     cards: list[dict[str, Any]] = []
     if model is not None and not provisional:
@@ -187,10 +187,10 @@ async def _build_baseline(
 ) -> tuple[dict[str, Any], float]:
     """Freeze the metric model + host id, compute the personal bar for `difficulty`."""
     model = await _metric_model(session, user.id, game, metric)
-    if model is None or model.n < METRIC_PROVISIONAL_MIN_N:
+    if model is None or model.n < STAT_BASELINE_MIN_N:
         raise PoolError(
-            "metric_provisional",
-            "Not enough recent matches to enter a pool on this stat yet.",
+            "no_stat_baseline",
+            "Play a match on this stat first — pools quote a bar from your results.",
             status_code=409,
             detail={"metric": metric, "n": model.n if model else 0},
         )

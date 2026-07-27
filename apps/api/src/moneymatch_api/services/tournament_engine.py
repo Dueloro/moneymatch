@@ -30,8 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
-    METRIC_PROVISIONAL_MIN_N,
     QUEUE_TICKET_TTL_SECONDS,
+    STAT_BASELINE_MIN_N,
     TOURNAMENT_DISPERSION_CAP,
     TOURNAMENT_ENGINE_VERSION,
     TOURNAMENT_FIELD_SIZE,
@@ -161,10 +161,10 @@ async def _build_baseline(
     session: AsyncSession, user: User, game: str, metric: str, link: LinkedAccount
 ) -> dict[str, Any]:
     model = await _metric_model(session, user.id, game, metric)
-    if model is None or model.n < METRIC_PROVISIONAL_MIN_N:
+    if model is None or model.n < STAT_BASELINE_MIN_N:
         raise TournamentError(
-            "metric_provisional",
-            "Not enough recent matches to enter a tournament on this stat yet.",
+            "no_stat_baseline",
+            "Play a match on this stat first — tournaments score from your results.",
             status_code=409,
             detail={"metric": metric, "n": model.n if model else 0},
         )
