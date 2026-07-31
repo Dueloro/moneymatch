@@ -227,7 +227,7 @@ def _match_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] |
     # stat_race / win_next
     seats = snapshot.get("seats") or {}
     you = seats.get(vid) or {}
-    opp = next((v for k, v in seats.items() if k != vid), {}) or {}
+    opp: dict[str, Any] = next((v for k, v in seats.items() if k != vid), {}) or {}
     view: dict[str, Any] = {
         "kind": "match",
         "format": fmt,

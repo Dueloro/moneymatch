@@ -101,9 +101,7 @@ async def file_dispute(
         raise APIError("bad_ref_type", "Unknown contest type.", status_code=422)
     disputable, is_participant = await _CHECKS[ref_type](session, ref_id, user.id)
     if not is_participant:
-        raise APIError(
-            "not_a_player", "You are not in this contest.", status_code=403
-        )
+        raise APIError("not_a_player", "You are not in this contest.", status_code=403)
     if not disputable:
         raise APIError(
             "not_disputable",

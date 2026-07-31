@@ -512,9 +512,7 @@ async def _refresh_live_snapshots(
             if await _live_is_fresh(session, "pool", pid, now):
                 continue
             entries = list(
-                await session.scalars(
-                    select(SoloEntry).where(SoloEntry.pool_id == pid)
-                )
+                await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pid))
             )
             snapshot = await live_activity_service.build_pool_snapshot(pool, entries)
             await _upsert_live(session, "pool", pid, snapshot, now)
@@ -542,10 +540,12 @@ async def _refresh_live_snapshots(
                     select(MatchPlayer).where(MatchPlayer.match_id == mid)
                 )
             )
-            snapshot = await live_activity_service.build_match_snapshot(match, seats)
-            if snapshot is None:
+            match_snapshot = await live_activity_service.build_match_snapshot(
+                match, seats
+            )
+            if match_snapshot is None:
                 continue
-            await _upsert_live(session, "match", mid, snapshot, now)
+            await _upsert_live(session, "match", mid, match_snapshot, now)
             await session.commit()
             report.live_refreshed += 1
 
