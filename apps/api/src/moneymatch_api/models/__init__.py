@@ -6,6 +6,7 @@ from .admin_audit import AdminAudit
 from .dispute import Dispute
 from .feature_flag import FeatureFlag
 from .linked_account import LinkedAccount
+from .live import LiveSnapshot
 from .notification import Notification
 from .play import Match, MatchPlayer, QueueTicket
 from .pools import SoloEntry, SoloPool
@@ -28,6 +29,7 @@ __all__ = [
     "PlatformLedgerEntry",
     "Limit",
     "LinkedAccount",
+    "LiveSnapshot",
     "MetricModel",
     "RawPayload",
     "QueueTicket",

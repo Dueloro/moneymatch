@@ -32,6 +32,7 @@ from ..constants import (
     FLAG_SETTLEMENT_PAUSED,
     FLAG_WORKER_HEARTBEAT,
     GRADING_ENGINE_VERSION,
+    LIVE_SNAPSHOT_REFRESH_SECONDS,
     MATCH_MAX_LIFETIME_SECONDS,
     NIGHTLY_INTERVAL_SECONDS,
     TOURNAMENT_STANDINGS_REFRESH_SECONDS,
@@ -39,13 +40,15 @@ from ..constants import (
 )
 from ..db.session import get_sessionmaker
 from ..models.feature_flag import FeatureFlag
-from ..models.play import Match
+from ..models.live import LiveSnapshot
+from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..services import (
     challenge_service,
     grading,
+    live_activity_service,
     match_lifecycle,
     matchmaking,
     metric_models_service,
@@ -83,6 +86,7 @@ class CycleReport:
     pools_settled: int = 0
     tournaments_settled: int = 0
     standings_refreshed: int = 0
+    live_refreshed: int = 0
     expired_challenges: int = 0
     paused: bool = False
 
@@ -456,6 +460,96 @@ async def _refresh_tournament_standings(
             report.standings_refreshed += 1
 
 
+async def _live_is_fresh(
+    session: AsyncSession, ref_type: str, ref_id: uuid.UUID, now: datetime
+) -> bool:
+    row = await session.get(LiveSnapshot, (ref_type, ref_id))
+    return (
+        row is not None
+        and (now - row.updated_at).total_seconds() < LIVE_SNAPSHOT_REFRESH_SECONDS
+    )
+
+
+async def _upsert_live(
+    session: AsyncSession,
+    ref_type: str,
+    ref_id: uuid.UUID,
+    data: dict,
+    now: datetime,
+) -> None:
+    row = await session.get(LiveSnapshot, (ref_type, ref_id))
+    if row is None:
+        session.add(
+            LiveSnapshot(ref_type=ref_type, ref_id=ref_id, data=data, updated_at=now)
+        )
+    else:
+        row.data = data
+        row.updated_at = now
+
+
+async def _refresh_live_snapshots(
+    sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
+) -> None:
+    """Refresh the under-the-card live view for in-flight pools & H2H matches.
+
+    One host read per participant on a slow cadence, cached in `live_snapshots`;
+    the `/activity` request path reads the cache only. A host outage on any one
+    contest is swallowed (the builder returns an "unavailable" cell) so the loop
+    never halts settlement."""
+    async with sm() as session:
+        pool_ids = list(
+            await session.scalars(
+                select(SoloPool.id).where(
+                    SoloPool.state == "LOCKED", SoloPool.window_ends_at > now
+                )
+            )
+        )
+    for pid in pool_ids:
+        async with sm() as session:
+            pool = await session.get(SoloPool, pid)
+            if pool is None or pool.state != "LOCKED":
+                continue
+            if await _live_is_fresh(session, "pool", pid, now):
+                continue
+            entries = list(
+                await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pid))
+            )
+            snapshot = await live_activity_service.build_pool_snapshot(pool, entries)
+            await _upsert_live(session, "pool", pid, snapshot, now)
+            await session.commit()
+            report.live_refreshed += 1
+
+    async with sm() as session:
+        match_ids = list(
+            await session.scalars(
+                select(Match.id).where(
+                    Match.state.in_(("ACTIVE", "AWAITING_RESULT")),
+                    Match.matched_at.isnot(None),
+                )
+            )
+        )
+    for mid in match_ids:
+        async with sm() as session:
+            match = await session.get(Match, mid)
+            if match is None or match.state not in ("ACTIVE", "AWAITING_RESULT"):
+                continue
+            if await _live_is_fresh(session, "match", mid, now):
+                continue
+            seats = list(
+                await session.scalars(
+                    select(MatchPlayer).where(MatchPlayer.match_id == mid)
+                )
+            )
+            match_snapshot = await live_activity_service.build_match_snapshot(
+                match, seats
+            )
+            if match_snapshot is None:
+                continue
+            await _upsert_live(session, "match", mid, match_snapshot, now)
+            await session.commit()
+            report.live_refreshed += 1
+
+
 async def _usernames(
     session: AsyncSession, ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, str | None]:
@@ -513,6 +607,7 @@ async def run_cycle(
     except SettlementHalted:
         return report
     await _refresh_tournament_standings(sm, now, report)
+    await _refresh_live_snapshots(sm, now, report)
     await _expire_pending_matches(sm, now, report)
     await _expire_tickets(sm, now, report)
     await _expire_challenges(sm, now, report)

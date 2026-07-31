@@ -340,8 +340,9 @@ async def file_dispute(
     session: AsyncSession = Depends(get_session),
 ) -> DisputeView:
     """Contest how a settled match was graded (participant-only, once)."""
-    match = await _load_match(session, match_id)
-    dispute = await dispute_service.file_dispute(session, user, match, body.reason)
+    dispute = await dispute_service.file_dispute(
+        session, user, "match", match_id, body.reason
+    )
     return DisputeView.model_validate(dispute)
 
 
@@ -352,7 +353,7 @@ async def get_dispute(
     session: AsyncSession = Depends(get_session),
 ) -> DisputeView | None:
     """The viewer's dispute for this match, if any."""
-    dispute = await dispute_service.get_for(session, match_id, user.id)
+    dispute = await dispute_service.get_for(session, "match", match_id, user.id)
     return DisputeView.model_validate(dispute) if dispute else None
 
 

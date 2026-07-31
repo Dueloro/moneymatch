@@ -125,4 +125,48 @@ describe('TournamentPage', () => {
     expect(screen.getByText(/#1 you/)).toBeInTheDocument();
     expect(screen.getByText(/Pot \$100.00/)).toBeInTheDocument();
   });
+
+  it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
+    renderWithProviders(<TournamentPage />);
+    expect(screen.queryByTestId('tournament-filters')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tournament-filters-toggle'));
+    expect(screen.getByTestId('tournament-filters')).toBeInTheDocument();
+  });
+
+  it('entry filter trims the grid to the chosen entry amount', () => {
+    renderWithProviders(<TournamentPage />);
+    // Baseline: 1 metric × 3 presets = 3 cards.
+    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(3);
+    fireEvent.click(screen.getByTestId('tournament-filters-toggle'));
+    const filters = screen.getByTestId('tournament-filters');
+    fireEvent.click(within(filters).getByRole('button', { name: '$25.00' }));
+    // 1 metric × 1 entry preset = 1 card.
+    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(1);
+  });
+
+  it('metric filter trims the grid to the chosen metric', () => {
+    // Two open metrics so the Metric chip row appears (hidden for a single one).
+    vi.mocked(useTournamentMarkets).mockReturnValue({
+      data: {
+        game: 'cs2.faceit',
+        linked: true,
+        entry_presets_cents: [500, 1000, 2500],
+        prize_split: [50, 30, 20],
+        field_size: 10,
+        score_matches: 3,
+        metrics: [
+          { metric: 'cs2_kd_ratio', label: 'K/D ratio', provisional: false },
+          { metric: 'cs2_adr', label: 'ADR', provisional: false },
+        ],
+      },
+    } as unknown as ReturnType<typeof useTournamentMarkets>);
+    renderWithProviders(<TournamentPage />);
+    // Baseline: 2 metrics × 3 presets = 6 cards.
+    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(6);
+    fireEvent.click(screen.getByTestId('tournament-filters-toggle'));
+    const filters = screen.getByTestId('tournament-filters');
+    fireEvent.click(within(filters).getByRole('button', { name: 'ADR' }));
+    // Only the chosen metric × 3 presets remain.
+    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(3);
+  });
 });

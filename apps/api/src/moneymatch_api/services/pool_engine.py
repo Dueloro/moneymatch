@@ -30,6 +30,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..constants import (
+    DEMO_AUTH_ID,
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
     METRIC_BAR_INCREMENT,
@@ -330,6 +331,7 @@ async def _form_room(
     entry_cents: int,
     room_bar: float,
     now: datetime,
+    min_entrants: int = POOL_MIN_ROOM,
 ) -> SoloPool:
     """Create the room, escrow every member, and retire their tickets."""
     pool = SoloPool(
@@ -340,7 +342,7 @@ async def _form_room(
         entry_cents=entry_cents,
         rake_bps=money_math.DEFAULT_RAKE_BPS,
         room_size=len(tickets),
-        min_entrants=POOL_MIN_ROOM,
+        min_entrants=min_entrants,
         pot_cents=entry_cents * len(tickets),
         state="LOCKED",
         window_starts_at=now,
@@ -499,10 +501,13 @@ async def enqueue(
     await geo_service.assert_can_enter(session, user.residence_state)
 
     link = await _require_link(session, user.id, game)
-    # Sandbagging block (metric wagers) — with the personal-bar feature.
-    await sandbagging_service.assert_not_sandbagging(
-        session, user, game, metric, link.host_account_id
-    )
+    # Sandbagging block (metric wagers) — with the personal-bar feature. Skipped
+    # for the synthetic demo account: the detector polls real host history, which
+    # doesn't exist for a demo handle (the host API 400s on it).
+    if user.auth_id != DEMO_AUTH_ID:
+        await sandbagging_service.assert_not_sandbagging(
+            session, user, game, metric, link.host_account_id
+        )
 
     existing = await _current_pool_for_user(session, user.id)
     if existing is not None:
@@ -512,6 +517,24 @@ async def enqueue(
     ticket = await _get_or_create_ticket(
         session, user, game, metric, difficulty, entry_cents, baseline, bar, link, now
     )
+
+    # Demo: skip the "forming your room…" wait entirely. Escrow the entry and
+    # form a room of one against the personal bar so the click-through lands
+    # straight on "room formed · go play". Never fires for real accounts — the
+    # matcher below still gates them on a fair, similar-skill room.
+    if user.auth_id == DEMO_AUTH_ID:
+        demo_room = await _form_room(
+            session,
+            [ticket],
+            game,
+            metric,
+            difficulty,
+            entry_cents,
+            bar,
+            now,
+            min_entrants=1,
+        )
+        return PoolEnqueueResult(status="formed", pool=demo_room)
 
     pool = await _try_form_room(
         session, user, ticket, game, metric, difficulty, entry_cents, now
@@ -549,11 +572,19 @@ async def poll_status(session: AsyncSession, user: User) -> PoolEnqueueResult:
 
 async def cancel(session: AsyncSession, user: User) -> bool:
     ticket = await get_waiting_ticket(session, user.id)
-    if ticket is None:
-        return False
-    ticket.state = "canceled"
-    await session.flush()
-    return True
+    if ticket is not None:
+        ticket.state = "canceled"
+        await session.flush()
+        return True
+    # Demo: a formed room's money is committed and isn't cancelable for real
+    # accounts, but the demo user can dismiss it — refund the entry and free the
+    # queue so the pool click-through is replayable.
+    if user.auth_id == DEMO_AUTH_ID:
+        pool = await _current_pool_for_user(session, user.id)
+        if pool is not None and pool.state == "LOCKED":
+            await cancel_pool(session, pool, reason="demo reset")
+            return True
+    return False
 
 
 # --------------------------------------------------------------------------- #

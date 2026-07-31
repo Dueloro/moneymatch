@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/testUtils';
 import { PoolsPage } from './PoolsPage';
 
+vi.mock('../auth/useAuth', () => ({
+  useAuth: () => ({ isDemo: false, session: null }),
+}));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
@@ -136,5 +139,37 @@ describe('PoolsPage', () => {
     expect(screen.getByTestId('room-card')).toBeInTheDocument();
     expect(screen.getByText(/bar 1.75/)).toBeInTheDocument(); // room bar
     expect(screen.getByText(/4 players · pot \$40.00/)).toBeInTheDocument();
+    // The "you can now play" cue reassures the entry is escrowed.
+    expect(screen.getByTestId('room-play-cue')).toHaveTextContent(
+      /you can now play your .* game/i,
+    );
+  });
+
+  it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
+    renderWithProviders(<PoolsPage />);
+    // Tucked away by default — only the toggle shows, not the panel.
+    expect(screen.queryByTestId('pool-filters')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('pool-filters-toggle'));
+    expect(screen.getByTestId('pool-filters')).toBeInTheDocument();
+  });
+
+  it('difficulty filter trims the grid to the chosen difficulty', () => {
+    renderWithProviders(<PoolsPage />);
+    // Baseline: 3 difficulties × 3 presets = 9 cards.
+    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(9);
+    fireEvent.click(screen.getByTestId('pool-filters-toggle'));
+    const filters = screen.getByTestId('pool-filters');
+    fireEvent.click(within(filters).getByRole('button', { name: 'hard' }));
+    // Only the hard difficulty × 3 presets remain.
+    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(3);
+  });
+
+  it('entry filter trims the grid to the chosen entry amount', () => {
+    renderWithProviders(<PoolsPage />);
+    fireEvent.click(screen.getByTestId('pool-filters-toggle'));
+    const filters = screen.getByTestId('pool-filters');
+    fireEvent.click(within(filters).getByRole('button', { name: '$25.00' }));
+    // 3 difficulties × 1 entry preset = 3 cards.
+    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(3);
   });
 });

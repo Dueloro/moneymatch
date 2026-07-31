@@ -131,13 +131,22 @@ class FileDisputeRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=1000)
 
 
+class ContestRequest(BaseModel):
+    """File a dispute against any contest type (match | pool | tournament)."""
+
+    ref_type: str = Field(..., pattern="^(match|pool|tournament)$")
+    ref_id: UUID
+    reason: str = Field(..., min_length=1, max_length=1000)
+
+
 class DisputeView(BaseModel):
     """A dispute as its filer sees it."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    match_id: UUID
+    ref_type: str  # match | pool | tournament
+    ref_id: UUID
     reason: str
     status: str  # open | resolved | rejected
     admin_note: str | None
@@ -195,6 +204,15 @@ class ActivityItem(BaseModel):
     opponent_username: str | None
     your_stat_line: dict | None
     opponent_stat_line: dict | None
+    # Best-effort live in-game view for an in-flight contest (worker-cached host
+    # read, oriented to the viewer); null when there's nothing live to show.
+    live: dict | None = None
+    # Structured "learn more" payload for the expanded card (per-match stats,
+    # map/mode, prize/entry, host link). Shape depends on the contest kind.
+    detail: dict | None = None
+    # The viewer's dispute status on this contest, if they've filed one:
+    # "open" | "resolved" | "rejected"; null when not contested.
+    dispute_status: str | None = None
     created_at: datetime
     resolved_at: datetime | None
 

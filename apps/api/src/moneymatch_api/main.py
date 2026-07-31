@@ -24,6 +24,7 @@ from .routers import (
     activity,
     admin,
     challenges,
+    disputes,
     friends,
     health,
     leaderboard,
@@ -129,6 +130,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(pools.router, prefix=API_V1_PREFIX)
     app.include_router(tournaments.router, prefix=API_V1_PREFIX)
     app.include_router(activity.router, prefix=API_V1_PREFIX)
+    app.include_router(disputes.router, prefix=API_V1_PREFIX)
     app.include_router(friends.router, prefix=API_V1_PREFIX)
     app.include_router(challenges.router, prefix=API_V1_PREFIX)
     app.include_router(leaderboard.router, prefix=API_V1_PREFIX)

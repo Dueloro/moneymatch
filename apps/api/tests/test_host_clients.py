@@ -14,7 +14,11 @@ import respx
 from moneymatch_api.config import get_settings
 from moneymatch_api.services.hosts import faceit, lichess, opendota
 from moneymatch_api.services.hosts._client import request_json
-from moneymatch_api.services.hosts.errors import HostNotFound, HostUnavailable
+from moneymatch_api.services.hosts.errors import (
+    HostError,
+    HostNotFound,
+    HostUnavailable,
+)
 
 
 @pytest.fixture
@@ -58,6 +62,16 @@ async def test_request_json_timeout_is_unavailable():
     respx.get(URL).mock(side_effect=httpx.ConnectTimeout("slow"))
     with pytest.raises(HostUnavailable):
         await request_json("example", "GET", URL)
+
+
+@respx.mock
+async def test_request_json_4xx_is_typed_host_error_not_retried():
+    # A 400 (e.g. a bad player id) is a typed, non-retryable HostError — never a
+    # raw httpx exception — so `except HostError` guards degrade instead of crash.
+    route = respx.get(URL).mock(return_value=httpx.Response(400))
+    with pytest.raises(HostError):
+        await request_json("example", "GET", URL)
+    assert route.call_count == 1  # 4xx is never retried
 
 
 # --------------------------------------------------------------------------- #

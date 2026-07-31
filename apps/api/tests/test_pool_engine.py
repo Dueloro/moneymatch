@@ -129,6 +129,41 @@ async def test_room_forms_at_size_with_derived_room_bar(session):
         assert (await _bal(session, u))[1] == 1000
 
 
+async def test_demo_user_forms_a_room_of_one_immediately(session):
+    # The demo user skips the "searching" wait: one enqueue → a formed, escrowed
+    # room of one, so the click-through lands straight on "room formed · play".
+    from moneymatch_api.constants import DEMO_AUTH_ID
+
+    user, _ = await pool_player(session, "demo", mu=1.50)
+    user.auth_id = DEMO_AUTH_ID
+    await session.flush()
+
+    result = await enq(session, user)
+    assert result.status == "formed"
+    pool = result.pool
+    assert pool.room_size == 1 and pool.min_entrants == 1 and pool.state == "LOCKED"
+    assert (await _bal(session, user)) == (9000, 1000)  # $10 entry escrowed
+
+    # Dismissing the formed demo room refunds the entry and frees the queue.
+    assert await pool_engine.cancel(session, user) is True
+    refreshed = await session.get(SoloPool, pool.id)
+    assert refreshed.state == "CANCELED"
+    assert (await _bal(session, user)) == (10000, 0)
+
+
+async def test_real_user_cannot_dismiss_a_formed_room(session):
+    # Non-demo formed rooms hold committed money — cancel is a no-op for them.
+    users = []
+    for i, mu in enumerate([1.48, 1.50, 1.52, 1.50]):
+        u, _ = await pool_player(session, f"r{i}", mu=mu)
+        users.append(u)
+    for u in users[:3]:
+        await enq(session, u)
+    assert (await enq(session, users[3])).status == "formed"
+    assert await pool_engine.cancel(session, users[0]) is False
+    assert (await _bal(session, users[0]))[1] == 1000  # still escrowed
+
+
 async def test_room_bar_reproduces_byte_for_byte_from_snapshots(session):
     users = []
     for i, mu in enumerate([1.48, 1.50, 1.52, 1.50]):

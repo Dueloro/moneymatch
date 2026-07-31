@@ -14,6 +14,7 @@ import { SocialPage } from './pages/SocialPage';
 import { TournamentPage } from './pages/TournamentPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminContestsPage } from './pages/admin/AdminContestsPage';
+import { AdminDisputesPage } from './pages/admin/AdminDisputesPage';
 import { AdminFlagsPage } from './pages/admin/AdminFlagsPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminQueuePage } from './pages/admin/AdminQueuePage';
@@ -44,6 +45,7 @@ export function App() {
             <Route index element={<Navigate to="/admin/users" replace />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="contests" element={<AdminContestsPage />} />
+            <Route path="disputes" element={<AdminDisputesPage />} />
             <Route path="queue" element={<AdminQueuePage />} />
             <Route path="flags" element={<AdminFlagsPage />} />
             <Route path="reconciliation" element={<AdminReconciliationPage />} />

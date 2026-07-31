@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { BalanceHeader } from '../components/BalanceHeader';
 import { AmountText } from '../components/ui/AmountText';
 import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
 import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
@@ -35,6 +37,10 @@ export function TournamentPage() {
   } = useTournamentMarkets(playableGame);
   const { data: status } = useTournamentStatus();
   const enter = useEnterTournament();
+
+  // Filters — trim the metric × entry browse grid down to what you want.
+  const [metricFilter, setMetricFilter] = useState<string>(ALL);
+  const [entryFilter, setEntryFilter] = useState<number | typeof ALL>(ALL);
 
   const header = (
     <div className="mb-6 flex items-center gap-4">
@@ -89,6 +95,18 @@ export function TournamentPage() {
   const scoreN = markets?.score_matches ?? 3;
   const busy = status?.status === 'searching' || status?.status === 'formed';
 
+  // Apply the active filters to the metric × entry grid. Keep each preset's
+  // original index so the advertised field size stays put when filtering.
+  const filteredMetrics = openMetrics.filter(
+    (m) => metricFilter === ALL || m.metric === metricFilter,
+  );
+  const filteredPresets = presets
+    .map((entry, i) => ({ entry, i }))
+    .filter(({ entry }) => entryFilter === ALL || entry === entryFilter);
+  const activeCount = (metricFilter !== ALL ? 1 : 0) + (entryFilter !== ALL ? 1 : 0);
+  const filterable = openMetrics.length > 1 || presets.length > 1;
+  const hasResults = filteredMetrics.length > 0 && filteredPresets.length > 0;
+
   return (
     <div>
       {header}
@@ -110,38 +128,78 @@ export function TournamentPage() {
             : 'No tournaments on this game yet — play a match on it and they appear here.'}
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {openMetrics.flatMap((m) =>
-            presets.map((entry, i) => {
-              const size = FIELD_SIZES[i % FIELD_SIZES.length];
-              const key = `${game}:${m.metric}:${entry}:${size}`;
-              return (
-                <WagerCard
-                  key={key}
-                  accent={meta?.accent ?? 'var(--text-secondary)'}
-                  gameName={meta?.short ?? 'Game'}
-                  tag={`${size} players`}
-                  title={m.label}
-                  subtitle={`Best ${scoreN} matches · top ${places} split the pot`}
-                  entryCents={entry}
-                  capacity={size}
-                  filled={filledSpots(key, size)}
-                  footnote={`Top ${places} paid`}
-                  buttonLabel="Join Tournament"
-                  disabled={busy}
-                  joining={enter.isPending}
-                  onJoin={() =>
-                    enter.mutate({
-                      game: markets!.game,
-                      metric: m.metric,
-                      entry_preset_cents: entry,
-                    })
+        <>
+          {filterable && (
+            <FilterBar
+              testId="tournament-filters"
+              activeCount={activeCount}
+              onClear={() => {
+                setMetricFilter(ALL);
+                setEntryFilter(ALL);
+              }}
+            >
+              {openMetrics.length > 1 && (
+                <FilterChips
+                  label="Metric"
+                  options={openMetrics.map((m) => m.metric)}
+                  selected={metricFilter}
+                  onSelect={(v) => setMetricFilter(v as string)}
+                  format={(m) =>
+                    openMetrics.find((x) => x.metric === m)?.label ?? String(m)
                   }
                 />
-              );
-            }),
+              )}
+              {presets.length > 1 && (
+                <FilterChips
+                  label="Entry"
+                  options={presets}
+                  selected={entryFilter}
+                  onSelect={setEntryFilter}
+                  format={(cents) => formatCurrency(cents)}
+                />
+              )}
+            </FilterBar>
           )}
-        </div>
+
+          {!hasResults ? (
+            <p className="py-8 text-sm text-text-secondary">
+              No tournaments match these filters.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredMetrics.flatMap((m) =>
+                filteredPresets.map(({ entry, i }) => {
+                  const size = FIELD_SIZES[i % FIELD_SIZES.length];
+                  const key = `${game}:${m.metric}:${entry}:${size}`;
+                  return (
+                    <WagerCard
+                      key={key}
+                      accent={meta?.accent ?? 'var(--text-secondary)'}
+                      gameName={meta?.short ?? 'Game'}
+                      tag={`${size} players`}
+                      title={m.label}
+                      subtitle={`Best ${scoreN} matches · top ${places} split the pot`}
+                      entryCents={entry}
+                      capacity={size}
+                      filled={filledSpots(key, size)}
+                      footnote={`Top ${places} paid`}
+                      buttonLabel="Join Tournament"
+                      disabled={busy}
+                      joining={enter.isPending}
+                      onJoin={() =>
+                        enter.mutate({
+                          game: markets!.game,
+                          metric: m.metric,
+                          entry_preset_cents: entry,
+                        })
+                      }
+                    />
+                  );
+                }),
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

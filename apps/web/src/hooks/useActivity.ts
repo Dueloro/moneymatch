@@ -19,8 +19,67 @@ export interface ActivityItem {
   opponent_username: string | null;
   your_stat_line: Record<string, unknown> | null;
   opponent_stat_line: Record<string, unknown> | null;
+  // Best-effort live in-game view for an in-flight contest, oriented to you.
+  // Shape depends on kind/format (pool | tournament | match·chess/stat_race/win_next).
+  live: LiveInfo | null;
+  // Structured "learn more" payload for the expanded card.
+  detail: ActivityDetail | null;
+  // The viewer's dispute status on this contest: open | resolved | rejected.
+  dispute_status: 'open' | 'resolved' | 'rejected' | null;
   created_at: string;
   resolved_at: string | null;
+}
+
+/** Expanded-card detail. Which fields are present depends on `kind`. */
+export interface ActivityDetail {
+  kind: 'match' | 'pool' | 'tournament';
+  game?: string;
+  // match
+  opponent?: string | null;
+  entry_cents?: number;
+  prize_cents?: number;
+  host_game_id?: string | null;
+  map?: string | null;
+  mode?: string | null;
+  your_stats?: Record<string, number | string> | null;
+  opponent_stats?: Record<string, number | string> | null;
+  // pool
+  difficulty?: string;
+  metric_label?: string;
+  room_bar?: number;
+  personal_bar?: number;
+  room_size?: number;
+  // tournament
+  field_size?: number;
+  your_rank?: number | null;
+  your_score?: number | null;
+}
+
+/** The under-the-card live view. Which fields are present depends on kind/format. */
+export interface LiveInfo {
+  kind: 'pool' | 'match' | 'tournament';
+  format?: 'chess' | 'stat_race' | 'win_next';
+  label?: string | null;
+  status: string;
+  // pool
+  target?: number | null;
+  current?: number | null;
+  cleared?: boolean | null;
+  matches?: number;
+  // chess
+  moves?: number;
+  your_color?: string | null;
+  turn?: 'you' | 'opp' | null;
+  result?: 'you' | 'opp' | 'draw' | null;
+  // stat_race / win_next
+  you?: number | string | null;
+  opp?: number | string | null;
+  leader?: 'you' | 'opp' | 'tie' | null;
+  // tournament
+  score?: number | null;
+  rank?: number | null;
+  field?: number;
+  score_matches?: number;
 }
 
 /** The unified activity feed (matches + pools + tournaments). Polls every 10 s. */

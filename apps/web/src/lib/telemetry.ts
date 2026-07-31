@@ -34,7 +34,9 @@ export type TelemetryEvent =
   | 'signup'
   | 'account_linked'
   | 'first_contest_joined'
-  | 'first_settlement';
+  | 'first_settlement'
+  // A player contests how a settled contest was graded (files a dispute).
+  | 'contest_filed';
 
 let initialized = false;
 

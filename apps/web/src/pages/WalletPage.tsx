@@ -1,6 +1,6 @@
 import { AmountText } from '../components/ui/AmountText';
 import { ErrorState } from '../components/ui/ErrorState';
-import { ListRow } from '../components/ui/ListRow';
+import { ExpandableCard } from '../components/ui/ExpandableCard';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
@@ -28,6 +28,18 @@ const ENTRY_LABELS: Record<string, string> = {
 
 function ledgerLabel(entry: LedgerEntry): string {
   return entry.memo ?? ENTRY_LABELS[entry.entry_type] ?? entry.entry_type;
+}
+
+/** A small semantic dot leading each ledger row: green credit, red platform
+ * fee, gray debit/hold — enough color to read the list at a glance. */
+function LedgerDot({ entry }: { entry: LedgerEntry }) {
+  const color =
+    entry.entry_type === 'rake'
+      ? 'bg-red'
+      : entry.amount_cents > 0
+        ? 'bg-green'
+        : 'bg-text-tertiary';
+  return <span className={`h-2 w-2 shrink-0 rounded-full ${color}`} aria-hidden />;
 }
 
 export function WalletPage() {
@@ -62,16 +74,33 @@ export function WalletPage() {
         </div>
       ) : (
         <>
-          <StatBar
-            cells={[
-              { label: 'Available', value: formatCurrency(available) },
-              { label: 'In escrow', value: formatCurrency(escrow) },
-              {
-                label: 'Lifetime',
-                value: <AmountText cents={lifetime} win={lifetime > 0} />,
-              },
-            ]}
-          />
+          <div className="relative">
+            {/* Ambient brand glow behind the balance — ties the wallet's headline
+             * number to the lime "money" accent used across the app. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 overflow-hidden rounded-card"
+              style={{
+                background:
+                  'radial-gradient(70% 130% at 0% 0%, rgba(198, 244, 64, 0.1), transparent 70%)',
+              }}
+            />
+            <StatBar
+              cells={[
+                {
+                  label: 'Available',
+                  value: (
+                    <span className="text-green">{formatCurrency(available)}</span>
+                  ),
+                },
+                { label: 'In escrow', value: formatCurrency(escrow) },
+                {
+                  label: 'Lifetime',
+                  value: <AmountText cents={lifetime} win={lifetime > 0} />,
+                },
+              ]}
+            />
+          </div>
 
           <section className="mt-8">
             <h2 className="mb-3 text-sm font-semibold">Add funds</h2>
@@ -101,10 +130,11 @@ export function WalletPage() {
             {rows.length === 0 ? (
               <p className="py-6 text-sm text-text-secondary">No activity yet.</p>
             ) : (
-              <div>
+              <div className="flex flex-col gap-2">
                 {rows.map((entry) => (
-                  <ListRow
+                  <ExpandableCard
                     key={entry.id}
+                    left={<LedgerDot entry={entry} />}
                     title={ledgerLabel(entry)}
                     subline={formatRelativeTime(entry.created_at)}
                     right={
