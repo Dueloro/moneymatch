@@ -47,6 +47,8 @@ from moneymatch_api.main import create_app  # noqa: E402
 from moneymatch_api.models import Base  # noqa: E402
 from moneymatch_api.services.feature_flags import DEFAULT_FLAGS  # noqa: E402
 
+TEST_ISSUER = "https://test-project.supabase.co/auth/v1"
+
 
 def make_token(
     sub: str,
@@ -56,11 +58,14 @@ def make_token(
     audience: str = "authenticated",
     algorithm: str = "HS256",
     exp_offset: int = 3600,
+    issuer: str | None = TEST_ISSUER,
 ) -> str:
     now = int(time.time())
     payload: dict = {"sub": sub, "aud": audience, "iat": now, "exp": now + exp_offset}
     if email is not None:
         payload["email"] = email
+    if issuer is not None:
+        payload["iss"] = issuer
     return jwt.encode(payload, secret, algorithm=algorithm)
 
 

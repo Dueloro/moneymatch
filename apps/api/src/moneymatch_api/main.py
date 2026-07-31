@@ -59,7 +59,10 @@ def _init_sentry(settings: Settings) -> None:
         environment=settings.env,
         release=os.getenv("RENDER_GIT_COMMIT") or settings.release,
         traces_sample_rate=0.0,
-        send_default_pii=True,
+        # Never ship default PII (IPs, cookies, request bodies) to Sentry — this
+        # is a real-money / KYC product, so attach only scrubbed context we opt
+        # into explicitly. See SECURITY notes on data minimisation.
+        send_default_pii=False,
     )
 
 
@@ -109,7 +112,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestLogMiddleware)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_bytes)
     app.add_middleware(
-        RateLimitMiddleware, per_minute=settings.rate_limit_writes_per_minute
+        RateLimitMiddleware,
+        per_minute=settings.rate_limit_writes_per_minute,
+        trusted_proxy_hops=settings.rate_limit_trusted_proxy_hops,
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(

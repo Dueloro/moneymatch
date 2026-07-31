@@ -40,6 +40,10 @@ class Settings(BaseSettings):
         default=None, description="JWKS endpoint for RS256/ES256 verification"
     )
     supabase_jwt_audience: str = Field(default="authenticated")
+    # Expected `iss` claim. Supabase issues `${SUPABASE_URL}/auth/v1`; override
+    # only if your project's issuer differs. Verified on every real token so a
+    # validly-signed token from another project/issuer is still rejected.
+    supabase_jwt_issuer: str | None = Field(default=None)
 
     # CORS — comma-separated browser origins.
     web_origin: str = Field(default="http://localhost:5173")
@@ -84,6 +88,15 @@ class Settings(BaseSettings):
     # (10-phase-7 §2). Requests per minute, per (user-or-ip, method+path).
     rate_limit_writes_per_minute: int = Field(default=60)
 
+    # Number of trusted reverse-proxy hops in front of the API. When > 0, the
+    # rate limiter reads the client IP from `X-Forwarded-For` (the Nth entry from
+    # the right, i.e. the address the closest trusted proxy saw) instead of the
+    # socket peer — otherwise, behind a load balancer, every client shares the
+    # proxy's IP and the "per-client" cap collapses into one global bucket. Only
+    # count proxies YOU control; anything beyond is attacker-spoofable. Default 0
+    # (direct connections / local). Set to 1 on Render (single edge proxy).
+    rate_limit_trusted_proxy_hops: int = Field(default=0, ge=0)
+
     # Dev/e2e sign-in bypass (backlog · "Browser e2e test-auth seam"). When true
     # AND env != prod, a `/dev/e2e/token` route mints a short-lived HS256 JWT for
     # a given auth_id so Playwright can authenticate seeded users headless without
@@ -122,6 +135,30 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _no_auth_bypass_with_real_stakes(self) -> Settings:
+        """Fail fast if a sign-in bypass is armed on a prod / real-money deploy.
+
+        The demo and e2e seams both accept a token signed with a key that is not
+        a real secret (demo uses a hardcoded, in-source key; e2e mints with the
+        project HS256 secret for arbitrary auth_ids). Either one on a real-money
+        deployment is a full authentication bypass, so config alone can never arm
+        them there — this refuses to boot rather than half-trusting the flag +
+        mount guards in `create_app`.
+        """
+        real_stakes = self.env == "prod" or self.payments_live
+        if real_stakes and self.demo_login_enabled:
+            raise ValueError(
+                "demo_login_enabled must be false when env=prod or "
+                "payments_live=true (it accepts a hardcoded, in-source key)."
+            )
+        if real_stakes and self.e2e_auth_enabled:
+            raise ValueError(
+                "e2e_auth_enabled must be false when env=prod or "
+                "payments_live=true (it mints tokens for any auth_id)."
+            )
+        return self
+
     @property
     def resolved_jwks_url(self) -> str | None:
         """JWKS URL to use when no HS256 secret is configured."""
@@ -132,6 +169,15 @@ class Settings(BaseSettings):
         if self.supabase_url:
             base = self.supabase_url.rstrip("/")
             return f"{base}/auth/v1/.well-known/jwks.json"
+        return None
+
+    @property
+    def resolved_issuer(self) -> str | None:
+        """Expected token issuer: explicit override, else the Supabase default."""
+        if self.supabase_jwt_issuer:
+            return self.supabase_jwt_issuer
+        if self.supabase_url:
+            return f"{self.supabase_url.rstrip('/')}/auth/v1"
         return None
 
     @property

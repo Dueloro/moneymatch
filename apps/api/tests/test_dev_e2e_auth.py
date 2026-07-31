@@ -8,7 +8,9 @@ Supabase project.
 
 from __future__ import annotations
 
+import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 
 from moneymatch_api.auth import verify_token
 from moneymatch_api.config import Settings, get_settings
@@ -64,13 +66,15 @@ async def test_minted_token_verifies_and_authenticates():
     assert identity.email == "p1@demo.test"
 
 
-async def test_route_refuses_in_prod_even_if_enabled():
-    # Guard is defense-in-depth: even a stray prod mount must not mint tokens.
-    app = _app_with(_settings(env="prod", e2e_auth_enabled=True))
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        resp = await c.post("/api/v1/dev/e2e/token", json={"auth_id": "seed_x"})
-        assert resp.status_code == 404
+async def test_config_refuses_e2e_bypass_in_prod():
+    # Strongest guard: the e2e seam can't even be *configured* on a prod / real-
+    # money deploy — Settings fails to construct, so the process never boots with
+    # a token-minting bypass armed (defense-in-depth over the mount + handler
+    # re-checks, which still exist for env=local misuse).
+    with pytest.raises(ValidationError, match="e2e_auth_enabled must be false"):
+        _settings(env="prod", e2e_auth_enabled=True)
+    with pytest.raises(ValidationError, match="e2e_auth_enabled must be false"):
+        _settings(payments_live=True, e2e_auth_enabled=True)
 
 
 async def test_seeded_token_matches_conftest_secret():
