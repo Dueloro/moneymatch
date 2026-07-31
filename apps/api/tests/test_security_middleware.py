@@ -55,3 +55,51 @@ async def test_reads_not_rate_limited(hardened_client: AsyncClient) -> None:
     for _ in range(5):
         r = await hardened_client.get("/api/v1/does-not-exist")
         assert r.status_code != 429
+
+
+@pytest_asyncio.fixture
+async def proxied_client() -> AsyncClient:
+    # Behind one trusted proxy: the limiter must bucket on X-Forwarded-For, not
+    # the (shared) socket peer.
+    settings = get_settings().model_copy(
+        update={"rate_limit_writes_per_minute": 2, "rate_limit_trusted_proxy_hops": 1}
+    )
+    app = create_app(settings)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+async def test_rate_limit_buckets_per_forwarded_client(
+    proxied_client: AsyncClient,
+) -> None:
+    # Two distinct real clients arrive via the same proxy. Each gets its own
+    # window; one exhausting its cap must not spend the other's.
+    a = {"headers": {"x-forwarded-for": "203.0.113.7"}, "content": b"{}"}
+    b = {"headers": {"x-forwarded-for": "198.51.100.9"}, "content": b"{}"}
+    assert (await proxied_client.post("/api/v1/does-not-exist", **a)).status_code != 429
+    assert (await proxied_client.post("/api/v1/does-not-exist", **a)).status_code != 429
+    # Client A is now over the cap...
+    assert (await proxied_client.post("/api/v1/does-not-exist", **a)).status_code == 429
+    # ...but client B, same proxy, is untouched.
+    assert (await proxied_client.post("/api/v1/does-not-exist", **b)).status_code != 429
+
+
+async def test_forwarded_for_ignored_without_trusted_hops(
+    hardened_client: AsyncClient,
+) -> None:
+    # Default posture trusts no proxy hops, so a spoofed X-Forwarded-For can't
+    # mint fresh buckets — all requests share the socket-peer bucket and the cap
+    # still bites on the third.
+    r1 = await hardened_client.post(
+        "/api/v1/does-not-exist", headers={"x-forwarded-for": "1.1.1.1"}, content=b"{}"
+    )
+    r2 = await hardened_client.post(
+        "/api/v1/does-not-exist", headers={"x-forwarded-for": "2.2.2.2"}, content=b"{}"
+    )
+    r3 = await hardened_client.post(
+        "/api/v1/does-not-exist", headers={"x-forwarded-for": "3.3.3.3"}, content=b"{}"
+    )
+    assert r1.status_code != 429
+    assert r2.status_code != 429
+    assert r3.status_code == 429

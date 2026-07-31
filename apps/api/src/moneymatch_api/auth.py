@@ -85,6 +85,7 @@ def verify_token(token: str, settings: Settings | None = None) -> AuthedIdentity
                 settings.supabase_jwt_secret,
                 algorithms=["HS256"],
                 audience=settings.supabase_jwt_audience,
+                issuer=settings.resolved_issuer,
             )
         else:
             jwks_url = settings.resolved_jwks_url
@@ -96,6 +97,7 @@ def verify_token(token: str, settings: Settings | None = None) -> AuthedIdentity
                 signing_key.key,
                 algorithms=["RS256", "ES256"],
                 audience=settings.supabase_jwt_audience,
+                issuer=settings.resolved_issuer,
             )
     except jwt.ExpiredSignatureError as exc:
         raise AuthError("Token expired") from exc

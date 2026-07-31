@@ -70,14 +70,33 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     WINDOW_SECONDS = 60
 
-    def __init__(self, app, *, per_minute: int) -> None:
+    def __init__(self, app, *, per_minute: int, trusted_proxy_hops: int = 0) -> None:
         super().__init__(app)
         self.per_minute = per_minute
+        self.trusted_proxy_hops = trusted_proxy_hops
         # key -> (window_start_epoch, count). Bounded implicitly by the small,
         # authed surface at MVP; a real deploy swaps this for a shared store.
         self._buckets: dict[str, tuple[int, int]] = {}
 
     def _client(self, request: Request) -> str:
+        """Identify the client for bucketing.
+
+        Behind a reverse proxy the socket peer is the proxy, so every client
+        would share one bucket. With `trusted_proxy_hops > 0` we instead take the
+        client IP from `X-Forwarded-For` — the Nth entry from the right, i.e. the
+        address the closest trusted proxy observed. We never trust more hops than
+        configured, so a client can't spoof its way into someone else's bucket
+        (or out of its own) by pre-seeding the header.
+        """
+        hops = self.trusted_proxy_hops
+        if hops > 0:
+            forwarded = request.headers.get("x-forwarded-for")
+            if forwarded:
+                parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+                if parts:
+                    # Clamp to available entries so a short/absent chain still
+                    # yields the left-most (original) client rather than erroring.
+                    return parts[-min(hops, len(parts))]
         return request.client.host if request.client else "unknown"
 
     async def dispatch(self, request: Request, call_next) -> Response:

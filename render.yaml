@@ -52,6 +52,11 @@ services:
         value: "true"
       - key: RELEASE
         value: "" # Render injects the deploy commit SHA via $RENDER_GIT_COMMIT at runtime
+      # Render terminates TLS at one edge proxy that sets X-Forwarded-For, so the
+      # rate limiter must read the real client IP from it (hops=1) — otherwise
+      # every client shares the proxy IP and the per-client cap becomes global.
+      - key: RATE_LIMIT_TRUSTED_PROXY_HOPS
+        value: "1"
       - fromGroup: moneymatch-shared
 
   # Optional standalone worker — only for paid tiers that want the loop isolated

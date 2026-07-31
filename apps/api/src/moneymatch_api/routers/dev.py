@@ -59,6 +59,9 @@ async def mint_e2e_token(
         "iat": int(now.timestamp()),
         "exp": int((now + _TOKEN_TTL).timestamp()),
     }
+    # Match the issuer the auth path now pins, so the minted token verifies.
+    if settings.resolved_issuer:
+        claims["iss"] = settings.resolved_issuer
     if body.email:
         claims["email"] = body.email
     token = jwt.encode(claims, settings.supabase_jwt_secret, algorithm="HS256")

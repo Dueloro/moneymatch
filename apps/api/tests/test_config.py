@@ -54,6 +54,48 @@ def test_jwks_url_derived_when_no_secret():
     )
 
 
+def test_issuer_derived_from_supabase_url():
+    s = _settings(
+        database_url="postgresql+asyncpg://u:p@h/db",
+        supabase_url="https://x.supabase.co/",
+        supabase_jwt_secret="s",
+    )
+    assert s.resolved_issuer == "https://x.supabase.co/auth/v1"
+
+
+def test_issuer_override_wins():
+    s = _settings(
+        database_url="postgresql+asyncpg://u:p@h/db",
+        supabase_url="https://x.supabase.co",
+        supabase_jwt_secret="s",
+        supabase_jwt_issuer="https://custom.example/iss",
+    )
+    assert s.resolved_issuer == "https://custom.example/iss"
+
+
+@pytest.mark.parametrize("stakes", [{"env": "prod"}, {"payments_live": "true"}])
+def test_demo_login_forbidden_with_real_stakes(stakes):
+    with pytest.raises(ValidationError, match="demo_login_enabled must be false"):
+        _settings(
+            database_url="postgresql+asyncpg://u:p@h/db",
+            supabase_url="https://x.supabase.co",
+            supabase_jwt_secret="s",
+            demo_login_enabled="true",
+            **stakes,
+        )
+
+
+def test_demo_login_allowed_off_prod():
+    # The intended demo posture — non-prod, play-money — still constructs fine.
+    s = _settings(
+        database_url="postgresql+asyncpg://u:p@h/db",
+        supabase_url="https://x.supabase.co",
+        supabase_jwt_secret="s",
+        demo_login_enabled="true",
+    )
+    assert s.demo_login_enabled is True
+
+
 def test_cors_origins_split():
     s = _settings(
         database_url="postgresql+asyncpg://u:p@h/db",
