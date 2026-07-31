@@ -107,6 +107,78 @@ async def test_pool_enqueue_searches_then_room_status(client):
     assert r.status_code == 200 and r.json()["status"] == "searching"
 
 
+async def test_activity_shows_pool_wager_and_live_without_any_match(client):
+    """Regression: a user whose only in-flight contest is a pool (no H2H match)
+    still sees it in Activity as a current wager — and with its live view."""
+    from datetime import UTC, datetime, timedelta
+
+    from moneymatch_api.models.linked_account import LinkedAccount
+    from moneymatch_api.models.live import LiveSnapshot
+    from moneymatch_api.models.pools import SoloEntry, SoloPool
+
+    await setup_player(client, "auth_ponly", "ponly")
+    sm = new_sessionmaker()
+    async with sm() as s:
+        user = await s.scalar(select(User).where(User.auth_id == "auth_ponly"))
+        la = await s.scalar(
+            select(LinkedAccount).where(LinkedAccount.user_id == user.id)
+        )
+        now = datetime.now(UTC)
+        pool = SoloPool(
+            game=CS2,
+            metric=KD,
+            difficulty="medium",
+            room_bar=1.25,
+            entry_cents=1000,
+            rake_bps=500,
+            room_size=1,
+            min_entrants=1,
+            state="LOCKED",
+            window_starts_at=now - timedelta(minutes=5),
+            window_ends_at=now + timedelta(hours=1),
+        )
+        s.add(pool)
+        await s.flush()
+        s.add(
+            SoloEntry(
+                pool_id=pool.id,
+                user_id=user.id,
+                linked_account_id=la.id,
+                host_account_id=la.host_account_id,
+                personal_bar=1.25,
+                status="LOCKED",
+            )
+        )
+        s.add(
+            LiveSnapshot(
+                ref_type="pool",
+                ref_id=pool.id,
+                data={
+                    "kind": "pool",
+                    "label": "K/D ratio",
+                    "target": 1.25,
+                    "members": {
+                        str(user.id): {
+                            "status": "cleared",
+                            "current": 1.6,
+                            "cleared": True,
+                            "matches": 1,
+                        }
+                    },
+                },
+            )
+        )
+        await s.commit()
+
+    r = await client.get(f"{V1}/activity", headers=_hdr("auth_ponly"))
+    items = r.json()["items"]
+    assert len(items) == 1
+    it = items[0]
+    assert it["type"] == "pool" and it["state"] == "LOCKED"
+    assert it["net_cents"] is None  # in flight → shown as "in play"
+    assert it["live"]["status"] == "cleared" and it["live"]["current"] == 1.6
+
+
 async def test_geo_fence_blocks_before_any_ledger_write(client):
     await _set_geo(["FL"])
     await setup_player(client, "auth_fl", "fl", state="FL")

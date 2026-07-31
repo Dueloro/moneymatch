@@ -105,6 +105,41 @@ class ChessLichessAdapter(GameAdapter):
         winner_name = white if winner == "white" else black
         return ids_lower.get(winner_name.lower())
 
+    async def live_match(self, game_id: str, players: list[str]) -> dict | None:
+        """Colour-neutral mid-game view: plies played, whose turn, and the
+        result once finished. Verified to be our two accounts' game so a stray
+        id never leaks someone else's board. ``None`` while unverifiable."""
+        g = await lichess.get_live_game(game_id)
+        if not g:
+            return None
+        players_j = g.get("players", {}) or {}
+        white = (((players_j.get("white") or {}).get("user")) or {}).get("name")
+        black = (((players_j.get("black") or {}).get("user")) or {}).get("name")
+        if not white or not black:
+            return None
+        want = {p.lower() for p in players}
+        if white.lower() not in want or black.lower() not in want:
+            return None
+        status = g.get("status")
+        finished = status in _FINISHED
+        plies = len((g.get("moves") or "").split())
+        winner = g.get("winner")  # "white" | "black" | None
+        result = winner if finished else None
+        if finished and winner is None:
+            result = "draw"
+        return {
+            "status": status,
+            "finished": finished,
+            "plies": plies,
+            "moves": _move_count(g.get("moves")),
+            # Even ply count ⇒ white is to move (white opens on ply 0).
+            "turn": None if finished else ("white" if plies % 2 == 0 else "black"),
+            "winner": result,  # "white" | "black" | "draw" | None(ongoing)
+            "white": white,
+            "black": black,
+            "speed": g.get("speed"),
+        }
+
     # --- Host-specific mapping (private to the adapter) -------------------- #
 
     def _to_profile(self, raw: dict) -> ProfileSnapshot:

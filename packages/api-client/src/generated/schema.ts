@@ -547,6 +547,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/disputes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * File Contest Dispute
+         * @description Contest how a settled contest (match/pool/tournament) was graded.
+         */
+        post: operations["file_contest_dispute_api_v1_disputes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/{ref_type}/{ref_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Contest Dispute
+         * @description The viewer's dispute for this contest, if any.
+         */
+        get: operations["get_contest_dispute_api_v1_disputes__ref_type___ref_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/friends": {
         parameters: {
             query?: never;
@@ -1235,6 +1275,16 @@ export interface components {
             opponent_stat_line: {
                 [key: string]: unknown;
             } | null;
+            /** Live */
+            live?: {
+                [key: string]: unknown;
+            } | null;
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            } | null;
+            /** Dispute Status */
+            dispute_status?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1393,11 +1443,13 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Ref Type */
+            ref_type: string;
             /**
-             * Match Id
+             * Ref Id
              * Format: uuid
              */
-            match_id: string;
+            ref_id: string;
             /**
              * User Id
              * Format: uuid
@@ -1629,6 +1681,21 @@ export interface components {
             expires_at: string;
         };
         /**
+         * ContestRequest
+         * @description File a dispute against any contest type (match | pool | tournament).
+         */
+        ContestRequest: {
+            /** Ref Type */
+            ref_type: string;
+            /**
+             * Ref Id
+             * Format: uuid
+             */
+            ref_id: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
          * CreateChallengeRequest
          * @description One shape for all three flows (the server picks based on which fields are
          *     set): direct (`challengee_id`), rematch (`rematch_of`), or invite link
@@ -1718,11 +1785,13 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Ref Type */
+            ref_type: string;
             /**
-             * Match Id
+             * Ref Id
              * Format: uuid
              */
-            match_id: string;
+            ref_id: string;
             /** Reason */
             reason: string;
             /** Status */
@@ -4041,6 +4110,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    file_contest_dispute_api_v1_disputes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_contest_dispute_api_v1_disputes__ref_type___ref_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ref_type: string;
+                ref_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeView"] | null;
                 };
             };
             /** @description Validation Error */

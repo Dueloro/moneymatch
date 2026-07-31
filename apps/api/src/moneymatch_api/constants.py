@@ -255,6 +255,10 @@ TOURNAMENT_DISPERSION_CAP = 1.0
 TOURNAMENT_WINDOW_SECONDS = 48 * 3600
 # Live standings refresh cadence during the window (cheap, cached).
 TOURNAMENT_STANDINGS_REFRESH_SECONDS = 10 * 60
+# Live under-the-card refresh cadence for in-flight pools & H2H matches. Faster
+# than standings — a chess board wants to feel live — but still host-cached so
+# the Activity request path never makes a host call.
+LIVE_SNAPSHOT_REFRESH_SECONDS = 30
 
 # Engine-version stamps for pool/tournament settlements (dispute replay).
 POOL_ENGINE_VERSION = "pool-1"

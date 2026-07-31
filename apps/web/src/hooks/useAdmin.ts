@@ -241,3 +241,48 @@ export function useClearFlag() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'risk'] }),
   });
 }
+
+// --- Disputes -------------------------------------------------------------- //
+
+export interface AdminDispute {
+  id: string;
+  ref_type: string; // match | pool | tournament
+  ref_id: string;
+  user_id: string;
+  reason: string;
+  status: string;
+  admin_note: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+/** Open, user-filed contest disputes awaiting admin review. */
+export function useAdminDisputes() {
+  return useQuery({
+    queryKey: ['admin', 'disputes'],
+    refetchInterval: 10000,
+    queryFn: async (): Promise<AdminDispute[]> => {
+      const { data, error } = await api.GET('/api/v1/admin/disputes');
+      if (error) throw new Error('Failed to load disputes');
+      return data as AdminDispute[];
+    },
+  });
+}
+
+export function useResolveDispute() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      dispute_id: string;
+      status: 'resolved' | 'rejected';
+      note?: string;
+    }): Promise<void> => {
+      const { error } = await api.POST('/api/v1/admin/disputes/{dispute_id}/resolve', {
+        params: { path: { dispute_id: input.dispute_id } },
+        body: { status: input.status, note: input.note ?? null },
+      });
+      if (error) throw new Error('Resolve failed');
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'disputes'] }),
+  });
+}

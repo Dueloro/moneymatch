@@ -20,7 +20,8 @@ class AdminDisputeItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    match_id: UUID
+    ref_type: str  # match | pool | tournament
+    ref_id: UUID
     user_id: UUID
     reason: str
     status: str

@@ -26,6 +26,25 @@ body,
   height: 100%;
 }
 
+/* Hide the scrollbar by default for a cleaner canvas. Scrolling still works via
+ * wheel / trackpad / keyboard — only the visual gutter is removed. Applied to
+ * the document (window scroll on mobile) and, via .no-scrollbar, to in-app
+ * scroll containers like the AppShell main region. */
+html,
+body,
+#root,
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge/IE */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 body {
   margin: 0;
   background: var(--bg);

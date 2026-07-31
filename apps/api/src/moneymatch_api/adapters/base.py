@@ -85,3 +85,11 @@ class GameAdapter(abc.ABC):
         """For a brokered game id, return the winning ``player_id`` once finished,
         ``""`` for a draw, or ``None`` while unfinished / unverifiable (Phase 3)."""
         raise NotImplementedError
+
+    async def live_match(self, game_id: str, players: list[str]) -> dict | None:
+        """Best-effort mid-game snapshot for the Activity live view.
+
+        Brokered adapters (chess) return whose turn it is, plies played, and the
+        result once finished; ``None`` means "nothing live to show" and is the
+        default for adapters whose host has no in-progress feed."""
+        return None

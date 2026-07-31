@@ -176,6 +176,59 @@ async def test_pool_boundary_match_excluded_then_refunded(monkeypatch):
         assert all(e.status == "REFUNDED" for e in entries)  # boundary match excluded
 
 
+async def test_live_snapshot_written_for_inflight_pool(monkeypatch):
+    """An in-flight (not-yet-due) pool gets a per-member live snapshot cached,
+    and `view_for` orients it to each viewer's first in-window match."""
+    from moneymatch_api.models.live import LiveSnapshot
+    from moneymatch_api.services import live_activity_service
+
+    sm = new_sessionmaker()
+    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())  # empty sandbag poll
+    async with sm() as s:
+        users = []
+        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+            u, host = await _player(s, f"L{i}", mu=mu)
+            users.append((u, host))
+        for u, _ in users[:3]:
+            await pool_engine.enqueue(
+                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            )
+        res = await pool_engine.enqueue(
+            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+        )
+        pool_id = res.pool.id
+        room_bar = res.pool.room_bar
+        # The freshly-formed window is running (ends in the future) → not due,
+        # so the worker only *refreshes live*, never settles it.
+        start = res.pool.window_starts_at
+        await s.commit()
+
+    mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
+    games = {
+        users[0][1]: [_game(mid_ms, room_bar + 0.5)],  # clears
+        users[2][1]: [_game(mid_ms, 0.3)],  # misses
+        # users[1] and users[3] have played nothing yet → "waiting".
+    }
+    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
+
+    report = await settlement_worker.run_cycle(sm)
+    assert report.pools_settled == 0  # in-flight, not settled
+    assert report.live_refreshed >= 1
+
+    async with sm() as s:
+        row = await s.get(LiveSnapshot, ("pool", pool_id))
+        assert row is not None
+        members = row.data["members"]
+        assert members[str(users[0][0].id)]["cleared"] is True
+        assert members[str(users[2][0].id)]["cleared"] is False
+        assert members[str(users[1][0].id)]["status"] == "waiting"
+
+        # Oriented to the clearing viewer.
+        view = live_activity_service.view_for("pool", row.data, users[0][0].id)
+        assert view["status"] == "cleared" and view["cleared"] is True
+        assert view["target"] == round(room_bar, 2)
+
+
 # --------------------------------------------------------------------------- #
 # Tournaments.
 # --------------------------------------------------------------------------- #

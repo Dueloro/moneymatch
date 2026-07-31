@@ -29,7 +29,7 @@ export function AppShell() {
       <GlowBackdrop />
       <MobileTopBar />
       <SidebarNav />
-      <main className="relative z-10 flex-1 overflow-y-auto pb-24 md:pb-8">
+      <main className="no-scrollbar relative z-10 flex-1 overflow-y-auto pb-24 md:pb-8">
         <Ticker />
         <div className="mx-auto w-full max-w-[1180px] px-4 py-6 md:px-10 md:py-8">
           <EligibilityBanner />

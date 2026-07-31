@@ -2,7 +2,11 @@
 
 The user-facing trust valve for the settlement engine: when a result looks
 wrong (host outage, disconnect, ambiguous tie), the player files a dispute that
-an admin reviews. One dispute per (match, user); resolution is admin-only.
+an admin reviews. One dispute per (contest, user); resolution is admin-only.
+
+A dispute is **polymorphic** across contest types: `(ref_type, ref_id)` points at
+a match, a solo pool, or a tournament (there is no single FK target, so this is a
+loose reference — the service verifies participation per type before filing).
 """
 
 from __future__ import annotations
@@ -17,6 +21,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ..db.base import Base, TimestampMixin, uuid_pk
 
 DISPUTE_STATUSES = ("open", "resolved", "rejected")
+# The contest kinds a dispute can point at (matches the Activity `type` vocab).
+DISPUTE_REF_TYPES = ("match", "pool", "tournament")
 
 
 class Dispute(Base, TimestampMixin):
@@ -25,16 +31,19 @@ class Dispute(Base, TimestampMixin):
         CheckConstraint(
             "status IN ('open', 'resolved', 'rejected')", name="ck_disputes_status"
         ),
+        CheckConstraint(
+            "ref_type IN ('match', 'pool', 'tournament')",
+            name="ck_disputes_ref_type",
+        ),
         # A user contests a given contest at most once.
-        Index("uq_disputes_match_user", "match_id", "user_id", unique=True),
+        Index("uq_disputes_ref_user", "ref_type", "ref_id", "user_id", unique=True),
     )
 
     id = uuid_pk()
-    match_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("matches.id", ondelete="RESTRICT"),
-        nullable=False,
-        index=True,
+    # Polymorphic contest reference — a match, a pool, or a tournament.
+    ref_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    ref_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), nullable=False, index=True
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),

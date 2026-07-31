@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { EmptyState } from '../components/ui/EmptyState';
-import { ListRow } from '../components/ui/ListRow';
+import { ExpandableCard } from '../components/ui/ExpandableCard';
 import { PillButton } from '../components/ui/PillButton';
 import { useAcceptChallenge, useDeclineChallenge } from '../hooks/useChallenges';
 import {
@@ -31,7 +31,11 @@ export function InboxPage() {
       {data && data.items.length === 0 ? (
         <EmptyState title="No notifications" subline="You're all caught up." />
       ) : (
-        data?.items.map((n) => <NotificationRow key={n.id} note={n} />)
+        <div className="flex flex-col gap-2">
+          {data?.items.map((n) => (
+            <NotificationRow key={n.id} note={n} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -87,7 +91,7 @@ function NotificationRow({ note }: { note: NotificationItem }) {
   }
 
   return (
-    <ListRow
+    <ExpandableCard
       left={
         <span
           aria-label={note.read ? 'read' : 'unread'}

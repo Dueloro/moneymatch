@@ -47,11 +47,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session) identify(data.session.user.id);
+    // Restore the Supabase session, but never let bootstrap hang the app. A
+    // stale/corrupt token in localStorage can leave getSession() pending
+    // indefinitely; without a bound, `loading` never clears and every route is
+    // stuck on the "Loading…" gate. Cap it, and always resolve to a definite
+    // signed-in/out state so a broken session falls through to sign-in.
+    let settled = false;
+    const finish = (next: Session | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      setSession(next);
+      if (next) identify(next.user.id);
       setLoading(false);
-    });
+    };
+    const timer = setTimeout(() => finish(null), 8000);
+    supabase.auth
+      .getSession()
+      .then(({ data }) => finish(data.session))
+      .catch(() => {
+        // The stored session is unusable — clear it locally (no network) so the
+        // next load doesn't hang on the same bad token, then show sign-in.
+        void supabase.auth.signOut({ scope: 'local' });
+        finish(null);
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       // Tie analytics to the user id after auth; drop it on sign-out so the
@@ -59,7 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next) identify(next.user.id);
       else resetIdentity();
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(

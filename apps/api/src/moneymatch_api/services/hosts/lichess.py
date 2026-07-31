@@ -148,3 +148,31 @@ async def get_game(game_id: str) -> dict | None:
         return response.json()
     except (HostError, ValueError):
         return None
+
+
+async def get_live_game(game_id: str) -> dict | None:
+    """Fetch a game **with its move list** for a live under-the-card view.
+
+    The game export works while a game is still in progress (`status:
+    "started"`), so this powers the Activity "moves played / whose turn"
+    line for a brokered head-to-head. ``moves=true`` returns space-separated
+    SAN; the caller counts plies. ``None`` on any host error (the card just
+    shows nothing rather than failing the feed).
+    """
+    params = {
+        "moves": "true",
+        "clocks": "false",
+        "evals": "false",
+        "opening": "false",
+    }
+    try:
+        response = await request_json(
+            HOST,
+            "GET",
+            f"https://lichess.org/game/export/{game_id}",
+            headers={**HEADERS, "Accept": "application/json"},
+            params=params,
+        )
+        return response.json()
+    except (HostError, ValueError):
+        return None

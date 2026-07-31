@@ -30,6 +30,9 @@ function item(overrides: Partial<ActivityItem>): ActivityItem {
     opponent_username: 'kvem_',
     your_stat_line: null,
     opponent_stat_line: null,
+    live: null,
+    detail: null,
+    dispute_status: null,
     created_at: new Date().toISOString(),
     resolved_at: null,
     ...overrides,
@@ -95,6 +98,55 @@ describe('ActivityPage', () => {
     expect(screen.getByText(/Push · refunded/)).toBeInTheDocument();
     expect(screen.getByText(/In progress/)).toBeInTheDocument();
     expect(screen.getByText('$10.00 in play')).toBeInTheDocument();
+  });
+
+  it('shows a live chess line with move count and whose turn', () => {
+    mockItems([
+      item({
+        id: 'chess1',
+        game: 'chess.lichess',
+        market: 'win_h2h',
+        kind: 'win_h2h',
+        state: 'ACTIVE',
+        net_cents: null,
+        live: {
+          kind: 'match',
+          format: 'chess',
+          status: 'live',
+          moves: 12,
+          your_color: 'white',
+          turn: 'you',
+          result: null,
+        },
+      }),
+    ]);
+    renderWithProviders(<ActivityPage />);
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText(/move 12 · your move/)).toBeInTheDocument();
+  });
+
+  it('shows a live pool line with current stat vs the bar', () => {
+    mockItems([
+      item({
+        type: 'pool',
+        id: 'poolLive',
+        title: 'K/D ratio · Medium pool',
+        state: 'LOCKED',
+        net_cents: null,
+        opponent_username: null,
+        live: {
+          kind: 'pool',
+          label: 'K/D ratio',
+          status: 'cleared',
+          current: 1.6,
+          target: 1.25,
+          cleared: true,
+          matches: 1,
+        },
+      }),
+    ]);
+    renderWithProviders(<ActivityPage />);
+    expect(screen.getByText(/K\/D ratio 1.60 · cleared 1.25/)).toBeInTheDocument();
   });
 
   it('pops a settlement toast when a match newly resolves', () => {

@@ -250,6 +250,52 @@ describe('PlayPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirm & stake/ }));
     expect(confirmMutate).toHaveBeenCalledWith('deep1');
   });
+
+  it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
+    renderWithProviders(<PlayPage />);
+    expect(screen.queryByTestId('play-filters')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('play-filters-toggle'));
+    expect(screen.getByTestId('play-filters')).toBeInTheDocument();
+  });
+
+  it('entry filter trims the grid to the chosen entry amount', () => {
+    renderWithProviders(<PlayPage />);
+    // Baseline: 1 market × 3 presets = 3 cards.
+    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(3);
+    fireEvent.click(screen.getByTestId('play-filters-toggle'));
+    const filters = screen.getByTestId('play-filters');
+    fireEvent.click(within(filters).getByRole('button', { name: '$25.00' }));
+    // 1 market × 1 entry preset = 1 card.
+    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(1);
+  });
+
+  it('market filter trims the grid to the chosen market', () => {
+    // Two open markets so the Market chip row appears (hidden for a single one).
+    vi.mocked(useMarkets).mockReturnValue({
+      data: {
+        game: 'cs2.faceit',
+        linked: true,
+        entry_presets_cents: [500, 1000, 2500],
+        markets: [
+          KD_MARKET,
+          {
+            ...KD_MARKET,
+            key: 'headshot_pct',
+            label: 'Headshot %',
+            metric: 'cs2_headshot_pct',
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useMarkets>);
+    renderWithProviders(<PlayPage />);
+    // Baseline: 2 markets × 3 presets = 6 cards.
+    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(6);
+    fireEvent.click(screen.getByTestId('play-filters-toggle'));
+    const filters = screen.getByTestId('play-filters');
+    fireEvent.click(within(filters).getByRole('button', { name: 'Headshot %' }));
+    // Only the chosen market × 3 presets remain.
+    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(3);
+  });
 });
 
 describe('prizeForEntry', () => {
