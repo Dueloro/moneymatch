@@ -14,9 +14,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import jwt
+import structlog
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import AuthedIdentity
@@ -36,16 +37,20 @@ from ..constants import (
 )
 from ..db.session import get_session
 from ..errors import APIError
+from ..models.chat import Conversation, ConversationMember, Message
 from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer
 from ..models.skill import MetricModel
+from ..models.social import Friendship
 from ..models.user import User
-from ..services import money_math, wallet_service
+from ..services import challenge_service, chat_service, money_math, wallet_service
 from ..services.user_service import (
     complete_onboarding,
     get_or_create_user,
     provision_new_user,
 )
+
+log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
@@ -484,6 +489,260 @@ async def _seed_settled_match(
 _PRIMARY_LABEL = {"cs2_kd_ratio": "K/D", "pubg_kills": "Kills"}
 
 
+# --------------------------------------------------------------------------- #
+# Demo social — accepted friends, chat threads, and invite cards, so the Inbox
+# opens on a populated messaging surface instead of an empty rail. The same
+# opponents from the Activity history double as the demo's friends. Created
+# exactly once (guarded on "does this user have any conversation yet").
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class _ChatLine:
+    """One seeded message. `invite` carries the extra payload for a card."""
+
+    mine: bool  # the demo user wrote it
+    minutes_ago: float
+    body: str | None = None
+    invite: dict | None = None  # {invite_kind, game, entry_cents, ...}
+
+
+@dataclass(frozen=True)
+class _DemoThread:
+    friend: str  # opponent handle (reused from the Activity history)
+    game: str
+    online: bool  # seeds `last_seen_at` → the presence dot
+    lines: tuple[_ChatLine, ...]
+
+
+_DAY = 60 * 24
+
+_DEMO_THREADS: tuple[_DemoThread, ...] = (
+    _DemoThread(
+        friend="s1mple_fan",
+        game=GAME_CS2_FACEIT,
+        online=True,
+        lines=(
+            _ChatLine(False, 2 * _DAY + 40, "gg earlier, that dust2 half was rough"),
+            _ChatLine(True, 2 * _DAY + 33, "you were 1 kill off. run it back later?"),
+            _ChatLine(False, 2 * _DAY + 30, "for sure. $10 K/D duel?"),
+            _ChatLine(
+                False,
+                _DAY + 90,
+                None,
+                {
+                    "invite_kind": "pool",
+                    "game": GAME_CS2_FACEIT,
+                    "entry_cents": 1000,
+                    "metric": "cs2_kd_ratio",
+                    "difficulty": "medium",
+                    "status": "accepted",
+                },
+            ),
+            _ChatLine(True, _DAY + 80, "in. cleared the bar with room to spare"),
+            _ChatLine(False, 55, "queueing now — send me something for tonight"),
+        ),
+    ),
+    _DemoThread(
+        friend="chocoTaco",
+        game=GAME_PUBG_STEAM,
+        online=False,
+        lines=(
+            _ChatLine(True, _DAY + 200, "erangel squads later?"),
+            _ChatLine(False, _DAY + 190, "yeah. tournament instead? best 3 kills"),
+            _ChatLine(
+                True,
+                _DAY + 20,
+                None,
+                {
+                    "invite_kind": "tournament",
+                    "game": GAME_PUBG_STEAM,
+                    "entry_cents": 2500,
+                    "metric": "pubg_kills",
+                    "status": "pending",
+                },
+            ),
+            _ChatLine(False, 240, "saw it — jumping in after this game"),
+            _ChatLine(
+                False,
+                180,
+                None,
+                {
+                    "invite_kind": "pool",
+                    "game": GAME_PUBG_STEAM,
+                    "entry_cents": 500,
+                    "metric": "pubg_kills",
+                    "difficulty": "easy",
+                    "status": "pending",
+                },
+            ),
+        ),
+    ),
+    _DemoThread(
+        friend="kvem_",
+        game=GAME_CS2_FACEIT,
+        online=False,
+        lines=(
+            _ChatLine(False, 4 * _DAY, "that inferno one came down to the last round"),
+            _ChatLine(True, 4 * _DAY - 5, "closest match I've had on here"),
+            _ChatLine(
+                True,
+                3 * _DAY,
+                None,
+                {
+                    "invite_kind": "pool",
+                    "game": GAME_CS2_FACEIT,
+                    "entry_cents": 2500,
+                    "metric": "cs2_adr",
+                    "difficulty": "hard",
+                    "status": "declined",
+                },
+            ),
+            _ChatLine(False, 3 * _DAY - 10, "hard ADR bar is not my week, sorry"),
+        ),
+    ),
+)
+
+# The support thread the demo lands on: a real question, the auto-ack, and an
+# agent follow-up, so the thread reads like a conversation and not a form.
+_DEMO_SUPPORT: tuple[_ChatLine, ...] = (
+    _ChatLine(False, _DAY + 400, chat_service.SUPPORT_GREETING),
+    _ChatLine(
+        True, _DAY + 60, "My K/D duel from Tuesday settled — where's the payout?"
+    ),
+    _ChatLine(False, _DAY + 59, chat_service.SUPPORT_AUTO_REPLY),
+    _ChatLine(
+        False,
+        _DAY + 20,
+        "Checked it: the prize posted to your balance at 9:14pm, under "
+        "Activity → Settled. Anything else, just reply here.",
+    ),
+)
+
+
+def _seed_message(
+    session: AsyncSession,
+    conversation: Conversation,
+    *,
+    sender_id: uuid.UUID | None,
+    line: _ChatLine,
+    now: datetime,
+) -> None:
+    """Append one backdated message (explicit `created_at`, so the transcript has
+    real day dividers instead of collapsing onto today)."""
+    created = now - timedelta(minutes=line.minutes_ago)
+    payload: dict = {}
+    if line.invite is not None:
+        payload = {
+            **line.invite,
+            "redirect_path": (
+                "/pools" if line.invite["invite_kind"] == "pool" else "/tournament"
+            ),
+        }
+        payload["title"] = chat_service.invite_title(payload)
+    session.add(
+        Message(
+            conversation_id=conversation.id,
+            sender_id=sender_id,
+            kind="invite" if line.invite else ("text" if sender_id else "system"),
+            body=line.body,
+            payload=payload,
+            created_at=created,
+        )
+    )
+    if conversation.last_message_at is None or created > conversation.last_message_at:
+        conversation.last_message_at = created
+
+
+async def _ensure_demo_social(session: AsyncSession, demo: User) -> None:
+    """Friend the demo user to its Activity opponents and seed their threads."""
+    already = await session.scalar(
+        select(ConversationMember.id)
+        .where(ConversationMember.user_id == demo.id)
+        .limit(1)
+    )
+    if already is not None:
+        return
+
+    now = datetime.now(UTC)
+    for spec in _DEMO_THREADS:
+        friend = await _demo_opponent(session, spec.friend, spec.game)
+        friend.last_seen_at = now if spec.online else now - timedelta(hours=6)
+        # Guarded independently of the conversation check above: the friendship
+        # may already exist (added by hand, or left behind when a thread was
+        # cleared), and `uq_friendships_pair` covers the pair in one direction.
+        existing = await session.scalar(
+            select(Friendship.id).where(
+                or_(
+                    and_(
+                        Friendship.user_id == friend.id,
+                        Friendship.friend_id == demo.id,
+                    ),
+                    and_(
+                        Friendship.user_id == demo.id,
+                        Friendship.friend_id == friend.id,
+                    ),
+                )
+            )
+        )
+        if existing is None:
+            session.add(
+                Friendship(
+                    user_id=friend.id,
+                    friend_id=demo.id,
+                    state="accepted",
+                    accepted_at=now - timedelta(days=9),
+                )
+            )
+        conversation = Conversation(kind="dm")
+        session.add(conversation)
+        await session.flush()
+        session.add_all(
+            [
+                ConversationMember(conversation_id=conversation.id, user_id=demo.id),
+                ConversationMember(conversation_id=conversation.id, user_id=friend.id),
+            ]
+        )
+        for line in spec.lines:
+            _seed_message(
+                session,
+                conversation,
+                sender_id=demo.id if line.mine else friend.id,
+                line=line,
+                now=now,
+            )
+
+    support = Conversation(kind="support", subject=chat_service.SUPPORT_TITLE)
+    session.add(support)
+    await session.flush()
+    session.add(ConversationMember(conversation_id=support.id, user_id=demo.id))
+    for line in _DEMO_SUPPORT:
+        _seed_message(
+            session,
+            support,
+            sender_id=demo.id if line.mine else None,
+            line=line,
+            now=now,
+        )
+    await session.flush()
+
+    # One live head-to-head challenge from a friend: a *real* `challenges` row, so
+    # the invite card in chat (and the Inbox pill) actually forms a match on
+    # accept. Posted last so it's the newest thing in the Inbox.
+    challenger = await _demo_opponent(session, _DEMO_THREADS[0].friend, GAME_CS2_FACEIT)
+    try:
+        await challenge_service.create_direct(
+            session,
+            challenger,
+            challengee_id=demo.id,
+            game=GAME_CS2_FACEIT,
+            market_key="kd_ratio",
+            entry_cents=1000,
+        )
+    except APIError as exc:  # e.g. the game flag is off — the threads still stand
+        log.warning("demo.challenge_seed_skipped", error=str(exc))
+
+
 class DemoLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -517,6 +776,8 @@ async def demo_login(
     await _ensure_demo_fixture(session, user)
     # A populated, believable Activity feed of past CS2/PUBG games (demo-only).
     await _ensure_demo_history(session, user)
+    # Friends + chat threads (with invite cards) so the Inbox opens populated.
+    await _ensure_demo_social(session, user)
     await session.commit()
 
     now = datetime.now(UTC)

@@ -40,7 +40,13 @@ from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer
 from ..models.social import Challenge
 from ..models.user import User
-from . import friends_service, matchmaking, notifications_service, sandbagging_service
+from . import (
+    chat_service,
+    friends_service,
+    matchmaking,
+    notifications_service,
+    sandbagging_service,
+)
 from .feature_flags import get_boolean_flags
 from .markets import KIND_STAT_RACE, MarketDef
 from .markets import get as get_market
@@ -235,6 +241,19 @@ async def create_direct(
             "entry_cents": entry_cents,
             "friendly": friendly,
         },
+    )
+    # Mirror the invite into the pair's DM so it lands where they actually talk
+    # (the Inbox chat), not only in the notification feed.
+    await chat_service.post_challenge_invite(
+        session,
+        challenger=challenger,
+        challengee_id=challengee_id,
+        challenge_id=challenge.id,
+        game=game,
+        market=market_key,
+        market_label=market.label,
+        entry_cents=entry_cents,
+        friendly=friendly,
     )
     return challenge
 
@@ -436,6 +455,11 @@ async def _accept(
             "friendly": friendly,
         },
     )
+    # Keep the chat invite card in step, however the challenge was answered
+    # (Inbox pill, chat card, or invite link).
+    await chat_service.note_challenge_resolved(
+        session, challenge.id, status="accepted", match_id=match.id
+    )
     log.info(
         "challenge.accepted",
         challenge_id=str(challenge.id),
@@ -487,6 +511,7 @@ async def decline(
             "by_username": user.username,
         },
     )
+    await chat_service.note_challenge_resolved(session, challenge.id, status="declined")
     return challenge
 
 
@@ -558,6 +583,9 @@ async def expire_due(session: AsyncSession, *, now: datetime | None = None) -> i
             challenge.challenger_id,
             "system",
             {"event": "challenge_expired", "challenge_id": str(challenge.id)},
+        )
+        await chat_service.note_challenge_resolved(
+            session, challenge.id, status="expired"
         )
     await session.flush()
     return len(due)

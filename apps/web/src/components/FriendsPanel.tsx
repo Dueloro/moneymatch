@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   useAddFriend,
@@ -129,6 +130,7 @@ function FriendRow({
   onChallenge: (f: FriendItem) => void;
 }) {
   const remove = useRemoveFriend();
+  const navigate = useNavigate();
   return (
     <ListRow
       left={<PresenceDot online={friend.online} />}
@@ -136,6 +138,12 @@ function FriendRow({
       subline={friend.online ? 'Active now' : 'Offline'}
       right={
         <div className="flex items-center gap-2">
+          <PillButton
+            variant="outline"
+            onClick={() => navigate(`/social?tab=inbox&dm=${friend.user_id}`)}
+          >
+            Message
+          </PillButton>
           <PillButton variant="secondary" onClick={() => onChallenge(friend)}>
             Challenge
           </PillButton>

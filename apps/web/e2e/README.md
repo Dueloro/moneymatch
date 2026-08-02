@@ -12,7 +12,13 @@ client input after enqueue.
 `invite.spec.ts` drives the Phase-5 funnel: A mints an invite link, a **fresh**
 user B accepts, both confirm, the fixture settles, and both inboxes are correct.
 
-All three **skip** unless `E2E_AUTH=1` (they never silently pass). This suite is
+`chat.spec.ts` drives the Inbox messaging loop (14-inbox-messaging): A befriends
+B, messages them from the Friends tab, B's bell lights **from another page**, B
+reads and replies, A sends a head-to-head invite from the chat composer, and B
+accepts the card — forming a real PENDING match. It is the only test that
+exercises two independent sessions against the poll loop and the unread cursor.
+
+All four **skip** unless `E2E_AUTH=1` (they never silently pass). This suite is
 **not** in the unit-test CI job — it needs the whole stack and real browsers.
 
 ## The test-auth seam

@@ -8,7 +8,11 @@ import { AppShell } from './AppShell';
 vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
 // The live ticker depends on auth + query context the shell test doesn't provide.
 vi.mock('./ui/Ticker', () => ({ Ticker: () => null }));
+// The bell's badge is a live query (notifications + unread DMs); the shell test
+// has no auth context, so drive it directly.
+vi.mock('../hooks/useChat', () => ({ useInboxUnread: vi.fn(() => 0) }));
 
+import { useInboxUnread } from '../hooks/useChat';
 import { useMe } from '../hooks/useMe';
 
 vi.mocked(useMe).mockReturnValue({
@@ -62,6 +66,23 @@ describe('AppShell', () => {
       'href',
       '/admin',
     );
+  });
+
+  it('lights the bell for an unread message from anywhere in the app', () => {
+    vi.mocked(useMe).mockReturnValue({
+      data: { user: { username: 'kvem_' }, needs_onboarding: false },
+      isLoading: false,
+    } as ReturnType<typeof useMe>);
+
+    vi.mocked(useInboxUnread).mockReturnValue(0);
+    renderShell().unmount();
+    expect(screen.queryByTestId('inbox-unread-dot')).not.toBeInTheDocument();
+
+    vi.mocked(useInboxUnread).mockReturnValue(2);
+    renderShell();
+    // Rendered by both responsive bars; the link carries the count for a11y.
+    expect(screen.getAllByTestId('inbox-unread-dot').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Inbox (2 unread)' }).length).toBe(2);
   });
 
   it('hides the Admin link from non-admins', () => {

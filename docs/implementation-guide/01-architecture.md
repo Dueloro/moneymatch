@@ -150,7 +150,15 @@ varchars, FKs `ON DELETE RESTRICT` (nothing money-adjacent cascades).
   (nullable + `invite_token` for link invites), `game`, `market`, `entry_cents`,
   `state` (`sent|accepted|declined|expired`), on accept → creates a `match`.
 - **notifications** — `user_id`, `kind` (`match_found|settled|challenge|refund|system`),
-  `payload jsonb`, `read_at`. Backs the Inbox screen.
+  `payload jsonb`, `read_at`. Backs the Inbox's notification feed.
+- **conversations** — a chat thread: `kind` (`dm|support`), `subject`,
+  `last_message_at` (denormalized so the list sorts without touching `messages`).
+- **conversation_members** — membership + the per-user read cursor
+  (`last_read_at`), which the unread badge counts against. Unique per pair.
+- **messages** — `conversation_id`, `sender_id` (null = platform-authored),
+  `kind` (`text|invite|system`), `body`, `payload jsonb`. An `invite` row carries
+  the whole invite card (pool / tournament / h2h + its `status`), so an invite
+  lands in the thread where the two players actually talk.
 - **feature_flags** — `key`, `enabled bool`, `payload jsonb` (e.g. per-game
   enable, `settlement_paused`, `queue_paused`).
 - **admin_audit** — every admin action: `admin_id`, `action`, `target`, `detail jsonb`.

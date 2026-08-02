@@ -17,7 +17,14 @@ able to *summon* opponents; see `docs/business/business-and-competition.md` §3)
    username or code" input) — codes avoid a scrapeable public directory.
    Request/accept/decline/block; caps (500 friends, 20 pending outbound);
    presence-lite (`last_seen_at` heartbeat; green dot = active in last 5 min).
-   No chat at MVP.
+   **Chat** (added after the original MVP cut, per the owner): friend DMs and a
+   support thread live in the Inbox alongside the notification feed —
+   `conversations` / `conversation_members` / `messages`, `/chat/*`. Messaging
+   follows friendship (the same rule as a direct challenge), and invites render
+   as cards inside the thread: a head-to-head card wraps a real `challenges` row
+   so accepting it in chat forms the PENDING match, while pool/tournament cards
+   deep-link into those tabs. Full write-up:
+   [`14-inbox-messaging.md`](./14-inbox-messaging.md).
 3. **Challenges** (the design's "Invite friend" slip + Friends "Challenge" pill):
    - Direct: challenger picks market + entry preset → challengee gets an inbox
      notification + Respond → accept creates a `match` (PENDING) through the

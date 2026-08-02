@@ -4,9 +4,9 @@ Adds by MoneyMatch **username** (exact citext match — never host-game accounts
 so linkage never leaks) or by immutable **friend code** (`MM-7F3K2Q`). One row
 per relationship (`user_id` = requester, `friend_id` = addressee); the service
 guards the reverse pair so A→B and B→A never coexist — a request that mirrors a
-pending one auto-accepts. Caps bite here (500 friends, 20 pending outbound). No
-chat at MVP (08-phase-5 · deliverable 2). Flushes, never commits — the caller
-owns the transaction.
+pending one auto-accepts. Caps bite here (500 friends, 20 pending outbound).
+Friendship is also what gates chat — see `chat_service` (08-phase-5 ·
+deliverable 2). Flushes, never commits — the caller owns the transaction.
 """
 
 from __future__ import annotations

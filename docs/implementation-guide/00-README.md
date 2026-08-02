@@ -15,6 +15,11 @@ built in *this* repo.
 5. [`11-migration-map.md`](./11-migration-map.md) — exactly what to reuse from the PoC and how.
 6. [`12-mvp-acceptance.md`](./12-mvp-acceptance.md) — the definition of done for the MVP.
 
+Post-MVP features that outgrew their phase doc get their own file:
+[`14-inbox-messaging.md`](./14-inbox-messaging.md) — friend DMs, the support
+thread, and in-thread invite cards (added after the original MVP cut; read it
+before touching `chat_service` or `components/chat/`).
+
 Product/legal context (read once): [`docs/product/overview.md`](../product/overview.md),
 [`docs/legal/legal-compliance.md`](../legal/legal-compliance.md),
 [`docs/legal/integrity-audit.md`](../legal/integrity-audit.md).

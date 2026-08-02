@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 
+import { useInboxUnread } from '../../hooks/useChat';
 import { useMe } from '../../hooks/useMe';
 import { Logo } from './brand';
 import { BellIcon } from './icons';
@@ -58,7 +59,8 @@ const MOBILE_LABEL: Record<string, string> = {
 export function MobileTopBar() {
   const me = useMe();
   const username = me.data?.user.username ?? '…';
-  const unread = me.data?.unread_notifications ?? 0;
+  // Same live count as the desktop sidebar: notifications + unread DMs.
+  const unread = useInboxUnread();
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-hairline bg-bg px-4 py-3 md:hidden">

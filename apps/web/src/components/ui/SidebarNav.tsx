@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 
+import { useInboxUnread } from '../../hooks/useChat';
 import { useMe } from '../../hooks/useMe';
 import { Logo } from './brand';
 import { BellIcon } from './icons';
@@ -10,7 +11,8 @@ import { NAV } from './nav';
 export function SidebarNav() {
   const me = useMe();
   const username = me.data?.user.username ?? '…';
-  const unread = me.data?.unread_notifications ?? 0;
+  // Notifications *and* unread DMs — both poll, so the dot is live from any page.
+  const unread = useInboxUnread();
   const isAdmin = me.data?.user.role === 'admin';
 
   return (

@@ -778,6 +778,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Conversations */
+        get: operations["list_conversations_api_v1_chat_conversations_get"];
+        put?: never;
+        /**
+         * Open Conversation
+         * @description Get-or-create a thread: a friend DM (`user_id`) or support (`kind`).
+         */
+        post: operations["open_conversation_api_v1_chat_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Thread */
+        get: operations["get_thread_api_v1_chat_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message
+         * @description Post a typed line or an invite card, and return the refreshed thread.
+         */
+        post: operations["send_message_api_v1_chat_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/conversations/{conversation_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Read */
+        post: operations["mark_read_api_v1_chat_conversations__conversation_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{message_id}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Respond Invite
+         * @description Accept or decline an invite card. Accepting a head-to-head forms a PENDING
+         *     match (same lifecycle as the Inbox Respond pill).
+         */
+        post: operations["respond_invite_api_v1_chat_messages__message_id__respond_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leaderboard": {
         parameters: {
             query?: never;
@@ -1681,6 +1777,15 @@ export interface components {
             expires_at: string;
         };
         /**
+         * ChatReadResponse
+         * @description Named apart from the notifications mark-read so the two never collide in
+         *     the generated OpenAPI component map.
+         */
+        ChatReadResponse: {
+            /** Unread Total */
+            unread_total: number;
+        };
+        /**
          * ContestRequest
          * @description File a dispute against any contest type (match | pool | tournament).
          */
@@ -1694,6 +1799,40 @@ export interface components {
             ref_id: string;
             /** Reason */
             reason: string;
+        };
+        /**
+         * ConversationView
+         * @description A row in the conversation list (and the header of an open thread).
+         */
+        ConversationView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+            /** Peer User Id */
+            peer_user_id: string | null;
+            /** Peer Username */
+            peer_username: string | null;
+            /** Online */
+            online: boolean;
+            /** Unread */
+            unread: number;
+            /** Last Message At */
+            last_message_at: string | null;
+            /** Last Message Preview */
+            last_message_preview: string | null;
+        };
+        /** ConversationsResponse */
+        ConversationsResponse: {
+            /** Unread Total */
+            unread_total: number;
+            /** Conversations */
+            conversations: components["schemas"]["ConversationView"][];
         };
         /**
          * CreateChallengeRequest
@@ -1995,6 +2134,23 @@ export interface components {
             };
             worker: components["schemas"]["WorkerHealth"];
         };
+        /**
+         * InviteDraft
+         * @description The client's half of an invite card. Entry is a preset choice — the
+         *     server validates it against the offered presets and owns the cents.
+         */
+        InviteDraft: {
+            /** Invite Kind */
+            invite_kind: string;
+            /** Game */
+            game: string;
+            /** Entry Preset Cents */
+            entry_preset_cents: number;
+            /** Metric */
+            metric?: string | null;
+            /** Difficulty */
+            difficulty?: string | null;
+        };
         /** LeaderboardResponse */
         LeaderboardResponse: {
             /** Rows */
@@ -2219,6 +2375,41 @@ export interface components {
             unread_notifications: number;
             getting_started?: components["schemas"]["GettingStarted"] | null;
         };
+        /**
+         * MessageView
+         * @description One rendered message. `payload` is populated for invite cards only.
+         */
+        MessageView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Sender Id */
+            sender_id: string | null;
+            /** Sender Username */
+            sender_username: string | null;
+            /** Mine */
+            mine: boolean;
+            /** Kind */
+            kind: string;
+            /** Body */
+            body: string | null;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** NotificationItem */
         NotificationItem: {
             /**
@@ -2246,6 +2437,20 @@ export interface components {
             unread: number;
             /** Items */
             items: components["schemas"]["NotificationItem"][];
+        };
+        /**
+         * OpenConversationRequest
+         * @description Open (or reopen) a thread: a friend's `user_id` for a DM, or
+         *     `kind='support'` for the support thread.
+         */
+        OpenConversationRequest: {
+            /** User Id */
+            user_id?: string | null;
+            /**
+             * Kind
+             * @default dm
+             */
+            kind: string;
         };
         /**
          * PoolEnterRequest
@@ -2553,6 +2758,19 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** RespondInviteRequest */
+        RespondInviteRequest: {
+            /** Action */
+            action: string;
+        };
+        /** RespondInviteResponse */
+        RespondInviteResponse: {
+            message: components["schemas"]["MessageView"];
+            /** Match Id */
+            match_id?: string | null;
+            /** Redirect Path */
+            redirect_path?: string | null;
+        };
         /** RiskFlagRow */
         RiskFlagRow: {
             /**
@@ -2613,6 +2831,15 @@ export interface components {
             /** Flags */
             flags: components["schemas"]["RiskFlagRow"][];
         };
+        /**
+         * SendMessageRequest
+         * @description Either a typed line or an invite card (exactly one of the two).
+         */
+        SendMessageRequest: {
+            /** Body */
+            body?: string | null;
+            invite?: components["schemas"]["InviteDraft"] | null;
+        };
         /** StandingRow */
         StandingRow: {
             /**
@@ -2632,6 +2859,12 @@ export interface components {
             is_you: boolean;
             /** Payout Cents */
             payout_cents: number;
+        };
+        /** ThreadResponse */
+        ThreadResponse: {
+            conversation: components["schemas"]["ConversationView"];
+            /** Messages */
+            messages: components["schemas"]["MessageView"][];
         };
         /** TournamentEnterRequest */
         TournamentEnterRequest: {
@@ -4575,6 +4808,212 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChallengeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_api_v1_chat_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_conversation_api_v1_chat_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thread_api_v1_chat_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_v1_chat_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_api_v1_chat_conversations__conversation_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatReadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_invite_api_v1_chat_messages__message_id__respond_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespondInviteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespondInviteResponse"];
                 };
             };
             /** @description Validation Error */

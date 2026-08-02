@@ -28,6 +28,9 @@ export type TelemetryEvent =
   | 'invite_created'
   | 'invite_viewed'
   | 'invite_accepted'
+  // Inbox messaging: a line sent, and an invite card sent from a chat thread.
+  | 'chat_message_sent'
+  | 'chat_invite_sent'
   // Phase 6 activation funnel (gtm-prelaunch §1.2). `landing`/`signup` fire
   // from the sign-in surface; the rest map to existing product moments.
   | 'landing'
