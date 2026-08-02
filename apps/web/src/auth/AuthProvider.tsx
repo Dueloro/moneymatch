@@ -145,10 +145,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // locally; a real session signs out through Supabase as usual.
         const wasDemo = getDemoToken() != null;
         clearDemoToken();
-        await supabase.auth.signOut().catch(() => undefined);
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+        resetIdentity();
+        setSession(null);
         if (wasDemo) {
-          resetIdentity();
-          setSession(null);
           window.location.assign('/signin');
         }
       },

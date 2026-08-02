@@ -22,7 +22,26 @@ export function SignInPage() {
   // Post-profile onboarding runs two sub-steps: pick your games, then link them.
   const [postStep, setPostStep] = useState<'idle' | 'pick' | 'link'>('idle');
 
-  if (loading || (session && me.isLoading)) return <Centered>Loading…</Centered>;
+  if (loading || (session && me.isLoading && !me.isError)) {
+    return <Centered>Loading…</Centered>;
+  }
+
+  // Stale browser session (e.g. HS256 token while API expects JWKS) — drop it
+  // and show the sign-in form instead of spinning forever.
+  if (session && me.isError) {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center bg-bg px-4">
+        <GlowBackdrop />
+        <div className="relative z-10 w-full max-w-sm">
+          <div className="mb-8 flex flex-col items-center gap-4">
+            <TriangleMark className="h-11 w-11" />
+            <StepProgress step={1} />
+          </div>
+          <StaleSessionStep />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-bg px-4">
@@ -58,6 +77,56 @@ function PostAuthRedirect() {
     return <Navigate to={returnTo} replace />;
   }
   return <Navigate to="/pools" replace />;
+}
+
+/** Browser had a session the API rejects (stale / wrong signing scheme). Clear
+ * it and offer a clean sign-in / demo entry. */
+function StaleSessionStep() {
+  const { signOut } = useAuth();
+  const [busy, setBusy] = useState(false);
+
+  async function clearAndStay() {
+    setBusy(true);
+    await signOut();
+  }
+
+  async function enterDemo() {
+    setBusy(true);
+    try {
+      await demoEnter();
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Could not enter the demo.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="text-center">
+      <h1 className="text-xl font-semibold">Session expired</h1>
+      <p className="mt-2 text-sm text-text-secondary">
+        Your saved sign-in is no longer valid. Sign in again or enter the demo.
+      </p>
+      <div className="mt-8 flex flex-col gap-3">
+        <PillButton
+          type="button"
+          fullWidth
+          disabled={busy}
+          onClick={() => void enterDemo()}
+        >
+          Enter the demo
+        </PillButton>
+        <PillButton
+          type="button"
+          variant="outline"
+          fullWidth
+          disabled={busy}
+          onClick={() => void clearAndStay()}
+        >
+          Back to sign in
+        </PillButton>
+      </div>
+    </div>
+  );
 }
 
 /** Map Supabase auth errors to friendly, actionable copy. */

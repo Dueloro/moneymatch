@@ -99,7 +99,10 @@ def verify_token(token: str, settings: Settings | None = None) -> AuthedIdentity
             )
     except jwt.ExpiredSignatureError as exc:
         raise AuthError("Token expired") from exc
-    except jwt.InvalidTokenError as exc:
+    except (jwt.InvalidTokenError, jwt.PyJWKClientError) as exc:
+        # PyJWKClientError is *not* an InvalidTokenError — a stale HS256 / kid-less
+        # token used to 500 here, which left the SPA stuck on "Loading…" (CORS
+        # dropped on the unhandled exception, so the client never got a 401).
         raise AuthError("Invalid token") from exc
 
     sub = claims.get("sub")
