@@ -1316,6 +1316,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/relink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Demo Relink
+         * @description Swap the shared demo user's placeholder handle for a real one, per game.
+         *
+         *     This router is only mounted when `demo_login_enabled` (main.py), so demo mode
+         *     is already enforced. Scoped further to the demo user (`auth_id ==
+         *     DEMO_AUTH_ID`) so real users' immutable bindings and the admin-only unlink are
+         *     untouched. `rebind` soft-unbinds the old link and binds the new handle — live
+         *     host verification + real skill bootstrap — in one transaction, so a bad handle
+         *     leaves the old link intact. Returns the same `LinksResponse` as `/links`.
+         */
+        post: operations["demo_relink_api_v1_demo_relink_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5875,6 +5902,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemoLoginResponse"];
+                };
+            };
+        };
+    };
+    demo_relink_api_v1_demo_relink_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinksResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -185,6 +185,25 @@ async def refresh(session: AsyncSession, user: User, game: str) -> LinkedAccount
     return link
 
 
+async def rebind(
+    session: AsyncSession, user: User, game: str, username: str
+) -> LinkedAccount:
+    """Swap a game's binding to a new host handle in one transaction.
+
+    Soft-unbinds any existing live link (``status='unbound'``) so the partial-
+    unique slot frees up while the row — and its contest-history FKs
+    (``match_players`` is ``ondelete=RESTRICT``) — is retained, then binds the
+    new handle. If ``bind`` raises (e.g. an unknown handle), the caller's
+    transaction rolls back and the original binding is preserved. Used by the
+    demo handle-swap so the shared demo user can point a game at a real account.
+    """
+    existing = await get_link(session, user.id, game)
+    if existing is not None:
+        existing.status = "unbound"
+        await session.flush()
+    return await bind(session, user, game, username)
+
+
 async def unlink(session: AsyncSession, user_id: uuid.UUID, game: str) -> None:
     """Remove a binding. Admin-only in MVP (bindings are immutable to users);
     unlinking while a contest is in flight is blocked once matches exist (Phase 3)."""
