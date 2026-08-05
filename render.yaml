@@ -4,13 +4,17 @@
 # (RUN_WORKER_IN_PROCESS=true) because Render's free tier has no Background Worker
 # instance type; a standalone `type: worker` is commented below for paid tiers.
 #
-# Migrations run at api startup, never at import time: the api's dockerCommand
-# runs `alembic upgrade head` before uvicorn binds. (Render's preDeployCommand is
-# a paid feature; folding it into the start command keeps free-tier deploys
-# migrating. `alembic upgrade head` is idempotent and the free tier runs a single
-# instance, so there's no multi-instance migration race.) The in-process worker
-# loop starts only after uvicorn boots the app — i.e. after migrations apply.
-# Roll back by redeploying the previous image from the dashboard (docs/runbook.md).
+# Migrations run at api startup, never at import time: the image ENTRYPOINT
+# (apps/api/docker-entrypoint.sh) runs `alembic upgrade head` before the app
+# command binds. It lives in the image (not this file's start command) on purpose
+# — that way the migration runs even if the Render service has a dashboard-level
+# Docker Command override, which is what left beta stuck at 0010 and 500'd every
+# authed request (`users.active_games` missing). Render's preDeployCommand is a
+# paid feature; baking it into the entrypoint keeps free-tier deploys migrating.
+# `alembic upgrade head` is idempotent and the free tier runs a single instance,
+# so there's no multi-instance migration race. The in-process worker loop starts
+# only after uvicorn boots the app — i.e. after migrations apply. Roll back by
+# redeploying the previous image from the dashboard (docs/runbook.md).
 #
 # Set the sync:false secrets in the dashboard (or an env group named
 # `moneymatch-shared`): DATABASE_URL is wired from the managed DB below;
@@ -29,12 +33,12 @@ services:
     dockerContext: .
     healthCheckPath: /api/v1/health
     plan: starter
-    # alembic is on PATH (installed system-wide in the image); uv run would
-    # spin up a separate venv and fail. $PORT is Render's dynamic port. Migrate
-    # then serve — if the migration fails the process exits and the deploy fails,
-    # so we never serve against a stale schema. `sh -c` is required: Render execs
-    # the command directly, so `&&` needs a shell to chain (and expand $PORT).
-    dockerCommand: sh -c "alembic upgrade head && uvicorn moneymatch_api.main:app --host 0.0.0.0 --port $PORT"
+    # No dockerCommand: the image ENTRYPOINT migrates then runs the default CMD,
+    # which serves uvicorn on $PORT (Render injects it). Migration lives in the
+    # entrypoint, not here, so it can't be skipped by a dashboard command override
+    # — if it fails the container exits and the deploy fails, so we never serve a
+    # stale schema. (Do NOT re-add a start command that only runs uvicorn; that is
+    # the mistake that stranded beta at migration 0010.)
     envVars:
       - key: ENV
         value: prod

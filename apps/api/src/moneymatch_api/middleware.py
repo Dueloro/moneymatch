@@ -9,15 +9,56 @@ worker action, and a settlement together.
 
 from __future__ import annotations
 
+import contextlib
 import time
 import uuid
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 log = structlog.get_logger("request")
+
+
+class ExceptionEnvelopeMiddleware(BaseHTTPMiddleware):
+    """Turn an otherwise-unhandled exception into the standard JSON `500`
+    envelope *inside* the app's middleware stack.
+
+    Starlette's `ServerErrorMiddleware` — which would otherwise produce the 500 —
+    sits *outside* every user middleware, including `CORSMiddleware`. So a raw
+    500 ships with no `Access-Control-Allow-Origin` header, the browser blocks the
+    cross-origin response, and `fetch` rejects with an opaque "Failed to fetch"
+    instead of letting the SPA read the error. Catching here (the innermost user
+    middleware) means the synthetic 500 flows back out through request logging,
+    the security headers, and CORS — so it is logged and carries the right headers.
+
+    The registered handlers (`APIError` / `HTTPException` / validation) run further
+    in, in Starlette's `ExceptionMiddleware`, and are unaffected: only genuinely
+    unexpected errors reach this last-resort net.
+    """
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        try:
+            return await call_next(request)
+        except Exception as exc:  # noqa: BLE001 — last-resort net; re-shaped as 500
+            log.exception(
+                "http.unhandled", method=request.method, path=request.url.path
+            )
+            # Preserve Sentry reporting we'd otherwise lose by not re-raising to
+            # ServerErrorMiddleware. No-op when Sentry isn't installed/initialised.
+            with contextlib.suppress(ImportError):
+                import sentry_sdk
+
+                sentry_sdk.capture_exception(exc)
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "code": "internal_error",
+                    "message": "Internal server error.",
+                    "detail": None,
+                },
+            )
 
 
 class RequestLogMiddleware(BaseHTTPMiddleware):

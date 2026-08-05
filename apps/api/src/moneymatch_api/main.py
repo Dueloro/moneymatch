@@ -19,7 +19,7 @@ from .config import Settings, get_settings
 from .db.session import dispose_engine
 from .errors import register_error_handlers
 from .logging import configure_logging
-from .middleware import RequestLogMiddleware
+from .middleware import ExceptionEnvelopeMiddleware, RequestLogMiddleware
 from .routers import (
     activity,
     admin,
@@ -105,8 +105,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Middleware wrap inner→outer in add order (last added = outermost). The
     # target chain, outer→inner, is: CORS → security headers → rate limit →
-    # body-size cap → request log → app, so every response (including an early
-    # 413/429) still carries CORS + security headers (10-phase-7 §2).
+    # body-size cap → request log → exception envelope → app, so every response
+    # (including an early 413/429) still carries CORS + security headers
+    # (10-phase-7 §2). The exception envelope is innermost so an unhandled error
+    # is re-shaped into a JSON 500 that still flows back out through logging, the
+    # security headers, and CORS — otherwise Starlette's ServerErrorMiddleware
+    # (outside CORS) returns a raw 500 with no CORS header and the browser sees
+    # only "Failed to fetch".
+    app.add_middleware(ExceptionEnvelopeMiddleware)
     app.add_middleware(RequestLogMiddleware)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_bytes)
     app.add_middleware(
