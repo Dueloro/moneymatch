@@ -36,6 +36,7 @@ from ..constants import (
     game_display_name,
 )
 from ..db.session import get_session
+from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.chat import Conversation, ConversationMember, Message
 from ..models.linked_account import LinkedAccount
@@ -43,12 +44,20 @@ from ..models.play import Match, MatchPlayer
 from ..models.skill import MetricModel
 from ..models.social import Friendship
 from ..models.user import User
-from ..services import challenge_service, chat_service, money_math, wallet_service
+from ..schemas.links import CreateLinkRequest, LinksResponse
+from ..services import (
+    challenge_service,
+    chat_service,
+    linking_service,
+    money_math,
+    wallet_service,
+)
 from ..services.user_service import (
     complete_onboarding,
     get_or_create_user,
     provision_new_user,
 )
+from .links import _links_response
 
 log = structlog.get_logger(__name__)
 
@@ -794,3 +803,25 @@ async def demo_login(
         algorithm="HS256",
     )
     return DemoLoginResponse(access_token=token)
+
+
+@router.post("/relink", response_model=LinksResponse)
+async def demo_relink(
+    body: CreateLinkRequest,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> LinksResponse:
+    """Swap the shared demo user's placeholder handle for a real one, per game.
+
+    This router is only mounted when `demo_login_enabled` (main.py), so demo mode
+    is already enforced. Scoped further to the demo user (`auth_id ==
+    DEMO_AUTH_ID`) so real users' immutable bindings and the admin-only unlink are
+    untouched. `rebind` soft-unbinds the old link and binds the new handle — live
+    host verification + real skill bootstrap — in one transaction, so a bad handle
+    leaves the old link intact. Returns the same `LinksResponse` as `/links`.
+    """
+    if user.auth_id != DEMO_AUTH_ID:
+        raise APIError("not_found", "Not found.", status_code=404)
+    await linking_service.rebind(session, user, body.game, body.username)
+    await session.commit()
+    return await _links_response(session, user.id)

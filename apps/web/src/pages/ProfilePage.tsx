@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '../auth/useAuth';
+import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
 import { FooterBreadcrumb } from '../components/ui/FooterBreadcrumb';
 import { PillButton } from '../components/ui/PillButton';
@@ -43,6 +44,16 @@ export function ProfilePage() {
         </p>
         <LinkGames />
       </Section>
+
+      {isDemo && (
+        <Section title="Test with real accounts">
+          <p className="mb-3 text-sm text-text-secondary">
+            The demo is linked to placeholder handles. Swap in a real account per game
+            to pull its live profile and stats.
+          </p>
+          <DemoHandles />
+        </Section>
+      )}
 
       <Section title="Limits">
         {limits ? <LimitsEditor limits={limits} /> : <p className="text-sm">—</p>}
