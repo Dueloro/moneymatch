@@ -48,8 +48,8 @@ export function ProfilePage() {
       {isDemo && (
         <Section title="Test with real accounts">
           <p className="mb-3 text-sm text-text-secondary">
-            The demo is linked to placeholder handles. Swap in a real account per
-            game to pull its live profile and stats.
+            The demo is linked to placeholder handles. Swap in a real account per game
+            to pull its live profile and stats.
           </p>
           <DemoHandles />
         </Section>
