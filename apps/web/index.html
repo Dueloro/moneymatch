@@ -4,11 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Inter was always the intended face but was never actually loaded, so the
+         app silently rendered in whatever system-ui resolved to. Two weights is
+         all the UI uses; `display=swap` keeps first paint immediate. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
     <meta
       name="description"
       content="Money Match turns the games you already play into head-to-head matches for real payouts. Stake into a shared pot, play a real game, winner takes it minus a flat fee."
     />
-    <meta name="theme-color" content="#080a07" />
+    <meta name="theme-color" content="#0b0c0f" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Money Match: put your skill on the line" />
     <meta

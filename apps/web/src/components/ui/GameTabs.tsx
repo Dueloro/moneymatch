@@ -3,10 +3,17 @@ import { useLayoutEffect, useRef } from 'react';
 import type { GameLink } from '../../hooks/useLinks';
 import { gameMeta } from '../../lib/games';
 
-/** Shared game switcher: icon + coloured name per game, recency-ordered by the
- * caller. Used by Head-to-Head, Solo Pools, and Tournament. Selecting a game
- * shuffles it to the front; `useFlipReorder` animates that swap so pills glide
- * to their new spot instead of jumping. */
+/**
+ * Shared game switcher, recency-ordered by the caller. Used by all three contest
+ * modes. Selecting a game shuffles it to the front; `useFlipReorder` animates
+ * that swap so pills glide to their new spot instead of jumping.
+ *
+ * This is now the **only** place a game's accent colour appears on a browse
+ * page. On a screen already filtered to one game, a coloured pill and a coloured
+ * progress bar on every card carried no information and cost two hues per card
+ * (16-ui-revamp-plan §2). Here the accent is doing a job: telling four games
+ * apart in one row.
+ */
 export function GameTabs({
   games,
   selected,
@@ -21,7 +28,7 @@ export function GameTabs({
   if (games.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2" role="tablist">
+    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Game">
       {games.map((g) => {
         const meta = gameMeta(g.game, g.display_name);
         const active = g.game === selected;
@@ -33,15 +40,14 @@ export function GameTabs({
             role="tab"
             aria-selected={active}
             onClick={() => onSelect(g.game)}
-            style={active ? { borderColor: meta.accent } : undefined}
             className={[
-              'inline-flex items-center gap-2 rounded-pill border px-4 py-1.5 text-sm font-semibold transition',
+              'inline-flex items-center gap-2 rounded-pill border px-3.5 py-1.5 text-sm font-semibold transition-colors',
               active
-                ? 'bg-panel-raised text-text'
-                : 'border-hairline text-text-secondary hover:text-text',
+                ? 'border-line-strong bg-panel-raised text-text'
+                : 'border-hairline text-text-secondary hover:border-line-strong hover:text-text',
             ].join(' ')}
           >
-            <span style={{ color: meta.accent }}>
+            <span style={{ color: active ? meta.accent : undefined }}>
               <Icon className="h-4 w-4" />
             </span>
             {meta.name}
@@ -78,7 +84,7 @@ function useFlipReorder() {
       const dx = prev.left - next.left;
       const dy = prev.top - next.top;
       if (!dx && !dy) return;
-      // Moved again — restart this pill's glide from the new offset.
+      // Moved again, so restart this pill's glide from the new offset.
       anims.current.get(id)?.cancel();
       anims.current.set(
         id,

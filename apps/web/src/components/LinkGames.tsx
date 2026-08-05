@@ -9,9 +9,11 @@ import {
   type ProfileSnapshot,
 } from '../hooks/useLinks';
 import { gameMeta, isComingSoon } from '../lib/games';
+import { TextInput } from './ui/Field';
+import { SkeletonList } from './ui/Skeleton';
 import { PillButton } from './ui/PillButton';
 
-/** The single best skill descriptor for a snapshot — a rank label, else a
+/** The single best skill descriptor for a snapshot: a rank label, else a
  * rating. Drives the per-game skill badge. */
 function skillBadge(p: ProfileSnapshot): string | null {
   const rating =
@@ -39,7 +41,7 @@ export function LinkGames({ onlyActive = false }: { onlyActive?: boolean }) {
   const setActiveGames = useSetActiveGames();
 
   if (links.isLoading) {
-    return <p className="text-sm text-text-secondary">Loading games…</p>;
+    return <SkeletonList rows={3} />;
   }
   if (links.isError || !links.data) {
     return <p className="text-sm text-red">Couldn't load your games.</p>;
@@ -138,7 +140,9 @@ function GameRow({
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-text">{link.display_name}</div>
+          {/* meta.name, not display_name: the server sends "CS2 — FACEIT" and
+           * the copy rules ban the em dash. */}
+          <div className="text-sm font-medium text-text">{meta.name}</div>
           <div className="truncate text-xs text-text-secondary">
             {soon
               ? 'Linking coming soon'
@@ -149,25 +153,22 @@ function GameRow({
                 : link.status === 'BLOCKED'
                   ? 'Unavailable right now'
                   : selected
-                    ? 'Not linked — link to play'
+                    ? 'Link it to play'
                     : 'Not linked'}
           </div>
           {link.status === 'LINKED' && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {link.profile && skillBadge(link.profile) && (
                 <span
-                  className="rounded-pill px-2 py-0.5 text-[11px] font-semibold"
-                  style={{ color: meta.accent, backgroundColor: `${meta.accent}22` }}
+                  className="rounded-pill px-2 py-0.5 text-micro font-semibold"
+                  style={{ color: meta.accent, backgroundColor: `${meta.accent}1f` }}
                 >
                   {skillBadge(link.profile)}
                 </span>
               )}
               {link.win_streak > 0 && (
-                <span
-                  className="rounded-pill bg-panel px-2 py-0.5 text-[11px] font-semibold text-text"
-                  title={`${link.win_streak}-win streak`}
-                >
-                  🔥 {link.win_streak}W streak
+                <span className="rounded-pill bg-panel-raised px-2 py-0.5 text-micro font-semibold text-text">
+                  {link.win_streak} win streak
                 </span>
               )}
             </div>
@@ -190,7 +191,7 @@ function GameRow({
               >
                 {refresh.isPending ? 'Refreshing…' : 'Refresh'}
               </button>
-              <span className="text-xs font-semibold uppercase tracking-wide text-green">
+              <span className="text-xs font-semibold uppercase tracking-wide text-live">
                 Linked
               </span>
             </div>
@@ -211,14 +212,14 @@ function GameRow({
       {!soon && link.status === 'UNLINKED' && editing && (
         <form className="mt-3 flex flex-col gap-2" onSubmit={submit}>
           <div className="flex items-center gap-2">
-            <input
+            <TextInput
               autoFocus
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              aria-label={`Your ${meta.name} username`}
               placeholder={
                 link.game === 'dota2.opendota' ? 'Steam name or ID' : 'Your username'
               }
-              className="min-w-0 flex-1 rounded-pill border border-hairline bg-panel px-4 py-2 text-sm outline-none focus:border-text-secondary"
             />
             <PillButton
               type="submit"

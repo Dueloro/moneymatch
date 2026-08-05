@@ -4,7 +4,7 @@ type Tone = 'live' | 'good' | 'bad' | 'muted';
 
 /** Format a live metric value: numbers to ≤2 dp, win/next verbs to words. */
 function fmtVal(v: number | string | null | undefined): string {
-  if (v == null) return '—';
+  if (v == null) return '-';
   if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2);
   return { won: 'won', lost: 'lost', pending: 'in a match' }[v] ?? v;
 }
@@ -33,7 +33,7 @@ function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
   if (live.kind === 'tournament') {
     if (live.status === 'scoring')
       return {
-        text: `#${live.rank ?? '—'} of ${live.field ?? '—'} · ${label} ${fmtVal(live.score)}`,
+        text: `#${live.rank ?? '-'} of ${live.field ?? '-'} · ${label} ${fmtVal(live.score)}`,
         tone: 'live',
       };
     return { text: `waiting for your first match`, tone: 'muted' };
@@ -60,7 +60,7 @@ function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
     const tone: Tone =
       live.leader === 'you' ? 'good' : live.leader === 'opp' ? 'bad' : 'live';
     return {
-      text: `${label} — you ${fmtVal(live.you)} · opp ${fmtVal(live.opp)}`,
+      text: `${label} · you ${fmtVal(live.you)} · opp ${fmtVal(live.opp)}`,
       tone,
     };
   }
@@ -69,7 +69,7 @@ function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
 }
 
 const TONE_DOT: Record<Tone, string> = {
-  live: 'bg-green animate-pulse',
+  live: 'bg-live animate-pulse',
   good: 'bg-green',
   bad: 'bg-text-secondary',
   muted: 'bg-text-secondary',

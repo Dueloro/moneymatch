@@ -19,11 +19,15 @@ const TERMINAL_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 // A settled outcome the player can contest (matches also allow PUSHED).
 const DISPUTABLE_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 
-/** A win or a live contest gets the green dot; everything settled is gray. */
+/**
+ * A win is money, so it gets lime. A contest still running is not money yet, so
+ * it gets the live tone. Everything else is settled and quiet.
+ */
 function dotClass(item: ActivityItem): string {
   const won = item.state === 'SETTLED' && (item.net_cents ?? 0) > 0;
+  if (won) return 'bg-green';
   const live = LIVE_STATES.has(item.state) || item.state === 'LOCKED';
-  return won || live ? 'bg-green' : 'bg-text-secondary';
+  return live ? 'bg-live' : 'bg-text-tertiary';
 }
 
 function stateLabel(item: ActivityItem): string {
@@ -47,14 +51,14 @@ function stateLabel(item: ActivityItem): string {
   }
 }
 
-/** Stat-race result line (matches only — pools/tournaments have no opponent). */
+/** Stat-race result line (matches only; pools and tournaments have no opponent). */
 function statLine(item: ActivityItem): string | null {
   if (item.type !== 'match') return null;
   const you = statValue(item.your_stat_line);
   const opp = statValue(item.opponent_stat_line);
   if (you == null && opp == null) return null;
   const name = item.opponent_username ?? 'opponent';
-  return `You ${you ?? '—'} · ${name} ${opp ?? '—'}`;
+  return `You ${you ?? '-'} · ${name} ${opp ?? '-'}`;
 }
 
 function title(item: ActivityItem): string {
@@ -74,8 +78,8 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
   const keys = Array.from(new Set([...Object.keys(you), ...Object.keys(opp)]));
   if (keys.length === 0) return null;
   return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-hairline">
-      <div className="grid grid-cols-3 bg-panel-raised px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+    <div className="mt-3 overflow-hidden rounded-inset border border-hairline">
+      <div className="grid grid-cols-3 bg-panel-raised px-3 py-1.5 text-micro font-semibold uppercase tracking-wide text-text-secondary">
         <span>Stat</span>
         <span className="text-right">You</span>
         <span className="text-right">{detail.opponent ?? 'Opponent'}</span>
@@ -91,14 +95,14 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
           >
             <span className="text-text-secondary">{k}</span>
             <span
-              className={`text-right ${better && y > o ? 'font-semibold text-green' : 'text-text'}`}
+              className={`text-right ${better && y > o ? 'font-semibold text-text' : 'text-text-secondary'}`}
             >
-              {y == null ? '—' : fmt(y)}
+              {y == null ? '-' : fmt(y)}
             </span>
             <span
-              className={`text-right ${better && o > y ? 'font-semibold text-green' : 'text-text'}`}
+              className={`text-right ${better && o > y ? 'font-semibold text-text' : 'text-text-secondary'}`}
             >
-              {o == null ? '—' : fmt(o)}
+              {o == null ? '-' : fmt(o)}
             </span>
           </div>
         );
@@ -110,8 +114,8 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
 /** A labelled fact chip used in the pool/tournament expanded view. */
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-panel-raised px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wide text-text-secondary">
+    <div className="rounded-inset bg-panel-raised px-3 py-2">
+      <div className="text-micro uppercase tracking-wide text-text-secondary">
         {label}
       </div>
       <div className="text-sm font-medium text-text">{value}</div>
@@ -178,7 +182,7 @@ const REF_OF: Record<ActivityItem['type'], ContestRefType> = {
   tournament: 'tournament',
 };
 
-/** "Contest this result" — files a dispute (support review) inline. */
+/** "Contest this result" files a dispute (support review) inline. */
 function ContestSection({ item }: { item: ActivityItem }) {
   const file = useFileDispute();
   const [open, setOpen] = useState(false);
@@ -192,7 +196,7 @@ function ContestSection({ item }: { item: ActivityItem }) {
           ? 'Contest resolved'
           : 'Contest reviewed · result stands';
     return (
-      <div className="mt-3 rounded-lg bg-panel-raised px-3 py-2 text-xs text-text-secondary">
+      <div className="mt-3 rounded-inset bg-panel-raised px-3 py-2 text-xs text-text-secondary">
         {label}
       </div>
     );
@@ -206,7 +210,7 @@ function ContestSection({ item }: { item: ActivityItem }) {
         ref_id: item.id,
         reason: reason.trim(),
       });
-      toast.success('Contest submitted — support will review it.');
+      toast.success('Contest submitted. Support will review it.');
       setOpen(false);
       setReason('');
     } catch (err) {
@@ -217,7 +221,7 @@ function ContestSection({ item }: { item: ActivityItem }) {
   return (
     <div className="mt-3">
       {open ? (
-        <div className="rounded-xl border border-hairline p-3">
+        <div className="rounded-inset border border-hairline p-3">
           <label className="text-xs text-text-secondary" htmlFor={`contest-${item.id}`}>
             Tell support what looks wrong
           </label>
@@ -228,7 +232,7 @@ function ContestSection({ item }: { item: ActivityItem }) {
             rows={3}
             maxLength={1000}
             placeholder="e.g. my last round wasn't counted"
-            className="mt-1 w-full resize-none rounded-lg border border-hairline bg-bg px-3 py-2 text-sm text-text outline-none focus:border-text-secondary"
+            className="mt-1 w-full resize-none rounded-inset border border-hairline bg-bg px-3 py-2 text-sm text-text outline-none focus:border-text-secondary"
           />
           <div className="mt-2 flex items-center gap-2">
             <PillButton
@@ -277,7 +281,7 @@ export function ActivityCard({ item }: { item: ActivityItem }) {
   const sub = statLine(item);
   return (
     <ExpandableCard
-      ariaLabel={`${title(item)} — details`}
+      ariaLabel={`${title(item)}, details`}
       left={
         <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${dotClass(item)}`} />
       }

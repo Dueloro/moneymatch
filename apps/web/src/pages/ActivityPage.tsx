@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 
+import { Link } from 'react-router-dom';
+
 import { ActivityCard } from '../components/activity/ActivityCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { PillButton } from '../components/ui/PillButton';
+import { SectionHeader } from '../components/ui/SectionHeader';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
 import { toast } from '../lib/toast';
@@ -46,17 +50,31 @@ export function ActivityPage() {
   }, [items]);
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="mb-6 text-2xl font-bold">Activity</h1>
+    // Spans the column rather than capping at the reading measure: the rail
+    // already balances the page, so a 640px cap only stranded ~160px of dead
+    // column between the list and the rail.
+    <div>
+      <SectionHeader level="page" hint="Every contest you have played, newest first.">
+        Activity
+      </SectionHeader>
 
       {isError ? (
-        <ErrorState title="Could not load your activity" onRetry={() => refetch()} />
+        <ErrorState
+          title="Could not load your activity"
+          subline="The connection dropped. Try again."
+          onRetry={() => refetch()}
+        />
       ) : isLoading ? (
         <SkeletonList rows={5} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="Nothing here yet"
-          subline="Your matches, pools, and tournaments will show up here."
+          title="No contests yet"
+          subline="Join a pool and your results land here automatically."
+          action={
+            <Link to="/pools">
+              <PillButton>Browse solo pools</PillButton>
+            </Link>
+          }
         />
       ) : (
         <div className="flex flex-col gap-2">

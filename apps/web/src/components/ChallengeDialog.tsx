@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useCreateChallenge } from '../hooks/useChallenges';
 import { useMarkets, type MarketRow } from '../hooks/useMatchmaking';
 import { formatCurrency } from '../lib/format';
+import { Card } from './ui/Card';
+import { RadioRow } from './ui/Field';
 import { PillButton } from './ui/PillButton';
 import { PresetSelector } from './ui/PresetSelector';
 
@@ -78,8 +80,9 @@ export function ChallengeDialog({
       role="dialog"
       aria-modal="true"
     >
-      <div
-        className="w-full max-w-md rounded-2xl bg-panel p-6"
+      <Card
+        tone="overlay"
+        className="w-full max-w-md p-6"
         data-testid="challenge-dialog"
       >
         <div className="mb-4 flex items-center justify-between">
@@ -123,18 +126,14 @@ export function ChallengeDialog({
             </p>
             <div className="mb-4 max-h-40 overflow-y-auto">
               {markets?.markets.map((m) => (
-                <label
+                <RadioRow
                   key={`${m.key}-${m.label}`}
-                  className="flex cursor-pointer items-center gap-3 border-b border-hairline py-2 last:border-b-0"
+                  name="challenge-market"
+                  checked={m.key === (market?.key ?? '')}
+                  onSelect={() => setMarketKey(m.key)}
                 >
-                  <input
-                    type="radio"
-                    name="challenge-market"
-                    checked={m.key === (market?.key ?? '')}
-                    onChange={() => setMarketKey(m.key)}
-                  />
-                  <span className="text-sm text-text">{m.label}</span>
-                </label>
+                  {m.label}
+                </RadioRow>
               ))}
             </div>
 
@@ -147,7 +146,7 @@ export function ChallengeDialog({
                     className={[
                       'rounded-pill border px-3 py-1 text-xs transition',
                       s === speed
-                        ? 'border-green text-green'
+                        ? 'border-line-strong bg-panel-raised text-text'
                         : 'border-hairline text-text-secondary hover:text-text',
                     ].join(' ')}
                   >
@@ -179,7 +178,7 @@ export function ChallengeDialog({
                   <input
                     readOnly
                     value={inviteUrl}
-                    className="min-w-0 flex-1 rounded-lg border border-hairline bg-bg px-3 py-2 text-xs text-text"
+                    className="min-w-0 flex-1 rounded-inset border border-hairline bg-bg px-3 py-2 text-xs text-text"
                   />
                   <PillButton onClick={copyLink}>
                     {copied ? 'Copied' : 'Copy'}
@@ -214,7 +213,7 @@ export function ChallengeDialog({
             )}
           </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

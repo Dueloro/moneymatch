@@ -5,7 +5,8 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { GameSelectGrid } from '../components/GameSelectGrid';
 import { LinkGames } from '../components/LinkGames';
-import { GlowBackdrop, TriangleMark } from '../components/ui/brand';
+import { TriangleMark } from '../components/ui/brand';
+import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
 import { useMe, useSetActiveGames } from '../hooks/useMe';
@@ -30,9 +31,8 @@ export function SignInPage() {
   // and show the sign-in form instead of spinning forever.
   if (session && me.isError) {
     return (
-      <div className="relative flex min-h-screen items-center justify-center bg-bg px-4">
-        <GlowBackdrop />
-        <div className="relative z-10 w-full max-w-sm">
+      <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+        <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center gap-4">
             <TriangleMark className="h-11 w-11" />
             <StepProgress step={1} />
@@ -44,9 +44,8 @@ export function SignInPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-bg px-4">
-      <GlowBackdrop />
-      <div className="relative z-10 w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+      <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-4">
           <TriangleMark className="h-11 w-11" />
           <StepProgress step={!session ? 1 : me.data?.needs_onboarding ? 2 : 3} />
@@ -229,7 +228,7 @@ function AuthStep() {
         </div>
 
         <form className="flex flex-col gap-3" onSubmit={submit}>
-          <input
+          <TextInput
             type="email"
             required
             autoComplete="email"
@@ -237,9 +236,8 @@ function AuthStep() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@email.com"
-            className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
           />
-          <input
+          <TextInput
             type="password"
             required
             minLength={6}
@@ -247,8 +245,7 @@ function AuthStep() {
             aria-label="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password (min 6 characters)"
-            className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
+            placeholder="Password, at least 6 characters"
           />
           <PillButton type="submit" variant="primary" fullWidth disabled={!canSubmit}>
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
@@ -351,50 +348,38 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
           mutation.mutate();
         }}
       >
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-text-secondary">Username</span>
-          <input
+        <Field
+          label="Username"
+          hint="3 to 20 characters: lowercase letters, numbers, underscore."
+        >
+          <TextInput
             value={username}
             onChange={(e) => setUsername(e.target.value.toLowerCase())}
             placeholder="kvem_"
-            className="rounded-pill border border-hairline bg-panel px-5 py-2.5 outline-none focus:border-text-secondary"
           />
-          <span className="text-xs text-text-tertiary">
-            3–20 characters: lowercase letters, numbers, underscore.
-          </span>
-        </label>
+        </Field>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-text-secondary">Residence state</span>
-          <select
-            value={state}
-            onChange={(e) => setState(e.target.value)}
-            className="rounded-pill border border-hairline bg-panel px-5 py-2.5 outline-none focus:border-text-secondary"
-          >
+        <Field
+          label="Residence state"
+          hint={
+            isExcludedState(state)
+              ? `Cash play is not available in ${stateName(state)} yet. You can still sign up and play every match for free.`
+              : undefined
+          }
+        >
+          <Select value={state} onChange={(e) => setState(e.target.value)}>
             <option value="">Select a state…</option>
             {US_STATES.map((s) => (
               <option key={s.code} value={s.code}>
                 {s.name}
               </option>
             ))}
-          </select>
-          {isExcludedState(state) && (
-            <span className="text-xs text-text-secondary">
-              Cash play is not available in {stateName(state)} yet. You can still sign
-              up and play every match for free.
-            </span>
-          )}
-        </label>
+          </Select>
+        </Field>
 
-        <label className="flex items-start gap-2 text-sm text-text-secondary">
-          <input
-            type="checkbox"
-            checked={attested}
-            onChange={(e) => setAttested(e.target.checked)}
-            className="mt-0.5"
-          />
-          <span>I am 18 years of age or older.</span>
-        </label>
+        <Checkbox checked={attested} onChange={setAttested}>
+          I am 18 years of age or older.
+        </Checkbox>
 
         <PillButton
           type="submit"

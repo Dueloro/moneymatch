@@ -33,7 +33,7 @@ export function NewMessageSheet({
       aria-label="New message"
     >
       <div
-        className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-hairline bg-panel p-7 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.95)]"
+        className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-card border border-hairline bg-panel p-7 shadow-overlay"
         data-testid="new-message-sheet"
       >
         <div className="mb-4 flex items-center justify-between">
@@ -48,16 +48,16 @@ export function NewMessageSheet({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search friends"
           aria-label="Search friends"
-          className="mb-4 rounded-pill border border-hairline bg-bg px-4 py-2.5 text-[15px] text-text transition placeholder:text-text-tertiary focus:border-green/60 focus:outline-none"
+          className="mb-4 rounded-pill border border-hairline bg-bg px-4 py-2.5 text-sm text-text transition placeholder:text-text-tertiary focus:border-line-strong focus:outline-none"
         />
 
-        {error && <p className="mb-3 text-[13px] text-red">{error}</p>}
+        {error && <p className="mb-3 text-xs text-red">{error}</p>}
 
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
           {friends.length === 0 ? (
             <p className="py-6 text-center text-sm text-text-secondary">
               {data && data.friends.length === 0
-                ? 'Add a friend first — messaging follows friendship.'
+                ? 'Add a friend first. Messaging follows friendship.'
                 : 'No friend matches that search.'}
             </p>
           ) : (
@@ -67,7 +67,7 @@ export function NewMessageSheet({
                 type="button"
                 disabled={pending}
                 onClick={() => onPick(f.user_id)}
-                className="flex w-full items-center gap-3.5 rounded-xl px-2.5 py-3 text-left transition hover:bg-panel-raised disabled:opacity-50"
+                className="flex w-full items-center gap-3.5 rounded-inset px-2.5 py-3 text-left transition hover:bg-panel-raised disabled:opacity-50"
               >
                 <Avatar
                   name={f.username ?? 'Player'}
@@ -76,10 +76,10 @@ export function NewMessageSheet({
                   size="sm"
                 />
                 <span className="min-w-0">
-                  <span className="block truncate text-[15px] font-semibold text-text">
+                  <span className="block truncate text-sm font-semibold text-text">
                     {f.username ?? 'Player'}
                   </span>
-                  <span className="block text-[13px] text-text-secondary">
+                  <span className="block text-xs text-text-secondary">
                     {f.online ? 'Active now' : 'Offline'}
                   </span>
                 </span>

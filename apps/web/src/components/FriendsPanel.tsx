@@ -10,8 +10,10 @@ import {
 } from '../hooks/useFriends';
 import { ChallengeDialog } from './ChallengeDialog';
 import { EmptyState } from './ui/EmptyState';
+import { TextInput } from './ui/Field';
 import { ListRow } from './ui/ListRow';
 import { PillButton } from './ui/PillButton';
+import { SectionHeader } from './ui/SectionHeader';
 
 /** Friends tab (design p.8): add by username/code, pending requests, and the
  * friend list with presence dots + a Challenge pill. */
@@ -33,13 +35,14 @@ export function FriendsPanel() {
   }
 
   return (
-    <div className="max-w-xl">
-      <form onSubmit={submitAdd} className="flex gap-2">
-        <input
+    <div>
+      {/* The lists span the column; the add field keeps the reading measure,
+       * because a single-line input has no business being 800px wide. */}
+      <form onSubmit={submitAdd} className="flex max-w-read gap-2">
+        <TextInput
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Add by username or code (MM-…)"
-          className="min-w-0 flex-1 rounded-pill border border-hairline bg-bg px-4 py-2 text-sm text-text placeholder:text-text-tertiary"
           aria-label="Add friend by username or code"
         />
         <PillButton type="submit" disabled={add.isPending || !query.trim()}>
@@ -56,24 +59,20 @@ export function FriendsPanel() {
       )}
 
       {data && data.incoming.length > 0 && (
-        <div className="mt-6">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-            Requests
-          </p>
+        <div className="mt-8">
+          <SectionHeader level="sub">Requests</SectionHeader>
           {data.incoming.map((f) => (
             <RequestRow key={f.friendship_id} friend={f} />
           ))}
         </div>
       )}
 
-      <div className="mt-6">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Friends
-        </p>
+      <div className="mt-8">
+        <SectionHeader level="sub">Friends</SectionHeader>
         {data && data.friends.length === 0 ? (
           <EmptyState
             title="No friends yet"
-            subline="Add someone by their username or MM- code to challenge them."
+            subline="Add someone by username or MM code and you can message and challenge them."
           />
         ) : (
           data?.friends.map((f) => (
@@ -87,10 +86,8 @@ export function FriendsPanel() {
       </div>
 
       {data && data.outgoing.length > 0 && (
-        <div className="mt-6">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-            Sent
-          </p>
+        <div className="mt-8">
+          <SectionHeader level="sub">Sent</SectionHeader>
           {data.outgoing.map((f) => (
             <ListRow
               key={f.friendship_id}
@@ -115,7 +112,7 @@ function PresenceDot({ online }: { online: boolean }) {
   return (
     <span
       aria-label={online ? 'online' : 'offline'}
-      className={['h-2.5 w-2.5 rounded-full', online ? 'bg-green' : 'bg-hairline'].join(
+      className={['h-2.5 w-2.5 rounded-full', online ? 'bg-live' : 'bg-hairline'].join(
         ' ',
       )}
     />
@@ -137,18 +134,23 @@ function FriendRow({
       title={friend.username ?? 'Player'}
       subline={friend.online ? 'Active now' : 'Offline'}
       right={
-        <div className="flex items-center gap-2">
+        // Three actions crowded the username on a phone. `sm` buttons plus a
+        // wrap keeps all three reachable without squeezing the name.
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <PillButton
-            variant="outline"
+            size="sm"
+            variant="secondary"
             onClick={() => navigate(`/social?tab=inbox&dm=${friend.user_id}`)}
           >
             Message
           </PillButton>
-          <PillButton variant="secondary" onClick={() => onChallenge(friend)}>
+          <PillButton size="sm" onClick={() => onChallenge(friend)}>
             Challenge
           </PillButton>
           <PillButton
+            size="sm"
             variant="text"
+            aria-label={`Remove ${friend.username ?? 'friend'}`}
             onClick={() => remove.mutate(friend.friendship_id)}
             disabled={remove.isPending}
           >

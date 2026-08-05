@@ -2,21 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens. Dueloro brand: acid-lime accent on a near-black canvas with an
- * ambient green glow. Tailwind colors map to these vars (see tailwind.config). */
+/* Design tokens (16-ui-revamp-plan §2). The ground is neutral ink rather than a
+ * green-cast near-black, so lime reads as an accent instead of as the room's
+ * ambient colour, and page / card / raised / overlay are genuinely distinct.
+ *
+ * Lime means ONE thing: money. Primary actions are paper, live states are cyan,
+ * selection is structural. Tailwind colour names map to these vars, so the
+ * existing class vocabulary keeps working. */
 :root {
-  --bg: #080a07; /* near-black with a faint green cast */
-  --panel: #0f110e; /* right-slip / card panels */
-  --panel-raised: #191c17; /* selected nav item, avatar chips */
-  --hairline: #23271f; /* 1px separators, card borders */
-  --text: #ffffff;
-  --text-secondary: #8b9089; /* labels, sublines */
-  --text-tertiary: #565b55; /* footer breadcrumbs, disabled */
-  --green: #c6f440; /* brand + money + CTAs (acid lime) */
-  --green-dim: #37450f; /* dim lime for glow/outline */
-  --red: #ff4d2e; /* BLOCKED, self-exclude, losses */
-  --radius-pill: 999px;
+  /* Surfaces, dark to light. */
+  --bg: #0b0c0f; /* page */
+  --panel: #111318; /* card surface */
+  --panel-raised: #171a20; /* input, hover, chip, selected */
+  --overlay: #1d212a; /* dialog, menu, popover */
+  --hairline: #23272f; /* default 1px line */
+  --line-strong: #333945; /* hover line, overlay edge */
+
+  /* Text. Both secondary and tertiary are contrast-checked against --panel:
+   * 7.2:1 and 5.0:1, so both clear AA for body copy. */
+  --text: #eef0f4;
+  --text-secondary: #9aa2b1;
+  --text-tertiary: #7c8593;
+
+  /* Semantics. One job each. */
+  --green: #c6f440; /* MONEY ONLY: currency, gains, balance */
+  --green-dim: #3d4a18; /* dim lime for money-adjacent rules */
+  --action: #f2f5ef; /* primary action fill (ink text on top) */
+  --live: #4fd1e0; /* in progress, online, searching. Dots and one-word
+                      labels only, never a fill or a run of text. */
+  --red: #ff5f48; /* loss, error, destructive */
+  --warn: #f5b93c; /* pending, caution */
+  --focus: #a8c7ff; /* focus ring only, never decorative */
+
+  /* Shape: a hierarchy, not four competing values. Anything sitting on the page
+   * is `card`; anything nested inside a card is `inset`; controls are `pill`. */
   --radius-card: 12px;
+  --radius-inset: 8px;
+  --radius-pill: 999px;
+
+  /* Elevation: exactly one shadow, used only by overlays. Cards separate by
+   * border and surface value, never by shadow. */
+  --shadow-overlay:
+    0 16px 48px -24px rgb(0 0 0 / 0.85), 0 2px 8px -2px rgb(0 0 0 / 0.45);
+
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -24,25 +52,6 @@ html,
 body,
 #root {
   height: 100%;
-}
-
-/* Hide the scrollbar by default for a cleaner canvas. Scrolling still works via
- * wheel / trackpad / keyboard — only the visual gutter is removed. Applied to
- * the document (window scroll on mobile) and, via .no-scrollbar, to in-app
- * scroll containers like the AppShell main region. */
-html,
-body,
-#root,
-.no-scrollbar {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* legacy Edge/IE */
-}
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-#root::-webkit-scrollbar,
-.no-scrollbar::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 
 body {
@@ -55,24 +64,82 @@ body {
     -apple-system,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Money is everywhere in this product, so lining tabular figures are the
+   * default rather than something each component opts into. */
+  font-variant-numeric: tabular-nums;
 }
 
-/* Footer breadcrumb: uppercase, letter-spaced, mono — doubles as a QA locator. */
+/* Scrollbars are thin and visible rather than hidden. A scroll container with no
+ * affordance looks fine in a screenshot and feels broken in use. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--hairline);
+  border-radius: var(--radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--line-strong);
+  background-clip: content-box;
+}
+
+/* Kept for the marquee, which is decorative and must not show a gutter. Not for
+ * real scroll containers. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* One focus treatment for everything interactive. `:focus-visible` so a mouse
+ * click doesn't ring, but every keyboard path does. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The one surviving mono label, and it has one job: the tiny caption above a
+ * money figure (Entry, Pot, Balance). Not a heading style. */
+.label-money {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-tertiary);
+}
+
+/* Retained so any surface still referencing the old label keeps rendering; new
+ * code should use .label-money or a SectionHeader. */
+.label-mono {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-tertiary);
+}
+
 .footer-breadcrumb {
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--text-tertiary);
   font-size: 11px;
-}
-
-/* Uppercase, letter-spaced mono micro-label (section headers, chips). */
-.label-mono {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 11px;
-  color: var(--text-secondary);
 }
 
 /* Lime highlight marker for key words in headlines. */
@@ -85,10 +152,11 @@ body {
   -webkit-box-decoration-break: clone;
 }
 
-/* Selected/active surface: a crisp lime edge, no blurred outer glow. */
-.glow-selected {
-  border-color: var(--green) !important;
-  box-shadow: 0 0 0 1px var(--green);
+/* Selection is structural: a raised surface and a strong edge, no hue, so it
+ * never competes with money or with the primary action. */
+.is-selected {
+  border-color: var(--line-strong) !important;
+  background-color: var(--panel-raised);
 }
 
 /* Marquee crawl for the live ticker. Content is duplicated, so -50% loops. */
@@ -126,5 +194,12 @@ body {
   .animate-marquee,
   .animate-rise {
     animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -24,9 +24,9 @@ function Chip({
   return (
     <span
       className={[
-        'rounded-pill border px-2.5 py-1 text-[11px] font-medium',
+        'rounded-pill border px-2.5 py-1 text-micro font-medium',
         highlight
-          ? 'border-green/40 bg-green/10 text-green'
+          ? 'border-hairline bg-panel-raised text-text-secondary'
           : 'border-hairline text-text-secondary',
       ].join(' ')}
     >
@@ -36,7 +36,7 @@ function Chip({
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  accepted: 'border-green/50 text-green',
+  accepted: 'border-line-strong text-text',
   declined: 'border-hairline text-text-tertiary',
   expired: 'border-hairline text-text-tertiary',
 };
@@ -74,7 +74,7 @@ export function InviteCard({ message }: { message: ChatMessage }) {
   return (
     <div
       data-testid="invite-card"
-      className="w-full max-w-md overflow-hidden rounded-2xl border border-hairline bg-panel-raised shadow-[0_16px_40px_-24px_rgba(0,0,0,0.9)]"
+      className="w-full max-w-md overflow-hidden rounded-card border border-hairline bg-panel-raised "
       style={{
         // A faint wash of the game's accent, so a CS2 card reads differently
         // from a PUBG one at a glance.
@@ -93,11 +93,11 @@ export function InviteCard({ message }: { message: ChatMessage }) {
           >
             <meta.Icon className="h-4 w-4" />
           </span>
-          <span className="label-mono !text-[10px]">{meta.label}</span>
+          <span className="label-money !text-micro">{meta.label}</span>
           {!pending && (
             <span
               className={[
-                'ml-auto rounded-pill border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                'ml-auto rounded-pill border px-2.5 py-0.5 text-micro font-semibold uppercase tracking-wide',
                 STATUS_STYLE[status] ?? 'border-hairline text-text-tertiary',
               ].join(' ')}
             >

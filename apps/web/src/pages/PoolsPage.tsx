@@ -2,15 +2,21 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
-import { BalanceHeader } from '../components/BalanceHeader';
 import { GettingStarted } from '../components/GettingStarted';
+import { ModeSwitcher } from '../components/ModeSwitcher';
+import { Card } from '../components/ui/Card';
+import { CardGrid } from '../components/ui/CardGrid';
+import { ClearBar } from '../components/ui/ClearBar';
 import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
+import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
 import { GameTabs } from '../components/ui/GameTabs';
 import { PillButton } from '../components/ui/PillButton';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
-import { formatCurrency, formatPct } from '../lib/format';
+import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { filledSpots } from '../lib/spots';
 import { useGameSelection } from '../hooks/useGameSelection';
@@ -26,7 +32,7 @@ import {
 // A full pool is POOL_ROOM_SIZE (backend); we advertise the target on each card.
 const POOL_CAPACITY = 4;
 
-// Difficulty chips read easiest → hardest regardless of API order.
+// Difficulty chips read easiest to hardest regardless of API order.
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'];
 
 export function PoolsPage() {
@@ -40,18 +46,11 @@ export function PoolsPage() {
   const { data: status } = usePoolStatus();
   const enter = useEnterPool();
 
-  // Filters — trim the metric × difficulty × entry grid down to what you want.
-  // Tucked behind a hamburger toggle so they don't eat screen space by default.
+  // Filters trim the metric × difficulty grid. Entry is no longer a filter
+  // dimension: it lives inside each card as a control, so filtering by it would
+  // hide contests rather than narrow them.
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
   const [difficultyFilter, setDifficultyFilter] = useState<string>(ALL);
-  const [entryFilter, setEntryFilter] = useState<number | typeof ALL>(ALL);
-
-  const header = (
-    <div className="mb-6 flex items-center gap-4">
-      <GameTabs games={games} selected={game} onSelect={setGame} />
-      <BalanceHeader />
-    </div>
-  );
 
   const presets = markets?.entry_presets_cents ?? [];
   const openMetrics = useMemo(
@@ -64,7 +63,6 @@ export function PoolsPage() {
     return DIFFICULTY_ORDER.filter((d) => seen.has(d));
   }, [openMetrics]);
 
-  // Apply the active filters to the metric → cards → entries fan-out.
   const filteredMetrics = useMemo(() => {
     return openMetrics
       .filter((m) => metricFilter === ALL || m.metric === metricFilter)
@@ -76,14 +74,25 @@ export function PoolsPage() {
       }))
       .filter((m) => m.cards.length > 0);
   }, [openMetrics, metricFilter, difficultyFilter]);
-  const filteredPresets = presets.filter(
-    (e) => entryFilter === ALL || e === entryFilter,
-  );
   const activeCount =
-    (metricFilter !== ALL ? 1 : 0) +
-    (difficultyFilter !== ALL ? 1 : 0) +
-    (entryFilter !== ALL ? 1 : 0);
-  const hasResults = filteredMetrics.length > 0 && filteredPresets.length > 0;
+    (metricFilter !== ALL ? 1 : 0) + (difficultyFilter !== ALL ? 1 : 0);
+  const hasResults = filteredMetrics.length > 0 && presets.length > 0;
+
+  const header = (
+    <div className="mb-6 flex flex-wrap items-center gap-3">
+      <ModeSwitcher />
+      <div className="w-full md:w-auto">
+        <GameTabs games={games} selected={game} onSelect={setGame} />
+      </div>
+      <div className="ml-auto">
+        <HowItWorks id="pools">
+          Three or four similar-skill players each get a personal bar quoted from their
+          own baseline. Clear your bar in your next match and you take a share of the
+          pot. You are playing the number, not the other players.
+        </HowItWorks>
+      </div>
+    </div>
+  );
 
   if (game && isComingSoon(game)) {
     return (
@@ -100,8 +109,13 @@ export function PoolsPage() {
       <div>
         {header}
         <EmptyState
-          title={`Pools aren't available for ${gameMeta(game).name} yet`}
-          subline="Solo pools are Counter-Strike 2 only for now — more games soon."
+          title={`No pools on ${gameMeta(game).name} yet`}
+          subline="Solo pools are Counter Strike 2 only for now. More games are coming."
+          action={
+            <Link to="/play">
+              <PillButton>Play head to head</PillButton>
+            </Link>
+          }
         />
       </div>
     );
@@ -113,7 +127,7 @@ export function PoolsPage() {
         {header}
         <EmptyState
           title={`Link your ${game ? gameMeta(game).name : 'game'} account`}
-          subline="Pools are graded from your real matches. Link to play."
+          subline="Pools are graded from your real matches, so we need to know which account is yours."
           action={
             <Link to="/profile">
               <PillButton>Link a game</PillButton>
@@ -124,8 +138,7 @@ export function PoolsPage() {
     );
   }
 
-  const meta = game ? gameMeta(game, undefined) : null;
-  // One pool in flight at a time — freeze joins while searching or formed.
+  // One pool in flight at a time, so joins freeze while searching or formed.
   const busy = status?.status === 'searching' || status?.status === 'formed';
 
   return (
@@ -134,105 +147,107 @@ export function PoolsPage() {
 
       <GettingStarted />
 
-      <p className="mb-6 max-w-2xl text-sm text-text-secondary">
-        Solo pools put 3–4 similar-skill players against a personal bar quoted from your
-        own baseline. Clear your bar in your next match to take a share of the pot. Pick
-        a pool below and join.
-      </p>
-
+      {/* From xl up the rail's "Room formed" section owns this, so a formed room
+       * stops pushing the grid down. Below xl there is no rail, so keep it here
+       * — it is the only place to see the room or leave the queue. */}
       {status && (status.status === 'searching' || status.status === 'formed') && (
-        <PoolStatusBanner status={status} />
+        <div className="xl:hidden">
+          <PoolStatusBanner status={status} />
+        </div>
       )}
 
-      {openMetrics.length === 0 ? (
-        <p className="py-8 text-sm text-text-secondary">
-          {marketsLoading
-            ? 'Loading pools…'
-            : 'No pools on this game yet — play a match on it and its pools appear here.'}
-        </p>
+      <SectionHeader
+        level="page"
+        action={
+          !marketsLoading &&
+          openMetrics.length > 0 && (
+            <FilterBar
+              testId="pool-filters"
+              activeCount={activeCount}
+              onClear={() => {
+                setMetricFilter(ALL);
+                setDifficultyFilter(ALL);
+              }}
+            >
+              {openMetrics.length > 1 && (
+                <FilterChips
+                  label="Metric"
+                  options={openMetrics.map((m) => m.metric)}
+                  selected={metricFilter}
+                  onSelect={(v) => setMetricFilter(v as string)}
+                  format={(m) =>
+                    openMetrics.find((x) => x.metric === m)?.label ?? String(m)
+                  }
+                />
+              )}
+              {difficulties.length > 1 && (
+                <FilterChips
+                  label="Difficulty"
+                  options={difficulties}
+                  selected={difficultyFilter}
+                  onSelect={(v) => setDifficultyFilter(v as string)}
+                />
+              )}
+            </FilterBar>
+          )
+        }
+      >
+        Solo pools
+      </SectionHeader>
+
+      {marketsLoading ? (
+        <SkeletonList rows={3} />
+      ) : openMetrics.length === 0 ? (
+        <EmptyState
+          title="No pools on this game yet"
+          subline="Play a match on it and its pools appear here."
+        />
       ) : (
         <>
-          <FilterBar
-            testId="pool-filters"
-            activeCount={activeCount}
-            onClear={() => {
-              setMetricFilter(ALL);
-              setDifficultyFilter(ALL);
-              setEntryFilter(ALL);
-            }}
-          >
-            {openMetrics.length > 1 && (
-              <FilterChips
-                label="Metric"
-                options={openMetrics.map((m) => m.metric)}
-                selected={metricFilter}
-                onSelect={(v) => setMetricFilter(v as string)}
-                format={(m) =>
-                  openMetrics.find((x) => x.metric === m)?.label ?? String(m)
-                }
-              />
-            )}
-            {difficulties.length > 1 && (
-              <FilterChips
-                label="Difficulty"
-                options={difficulties}
-                selected={difficultyFilter}
-                onSelect={(v) => setDifficultyFilter(v as string)}
-              />
-            )}
-            {presets.length > 1 && (
-              <FilterChips
-                label="Entry"
-                options={presets}
-                selected={entryFilter}
-                onSelect={setEntryFilter}
-                format={(cents) => formatCurrency(cents)}
-              />
-            )}
-          </FilterBar>
-
           {!hasResults ? (
-            <p className="py-8 text-sm text-text-secondary">
-              No pools match these filters.
-            </p>
+            <EmptyState
+              title="Nothing matches those filters"
+              subline="Clear them to see every open pool."
+            />
           ) : (
             filteredMetrics.map((m) => (
               <section key={m.metric} className="mb-8">
-                <h2 className="mb-3 label-mono">{m.label}</h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {m.cards.flatMap((c) =>
-                    filteredPresets.map((entry) => {
-                      const key = `${game}:${m.metric}:${c.difficulty}:${entry}`;
-                      return (
-                        <WagerCard
-                          key={key}
-                          accent={meta?.accent ?? 'var(--text-secondary)'}
-                          gameName={meta?.short ?? 'Game'}
-                          tag={c.difficulty}
-                          title={`${m.label} ≥ ${c.bar}`}
-                          subtitle={`Clears ≈ ${formatPct(c.clear_rate)} of the time`}
-                          entryCents={entry}
-                          capacity={POOL_CAPACITY}
-                          filled={filledSpots(key, POOL_CAPACITY)}
-                          footnote={`Est. payout ≈ ${formatCurrency(
-                            estPrize(entry, c.est_multiplier_bps),
-                          )}`}
-                          buttonLabel="Join Pool"
-                          disabled={busy}
-                          joining={enter.isPending}
-                          onJoin={() =>
-                            enter.mutate({
-                              game: markets!.game,
-                              metric: m.metric,
-                              difficulty: c.difficulty,
-                              entry_preset_cents: entry,
-                            })
-                          }
-                        />
-                      );
-                    }),
-                  )}
-                </div>
+                {filteredMetrics.length > 1 && (
+                  <SectionHeader level="section">{m.label}</SectionHeader>
+                )}
+                <CardGrid count={m.cards.length}>
+                  {/* One card per bar. Entry is a control inside it, so a
+                   * three-difficulty metric is three cards, not nine. */}
+                  {m.cards.map((c) => {
+                    const key = `${game}:${m.metric}:${c.difficulty}`;
+                    return (
+                      <WagerCard
+                        key={key}
+                        gameName={m.label}
+                        tag={c.difficulty}
+                        title={`Clear ${c.bar}`}
+                        target={c.bar}
+                        clearRate={c.clear_rate}
+                        entryOptions={presets}
+                        payoutFor={(entry) => estPrize(entry, c.est_multiplier_bps)}
+                        payoutLabel="Est. win"
+                        capacity={POOL_CAPACITY}
+                        filled={filledSpots(key, POOL_CAPACITY)}
+                        buttonLabel="Join pool"
+                        disabled={busy}
+                        joining={enter.isPending}
+                        onJoin={(entry) =>
+                          enter.mutate({
+                            game: markets!.game,
+                            metric: m.metric,
+                            difficulty: c.difficulty,
+                            entry_preset_cents: entry,
+                          })
+                        }
+                      />
+                    );
+                  })}
+                </CardGrid>
               </section>
             ))
           )}
@@ -255,16 +270,16 @@ function PoolStatusBanner({
   }
 
   return (
-    <div
-      className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-panel p-4"
+    <Card
+      className="mb-6 flex items-center justify-between gap-4 p-4"
       data-testid="pool-status"
     >
       <div className="flex items-center gap-3">
-        <span className="h-3 w-3 animate-pulse rounded-full bg-green" />
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-live" />
         <div>
-          <p className="text-sm font-semibold text-text">Forming your room…</p>
+          <p className="text-sm font-medium text-text">Finding your room</p>
           <p className="text-xs text-text-secondary">
-            Matching you with similar-stat players.
+            Matching you with players of a similar standard.
           </p>
         </div>
       </div>
@@ -275,7 +290,7 @@ function PoolStatusBanner({
       >
         Cancel
       </PillButton>
-    </div>
+    </Card>
   );
 }
 
@@ -284,21 +299,33 @@ function RoomBanner({ pool }: { pool: PoolView }) {
   const leave = useLeavePool();
   const gameName = gameMeta(pool.game).name;
   return (
-    <div className="mb-6 rounded-2xl bg-panel p-4" data-testid="room-card">
-      <p className="label-mono">Room formed</p>
-      <h3 className="mt-1 text-lg font-bold capitalize text-text">
-        {pool.difficulty} {pool.metric_label} · bar {pool.room_bar}
-      </h3>
-      <p className="mt-1 text-xs text-text-secondary">
-        {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
-        {formatCurrency(pool.pot_cents)}.
-      </p>
-      <p className="mt-2 text-sm font-semibold text-green" data-testid="room-play-cue">
-        ✓ Your {formatCurrency(pool.entry_cents)} is locked in escrow — you can now play
-        your {gameName} game. Clear the room bar in your next match to take your share.
+    <Card className="mb-6 p-5" data-testid="room-card">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-live" aria-hidden />
+            <p className="text-xs font-semibold uppercase tracking-wide text-live">
+              Room formed
+            </p>
+          </div>
+          <h2 className="mt-2 text-xl font-semibold capitalize text-text">
+            {pool.difficulty} {pool.metric_label} · bar {pool.room_bar}
+          </h2>
+          <p className="mt-1 text-xs text-text-secondary">
+            {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
+            {formatCurrency(pool.pot_cents)}
+          </p>
+        </div>
+        <div className="w-full max-w-xs">
+          <ClearBar current={pool.your_bar} target={pool.room_bar} label="your avg" />
+        </div>
+      </div>
+      <p className="mt-4 text-sm text-text" data-testid="room-play-cue">
+        Your {formatCurrency(pool.entry_cents)} is in escrow, so you can now play your{' '}
+        {gameName} game. Clear the room bar in your next match to take your share.
       </p>
       {isDemo && (
-        <div className="mt-3">
+        <div className="mt-4">
           <PillButton
             variant="outline"
             onClick={() => leave.mutate()}
@@ -308,6 +335,6 @@ function RoomBanner({ pool }: { pool: PoolView }) {
           </PillButton>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

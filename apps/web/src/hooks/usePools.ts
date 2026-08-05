@@ -98,7 +98,11 @@ export function usePoolStatus() {
   return useQuery({
     queryKey: ['pool-status', session?.user.id],
     enabled: !!session,
-    refetchInterval: 2500,
+    // The rail mounts this app-wide, so only poll hard while a room is actually
+    // forming. Idle and formed both change off the back of something that
+    // already invalidates the key (a join, a leave, a settlement).
+    refetchInterval: (query) =>
+      query.state.data?.status === 'searching' ? 2500 : 10_000,
     queryFn: async (): Promise<PoolStatus> => {
       const { data, error } = await api.GET('/api/v1/pools/queue/status');
       if (error) throw new Error('Failed to load pool status');

@@ -20,7 +20,7 @@ export function MessageBubble({
   peerName,
 }: {
   message: ChatMessage;
-  /** First message of a run from the same sender — only then show the avatar. */
+  /** First message of a run from the same sender, so only then show the avatar. */
   showAvatar: boolean;
   peerName: string;
 }) {
@@ -53,7 +53,7 @@ export function MessageBubble({
         ].join(' ')}
       >
         {!mine && showAvatar && (
-          <span className="px-1 text-[11px] font-semibold text-text-secondary">
+          <span className="px-1 text-micro font-semibold text-text-secondary">
             {name}
           </span>
         )}
@@ -62,16 +62,16 @@ export function MessageBubble({
         ) : (
           <div
             className={[
-              'whitespace-pre-wrap break-words px-4 py-2.5 text-[15px] leading-relaxed',
+              'whitespace-pre-wrap break-words px-4 py-2.5 text-sm leading-relaxed',
               mine
-                ? 'rounded-2xl rounded-br-sm bg-green font-medium text-black shadow-[0_8px_24px_-14px_var(--green)]'
-                : 'rounded-2xl rounded-bl-sm border border-hairline bg-panel-raised text-text',
+                ? 'rounded-card rounded-br-sm bg-action font-medium text-bg'
+                : 'rounded-card rounded-bl-sm border border-hairline bg-panel-raised text-text',
             ].join(' ')}
           >
             {message.body}
           </div>
         )}
-        <span className="px-1 text-[11px] text-text-tertiary">
+        <span className="px-1 text-micro text-text-tertiary">
           {clockTime(message.created_at)}
         </span>
       </div>

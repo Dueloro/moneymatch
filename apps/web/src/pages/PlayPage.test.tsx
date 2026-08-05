@@ -124,22 +124,17 @@ describe('PlayPage', () => {
     } as unknown as ReturnType<typeof useLeaveQueue>);
   });
 
-  it('renders a joinable 1v1 card per entry with the derived "You\'d win"', () => {
+  it('renders one 1v1 card per market with the derived payout inside it', () => {
     renderWithProviders(<PlayPage />);
-    // 1 market × 3 entry presets = 3 cards.
-    expect(screen.getAllByText('K/D ratio')).toHaveLength(3);
-    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(3);
-    // 2 × $10 × (1 − 0.10) = $18.00, derived — never an odds line.
-    expect(screen.getByText("You'd win ≈ $18.00")).toBeInTheDocument();
+    // 1 market = 1 card. Entry is a control inside it, not a grid dimension.
+    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
+    // 2 x $10 x (1 - 0.10) = $18.00, derived. Never an odds line.
+    expect(screen.getByText('$18.00')).toBeInTheDocument();
   });
 
-  it('joining a card finds a match with its preset params', () => {
+  it('joining a card finds a match with the entry selected inside it', () => {
     renderWithProviders(<PlayPage />);
-    // The $10 card is identifiable by its unique estimated payout.
-    const card = screen.getByText("You'd win ≈ $18.00").closest('.rounded-2xl')!;
-    fireEvent.click(
-      within(card as HTMLElement).getByRole('button', { name: 'Find Match' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Find match' }));
     expect(joinMutate).toHaveBeenCalledWith({
       game: 'cs2.faceit',
       market: 'kd_ratio',
@@ -200,9 +195,7 @@ describe('PlayPage', () => {
       can_cancel: false,
     });
     renderWithProviders(<PlayPage />);
-    expect(screen.getByTestId('forecast')).toHaveTextContent(
-      'Even duel — model gives you 52%',
-    );
+    expect(screen.getByTestId('forecast')).toHaveTextContent(/52%/);
     fireEvent.click(screen.getByRole('button', { name: /Confirm & stake/ }));
     expect(confirmMutate).toHaveBeenCalledWith('m1');
   });
@@ -252,21 +245,19 @@ describe('PlayPage', () => {
   });
 
   it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
+    // A single market hides the filter bar entirely, so use two here.
+    vi.mocked(useMarkets).mockReturnValue({
+      data: {
+        game: 'cs2.faceit',
+        linked: true,
+        entry_presets_cents: [500, 1000, 2500],
+        markets: [KD_MARKET, { ...KD_MARKET, key: 'adr', label: 'ADR' }],
+      },
+    } as unknown as ReturnType<typeof useMarkets>);
     renderWithProviders(<PlayPage />);
     expect(screen.queryByTestId('play-filters')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('play-filters-toggle'));
     expect(screen.getByTestId('play-filters')).toBeInTheDocument();
-  });
-
-  it('entry filter trims the grid to the chosen entry amount', () => {
-    renderWithProviders(<PlayPage />);
-    // Baseline: 1 market × 3 presets = 3 cards.
-    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(3);
-    fireEvent.click(screen.getByTestId('play-filters-toggle'));
-    const filters = screen.getByTestId('play-filters');
-    fireEvent.click(within(filters).getByRole('button', { name: '$25.00' }));
-    // 1 market × 1 entry preset = 1 card.
-    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(1);
   });
 
   it('market filter trims the grid to the chosen market', () => {
@@ -288,13 +279,12 @@ describe('PlayPage', () => {
       },
     } as unknown as ReturnType<typeof useMarkets>);
     renderWithProviders(<PlayPage />);
-    // Baseline: 2 markets × 3 presets = 6 cards.
-    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(6);
+    // Baseline: 2 markets = 2 cards.
+    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(2);
     fireEvent.click(screen.getByTestId('play-filters-toggle'));
     const filters = screen.getByTestId('play-filters');
     fireEvent.click(within(filters).getByRole('button', { name: 'Headshot %' }));
-    // Only the chosen market × 3 presets remain.
-    expect(screen.getAllByRole('button', { name: 'Find Match' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
   });
 });
 

@@ -144,7 +144,7 @@ describe('ProfilePage', () => {
     expect(screen.getByText('Blocked')).toBeInTheDocument();
     expect(screen.getByText('s1mple · 100 games')).toBeInTheDocument();
     expect(screen.getByText('Level 10')).toBeInTheDocument(); // skill badge
-    expect(screen.getByText('🔥 5W streak')).toBeInTheDocument(); // win streak
+    expect(screen.getByText('5 win streak')).toBeInTheDocument(); // win streak
     expect(screen.getByDisplayValue('200')).toBeInTheDocument(); // daily loss cap ($)
   });
 

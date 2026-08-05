@@ -5,9 +5,9 @@ import { subscribeToasts, type ToastMessage } from '../../lib/toast';
 const DURATION_MS = 4000;
 
 const DOT: Record<ToastMessage['kind'], string> = {
-  success: 'bg-green',
+  success: 'bg-action',
   error: 'bg-red',
-  info: 'bg-text-secondary',
+  info: 'bg-live',
 };
 
 /** Global toast host. Mounted once at the root; sits above the mobile tab bar. */
@@ -42,7 +42,7 @@ export function Toaster() {
         <div
           key={t.id}
           role="status"
-          className="pointer-events-auto flex max-w-sm items-center gap-2.5 rounded-pill bg-panel-raised px-5 py-3 text-sm font-semibold text-text shadow-lg"
+          className="pointer-events-auto flex max-w-sm items-center gap-2.5 rounded-pill border border-line-strong bg-overlay px-4 py-2.5 text-sm font-medium text-text shadow-overlay"
         >
           <span
             aria-hidden
