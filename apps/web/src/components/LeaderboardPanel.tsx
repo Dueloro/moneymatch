@@ -11,14 +11,14 @@ export function LeaderboardPanel() {
   if (data.rows.length === 0) {
     return (
       <EmptyState
-        title="No ranked players yet"
-        subline={`Play ${data.min_contests}+ settled contests over ${data.window_days} days to make the board.`}
+        title="Nobody is ranked yet"
+        subline={`Settle ${data.min_contests} contests inside ${data.window_days} days and you are on the board.`}
       />
     );
   }
 
   return (
-    <div className="max-w-xl">
+    <div>
       {data.rows.map((row) => (
         <ListRow
           key={row.user_id}
@@ -28,19 +28,15 @@ export function LeaderboardPanel() {
             </span>
           }
           title={
-            <span className={row.is_you ? 'font-semibold text-green' : undefined}>
+            <span className={row.is_you ? 'font-semibold text-text' : undefined}>
               {row.username ?? 'Player'}
               {row.is_you ? ' (you)' : ''}
             </span>
           }
           subline={`${row.contests} contests`}
           right={
-            <span
-              className={[
-                'tabular-nums',
-                row.roi_bps >= 0 ? 'text-green' : 'text-text-secondary',
-              ].join(' ')}
-            >
+            // ROI is a return on money, so lime stays correct here.
+            <span className={row.roi_bps >= 0 ? 'text-green' : 'text-text-secondary'}>
               {formatRoi(row.roi_bps)}
             </span>
           }
@@ -48,8 +44,8 @@ export function LeaderboardPanel() {
       ))}
       {!data.you.qualified && (
         <p className="mt-4 text-xs text-text-secondary">
-          You&apos;re not ranked yet — play {data.you.contests_needed} more settled
-          contest{data.you.contests_needed === 1 ? '' : 's'} to qualify.
+          You are not ranked yet. Settle {data.you.contests_needed} more contest
+          {data.you.contests_needed === 1 ? '' : 's'} to qualify.
         </p>
       )}
     </div>

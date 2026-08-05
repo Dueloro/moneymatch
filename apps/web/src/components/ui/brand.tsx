@@ -3,7 +3,7 @@
 export function TriangleMark({ className = 'h-7 w-7' }: { className?: string }) {
   return (
     <span
-      className={`grid place-items-center rounded-lg bg-panel-raised ring-1 ring-hairline ${className}`}
+      className={`grid place-items-center rounded-inset bg-panel-raised ring-1 ring-hairline ${className}`}
     >
       <svg
         viewBox="0 0 24 24"

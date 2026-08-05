@@ -1,10 +1,11 @@
 import { AmountText } from '../components/ui/AmountText';
+import { Card } from '../components/ui/Card';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ExpandableCard } from '../components/ui/ExpandableCard';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
+import { SectionHeader } from '../components/ui/SectionHeader';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
-import { StatBar } from '../components/ui/StatBar';
 import { formatCurrency, formatRelativeTime } from '../lib/format';
 import {
   DEMO_DEPOSIT_PRESETS_CENTS,
@@ -30,8 +31,7 @@ function ledgerLabel(entry: LedgerEntry): string {
   return entry.memo ?? ENTRY_LABELS[entry.entry_type] ?? entry.entry_type;
 }
 
-/** A small semantic dot leading each ledger row: green credit, red platform
- * fee, gray debit/hold — enough color to read the list at a glance. */
+/** A small semantic dot leading each ledger row: money in, fee, or hold. */
 function LedgerDot({ entry }: { entry: LedgerEntry }) {
   const color =
     entry.entry_type === 'rake'
@@ -56,54 +56,44 @@ export function WalletPage() {
   const busy = deposit.isPending || withdraw.isPending;
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="mb-1 text-2xl font-bold">Wallet</h1>
-      <p className="mb-6 text-sm text-text-secondary">
-        Play money used until full launch.
-      </p>
+    // A column the height of the viewport: the balance and the two preset rows
+    // stay put and only the ledger scrolls, so the page stops growing with the
+    // number of entries.
+    <div className="flex h-full flex-col">
+      <SectionHeader level="page" hint="Play money until full launch.">
+        Wallet
+      </SectionHeader>
 
       {isError ? (
-        <ErrorState title="Could not load your wallet" onRetry={() => refetch()} />
+        <ErrorState
+          title="Could not load your wallet"
+          subline="The connection dropped. Try again."
+          onRetry={() => refetch()}
+        />
       ) : isLoading ? (
         <div>
-          <Skeleton className="h-[74px] w-full rounded-card" />
-          <Skeleton className="mt-8 h-9 w-24" />
+          <Skeleton className="h-28 w-full rounded-card" />
           <div className="mt-8">
             <SkeletonList rows={3} />
           </div>
         </div>
       ) : (
         <>
-          <div className="relative">
-            {/* Ambient brand glow behind the balance — ties the wallet's headline
-             * number to the lime "money" accent used across the app. */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 overflow-hidden rounded-card"
-              style={{
-                background:
-                  'radial-gradient(70% 130% at 0% 0%, rgba(198, 244, 64, 0.1), transparent 70%)',
-              }}
-            />
-            <StatBar
-              cells={[
-                {
-                  label: 'Available',
-                  value: (
-                    <span className="text-green">{formatCurrency(available)}</span>
-                  ),
-                },
-                { label: 'In escrow', value: formatCurrency(escrow) },
-                {
-                  label: 'Lifetime',
-                  value: <AmountText cents={lifetime} win={lifetime > 0} />,
-                },
-              ]}
-            />
-          </div>
+          {/* One hero figure rather than three equal cells. Available is the
+           * number you came for; escrow and lifetime are its context. */}
+          <Card className="p-5">
+            <p className="label-money">Available</p>
+            <p className="mt-1 text-3xl font-semibold text-green">
+              {formatCurrency(available)}
+            </p>
+            <p className="mt-2 text-xs text-text-secondary">
+              {formatCurrency(escrow)} in play ·{' '}
+              <AmountText cents={lifetime} win={lifetime > 0} /> all time
+            </p>
+          </Card>
 
           <section className="mt-8">
-            <h2 className="mb-3 text-sm font-semibold">Add funds</h2>
+            <SectionHeader level="sub">Add funds</SectionHeader>
             <PresetSelector
               presetsCents={DEMO_DEPOSIT_PRESETS_CENTS}
               onSelect={(cents) => deposit.mutate(cents)}
@@ -112,25 +102,32 @@ export function WalletPage() {
           </section>
 
           <section className="mt-6">
-            <h2 className="mb-3 text-sm font-semibold">Cash out</h2>
-            <PresetSelector
-              presetsCents={DEMO_DEPOSIT_PRESETS_CENTS.filter((c) => c <= available)}
-              onSelect={(cents) => withdraw.mutate(cents)}
-              disabled={busy}
-            />
-            {available === 0 && (
-              <p className="mt-2 text-xs text-text-secondary">
-                Nothing available to cash out.
+            <SectionHeader level="sub">Cash out</SectionHeader>
+            {available === 0 ? (
+              <p className="text-xs text-text-tertiary">
+                Nothing to cash out yet. Win a contest and it lands here.
               </p>
+            ) : (
+              <PresetSelector
+                presetsCents={DEMO_DEPOSIT_PRESETS_CENTS.filter((c) => c <= available)}
+                onSelect={(cents) => withdraw.mutate(cents)}
+                disabled={busy}
+              />
             )}
           </section>
 
-          <section className="mt-8">
-            <h2 className="mb-1 text-sm font-semibold">Recent</h2>
+          <section className="mt-8 flex min-h-0 flex-1 flex-col">
+            <SectionHeader level="sub" className="shrink-0">
+              Recent
+            </SectionHeader>
             {rows.length === 0 ? (
-              <p className="py-6 text-sm text-text-secondary">No activity yet.</p>
+              <p className="text-xs text-text-tertiary">
+                Nothing yet. Add funds and join a contest to start the ledger.
+              </p>
             ) : (
-              <div className="flex flex-col gap-2">
+              // `min-h` keeps the ledger from being squeezed to nothing on a
+              // short window; past that the outer column takes over scrolling.
+              <div className="min-h-[9rem] flex-1 space-y-2 overflow-y-auto pb-1 pr-2">
                 {rows.map((entry) => (
                   <ExpandableCard
                     key={entry.id}
@@ -145,17 +142,17 @@ export function WalletPage() {
                     }
                   />
                 ))}
-              </div>
-            )}
-            {ledger.hasNextPage && (
-              <div className="mt-4">
-                <PillButton
-                  variant="outline"
-                  onClick={() => ledger.fetchNextPage()}
-                  disabled={ledger.isFetchingNextPage}
-                >
-                  Load more
-                </PillButton>
+                {ledger.hasNextPage && (
+                  <div className="pt-2">
+                    <PillButton
+                      variant="outline"
+                      onClick={() => ledger.fetchNextPage()}
+                      disabled={ledger.isFetchingNextPage}
+                    >
+                      {ledger.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                    </PillButton>
+                  </div>
+                )}
               </div>
             )}
           </section>

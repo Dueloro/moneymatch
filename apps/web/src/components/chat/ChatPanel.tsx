@@ -92,11 +92,11 @@ export function ChatPanel() {
     // counts); desktop takes the taller surface.
     <div
       data-testid="chat-panel"
-      className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-2xl border border-hairline bg-panel/50 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.9)] backdrop-blur-sm md:grid md:h-[calc(100vh-11rem)] md:min-h-[36rem] md:grid-cols-[23rem_1fr]"
+      className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:grid md:h-[calc(100vh-11rem)] md:min-h-[36rem] md:grid-cols-[23rem_1fr]"
     >
       <div
         className={[
-          'h-full min-h-0 border-hairline bg-bg/30 md:block md:border-r',
+          'h-full min-h-0 border-hairline bg-bg md:block md:border-r',
           mobilePane === 'list' ? 'block' : 'hidden',
         ].join(' ')}
       >
@@ -121,7 +121,7 @@ export function ChatPanel() {
       >
         {selection.type === 'notifications' ? (
           <div className="flex h-full min-h-0 flex-col">
-            <header className="flex items-center gap-3.5 border-b border-hairline bg-panel/40 px-5 py-4">
+            <header className="flex items-center gap-3.5 border-b border-hairline bg-panel px-5 py-4">
               <button
                 type="button"
                 onClick={() => setMobilePane('list')}
@@ -129,12 +129,12 @@ export function ChatPanel() {
               >
                 ← Inbox
               </button>
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-green/40 bg-green/10 text-green">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-hairline bg-panel-raised text-text-secondary">
                 <BellIcon className="h-5 w-5" />
               </span>
               <div>
                 <p className="text-base font-bold text-text">Notifications</p>
-                <p className="text-[13px] text-text-secondary">
+                <p className="text-xs text-text-secondary">
                   Everything the platform sent you
                 </p>
               </div>

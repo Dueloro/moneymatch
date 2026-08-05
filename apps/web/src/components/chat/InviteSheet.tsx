@@ -16,14 +16,14 @@ const COPY = {
   pool: {
     title: 'Invite to a solo pool',
     blurb:
-      'Drops an invite card in this chat. Rooms are joined on the Solo Pools tab — open it to pick the exact room.',
+      'Drops an invite card in this chat. Rooms are joined on the Solo Pools tab. Open it to pick the exact room.',
     tab: 'Solo Pools',
     path: '/pools',
   },
   tournament: {
     title: 'Invite to a tournament',
     blurb:
-      'Drops an invite card in this chat. Fields are joined on the Tournament tab — open it to pick the exact field.',
+      'Drops an invite card in this chat. Fields are joined on the Tournament tab. Open it to pick the exact field.',
     tab: 'Tournament',
     path: '/tournament',
   },
@@ -77,7 +77,7 @@ export function InviteSheet({
       aria-label={copy.title}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border border-hairline bg-panel p-7 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.95)]"
+        className="w-full max-w-lg rounded-card border border-hairline bg-panel p-7 shadow-overlay"
         data-testid="invite-sheet"
       >
         <div className="mb-1 flex items-start justify-between gap-4">
@@ -86,11 +86,9 @@ export function InviteSheet({
             Close
           </PillButton>
         </div>
-        <p className="mb-6 text-[13px] leading-relaxed text-text-secondary">
-          {copy.blurb}
-        </p>
+        <p className="mb-6 text-xs leading-relaxed text-text-secondary">{copy.blurb}</p>
 
-        <p className="label-mono mb-2.5">Game</p>
+        <p className="label-money mb-2.5">Game</p>
         <div className="mb-6 flex flex-wrap gap-2">
           {gameIds.map((id) => (
             <button
@@ -98,7 +96,7 @@ export function InviteSheet({
               type="button"
               onClick={() => setGame(id)}
               className={[
-                'rounded-pill px-4 py-1.5 text-[13px] font-semibold transition',
+                'rounded-pill px-4 py-1.5 text-xs font-semibold transition',
                 id === game
                   ? 'bg-text text-black'
                   : 'border border-hairline text-text-secondary hover:text-text',
@@ -111,7 +109,7 @@ export function InviteSheet({
 
         {kind === 'pool' && (
           <>
-            <p className="label-mono mb-2.5">Difficulty</p>
+            <p className="label-money mb-2.5">Difficulty</p>
             <div className="mb-6 flex flex-wrap gap-2">
               {DIFFICULTIES.map((d) => (
                 <button
@@ -119,9 +117,9 @@ export function InviteSheet({
                   type="button"
                   onClick={() => setDifficulty(d)}
                   className={[
-                    'rounded-pill border px-4 py-1.5 text-[13px] font-semibold capitalize transition',
+                    'rounded-pill border px-4 py-1.5 text-xs font-semibold capitalize transition',
                     d === difficulty
-                      ? 'glow-selected text-green'
+                      ? 'is-selected text-text'
                       : 'border-hairline text-text-secondary hover:text-text',
                   ].join(' ')}
                 >
@@ -132,7 +130,7 @@ export function InviteSheet({
           </>
         )}
 
-        <p className="label-mono mb-2.5">Entry</p>
+        <p className="label-money mb-2.5">Entry</p>
         <PresetSelector
           presetsCents={ENTRY_PRESETS}
           selectedCents={entryCents}

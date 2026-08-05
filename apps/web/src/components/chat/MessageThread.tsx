@@ -72,7 +72,7 @@ export function MessageThread({
       className="flex h-full min-h-0 flex-col"
       aria-label={`Chat with ${peerName}`}
     >
-      <header className="flex items-center gap-3.5 border-b border-hairline bg-panel/40 px-5 py-4">
+      <header className="flex items-center gap-3.5 border-b border-hairline bg-panel px-5 py-4">
         <button
           type="button"
           onClick={onBack}
@@ -89,13 +89,13 @@ export function MessageThread({
         />
         <div className="min-w-0">
           <p className="truncate text-base font-bold text-text">{peerName}</p>
-          <p className="flex items-center gap-1.5 text-[13px] text-text-secondary">
+          <p className="flex items-center gap-1.5 text-xs text-text-secondary">
             {conversation?.kind !== 'support' && (
               <span
                 aria-hidden
                 className={[
                   'h-1.5 w-1.5 rounded-full',
-                  conversation?.online ? 'bg-green' : 'bg-text-tertiary',
+                  conversation?.online ? 'bg-live' : 'bg-text-tertiary',
                 ].join(' ')}
               />
             )}
@@ -111,9 +111,9 @@ export function MessageThread({
       <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-5 py-5">
         {isLoading && (
           <div className="flex flex-col gap-3">
-            <Skeleton className="h-12 w-56 rounded-2xl" />
-            <Skeleton className="h-12 w-72 self-end rounded-2xl" />
-            <Skeleton className="h-12 w-48 rounded-2xl" />
+            <Skeleton className="h-12 w-56 rounded-card" />
+            <Skeleton className="h-12 w-72 self-end rounded-card" />
+            <Skeleton className="h-12 w-48 rounded-card" />
           </div>
         )}
 
@@ -122,8 +122,8 @@ export function MessageThread({
             <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full border border-hairline bg-panel-raised text-text-tertiary">
               <ChatIcon className="h-6 w-6" />
             </span>
-            <p className="text-[15px] font-semibold text-text">No messages yet</p>
-            <p className="mt-1 text-[13px] text-text-secondary">
+            <p className="text-sm font-semibold text-text">No messages yet</p>
+            <p className="mt-1 text-xs text-text-secondary">
               Say hi, or send {peerName} an invite with the + button.
             </p>
           </div>
@@ -140,7 +140,7 @@ export function MessageThread({
               {newDay && (
                 <div className="my-3 flex items-center gap-3">
                   <span className="h-px flex-1 bg-hairline" />
-                  <span className="text-[11px] uppercase tracking-[0.14em] text-text-tertiary">
+                  <span className="text-micro uppercase tracking-[0.14em] text-text-tertiary">
                     {dayLabel(message.created_at)}
                   </span>
                   <span className="h-px flex-1 bg-hairline" />

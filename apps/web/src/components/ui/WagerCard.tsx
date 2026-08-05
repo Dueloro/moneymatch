@@ -1,97 +1,135 @@
+import { useState } from 'react';
+
 import { formatCurrency } from '../../lib/format';
+import { Card } from './Card';
+import { ClearRate } from './ClearBar';
 import { PillButton } from './PillButton';
+import { Segmented } from './Segmented';
 
 /**
- * A single joinable wager (pool / tournament / head-to-head) as a self-contained
- * rounded card: game + difficulty tag, what you're wagering on, a pre-set entry
- * fee, how full it is, an estimated payout, and a Join button. Reused across all
- * three modes so they read consistently.
+ * One joinable contest. The important change from the first build: **entry is a
+ * control inside the card, not a separate card**.
+ *
+ * The old version rendered the difficulty × entry cross-product, so Solo Pools
+ * showed nine cards where three sentences repeated verbatim and only the dollar
+ * amount differed. A stake is a parameter of a contest, not a different
+ * contest. Picking an entry here updates the payout in place, and the grid drops
+ * from nine cards to three (16-ui-revamp-plan §1).
+ *
+ * The headline is the **clear bar**: the number to beat, drawn against your own
+ * baseline. That is the product's actual idea, and it says what "Clears ≈ 16% of
+ * the time" was trying to say without a sentence.
  */
 export function WagerCard({
-  accent,
   gameName,
   tag,
   title,
   subtitle,
-  entryCents,
+  target,
+  clearRate,
+  entryOptions,
+  payoutFor,
+  payoutLabel,
   capacity,
   filled,
   oneVsOne = false,
-  footnote,
   buttonLabel,
   onJoin,
   disabled = false,
   joining = false,
 }: {
-  accent: string;
   gameName: string;
+  /** Difficulty, field size, or speed. One word where possible. */
   tag?: string;
   title: string;
-  subtitle: string;
-  entryCents: number;
+  /** One short line. Not a paragraph. */
+  subtitle?: string;
+  /** The number to beat. Omitted for markets with no bar (e.g. win the game). */
+  target?: number | null;
+  /** Server's estimate (0..1) of how often you clear that bar. */
+  clearRate?: number | null;
+  entryOptions: number[];
+  /** Derived payout for the selected entry. */
+  payoutFor: (entryCents: number) => number;
+  payoutLabel: string;
   capacity: number;
   filled: number;
   oneVsOne?: boolean;
-  footnote?: string;
   buttonLabel: string;
-  onJoin: () => void;
+  onJoin: (entryCents: number) => void;
   disabled?: boolean;
   joining?: boolean;
 }) {
-  const pct = capacity > 0 ? Math.min(100, Math.round((filled / capacity) * 100)) : 0;
+  // Default to the middle preset: the one most people pick, and it makes the
+  // segmented control's purpose obvious at a glance.
+  const [entry, setEntry] = useState(
+    () => entryOptions[Math.floor(entryOptions.length / 2)] ?? entryOptions[0],
+  );
+  const selected = entryOptions.includes(entry) ? entry : entryOptions[0];
 
   return (
-    <div className="flex flex-col rounded-2xl border border-hairline bg-panel p-4 transition hover:border-text-secondary/50">
-      <div className="flex items-start justify-between gap-2">
-        <span
-          className="rounded-pill px-2 py-0.5 text-[11px] font-semibold"
-          style={{ color: accent, backgroundColor: `${accent}22` }}
-        >
-          {gameName}
-        </span>
+    <Card className="flex flex-col p-4" interactive>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-text-secondary">{gameName}</span>
         {tag && (
-          <span className="rounded-pill bg-panel-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+          <span className="rounded-pill bg-panel-raised px-2 py-0.5 text-micro font-semibold capitalize text-text-secondary">
             {tag}
           </span>
         )}
       </div>
 
-      <h3 className="mt-3 text-lg font-bold leading-tight text-text">{title}</h3>
-      <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
+      <h3 className="mt-3 text-lg font-semibold leading-tight text-text">{title}</h3>
 
-      <div className="mt-4 flex items-end justify-between">
-        <div>
-          <div className="label-mono">Entry</div>
-          <div className="text-xl font-bold tabular-nums">
-            {formatCurrency(entryCents)}
+      {target != null ? (
+        <div className="mt-4">
+          <div className="mb-2 flex items-baseline gap-2">
+            <span className="text-3xl font-semibold text-text">
+              {Number.isInteger(target) ? target : target.toFixed(2)}
+            </span>
+            <span className="text-xs text-text-secondary">to clear</span>
           </div>
+          {clearRate != null && <ClearRate rate={clearRate} />}
         </div>
-        <div className="text-right">
-          {oneVsOne ? (
-            <div className="text-sm font-semibold text-text">1v1</div>
-          ) : (
-            <div className="text-sm font-semibold text-text tabular-nums">
-              {filled} of {capacity} joined
-            </div>
-          )}
-          {footnote && <div className="mt-0.5 text-xs text-green">{footnote}</div>}
-        </div>
-      </div>
-
-      {!oneVsOne && (
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel-raised">
-          <div
-            className="h-full rounded-full"
-            style={{ width: `${pct}%`, backgroundColor: accent }}
-          />
-        </div>
+      ) : (
+        subtitle && <p className="mt-3 text-sm text-text-secondary">{subtitle}</p>
       )}
 
+      <div className="mt-5">
+        <p className="label-money mb-2">Entry</p>
+        <Segmented
+          size="sm"
+          ariaLabel={`Entry for ${title}`}
+          options={entryOptions.map((cents) => ({
+            value: cents,
+            label: formatCurrency(cents),
+          }))}
+          value={selected}
+          onChange={setEntry}
+        />
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="label-money">{payoutLabel}</p>
+          <p className="text-lg font-semibold text-green">
+            {formatCurrency(payoutFor(selected))}
+          </p>
+        </div>
+        <p className="text-xs text-text-tertiary">
+          {oneVsOne ? '1v1' : `${filled} of ${capacity} in`}
+        </p>
+      </div>
+
       <div className="mt-4">
-        <PillButton fullWidth disabled={disabled || joining} onClick={onJoin}>
+        <PillButton
+          fullWidth
+          size="lg"
+          disabled={disabled || joining}
+          onClick={() => onJoin(selected)}
+        >
           {joining ? 'Joining…' : buttonLabel}
         </PillButton>
       </div>
-    </div>
+    </Card>
   );
 }

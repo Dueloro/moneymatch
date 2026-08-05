@@ -73,12 +73,13 @@ describe('WalletPage', () => {
     } as unknown as ReturnType<typeof useDemoWithdrawal>);
   });
 
-  it('renders the stat bar with live balances', () => {
+  it('leads with available balance, with escrow and lifetime as context', () => {
     renderWithProviders(<WalletPage />);
     expect(screen.getByText('Available')).toBeInTheDocument();
     expect(screen.getByText('$1,000.00')).toBeInTheDocument();
-    expect(screen.getByText('$26.00')).toBeInTheDocument(); // escrow
-    expect(screen.getByText('+$68.94')).toBeInTheDocument(); // lifetime, green
+    // Escrow and lifetime now read as one supporting line under the hero.
+    expect(screen.getByText(/\$26\.00 in play/)).toBeInTheDocument();
+    expect(screen.getByText('+$68.94')).toBeInTheDocument(); // lifetime
   });
 
   it('shows the signup grant ledger row', () => {

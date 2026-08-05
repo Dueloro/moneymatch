@@ -10,7 +10,7 @@ export function ComingSoonPanel({ name }: { name: string }) {
   return (
     <EmptyState
       title={`${name} is coming soon`}
-      subline={`We're building ${name} matches. It's in your bar so you're ready the moment it goes live — we'll let you know.`}
+      subline={`We're building ${name} matches. It's in your bar so you're ready the moment it goes live. We will let you know.`}
       action={
         <Link to="/pools">
           <PillButton>Back to your games</PillButton>

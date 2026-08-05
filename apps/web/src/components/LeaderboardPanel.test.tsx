@@ -64,6 +64,6 @@ describe('LeaderboardPanel', () => {
       min_contests: 3,
     });
     renderWithProviders(<LeaderboardPanel />);
-    expect(screen.getByText('No ranked players yet')).toBeInTheDocument();
+    expect(screen.getByText('Nobody is ranked yet')).toBeInTheDocument();
   });
 });

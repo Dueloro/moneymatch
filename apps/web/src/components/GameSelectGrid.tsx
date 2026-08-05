@@ -1,5 +1,6 @@
 import { gameMeta, isComingSoon } from '../lib/games';
 import { useLinks } from '../hooks/useLinks';
+import { SkeletonList } from './ui/Skeleton';
 
 /**
  * Controlled multi-select grid of the game catalog. Tapping a card toggles the
@@ -17,7 +18,7 @@ export function GameSelectGrid({
   const links = useLinks();
 
   if (links.isLoading) {
-    return <p className="text-sm text-text-secondary">Loading games…</p>;
+    return <SkeletonList rows={2} />;
   }
   if (links.isError || !links.data) {
     return <p className="text-sm text-red">Couldn't load games.</p>;
@@ -69,7 +70,7 @@ export function GameSelectGrid({
             </span>
             <span className="text-sm font-semibold">{meta.name}</span>
             {soon && (
-              <span className="rounded-pill bg-panel px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+              <span className="rounded-pill bg-panel px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-text-secondary">
                 Soon
               </span>
             )}

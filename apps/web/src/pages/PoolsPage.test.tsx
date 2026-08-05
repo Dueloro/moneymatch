@@ -84,29 +84,42 @@ describe('PoolsPage', () => {
     } as unknown as ReturnType<typeof useLeavePool>);
   });
 
-  it('renders a joinable card per difficulty × entry with bar + estimated payout', () => {
+  it('renders one card per bar, with entry as a control inside it', () => {
     renderWithProviders(<PoolsPage />);
-    // 3 difficulties × 3 entry presets = 9 cards, each with a Join Pool button.
-    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(9);
-    // The medium-bar cards show the bar and disclosed clear rate.
-    expect(screen.getAllByText('K/D ratio ≥ 1.8').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Clears ≈ 16%/).length).toBeGreaterThan(0);
-    // Estimated payout is disclosed per card (medium @ $10 → $56.25).
-    expect(screen.getByText('Est. payout ≈ $56.25')).toBeInTheDocument();
+    // 3 difficulties = 3 cards. Entry is a segmented control inside each card
+    // rather than a third grid dimension, so no sentence repeats.
+    expect(screen.getAllByRole('button', { name: 'Join pool' })).toHaveLength(3);
+    expect(screen.getByText('Clear 1.8')).toBeInTheDocument();
+    // The clear rate is a meter carrying the real number, not a sentence.
+    expect(screen.getByText('16%')).toBeInTheDocument();
+    // Payout for the default (middle) entry on the medium bar: $10 -> $56.25.
+    expect(screen.getByText('$56.25')).toBeInTheDocument();
   });
 
-  it('joining a pool card enters the queue with its preset params', () => {
+  it('joining a pool uses the entry selected inside that card', () => {
     renderWithProviders(<PoolsPage />);
-    // medium @ $10 is the only card with this exact estimated payout.
-    const card = screen.getByText('Est. payout ≈ $56.25').closest('.rounded-2xl')!;
+    const card = screen.getByText('Clear 1.8').closest('.rounded-card')!;
+    // Defaults to the middle preset ($10).
     fireEvent.click(
-      within(card as HTMLElement).getByRole('button', { name: 'Join Pool' }),
+      within(card as HTMLElement).getByRole('button', { name: 'Join pool' }),
     );
     expect(enterMutate).toHaveBeenCalledWith({
       game: 'cs2.faceit',
       metric: 'cs2_kd_ratio',
       difficulty: 'medium',
       entry_preset_cents: 1000,
+    });
+
+    // Changing the entry inside the card changes what gets joined.
+    fireEvent.click(within(card as HTMLElement).getByRole('tab', { name: '$25.00' }));
+    fireEvent.click(
+      within(card as HTMLElement).getByRole('button', { name: 'Join pool' }),
+    );
+    expect(enterMutate).toHaveBeenLastCalledWith({
+      game: 'cs2.faceit',
+      metric: 'cs2_kd_ratio',
+      difficulty: 'medium',
+      entry_preset_cents: 2500,
     });
   });
 
@@ -155,21 +168,10 @@ describe('PoolsPage', () => {
 
   it('difficulty filter trims the grid to the chosen difficulty', () => {
     renderWithProviders(<PoolsPage />);
-    // Baseline: 3 difficulties × 3 presets = 9 cards.
-    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(9);
+    expect(screen.getAllByRole('button', { name: 'Join pool' })).toHaveLength(3);
     fireEvent.click(screen.getByTestId('pool-filters-toggle'));
     const filters = screen.getByTestId('pool-filters');
     fireEvent.click(within(filters).getByRole('button', { name: 'hard' }));
-    // Only the hard difficulty × 3 presets remain.
-    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(3);
-  });
-
-  it('entry filter trims the grid to the chosen entry amount', () => {
-    renderWithProviders(<PoolsPage />);
-    fireEvent.click(screen.getByTestId('pool-filters-toggle'));
-    const filters = screen.getByTestId('pool-filters');
-    fireEvent.click(within(filters).getByRole('button', { name: '$25.00' }));
-    // 3 difficulties × 1 entry preset = 3 cards.
-    expect(screen.getAllByRole('button', { name: 'Join Pool' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Join pool' })).toHaveLength(1);
   });
 });

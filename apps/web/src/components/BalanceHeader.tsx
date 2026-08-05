@@ -20,7 +20,7 @@ export function BalanceHeader() {
       data-testid="balance-header"
       className="ml-auto shrink-0 whitespace-nowrap text-right text-sm leading-tight"
     >
-      <span className="label-mono mr-2 align-middle">Balance</span>
+      <span className="label-money mr-2 align-middle">Balance</span>
       <span className="align-middle font-semibold tabular-nums">
         {formatCurrency(shown)}
       </span>

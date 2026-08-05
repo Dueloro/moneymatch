@@ -32,6 +32,7 @@ from ..constants import (
     GAME_PUBG_STEAM,
     POOL_METRICS,
     REGISTERED_GAMES,
+    STAT_BASELINE_MIN_N,
     TOURNAMENT_METRICS,
     game_display_name,
 )
@@ -79,6 +80,10 @@ _DEMO_METRIC_FIXTURE: dict[str, tuple[float, float]] = {
     "pubg_headshot_pct": (22.0, 8.0),
 }
 
+# Sample count stamped on a seeded model — comfortably clear of every baseline
+# floor, so the demo never reads as provisional.
+_DEMO_METRIC_N = 25
+
 
 async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
     """Link the demo user to every playable game + seed non-provisional metric
@@ -89,12 +94,10 @@ async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
             select(LinkedAccount.game).where(LinkedAccount.user_id == user.id)
         )
     )
-    have_models = {
-        (g, m)
-        for g, m in await session.execute(
-            select(MetricModel.game, MetricModel.metric).where(
-                MetricModel.user_id == user.id
-            )
+    models = {
+        (m.game, m.metric): m
+        for m in await session.scalars(
+            select(MetricModel).where(MetricModel.user_id == user.id)
         )
     }
     for game in REGISTERED_GAMES:
@@ -119,14 +122,27 @@ async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
             TOURNAMENT_METRICS.get(game, ())
         )
         for metric in metrics:
-            if (game, metric) in have_models:
-                continue
             mu, sigma = _DEMO_METRIC_FIXTURE.get(metric, (1.0, 0.2))
-            session.add(
-                MetricModel(
-                    user_id=user.id, game=game, metric=metric, mu=mu, sigma=sigma, n=25
+            existing = models.get((game, metric))
+            if existing is None:
+                session.add(
+                    MetricModel(
+                        user_id=user.id,
+                        game=game,
+                        metric=metric,
+                        mu=mu,
+                        sigma=sigma,
+                        n=_DEMO_METRIC_N,
+                    )
                 )
-            )
+            elif existing.n < STAT_BASELINE_MIN_N:
+                # A history bootstrap over the demo's synthetic host account
+                # leaves an empty model (n=0). That reads as provisional and
+                # hides every pool/tournament card, so restore the baseline
+                # rather than skipping on mere row existence.
+                existing.mu = mu
+                existing.sigma = sigma
+                existing.n = _DEMO_METRIC_N
     await session.flush()
 
 

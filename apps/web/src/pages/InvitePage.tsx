@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
+import { TriangleMark } from '../components/ui/brand';
 import { PillButton } from '../components/ui/PillButton';
 import { useAcceptInvite, useInvitePreview } from '../hooks/useChallenges';
 import { useMe } from '../hooks/useMe';
@@ -46,8 +47,10 @@ export function InvitePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm text-center">
-        <div className="mx-auto mb-6 grid h-10 w-10 place-items-center rounded-xl bg-green text-black">
-          <span className="font-bold">M</span>
+        {/* The same mark as the shell and sign-in. This page used to carry a
+         * second, unrelated logo treatment. */}
+        <div className="mx-auto mb-6 flex justify-center">
+          <TriangleMark className="h-11 w-11" />
         </div>
 
         {isLoading ? (
@@ -60,7 +63,8 @@ export function InvitePage() {
               {preview.challenger_username ?? 'A player'} challenged you
             </h1>
             <p className="mt-2 text-sm text-text-secondary">
-              {preview.market_label} · {formatCurrency(preview.entry_cents)} entry
+              {preview.market_label} for{' '}
+              <span className="text-green">{formatCurrency(preview.entry_cents)}</span>
             </p>
 
             {!preview.valid ? (

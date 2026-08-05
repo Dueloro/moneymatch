@@ -35,12 +35,12 @@ export function Avatar({
   online?: boolean;
   /** Render the green/grey presence dot (conversation list + thread header). */
   showPresence?: boolean;
-  /** Platform identity (support, system) — uses the lime brand accent. */
+  /** Platform identity (support, system) uses the lime brand accent. */
   brand?: boolean;
   size?: 'sm' | 'md';
 }) {
   const accent = brand ? 'var(--green)' : accentFor(name);
-  const box = size === 'sm' ? 'h-10 w-10 text-xs' : 'h-12 w-12 text-sm';
+  const box = size === 'sm' ? 'h-10 w-10 text-xs' : 'h-10 w-10 text-sm';
 
   return (
     <span className="relative inline-flex shrink-0">
@@ -66,7 +66,7 @@ export function Avatar({
           aria-label={online ? 'online' : 'offline'}
           className={[
             'absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-bg',
-            online ? 'bg-green shadow-[0_0_8px_var(--green)]' : 'bg-hairline',
+            online ? 'bg-live' : 'bg-hairline',
           ].join(' ')}
         />
       )}

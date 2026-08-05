@@ -38,19 +38,22 @@ function mockStatus(s: unknown) {
   >);
 }
 
+const MARKETS = {
+  game: 'cs2.faceit',
+  linked: true,
+  entry_presets_cents: [500, 1000, 2500],
+  prize_split: [50, 30, 20],
+  field_size: 10,
+  score_matches: 3,
+  metrics: [{ metric: 'cs2_kd_ratio', label: 'K/D ratio', provisional: false }],
+};
+const ADR_METRIC = { metric: 'cs2_adr', label: 'ADR', provisional: false };
+
 describe('TournamentPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useTournamentMarkets).mockReturnValue({
-      data: {
-        game: 'cs2.faceit',
-        linked: true,
-        entry_presets_cents: [500, 1000, 2500],
-        prize_split: [50, 30, 20],
-        field_size: 10,
-        score_matches: 3,
-        metrics: [{ metric: 'cs2_kd_ratio', label: 'K/D ratio', provisional: false }],
-      },
+      data: MARKETS,
     } as unknown as ReturnType<typeof useTournamentMarkets>);
     mockStatus({ status: 'idle', tournament: null });
     vi.mocked(useEnterTournament).mockReturnValue({
@@ -63,19 +66,19 @@ describe('TournamentPage', () => {
     } as unknown as ReturnType<typeof useLeaveTournament>);
   });
 
-  it('renders joinable tournament cards (10-20 players) and joins with the preset', () => {
+  it('renders one card per metric and joins with the entry chosen inside it', () => {
     renderWithProviders(<TournamentPage />);
-    // 1 metric × 3 entry presets = 3 cards at advertised sizes 10 / 16 / 20.
-    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(3);
-    expect(screen.getByText('10 players')).toBeInTheDocument();
-    expect(screen.getByText('16 players')).toBeInTheDocument();
-    expect(screen.getByText('20 players')).toBeInTheDocument();
-    expect(screen.getAllByText('Best 3 matches · top 3 split the pot').length).toBe(3);
+    // 1 metric = 1 card. The advertised field size is the server's, not a
+    // number invented per entry preset.
+    expect(screen.getAllByRole('button', { name: 'Join tournament' })).toHaveLength(1);
+    expect(screen.getByText('top 3 paid')).toBeInTheDocument();
 
     // Join the $10 card (its entry amount is unique across cards).
-    const card = screen.getByText('$10.00').closest('.rounded-2xl')!;
+    const card = screen
+      .getByRole('button', { name: 'Join tournament' })
+      .closest('.rounded-card')!;
     fireEvent.click(
-      within(card as HTMLElement).getByRole('button', { name: 'Join Tournament' }),
+      within(card as HTMLElement).getByRole('button', { name: 'Join tournament' }),
     );
     expect(enterMutate).toHaveBeenCalledWith({
       game: 'cs2.faceit',
@@ -127,21 +130,14 @@ describe('TournamentPage', () => {
   });
 
   it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
+    // A single metric hides the filter bar entirely, so use two here.
+    vi.mocked(useTournamentMarkets).mockReturnValue({
+      data: { ...MARKETS, metrics: [...MARKETS.metrics, ADR_METRIC] },
+    } as unknown as ReturnType<typeof useTournamentMarkets>);
     renderWithProviders(<TournamentPage />);
     expect(screen.queryByTestId('tournament-filters')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('tournament-filters-toggle'));
     expect(screen.getByTestId('tournament-filters')).toBeInTheDocument();
-  });
-
-  it('entry filter trims the grid to the chosen entry amount', () => {
-    renderWithProviders(<TournamentPage />);
-    // Baseline: 1 metric × 3 presets = 3 cards.
-    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(3);
-    fireEvent.click(screen.getByTestId('tournament-filters-toggle'));
-    const filters = screen.getByTestId('tournament-filters');
-    fireEvent.click(within(filters).getByRole('button', { name: '$25.00' }));
-    // 1 metric × 1 entry preset = 1 card.
-    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(1);
   });
 
   it('metric filter trims the grid to the chosen metric', () => {
@@ -162,11 +158,10 @@ describe('TournamentPage', () => {
     } as unknown as ReturnType<typeof useTournamentMarkets>);
     renderWithProviders(<TournamentPage />);
     // Baseline: 2 metrics × 3 presets = 6 cards.
-    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(6);
+    expect(screen.getAllByRole('button', { name: 'Join tournament' })).toHaveLength(2);
     fireEvent.click(screen.getByTestId('tournament-filters-toggle'));
     const filters = screen.getByTestId('tournament-filters');
     fireEvent.click(within(filters).getByRole('button', { name: 'ADR' }));
-    // Only the chosen metric × 3 presets remain.
-    expect(screen.getAllByRole('button', { name: 'Join Tournament' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Join tournament' })).toHaveLength(1);
   });
 });

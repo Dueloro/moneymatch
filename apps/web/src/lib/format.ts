@@ -17,6 +17,19 @@ export function formatSignedCurrency(cents: number): string {
   return formatCurrency(cents); // negative already carries "-", zero is "$0.00"
 }
 
+/**
+ * Strip em and en dashes out of server-provided display strings (game display
+ * names, market resolution notes, forecast labels). The client owns
+ * presentation, and the copy rules ban the em dash outright, so this normalises
+ * at the render boundary rather than asking every caller to remember.
+ */
+export function dashless(text: string): string {
+  return text
+    .replace(/\s*[—–]\s*/g, ' · ')
+    .replace(/\s*·\s*·\s*/g, ' · ')
+    .trim();
+}
+
 /** Format a probability / share (0..1) as a whole-number percentage. */
 export function formatPct(prob: number): string {
   return `${Math.round(prob * 100)}%`;

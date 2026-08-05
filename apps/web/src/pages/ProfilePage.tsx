@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
-import { FooterBreadcrumb } from '../components/ui/FooterBreadcrumb';
 import { PillButton } from '../components/ui/PillButton';
+import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
 import { formatCurrency } from '../lib/format';
 import { disablePush, enablePush, isPushSupported, isSubscribed } from '../lib/push';
@@ -20,11 +20,11 @@ export function ProfilePage() {
   const excluded = user?.status === 'self_excluded';
 
   return (
-    <div className="max-w-lg">
-      <h1 className="mb-6 text-2xl font-bold">Profile</h1>
+    <div className="max-w-read">
+      <SectionHeader level="page">Profile</SectionHeader>
 
       <div className="flex items-center gap-3">
-        <span className="grid h-12 w-12 place-items-center rounded-full bg-panel-raised text-lg">
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-panel-raised text-lg font-semibold">
           {user?.username?.slice(0, 1).toUpperCase() ?? '?'}
         </span>
         <div>
@@ -56,7 +56,11 @@ export function ProfilePage() {
       )}
 
       <Section title="Limits">
-        {limits ? <LimitsEditor limits={limits} /> : <p className="text-sm">—</p>}
+        {limits ? (
+          <LimitsEditor limits={limits} />
+        ) : (
+          <p className="text-sm text-text-tertiary">Not set</p>
+        )}
       </Section>
 
       <Section title="Notifications">
@@ -109,8 +113,6 @@ export function ProfilePage() {
           </button>
         )}
       </div>
-
-      <FooterBreadcrumb segments={['PROFILE']} />
     </div>
   );
 }
@@ -201,7 +203,7 @@ function ChangePassword() {
         <PillButton variant="outline" onClick={() => setStep('current')}>
           Change password
         </PillButton>
-        {notice && <p className="text-xs text-green">{notice}</p>}
+        {notice && <p className="text-xs text-live">{notice}</p>}
       </div>
     );
   }
@@ -215,7 +217,7 @@ function ChangePassword() {
           placeholder="Enter current password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
+          className="w-full rounded-pill border border-hairline bg-panel-raised px-4 py-2.5 text-sm text-text transition-colors placeholder:text-text-tertiary hover:border-line-strong"
         />
         <button
           type="button"
@@ -226,7 +228,7 @@ function ChangePassword() {
           Forgot your password? Verify with email.
         </button>
         {error && <p className="text-xs text-red">{error}</p>}
-        {notice && <p className="text-xs text-green">{notice}</p>}
+        {notice && <p className="text-xs text-live">{notice}</p>}
         <div className="flex items-center gap-3">
           <PillButton type="submit" variant="primary" disabled={!current || busy}>
             {busy ? 'Checking…' : 'Continue'}
@@ -247,7 +249,7 @@ function ChangePassword() {
         placeholder="New password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
+        className="w-full rounded-pill border border-hairline bg-panel-raised px-4 py-2.5 text-sm text-text transition-colors placeholder:text-text-tertiary hover:border-line-strong"
       />
       <input
         type="password"
@@ -255,7 +257,7 @@ function ChangePassword() {
         placeholder="Confirm new password"
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
-        className="rounded-pill border border-hairline bg-panel px-5 py-2.5 text-sm outline-none focus:border-text-secondary"
+        className="w-full rounded-pill border border-hairline bg-panel-raised px-4 py-2.5 text-sm text-text transition-colors placeholder:text-text-tertiary hover:border-line-strong"
       />
       {tooShort && (
         <p className="text-xs text-text-secondary">Use at least 6 characters.</p>
@@ -323,7 +325,7 @@ function PushToggle() {
         >
           {busy ? 'Working…' : on ? 'Turn off notifications' : 'Enable notifications'}
         </PillButton>
-        {on && <span className="text-sm text-green">On</span>}
+        {on && <span className="text-sm text-live">On</span>}
         {error && <span className="text-sm text-red">{error}</span>}
       </div>
     </div>
@@ -504,7 +506,7 @@ function DollarField({
           inputMode="decimal"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-24 rounded-pill border border-hairline bg-panel px-4 py-1.5 text-right tabular-nums outline-none focus:border-text-secondary"
+          className="w-24 rounded-pill border border-hairline bg-panel-raised px-4 py-1.5 text-right text-sm text-text transition-colors hover:border-line-strong"
         />
       </span>
     </label>
@@ -533,8 +535,8 @@ function toCents(value: string): number | null {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mt-8">
-      <p className="mb-2 text-xs uppercase tracking-wide text-text-tertiary">{title}</p>
+    <div className="mt-10">
+      <SectionHeader level="sub">{title}</SectionHeader>
       {children}
     </div>
   );

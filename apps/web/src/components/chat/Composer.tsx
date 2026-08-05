@@ -73,11 +73,9 @@ export function Composer({
   }
 
   return (
-    <div className="border-t border-hairline bg-panel/60 px-4 py-4">
+    <div className="border-t border-hairline bg-panel px-4 py-4">
       {send.error && (
-        <p className="mb-2 px-1 text-[13px] text-red">
-          {(send.error as Error).message}
-        </p>
+        <p className="mb-2 px-1 text-xs text-red">{(send.error as Error).message}</p>
       )}
       <div className="flex items-end gap-2.5">
         {canInvite && (
@@ -86,9 +84,9 @@ export function Composer({
               <div
                 role="menu"
                 data-testid="invite-menu"
-                className="absolute bottom-14 left-0 z-20 w-64 overflow-hidden rounded-2xl border border-hairline bg-panel-raised shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)]"
+                className="absolute bottom-14 left-0 z-20 w-64 overflow-hidden rounded-card border border-hairline bg-panel-raised shadow-overlay"
               >
-                <p className="label-mono border-b border-hairline px-4 pb-2 pt-3">
+                <p className="label-money border-b border-hairline px-4 pb-2 pt-3">
                   Invite to
                 </p>
                 {INVITE_OPTIONS.map((opt) => (
@@ -102,11 +100,11 @@ export function Composer({
                     }}
                     className="group flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-panel"
                   >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hairline text-green transition group-hover:border-green/50">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-hairline text-text-secondary transition group-hover:border-line-strong">
                       <opt.Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[15px] font-semibold text-text">
+                      <span className="block text-sm font-semibold text-text">
                         {opt.label}
                       </span>
                       <span className="block text-xs text-text-secondary">
@@ -124,10 +122,10 @@ export function Composer({
               disabled={disabled}
               onClick={() => setMenuOpen((v) => !v)}
               className={[
-                'grid h-12 w-12 shrink-0 place-items-center rounded-full border transition',
+                'grid h-10 w-10 shrink-0 place-items-center rounded-full border transition',
                 menuOpen
-                  ? 'rotate-45 border-green bg-green text-black'
-                  : 'border-hairline text-text-secondary hover:border-green hover:text-green',
+                  ? 'rotate-45 border-action bg-action text-bg'
+                  : 'border-hairline text-text-secondary hover:border-line-strong hover:text-text',
               ].join(' ')}
             >
               <PlusIcon className="h-5 w-5" />
@@ -148,7 +146,7 @@ export function Composer({
           }}
           placeholder="Write a message…"
           aria-label="Message"
-          className="no-scrollbar max-h-40 min-h-[3rem] w-full flex-1 resize-none rounded-2xl border border-hairline bg-bg px-4 py-3 text-[15px] leading-relaxed text-text transition placeholder:text-text-tertiary focus:border-green/60 focus:shadow-[0_0_0_3px_rgba(198,244,64,0.08)] focus:outline-none"
+          className="no-scrollbar max-h-40 min-h-[3rem] w-full flex-1 resize-none rounded-card border border-hairline bg-bg px-4 py-3 text-sm leading-relaxed text-text transition placeholder:text-text-tertiary focus:border-line-strong  focus:outline-none"
         />
 
         <button
@@ -156,7 +154,7 @@ export function Composer({
           aria-label="Send"
           disabled={disabled || !text.trim() || send.isPending}
           onClick={() => void submit()}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-green text-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none [&:not(:disabled)]:shadow-[0_8px_24px_-12px_var(--green)]"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-action text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none "
         >
           <SendIcon className="h-5 w-5" />
         </button>

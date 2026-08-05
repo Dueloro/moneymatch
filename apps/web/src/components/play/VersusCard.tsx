@@ -26,10 +26,10 @@ export function VersusCard({
   status?: string;
 }) {
   return (
-    <div className="animate-rise rounded-2xl border border-hairline bg-panel-raised p-5">
+    <div className="animate-rise rounded-card border border-hairline bg-panel-raised p-5">
       <div className="flex items-center justify-between">
-        <span className="label-mono">{status ?? 'Opponent found'}</span>
-        <span className="label-mono">{marketLabel}</span>
+        <span className="label-money">{status ?? 'Opponent found'}</span>
+        <span className="label-money">{marketLabel}</span>
       </div>
 
       <div className="mt-4 flex items-stretch gap-3">
@@ -44,13 +44,13 @@ export function VersusCard({
 
       <div className="mt-5 flex items-center justify-between border-t border-hairline pt-4">
         <div>
-          <div className="label-mono">Pot</div>
+          <div className="label-money">Pot</div>
           <div className="text-lg font-bold tabular-nums">
             {formatCurrency(potCents)}
           </div>
         </div>
         <div className="text-right">
-          <div className="label-mono">You&apos;d win</div>
+          <div className="label-money">You&apos;d win</div>
           <div className="text-lg font-bold tabular-nums text-green">
             {formatCurrency(prizeCents)}
           </div>
@@ -65,15 +65,15 @@ function Player({ side, align = 'left' }: { side: Side; align?: 'left' | 'right'
   return (
     <div
       className={[
-        'flex min-w-0 flex-1 flex-col gap-2 rounded-xl border p-3',
-        side.you ? 'border-green/40 bg-green/5' : 'border-hairline',
+        'flex min-w-0 flex-1 flex-col gap-2 rounded-inset border p-3',
+        side.you ? 'border-line-strong bg-panel-raised' : 'border-hairline',
         right ? 'items-end text-right' : 'items-start',
       ].join(' ')}
     >
       <span
         className={[
           'grid h-9 w-9 place-items-center rounded-full text-sm font-bold',
-          side.you ? 'bg-green text-black' : 'bg-panel text-text',
+          side.you ? 'bg-action text-bg' : 'bg-panel text-text',
         ].join(' ')}
       >
         {(side.name || '?').slice(0, 1).toUpperCase()}
@@ -83,7 +83,7 @@ function Player({ side, align = 'left' }: { side: Side; align?: 'left' | 'right'
           {side.you ? 'You' : side.name || 'Opponent'}
         </div>
         <div className="text-xs tabular-nums text-text-secondary">
-          {side.rating != null ? side.rating : '—'}
+          {side.rating != null ? side.rating : '-'}
         </div>
       </div>
     </div>

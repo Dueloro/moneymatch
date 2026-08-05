@@ -69,7 +69,7 @@ export function PlaySlip({
 function SlipShell({ children }: { children: React.ReactNode }) {
   return (
     <aside
-      className="w-full shrink-0 rounded-2xl bg-panel p-6 md:w-[354px]"
+      className="w-full shrink-0 rounded-card border border-hairline bg-panel p-6 md:w-[354px]"
       data-testid="play-slip"
     >
       {children}
@@ -119,7 +119,7 @@ function WagerSlip({
       <h3 className="text-lg font-bold text-text">{market.label}</h3>
 
       {market.provisional ? (
-        <p className="mt-3 rounded-lg bg-bg p-3 text-xs text-text-secondary">
+        <p className="mt-3 rounded-inset bg-bg p-3 text-xs text-text-secondary">
           You need more recent matches on this stat before you can duel it. Play a few
           and check back.
         </p>
@@ -168,7 +168,7 @@ function SearchingSlip({ status }: { status: QueueStatus }) {
     <SlipShell>
       <div className="flex items-center gap-3">
         <span
-          className="h-3 w-3 animate-pulse rounded-full bg-green"
+          className="h-3 w-3 animate-pulse rounded-full bg-live"
           data-testid="searching-dot"
         />
         <p className="text-sm font-semibold text-text">Searching…</p>
@@ -211,7 +211,7 @@ function MatchedSlip({ match }: { match: MatchView }) {
       />
 
       {match.forecast && (
-        <p className="mt-3 text-xs text-green" data-testid="forecast">
+        <p className="mt-3 text-xs text-text-secondary" data-testid="forecast">
           {match.forecast.label}
         </p>
       )}
@@ -264,7 +264,7 @@ function GoPlay({ match }: { match: MatchView }) {
     );
   }
   return (
-    <div className="mt-5 rounded-lg bg-bg p-3">
+    <div className="mt-5 rounded-inset bg-bg p-3">
       <p className="text-sm font-medium text-text">Play your next match now</p>
       <p className="mt-1 text-xs text-text-secondary">
         Jump into {match.game.split('.')[0].toUpperCase()} and play. We grade your next

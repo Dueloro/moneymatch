@@ -1,17 +1,12 @@
 import { useId, useState, type ReactNode } from 'react';
 
+import { Card } from './Card';
 import { ChevronDownIcon } from './icons';
 
 /**
- * A self-contained card row with an optional expandable body — the app's
- * standard "line item you can open to learn more" (02-design §5, cards
- * refresh). Collapsed it reads like a `ListRow` (left slot, title + subline,
- * right slot); when `children` are provided a chevron appears and the header
- * toggles a detail panel. `footer` renders under the header in both states
- * (e.g. an Activity live line).
- *
- * Non-expandable (no `children`) it's just a styled card, so the same component
- * serves every list across the app.
+ * A card row with an optional expandable body: the app's standard "line item you
+ * can open to learn more". Built on `Card`, so it shares the one radius, the one
+ * border rule and the one surface value with everything else on the page.
  */
 export function ExpandableCard({
   left,
@@ -46,7 +41,7 @@ export function ExpandableCard({
       {right && <div className="shrink-0 text-sm">{right}</div>}
       {expandable && (
         <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-text-secondary transition-transform ${
+          className={`h-4 w-4 shrink-0 text-text-tertiary transition-transform ${
             open ? 'rotate-180' : ''
           }`}
         />
@@ -55,7 +50,7 @@ export function ExpandableCard({
   );
 
   return (
-    <div className="rounded-2xl border border-hairline bg-panel transition hover:border-text-secondary/40">
+    <Card interactive={expandable}>
       {expandable ? (
         <button
           type="button"
@@ -63,7 +58,7 @@ export function ExpandableCard({
           aria-controls={panelId}
           aria-label={ariaLabel}
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left"
+          className="flex w-full items-center gap-3 rounded-card px-4 py-3 text-left"
         >
           {header}
         </button>
@@ -78,6 +73,6 @@ export function ExpandableCard({
           {children}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

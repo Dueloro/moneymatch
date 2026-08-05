@@ -8,6 +8,11 @@ import { AppShell } from './AppShell';
 vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
 // The live ticker depends on auth + query context the shell test doesn't provide.
 vi.mock('./ui/Ticker', () => ({ Ticker: () => null }));
+// Same for the rail, which reads wallet + activity + queue.
+vi.mock('./rail/SideRail', () => ({ SideRail: () => null }));
+vi.mock('../hooks/useWallet', () => ({
+  useWallet: () => ({ data: { available_cents: 100_800, escrow_cents: 0 } }),
+}));
 // The bell's badge is a live query (notifications + unread DMs); the shell test
 // has no auth context, so drive it directly.
 vi.mock('../hooks/useChat', () => ({ useInboxUnread: vi.fn(() => 0) }));
@@ -20,41 +25,51 @@ vi.mocked(useMe).mockReturnValue({
   isLoading: false,
 } as ReturnType<typeof useMe>);
 
-describe('AppShell', () => {
-  it('renders the sidebar nav, routed content, and footer breadcrumb', () => {
-    renderWithProviders(
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route path="/play" element={<div>PLAY CONTENT</div>} />
-        </Route>
-      </Routes>,
-      { route: '/play' },
-    );
+function renderShell(route = '/pools') {
+  return renderWithProviders(
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/pools" element={<div>POOLS CONTENT</div>} />
+        <Route path="/play" element={<div>PLAY CONTENT</div>} />
+      </Route>
+    </Routes>,
+    { route },
+  );
+}
 
-    // Nav renders in two responsive bars (desktop sidebar + mobile tab bar), so
-    // a label can appear more than once; assert it is present at least once.
-    for (const label of ['Activity', 'Social', 'Wallet']) {
-      expect(screen.getAllByRole('link', { name: label }).length).toBeGreaterThan(0);
+describe('AppShell', () => {
+  it('renders four primary nav entries and the routed content', () => {
+    renderShell();
+
+    // Six entries collapsed to four: the three contest modes live behind "Play"
+    // with a mode switcher on that surface. Nav renders in two responsive bars
+    // (desktop sidebar + mobile tab bar), so a label appears more than once.
+    for (const label of ['Play', 'Activity', 'Social', 'Wallet']) {
+      expect(screen.getAllByRole('link', { name: label }).length).toBe(2);
     }
-    // The desktop sidebar uses full labels; the mobile bar abbreviates these.
-    for (const label of ['Head-to-Head', 'Solo Pools', 'Tournament']) {
-      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
-    }
-    expect(screen.getByText('PLAY CONTENT')).toBeInTheDocument();
-    expect(screen.getByTestId('footer-breadcrumb')).toHaveTextContent('HEAD-TO-HEAD');
+    // Tournament and Head-to-Head are no longer top-level nav entries.
+    expect(screen.queryByRole('link', { name: 'Tournament' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Head-to-Head' }),
+    ).not.toBeInTheDocument();
+
+    expect(screen.getByText('POOLS CONTENT')).toBeInTheDocument();
     expect(screen.getByText('kvem_')).toBeInTheDocument();
   });
 
-  function renderShell() {
-    return renderWithProviders(
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route path="/play" element={<div>PLAY CONTENT</div>} />
-        </Route>
-      </Routes>,
-      { route: '/play' },
-    );
-  }
+  it('keeps Play lit on every contest route', () => {
+    renderShell('/play');
+    const play = screen.getAllByRole('link', { name: 'Play' });
+    // `aria-current` is what NavLink sets for the active entry.
+    expect(play.some((el) => el.getAttribute('aria-current') === 'page')).toBe(true);
+    expect(screen.getByText('PLAY CONTENT')).toBeInTheDocument();
+  });
+
+  it('shows the balance in the sidebar footer', () => {
+    renderShell();
+    // The sidebar's dead space now ends in the number players check first.
+    expect(screen.getAllByText('$1,008.00').length).toBeGreaterThan(0);
+  });
 
   it('shows a role-gated Admin link for admins', () => {
     vi.mocked(useMe).mockReturnValue({
@@ -80,9 +95,8 @@ describe('AppShell', () => {
 
     vi.mocked(useInboxUnread).mockReturnValue(2);
     renderShell();
-    // Rendered by both responsive bars; the link carries the count for a11y.
-    expect(screen.getAllByTestId('inbox-unread-dot').length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'Inbox (2 unread)' }).length).toBe(2);
+    expect(screen.getByTestId('inbox-unread-dot')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Inbox, 2 unread' })).toBeInTheDocument();
   });
 
   it('hides the Admin link from non-admins', () => {

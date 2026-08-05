@@ -97,7 +97,7 @@ function NotificationRow({ note }: { note: NotificationItem }) {
           aria-label={note.read ? 'read' : 'unread'}
           className={[
             'h-2 w-2 rounded-full',
-            note.read ? 'bg-transparent' : 'bg-green',
+            note.read ? 'bg-transparent' : 'bg-action',
           ].join(' ')}
         />
       }

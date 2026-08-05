@@ -1,14 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { BalanceHeader } from '../components/BalanceHeader';
+import { ModeSwitcher } from '../components/ModeSwitcher';
 import { AmountText } from '../components/ui/AmountText';
+import { Card } from '../components/ui/Card';
+import { CardGrid } from '../components/ui/CardGrid';
 import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
+import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
 import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
@@ -22,10 +27,6 @@ import {
   type TournamentView,
 } from '../hooks/useTournaments';
 
-// Advertised field sizes (10–20 players). The backend forms a real field on
-// join; these give the browse cards a realistic range of tournament sizes.
-const FIELD_SIZES = [10, 16, 20];
-
 /** The Tournament section: browse joinable skill fields as cards. */
 export function TournamentPage() {
   const { games, selected: game, select: setGame } = useGameSelection();
@@ -38,14 +39,24 @@ export function TournamentPage() {
   const { data: status } = useTournamentStatus();
   const enter = useEnterTournament();
 
-  // Filters — trim the metric × entry browse grid down to what you want.
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
-  const [entryFilter, setEntryFilter] = useState<number | typeof ALL>(ALL);
+
+  const places = markets?.prize_split.length ?? 3;
+  const scoreN = markets?.score_matches ?? 3;
 
   const header = (
-    <div className="mb-6 flex items-center gap-4">
-      <GameTabs games={games} selected={game} onSelect={setGame} />
-      <BalanceHeader />
+    <div className="mb-6 flex flex-wrap items-center gap-3">
+      <ModeSwitcher />
+      <div className="w-full md:w-auto">
+        <GameTabs games={games} selected={game} onSelect={setGame} />
+      </div>
+      <div className="ml-auto">
+        <HowItWorks id="tournament">
+          A field of similar-skill players all chase the same stat. Your best {scoreN}{' '}
+          matches inside the window are scored automatically, and the top {places} split
+          the pot. No reporting, no brackets, just play.
+        </HowItWorks>
+      </div>
     </div>
   );
 
@@ -64,8 +75,13 @@ export function TournamentPage() {
       <div>
         {header}
         <EmptyState
-          title={`Tournaments aren't available for ${gameMeta(game).name} yet`}
-          subline="Tournaments are Counter-Strike 2 only for now — more games soon."
+          title={`No tournaments on ${gameMeta(game).name} yet`}
+          subline="Tournaments are Counter Strike 2 only for now. More games are coming."
+          action={
+            <Link to="/pools">
+              <PillButton>Browse solo pools</PillButton>
+            </Link>
+          }
         />
       </div>
     );
@@ -77,7 +93,7 @@ export function TournamentPage() {
         {header}
         <EmptyState
           title={`Link your ${game ? gameMeta(game).name : 'game'} account`}
-          subline="Tournaments record your best matches automatically. Link to play."
+          subline="Tournaments score your best matches automatically, so we need to know which account is yours."
           action={
             <Link to="/profile">
               <PillButton>Link a game</PillButton>
@@ -88,116 +104,95 @@ export function TournamentPage() {
     );
   }
 
-  const meta = game ? gameMeta(game, undefined) : null;
   const presets = markets?.entry_presets_cents ?? [];
   const openMetrics = markets?.metrics.filter((m) => !m.provisional) ?? [];
-  const places = markets?.prize_split.length ?? 3;
-  const scoreN = markets?.score_matches ?? 3;
+  const fieldSize = markets?.field_size ?? 16;
   const busy = status?.status === 'searching' || status?.status === 'formed';
 
-  // Apply the active filters to the metric × entry grid. Keep each preset's
-  // original index so the advertised field size stays put when filtering.
   const filteredMetrics = openMetrics.filter(
     (m) => metricFilter === ALL || m.metric === metricFilter,
   );
-  const filteredPresets = presets
-    .map((entry, i) => ({ entry, i }))
-    .filter(({ entry }) => entryFilter === ALL || entry === entryFilter);
-  const activeCount = (metricFilter !== ALL ? 1 : 0) + (entryFilter !== ALL ? 1 : 0);
-  const filterable = openMetrics.length > 1 || presets.length > 1;
-  const hasResults = filteredMetrics.length > 0 && filteredPresets.length > 0;
+  const activeCount = metricFilter !== ALL ? 1 : 0;
+  const hasResults = filteredMetrics.length > 0 && presets.length > 0;
 
   return (
     <div>
       {header}
 
-      <p className="mb-6 max-w-2xl text-sm text-text-secondary">
-        Tournaments field 10–20 similar-skill players. Your best {scoreN} matches over
-        the window are scored automatically — no reporting — and the top {places} split
-        the pot. Pick a tournament and join.
-      </p>
-
       {status && (status.status === 'searching' || status.status === 'formed') && (
         <TournamentStatusBanner status={status} />
       )}
 
-      {openMetrics.length === 0 ? (
-        <p className="py-8 text-sm text-text-secondary">
-          {marketsLoading
-            ? 'Loading tournaments…'
-            : 'No tournaments on this game yet — play a match on it and they appear here.'}
-        </p>
-      ) : (
-        <>
-          {filterable && (
+      <SectionHeader
+        level="page"
+        action={
+          !marketsLoading &&
+          openMetrics.length > 1 && (
             <FilterBar
               testId="tournament-filters"
               activeCount={activeCount}
-              onClear={() => {
-                setMetricFilter(ALL);
-                setEntryFilter(ALL);
-              }}
+              onClear={() => setMetricFilter(ALL)}
             >
-              {openMetrics.length > 1 && (
-                <FilterChips
-                  label="Metric"
-                  options={openMetrics.map((m) => m.metric)}
-                  selected={metricFilter}
-                  onSelect={(v) => setMetricFilter(v as string)}
-                  format={(m) =>
-                    openMetrics.find((x) => x.metric === m)?.label ?? String(m)
-                  }
-                />
-              )}
-              {presets.length > 1 && (
-                <FilterChips
-                  label="Entry"
-                  options={presets}
-                  selected={entryFilter}
-                  onSelect={setEntryFilter}
-                  format={(cents) => formatCurrency(cents)}
-                />
-              )}
+              <FilterChips
+                label="Metric"
+                options={openMetrics.map((m) => m.metric)}
+                selected={metricFilter}
+                onSelect={(v) => setMetricFilter(v as string)}
+                format={(m) =>
+                  openMetrics.find((x) => x.metric === m)?.label ?? String(m)
+                }
+              />
             </FilterBar>
-          )}
+          )
+        }
+      >
+        Tournaments
+      </SectionHeader>
 
+      {marketsLoading ? (
+        <SkeletonList rows={3} />
+      ) : openMetrics.length === 0 ? (
+        <EmptyState
+          title="No tournaments on this game yet"
+          subline="Play a match on it and they appear here."
+        />
+      ) : (
+        <>
           {!hasResults ? (
-            <p className="py-8 text-sm text-text-secondary">
-              No tournaments match these filters.
-            </p>
+            <EmptyState
+              title="Nothing matches those filters"
+              subline="Clear them to see every open tournament."
+            />
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredMetrics.flatMap((m) =>
-                filteredPresets.map(({ entry, i }) => {
-                  const size = FIELD_SIZES[i % FIELD_SIZES.length];
-                  const key = `${game}:${m.metric}:${entry}:${size}`;
-                  return (
-                    <WagerCard
-                      key={key}
-                      accent={meta?.accent ?? 'var(--text-secondary)'}
-                      gameName={meta?.short ?? 'Game'}
-                      tag={`${size} players`}
-                      title={m.label}
-                      subtitle={`Best ${scoreN} matches · top ${places} split the pot`}
-                      entryCents={entry}
-                      capacity={size}
-                      filled={filledSpots(key, size)}
-                      footnote={`Top ${places} paid`}
-                      buttonLabel="Join Tournament"
-                      disabled={busy}
-                      joining={enter.isPending}
-                      onJoin={() =>
-                        enter.mutate({
-                          game: markets!.game,
-                          metric: m.metric,
-                          entry_preset_cents: entry,
-                        })
-                      }
-                    />
-                  );
-                }),
-              )}
-            </div>
+            <CardGrid count={filteredMetrics.length}>
+              {filteredMetrics.map((m) => {
+                const key = `${game}:${m.metric}`;
+                return (
+                  <WagerCard
+                    key={key}
+                    gameName={`${fieldSize} players`}
+                    tag={`top ${places} paid`}
+                    title={m.label}
+                    subtitle={`Your best ${scoreN} matches in the window are scored automatically.`}
+                    entryOptions={presets}
+                    payoutFor={(entry) => entry * fieldSize}
+                    payoutLabel="Pot if full"
+                    capacity={fieldSize}
+                    filled={filledSpots(key, fieldSize)}
+                    buttonLabel="Join tournament"
+                    disabled={busy}
+                    joining={enter.isPending}
+                    onJoin={(entry) =>
+                      enter.mutate({
+                        game: markets!.game,
+                        metric: m.metric,
+                        entry_preset_cents: entry,
+                      })
+                    }
+                  />
+                );
+              })}
+            </CardGrid>
           )}
         </>
       )}
@@ -218,16 +213,16 @@ function TournamentStatusBanner({
   }
 
   return (
-    <div
-      className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-panel p-4"
+    <Card
+      className="mb-6 flex items-center justify-between gap-4 p-4"
       data-testid="tournament-status"
     >
       <div className="flex items-center gap-3">
-        <span className="h-3 w-3 animate-pulse rounded-full bg-green" />
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-live" />
         <div>
-          <p className="text-sm font-semibold text-text">Forming a field…</p>
+          <p className="text-sm font-medium text-text">Finding your field</p>
           <p className="text-xs text-text-secondary">
-            Matching you with similar-skill players under the dispersion cap.
+            Matching you with players of a similar standard.
           </p>
         </div>
       </div>
@@ -238,30 +233,42 @@ function TournamentStatusBanner({
       >
         Cancel
       </PillButton>
-    </div>
+    </Card>
   );
 }
 
 function StandingsPanel({ tournament }: { tournament: TournamentView }) {
   const settled = tournament.state === 'SETTLED';
   return (
-    <div className="mb-6 rounded-2xl bg-panel p-6" data-testid="standings-panel">
-      <p className="label-mono">{settled ? 'Final standings' : 'Live standings'}</p>
-      <h3 className="text-lg font-bold text-text">{tournament.metric_label}</h3>
+    <Card className="mb-6 p-5" data-testid="standings-panel">
+      <div className="flex items-center gap-2">
+        {!settled && <span className="h-2 w-2 rounded-full bg-live" aria-hidden />}
+        <p
+          className={[
+            'text-xs font-semibold uppercase tracking-wide',
+            settled ? 'text-text-tertiary' : 'text-live',
+          ].join(' ')}
+        >
+          {settled ? 'Final standings' : 'Live standings'}
+        </p>
+      </div>
+      <h2 className="mt-2 text-xl font-semibold text-text">
+        {tournament.metric_label}
+      </h2>
       <div className="mt-3">
         {tournament.standings.map((row) => (
           <ListRow
             key={row.user_id}
             title={
-              <span className={row.is_you ? 'text-green' : undefined}>
-                {row.rank ? `#${row.rank}` : '—'} {row.username ?? 'Player'}
+              <span className={row.is_you ? 'font-semibold text-text' : undefined}>
+                {row.rank ? `#${row.rank}` : '-'} {row.username ?? 'Player'}
                 {row.is_you ? ' (you)' : ''}
               </span>
             }
             subline={
               row.score != null
                 ? `${row.score.toFixed(2)} · ${row.matches} matches`
-                : 'no qualifying match yet'
+                : 'No qualifying match yet'
             }
             right={
               settled && row.payout_cents > 0 ? (
@@ -272,8 +279,8 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
         ))}
       </div>
       <p className="mt-3 text-xs text-text-secondary">
-        Pot {formatCurrency(tournament.pot_cents)} · window closes automatically.
+        Pot {formatCurrency(tournament.pot_cents)} · the window closes automatically.
       </p>
-    </div>
+    </Card>
   );
 }
