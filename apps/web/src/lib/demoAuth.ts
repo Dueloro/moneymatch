@@ -38,7 +38,15 @@ export async function enterDemo(): Promise<void> {
     body: '{}',
   });
   if (!res.ok) {
-    throw new Error('Demo login is not enabled on this server.');
+    // Only a 404 means the bypass is genuinely off (the router isn't mounted /
+    // demo_login_enabled is false). Any other status is a real failure — most
+    // often a 500 — and reporting it as "not enabled" masks the actual cause
+    // (e.g. a prod schema that's behind on migrations). Keep them distinct so
+    // outages are diagnosable from the toast instead of looking like config.
+    if (res.status === 404) {
+      throw new Error('Demo login is not enabled on this server.');
+    }
+    throw new Error(`Demo login failed (${res.status}). Please try again shortly.`);
   }
   const data = (await res.json()) as { access_token: string };
   window.localStorage.setItem(DEMO_TOKEN_KEY, data.access_token);
