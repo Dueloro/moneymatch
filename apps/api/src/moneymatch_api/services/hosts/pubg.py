@@ -22,7 +22,7 @@ import time
 
 from ...config import get_settings
 from ._client import request_json
-from .errors import HostError, HostNotFound
+from .errors import HostError, HostNotConfigured, HostNotFound
 
 HOST = "pubg"
 PUBG_BASE = "https://api.pubg.com/shards"
@@ -37,6 +37,12 @@ def _api_key() -> str | None:
     return get_settings().pubg_api_key
 
 
+def is_configured() -> bool:
+    """True when a PUBG API key is set. The link path checks this up front so a
+    missing key is a clear `HostNotConfigured`, not a silent "player not found"."""
+    return bool(_api_key())
+
+
 def _headers() -> dict:
     return {
         "Authorization": f"Bearer {_api_key()}",
@@ -48,9 +54,15 @@ def _headers() -> dict:
 async def get_player_by_name(name: str, shard: str = "steam") -> dict | None:
     """Resolve a PUBG player by display name. Returns the JSON:API player
     resource (``id`` = ``account.…``, ``attributes.name``, recent match ids under
-    ``relationships.matches.data``), or ``None`` if not found / no key."""
+    ``relationships.matches.data``), or ``None`` when no such player exists.
+
+    This is the link-verification path, so it does *not* swallow every failure
+    into ``None``: a missing key raises `HostNotConfigured`, and an outage / auth
+    / rate-limit error (`HostUnavailable` / `HostError`) propagates. Only a
+    genuine "no such player" (404 or an empty result set) returns ``None`` — so
+    the adapter's "player not found" means exactly that."""
     if not _api_key():
-        return None
+        raise HostNotConfigured(HOST, "PUBG_API_KEY is not configured")
     try:
         response = await request_json(
             HOST,
@@ -59,7 +71,7 @@ async def get_player_by_name(name: str, shard: str = "steam") -> dict | None:
             headers=_headers(),
             params={"filter[playerNames]": name},
         )
-    except HostError:
+    except HostNotFound:
         return None
     try:
         data = (response.json() or {}).get("data") or []

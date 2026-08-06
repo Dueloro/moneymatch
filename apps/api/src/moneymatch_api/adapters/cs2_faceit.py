@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from ..schemas.profile import ProfileSnapshot
 from ..services.hosts import faceit
+from ..services.hosts.errors import HostNotConfigured
 from .base import GameAdapter, GameFilters, NormGame, TelemetrySample
 
 _GAME = "cs2"
@@ -58,6 +59,8 @@ class CS2FaceitAdapter(GameAdapter):
     id = "cs2.faceit"
 
     async def link_account(self, method: str, identifier: str) -> ProfileSnapshot:
+        if not faceit.is_configured():
+            raise HostNotConfigured("faceit", "FACEIT_API_KEY is not configured")
         profile = await self.fetch_profile(identifier)
         profile.link_method = "oauth" if method == "oauth" else "username"
         return profile

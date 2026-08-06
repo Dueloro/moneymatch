@@ -18,7 +18,10 @@
 #
 # Set the sync:false secrets in the dashboard (or an env group named
 # `moneymatch-shared`): DATABASE_URL is wired from the managed DB below;
-# SUPABASE_*, FACEIT_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are per-environment.
+# SUPABASE_*, FACEIT_API_KEY, PUBG_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are
+# per-environment. Without FACEIT_API_KEY / PUBG_API_KEY, that game's account
+# linking returns a `host_not_configured` error (503) — set both so CS2 and PUBG
+# are linkable in the deployed environment, not just locally.
 
 databases:
   - name: moneymatch-postgres

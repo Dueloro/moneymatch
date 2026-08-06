@@ -19,6 +19,7 @@ from datetime import datetime
 
 from ..schemas.profile import ProfileSnapshot
 from ..services.hosts import pubg
+from ..services.hosts.errors import HostNotConfigured
 from .base import GameAdapter, GameFilters, NormGame, TelemetrySample
 
 # Cap match fan-out per history poll: the PUBG public rate limit is ~10 req/min,
@@ -53,6 +54,8 @@ class PubgAdapter(GameAdapter):
         return self.id.split(".", 1)[1] if "." in self.id else "steam"
 
     async def link_account(self, method: str, identifier: str) -> ProfileSnapshot:
+        if not pubg.is_configured():
+            raise HostNotConfigured("pubg", "PUBG_API_KEY is not configured")
         player = await pubg.get_player_by_name(identifier.strip(), self._shard)
         if player is None:
             raise ValueError(f"PUBG player '{identifier}' not found")
