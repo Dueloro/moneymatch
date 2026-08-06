@@ -18,12 +18,9 @@ describe('SignInPage', () => {
     mockUseAuth.mockReturnValue({
       session: null,
       loading: false,
-      signInWithGoogle: vi.fn(),
-      signInWithEmail: vi.fn(),
-      signInWithPassword: vi.fn(),
-      signUpWithPassword: vi.fn(),
+      signInWithUsername: vi.fn(),
+      signUpWithUsername: vi.fn(),
       verifyCurrentPassword: vi.fn(),
-      sendPasswordReset: vi.fn(),
       changePassword: vi.fn(),
       isDemo: false,
       signOut: vi.fn(),
@@ -33,12 +30,12 @@ describe('SignInPage', () => {
     >);
   });
 
-  it('renders the auth step with Google, email + password, and demo options', () => {
+  it('renders the auth step with username + password and demo options, no Google', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
     expect(
-      screen.getByRole('button', { name: /continue with google/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText('Email address')).toBeInTheDocument();
+      screen.queryByRole('button', { name: /continue with google/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Username')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /enter the demo/i })).toBeInTheDocument();

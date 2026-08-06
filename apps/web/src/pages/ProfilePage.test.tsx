@@ -59,7 +59,6 @@ describe('ProfilePage', () => {
       signOut: vi.fn(),
       isDemo: false,
       verifyCurrentPassword,
-      sendPasswordReset: vi.fn(),
       changePassword,
     } as unknown as ReturnType<typeof useAuth>);
     vi.mocked(useMe).mockReturnValue({
@@ -177,11 +176,12 @@ describe('ProfilePage', () => {
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
 
-    // Step 1: confirm current password, with the forgot-password email fallback.
+    // Step 1: confirm current password (no email-based reset — accounts are
+    // username-only with no inbox on file).
     expect(screen.getByPlaceholderText('Enter current password')).toBeInTheDocument();
     expect(
-      screen.getByText('Forgot your password? Verify with email.'),
-    ).toBeInTheDocument();
+      screen.queryByText('Forgot your password? Verify with email.'),
+    ).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('Enter current password'), {
       target: { value: 'oldpass1' },
@@ -206,7 +206,6 @@ describe('ProfilePage', () => {
       signOut: vi.fn(),
       isDemo: true,
       verifyCurrentPassword,
-      sendPasswordReset: vi.fn(),
       changePassword,
     } as unknown as ReturnType<typeof useAuth>);
     renderWithProviders(<ProfilePage />);
