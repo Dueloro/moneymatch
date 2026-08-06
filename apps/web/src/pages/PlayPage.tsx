@@ -100,18 +100,18 @@ export function PlayPage() {
   const hasResults = filteredMarkets.length > 0 && presets.length > 0;
 
   const header = (
-    <div className="mb-6 flex flex-wrap items-center gap-3">
-      <ModeSwitcher />
-      <div className="w-full md:w-auto">
-        <GameTabs games={games} selected={game} onSelect={setGame} />
+    <div className="mb-6 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <ModeSwitcher />
+        <div className="ml-auto">
+          <HowItWorks id="play">
+            You go 1v1 with an evenly matched opponent for the same stake. Both of you
+            play your own next match, we read the result from the game, and the better
+            stat line takes the pot.
+          </HowItWorks>
+        </div>
       </div>
-      <div className="ml-auto">
-        <HowItWorks id="play">
-          You go 1v1 with an evenly matched opponent for the same stake. Both of you
-          play your own next match, we read the result from the game, and the better
-          stat line takes the pot.
-        </HowItWorks>
-      </div>
+      <GameTabs games={games} selected={game} onSelect={setGame} />
     </div>
   );
 

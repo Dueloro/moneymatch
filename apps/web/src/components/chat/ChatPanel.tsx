@@ -92,7 +92,7 @@ export function ChatPanel() {
     // counts); desktop takes the taller surface.
     <div
       data-testid="chat-panel"
-      className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:grid md:h-[calc(100vh-11rem)] md:min-h-[36rem] md:grid-cols-[23rem_1fr]"
+      className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:grid md:h-[calc(100vh-11rem)] md:min-h-[36rem] md:grid-cols-[20rem_minmax(0,1fr)]"
     >
       <div
         className={[
@@ -115,7 +115,7 @@ export function ChatPanel() {
 
       <div
         className={[
-          'h-full min-h-0 md:block',
+          'h-full min-h-0 min-w-0 md:block',
           mobilePane === 'detail' ? 'block' : 'hidden',
         ].join(' ')}
       >

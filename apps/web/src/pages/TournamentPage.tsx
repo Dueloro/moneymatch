@@ -45,18 +45,18 @@ export function TournamentPage() {
   const scoreN = markets?.score_matches ?? 3;
 
   const header = (
-    <div className="mb-6 flex flex-wrap items-center gap-3">
-      <ModeSwitcher />
-      <div className="w-full md:w-auto">
-        <GameTabs games={games} selected={game} onSelect={setGame} />
+    <div className="mb-6 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <ModeSwitcher />
+        <div className="ml-auto">
+          <HowItWorks id="tournament">
+            A field of similar-skill players all chase the same stat. Your best{' '}
+            {scoreN} matches inside the window are scored automatically, and the top{' '}
+            {places} split the pot. No reporting, no brackets, just play.
+          </HowItWorks>
+        </div>
       </div>
-      <div className="ml-auto">
-        <HowItWorks id="tournament">
-          A field of similar-skill players all chase the same stat. Your best {scoreN}{' '}
-          matches inside the window are scored automatically, and the top {places} split
-          the pot. No reporting, no brackets, just play.
-        </HowItWorks>
-      </div>
+      <GameTabs games={games} selected={game} onSelect={setGame} />
     </div>
   );
 

@@ -79,18 +79,18 @@ export function PoolsPage() {
   const hasResults = filteredMetrics.length > 0 && presets.length > 0;
 
   const header = (
-    <div className="mb-6 flex flex-wrap items-center gap-3">
-      <ModeSwitcher />
-      <div className="w-full md:w-auto">
-        <GameTabs games={games} selected={game} onSelect={setGame} />
+    <div className="mb-6 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <ModeSwitcher />
+        <div className="ml-auto">
+          <HowItWorks id="pools">
+            Three or four similar-skill players each get a personal bar quoted from
+            their own baseline. Clear your bar in your next match and you take a share
+            of the pot. You are playing the number, not the other players.
+          </HowItWorks>
+        </div>
       </div>
-      <div className="ml-auto">
-        <HowItWorks id="pools">
-          Three or four similar-skill players each get a personal bar quoted from their
-          own baseline. Clear your bar in your next match and you take a share of the
-          pot. You are playing the number, not the other players.
-        </HowItWorks>
-      </div>
+      <GameTabs games={games} selected={game} onSelect={setGame} />
     </div>
   );
 

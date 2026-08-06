@@ -5,7 +5,7 @@ import { useActivity, type ActivityItem } from '../../hooks/useActivity';
 import { useWaiting } from '../../hooks/useMatchmaking';
 import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
 import { useWallet } from '../../hooks/useWallet';
-import { formatCurrency, formatSignedCurrency } from '../../lib/format';
+import { formatCurrency } from '../../lib/format';
 import { gameMeta } from '../../lib/games';
 import { LiveLine } from '../activity/LiveLine';
 import { Card } from '../ui/Card';
@@ -191,7 +191,6 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
 
   const available = wallet?.available_cents ?? 0;
   const inPlayCents = wallet?.escrow_cents ?? 0;
-  const lifetime = wallet?.lifetime_net_cents ?? 0;
 
   const inPlay = (activity?.items ?? [])
     .filter((i) => IN_PLAY.has(i.state))
@@ -206,10 +205,11 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
           <p className="mt-1 text-3xl font-semibold text-green">
             {formatCurrency(available)}
           </p>
-          <p className="mt-1 text-xs text-text-secondary">
-            {inPlayCents > 0 ? `${formatCurrency(inPlayCents)} in play · ` : ''}
-            {formatSignedCurrency(lifetime)} all time
-          </p>
+          {inPlayCents > 0 && (
+            <p className="mt-1 text-xs text-text-secondary">
+              {formatCurrency(inPlayCents)} in play
+            </p>
+          )}
           <Link
             to="/wallet"
             className="mt-3 inline-block text-xs font-semibold text-text-secondary transition-colors hover:text-text"
