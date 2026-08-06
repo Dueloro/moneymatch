@@ -13,6 +13,7 @@ import { useMe, useSetActiveGames } from '../hooks/useMe';
 import { api } from '../lib/api';
 import { enterDemo as demoEnter } from '../lib/demoAuth';
 import { toast } from '../lib/toast';
+import { emailToUsername } from '../lib/usernameAuth';
 import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
@@ -128,15 +129,15 @@ function StaleSessionStep() {
   );
 }
 
-/** Map Supabase auth errors to friendly, actionable copy. */
+/** Map Supabase auth errors to friendly, actionable copy. Usernames are mapped
+ * to a synthetic email under the hood, so Supabase's email-shaped errors are
+ * reworded in username terms. */
 function friendlyAuthError(err: unknown, mode: 'signin' | 'signup'): string {
   const msg = (err as { message?: string })?.message ?? '';
   if (/invalid login credentials/i.test(msg))
-    return 'Wrong email or password. New here? Create an account below.';
+    return 'Wrong username or password. New here? Create an account below.';
   if (/user already registered|already been registered/i.test(msg))
-    return 'That email already has an account. Try signing in instead.';
-  if (/email not confirmed/i.test(msg))
-    return 'Confirm your email first (check your inbox), then sign in.';
+    return 'That username is already taken. Try signing in instead.';
   if (/password should be at least/i.test(msg))
     return 'Use a password of at least 6 characters.';
   return (
@@ -145,25 +146,12 @@ function friendlyAuthError(err: unknown, mode: 'signin' | 'signup'): string {
 }
 
 function AuthStep() {
-  const { signInWithGoogle, signInWithPassword, signUpWithPassword } = useAuth();
+  const { signInWithUsername, signUpWithUsername } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [confirmEmail, setConfirmEmail] = useState<string | null>(null);
-
-  if (confirmEmail) {
-    return (
-      <ConfirmStep
-        email={confirmEmail}
-        onBack={() => {
-          setConfirmEmail(null);
-          setMode('signin');
-        }}
-      />
-    );
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -171,13 +159,9 @@ function AuthStep() {
     setBusy(true);
     try {
       if (mode === 'signin') {
-        await signInWithPassword(email, password);
+        await signInWithUsername(username, password);
       } else {
-        const { needsConfirmation } = await signUpWithPassword(email, password);
-        if (needsConfirmation) {
-          setConfirmEmail(email);
-          return;
-        }
+        await signUpWithUsername(username, password);
       }
       // On success the session updates and SignInPage advances automatically.
     } catch (err) {
@@ -199,7 +183,7 @@ function AuthStep() {
     }
   }
 
-  const canSubmit = email.length > 0 && password.length >= 6 && !busy;
+  const canSubmit = USERNAME_RE.test(username) && password.length >= 6 && !busy;
 
   return (
     <div>
@@ -211,31 +195,14 @@ function AuthStep() {
       </p>
 
       <div className="mt-8 flex flex-col gap-3">
-        <PillButton
-          type="button"
-          variant="outline"
-          fullWidth
-          disabled={busy}
-          onClick={() => void signInWithGoogle()}
-        >
-          Continue with Google
-        </PillButton>
-
-        <div className="my-1 flex items-center gap-3 text-xs text-text-tertiary">
-          <span className="h-px flex-1 bg-hairline" />
-          or
-          <span className="h-px flex-1 bg-hairline" />
-        </div>
-
         <form className="flex flex-col gap-3" onSubmit={submit}>
           <TextInput
-            type="email"
             required
-            autoComplete="email"
-            aria-label="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@email.com"
+            autoComplete="username"
+            aria-label="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase())}
+            placeholder="Username"
           />
           <TextInput
             type="password"
@@ -247,6 +214,12 @@ function AuthStep() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password, at least 6 characters"
           />
+          {mode === 'signup' && (
+            <p className="text-xs text-text-tertiary">
+              3 to 20 characters: lowercase letters, numbers, underscore. This is your
+              public handle and can't change.
+            </p>
+          )}
           <PillButton type="submit" variant="primary" fullWidth disabled={!canSubmit}>
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </PillButton>
@@ -282,26 +255,13 @@ function AuthStep() {
   );
 }
 
-function ConfirmStep({ email, onBack }: { email: string; onBack: () => void }) {
-  return (
-    <div className="text-center">
-      <h1 className="text-xl font-semibold">Confirm your email</h1>
-      <p className="mt-2 text-sm text-text-secondary">
-        We sent a confirmation link to <span className="text-text">{email}</span>. Open
-        it, then come back and sign in.
-      </p>
-      <div className="mt-8">
-        <PillButton variant="text" fullWidth onClick={onBack}>
-          Back to sign in
-        </PillButton>
-      </div>
-    </div>
-  );
-}
-
 function OnboardingStep({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
-  const [username, setUsername] = useState('');
+  const { session } = useAuth();
+  // The handle was chosen at sign-up; recover it from the synthetic email so it
+  // survives across sessions (e.g. an account that signed up but didn't finish).
+  const derived = emailToUsername(session?.user.email);
+  const [username, setUsername] = useState(derived ?? '');
   const [state, setState] = useState('');
   const [attested, setAttested] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -337,7 +297,7 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
     <div>
       <h1 className="text-center text-xl font-semibold">Create your profile</h1>
       <p className="mt-2 text-center text-sm text-text-secondary">
-        Your username is your public handle. Choose carefully, it can't change.
+        A couple of details and you're in.
       </p>
 
       <form
@@ -348,16 +308,22 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
           mutation.mutate();
         }}
       >
-        <Field
-          label="Username"
-          hint="3 to 20 characters: lowercase letters, numbers, underscore."
-        >
-          <TextInput
-            value={username}
-            onChange={(e) => setUsername(e.target.value.toLowerCase())}
-            placeholder="kvem_"
-          />
-        </Field>
+        {derived ? (
+          <Field label="Username" hint="Your public handle, chosen at sign-up.">
+            <TextInput value={username} readOnly disabled />
+          </Field>
+        ) : (
+          <Field
+            label="Username"
+            hint="3 to 20 characters: lowercase letters, numbers, underscore."
+          >
+            <TextInput
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase())}
+              placeholder="kvem_"
+            />
+          </Field>
+        )}
 
         <Field
           label="Residence state"

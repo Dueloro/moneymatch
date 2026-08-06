@@ -119,12 +119,12 @@ export function ProfilePage() {
 
 /**
  * Change the account password via Supabase. A "Change password" button opens a
- * two-step flow: confirm the current password (with a "forgot password" email
- * fallback), then set + confirm the new one. Email verification stays Supabase's
- * job; this only re-auths and sets the new password on the signed-in account.
+ * two-step flow: confirm the current password, then set + confirm the new one.
+ * Accounts sign in by username (no email on file), so there is no email-based
+ * reset; this only re-auths and sets the new password on the signed-in account.
  */
 function ChangePassword() {
-  const { verifyCurrentPassword, sendPasswordReset, changePassword } = useAuth();
+  const { verifyCurrentPassword, changePassword } = useAuth();
   const [step, setStep] = useState<'closed' | 'current' | 'new'>('closed');
 
   const [current, setCurrent] = useState('');
@@ -159,19 +159,6 @@ function ChangePassword() {
       setStep('new');
     } catch {
       setError('Could not verify your password. Try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const forgot = async () => {
-    setError(null);
-    setBusy(true);
-    try {
-      await sendPasswordReset();
-      setNotice('Check your email for a link to reset your password.');
-    } catch (err) {
-      setError((err as { message?: string })?.message ?? 'Could not send the email.');
     } finally {
       setBusy(false);
     }
@@ -219,14 +206,6 @@ function ChangePassword() {
           onChange={(e) => setCurrent(e.target.value)}
           className="w-full rounded-pill border border-hairline bg-panel-raised px-4 py-2.5 text-sm text-text transition-colors placeholder:text-text-tertiary hover:border-line-strong"
         />
-        <button
-          type="button"
-          onClick={forgot}
-          disabled={busy}
-          className="self-start text-xs text-text-secondary hover:text-text disabled:opacity-40"
-        >
-          Forgot your password? Verify with email.
-        </button>
         {error && <p className="text-xs text-red">{error}</p>}
         {notice && <p className="text-xs text-live">{notice}</p>}
         <div className="flex items-center gap-3">

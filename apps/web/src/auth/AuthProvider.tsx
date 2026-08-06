@@ -6,6 +6,7 @@ import { decodeJwtClaims, getE2eToken } from '../lib/e2eAuth';
 import { env } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { identify, resetIdentity } from '../lib/telemetry';
+import { usernameToEmail } from '../lib/usernameAuth';
 import { AuthContext, type AuthContextValue } from './authContext';
 
 /** Build a minimal Supabase-shaped session from an injected access token (demo
@@ -89,33 +90,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       loading,
       isDemo: getDemoToken() != null,
-      signInWithGoogle: async () => {
-        await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: window.location.origin },
-        });
-      },
-      signInWithEmail: async (email: string) => {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-      },
-      signInWithPassword: async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      },
-      signUpWithPassword: async (email: string, password: string) => {
-        const { data, error } = await supabase.auth.signUp({
-          email,
+      signInWithUsername: async (username: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: usernameToEmail(username),
           password,
-          options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        // With email confirmation disabled, signUp returns a live session and we
-        // are signed in immediately; otherwise the user must confirm by email.
-        return { needsConfirmation: !data.session };
+      },
+      signUpWithUsername: async (username: string, password: string) => {
+        const { error } = await supabase.auth.signUp({
+          email: usernameToEmail(username),
+          password,
+        });
+        if (error) throw error;
+        // Email confirmation is off and the synthetic address has no inbox, so
+        // signUp returns a live session and we are signed in immediately.
       },
       verifyCurrentPassword: async (currentPassword: string) => {
         const email = session?.user.email;
@@ -127,14 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: currentPassword,
         });
         return !error;
-      },
-      sendPasswordReset: async () => {
-        const email = session?.user.email;
-        if (!email) throw new Error('No email on file for this account.');
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin,
-        });
-        if (error) throw error;
       },
       changePassword: async (newPassword: string) => {
         const { error } = await supabase.auth.updateUser({ password: newPassword });
