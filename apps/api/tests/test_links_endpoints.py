@@ -11,12 +11,16 @@ import httpx
 import respx
 from sqlalchemy import text
 
+from moneymatch_api.config import get_settings
+
 from .conftest import auth_headers
 
 CHESS = "chess.lichess"
 DOTA = "dota2.opendota"
+PUBG = "pubg.steam"
 LI = "https://lichess.org/api/user"
 OD = "https://api.opendota.com/api"
+PUBG_PLAYERS = "https://api.pubg.com/shards/steam/players"
 
 
 def _lichess_user(username="magnus", rating=2800):
@@ -96,6 +100,34 @@ async def test_unknown_username_is_404(client):
     )
     assert r.status_code == 404
     assert r.json()["code"] == "host_account_unlinkable"
+
+
+async def test_pubg_link_without_key_is_503_not_configured(client, monkeypatch):
+    # The production bug: a missing PUBG_API_KEY made every link say "player not
+    # found". It must now be a distinct, actionable 503 — not a 404 about the
+    # player. No respx mock: the guard trips before any host call is made.
+    monkeypatch.setattr(get_settings(), "pubg_api_key", None)
+    r = await client.post(
+        "/api/v1/links",
+        json={"game": PUBG, "username": "C99R"},
+        headers=auth_headers("u-pubg-nokey"),
+    )
+    assert r.status_code == 503, r.text
+    assert r.json()["code"] == "host_not_configured"
+
+
+@respx.mock
+async def test_pubg_link_host_outage_is_502(client, monkeypatch):
+    # Key present but PUBG is down (5xx): a real outage → 502, never "not found".
+    monkeypatch.setattr(get_settings(), "pubg_api_key", "test-key")
+    respx.get(PUBG_PLAYERS).mock(return_value=httpx.Response(503))
+    r = await client.post(
+        "/api/v1/links",
+        json={"game": PUBG, "username": "C99R"},
+        headers=auth_headers("u-pubg-down"),
+    )
+    assert r.status_code == 502, r.text
+    assert r.json()["code"] == "host_unavailable"
 
 
 @respx.mock

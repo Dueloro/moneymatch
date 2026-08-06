@@ -35,6 +35,12 @@ def _api_key() -> str | None:
     return get_settings().faceit_api_key
 
 
+def is_configured() -> bool:
+    """True when a FaceIt API key is set. The link path checks this up front so a
+    missing key surfaces as `HostNotConfigured`, not a silent "player not found"."""
+    return bool(_api_key())
+
+
 def _headers() -> dict:
     return {
         "Authorization": f"Bearer {_api_key()}",

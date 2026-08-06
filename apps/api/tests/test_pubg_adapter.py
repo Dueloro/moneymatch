@@ -13,6 +13,7 @@ import respx
 from moneymatch_api.adapters.pubg import PubgAdapter
 from moneymatch_api.config import get_settings
 from moneymatch_api.services.hosts import pubg
+from moneymatch_api.services.hosts.errors import HostNotConfigured, HostUnavailable
 
 ADAPTER = PubgAdapter()
 ACCOUNT = "account.abc123"
@@ -119,9 +120,28 @@ async def test_link_account_maps_aggregated_lifetime(pubg_key):
 
 @respx.mock
 async def test_link_account_unknown_player_raises(pubg_key):
+    # A genuine "no such player" (empty result set) is the *only* case that maps
+    # to "not found" — distinct from a config gap or an outage below.
     respx.get(PLAYERS).mock(return_value=httpx.Response(200, json={"data": []}))
     with pytest.raises(ValueError, match="not found"):
         await ADAPTER.link_account("username", "ghost")
+
+
+@respx.mock
+async def test_link_account_host_outage_propagates(pubg_key):
+    # A key is set but PUBG is down (5xx): must surface as a host outage, never as
+    # "player not found" — the player might exist fine.
+    respx.get(PLAYERS).mock(return_value=httpx.Response(503))
+    with pytest.raises(HostUnavailable):
+        await ADAPTER.link_account("username", "chocoTaco")
+
+
+async def test_link_account_missing_key_raises_not_configured(monkeypatch):
+    # No key at all is a deploy/config gap — a distinct, actionable error, not the
+    # misleading "player not found" the user actually hit in production.
+    monkeypatch.setattr(get_settings(), "pubg_api_key", None)
+    with pytest.raises(HostNotConfigured):
+        await ADAPTER.link_account("username", "chocoTaco")
 
 
 @respx.mock
@@ -210,16 +230,23 @@ async def test_poll_filters_by_since_ms(pubg_key):
 
 
 # --------------------------------------------------------------------------- #
-# Fail-soft without a key
+# No key: the *poll* path still fails soft (settlement resilience), but the
+# *link* path surfaces the misconfig instead of masquerading as "not found".
 # --------------------------------------------------------------------------- #
 
 
-async def test_missing_key_fails_soft(monkeypatch):
+async def test_missing_key_poll_path_fails_soft(monkeypatch):
+    # The settlement/history poll must never crash on a missing key — it degrades
+    # to "nothing to poll" so a cycle keeps running.
     monkeypatch.setattr(get_settings(), "pubg_api_key", None)
     from moneymatch_api.adapters.base import GameFilters
 
-    assert await pubg.get_player_by_name("x") is None
     assert await pubg.get_lifetime("account.x") is None
     assert await ADAPTER.poll_eligible_games("account.x", 0, GameFilters()) == []
-    with pytest.raises(ValueError, match="not found"):
-        await ADAPTER.link_account("username", "x")
+
+
+async def test_missing_key_link_path_raises_not_configured(monkeypatch):
+    # The link path, by contrast, must surface a config gap loudly.
+    monkeypatch.setattr(get_settings(), "pubg_api_key", None)
+    with pytest.raises(HostNotConfigured):
+        await pubg.get_player_by_name("x")

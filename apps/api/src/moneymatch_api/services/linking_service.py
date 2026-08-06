@@ -24,7 +24,7 @@ from ..models.user import User
 from ..schemas.profile import ProfileSnapshot
 from ..services import metric_models_service, raw_payload_service
 from ..services.feature_flags import get_boolean_flags
-from ..services.hosts.errors import HostUnavailable
+from ..services.hosts.errors import HostError, HostNotConfigured, HostUnavailable
 
 log = structlog.get_logger(__name__)
 
@@ -87,7 +87,27 @@ async def _fetch_profile(game: str, method: str, username: str) -> ProfileSnapsh
     adapter = registry.get(game)
     try:
         return await adapter.link_account(method, username)
+    except HostNotConfigured as exc:
+        # A deploy/config gap (missing API key) — NOT the player's fault. Logged
+        # loud so ops see the misconfig instead of a stream of "not found"s, and
+        # surfaced distinctly so the user isn't told their handle is wrong.
+        log.error("link.host_not_configured", game=game, error=str(exc))
+        raise LinkError(
+            "host_not_configured",
+            "Linking for this game is temporarily unavailable. Please try again later.",
+            status_code=503,
+        ) from exc
     except HostUnavailable as exc:
+        raise LinkError(
+            "host_unavailable",
+            "The game's servers are unavailable right now — try again shortly.",
+            status_code=502,
+        ) from exc
+    except HostError as exc:
+        # Any other typed host failure (auth 401/403, rate-limit 429, bad request)
+        # — a real upstream problem, not a missing player. Don't let it fall
+        # through to the ValueError branch and masquerade as "account not found".
+        log.warning("link.host_error", game=game, error=str(exc))
         raise LinkError(
             "host_unavailable",
             "The game's servers are unavailable right now — try again shortly.",

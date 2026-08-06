@@ -25,3 +25,10 @@ class HostUnavailable(HostError):
 
 class HostNotFound(HostError):
     """The requested resource (player/game) does not exist on the host (404)."""
+
+
+class HostNotConfigured(HostError):
+    """The host integration has no API key configured — a deploy/config gap, not
+    a transient outage or a missing player. Raised (never swallowed to ``None``)
+    so linking surfaces an actionable message and ops can see the misconfig,
+    instead of every lookup masquerading as "player not found"."""
