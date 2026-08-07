@@ -98,13 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       },
       signUpWithUsername: async (username: string, password: string) => {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: usernameToEmail(username),
           password,
         });
         if (error) throw error;
-        // Email confirmation is off and the synthetic address has no inbox, so
-        // signUp returns a live session and we are signed in immediately.
+        // Autoconfirm must stay ON for this project: the synthetic address has no
+        // inbox, so if email confirmation is ever re-enabled, signUp returns no
+        // session and the app would silently stall on the sign-in screen. Fail
+        // loud with a message the UI can explain instead.
+        if (!data.session) throw new Error('email_confirmation_required');
       },
       verifyCurrentPassword: async (currentPassword: string) => {
         const email = session?.user.email;

@@ -50,9 +50,9 @@ export function TournamentPage() {
         <ModeSwitcher />
         <div className="ml-auto">
           <HowItWorks id="tournament">
-            A field of similar-skill players all chase the same stat. Your best{' '}
-            {scoreN} matches inside the window are scored automatically, and the top{' '}
-            {places} split the pot. No reporting, no brackets, just play.
+            A field of similar-skill players all chase the same stat. Your best {scoreN}{' '}
+            matches inside the window are scored automatically, and the top {places}{' '}
+            split the pot. No reporting, no brackets, just play.
           </HowItWorks>
         </div>
       </div>
