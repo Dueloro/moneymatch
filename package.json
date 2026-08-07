@@ -19,6 +19,9 @@
     "prettier": "^3.3.3"
   },
   "pnpm": {
+    "overrides": {
+      "dompurify@<3.4.13": ">=3.4.13"
+    },
     "auditConfig": {
       "ignoreGhsas": [
         "GHSA-wrjc-x8rr-h8h6",
