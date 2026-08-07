@@ -18,6 +18,18 @@ import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
+/** A specific, human explanation of why a username is invalid, or null when it's
+ * acceptable (or still empty). Drives inline feedback so the submit button never
+ * just sits greyed-out with no reason — the trap that made auth look "inactive". */
+function usernameProblem(username: string): string | null {
+  if (username === '') return null;
+  if (username.length < 3) return 'Username must be at least 3 characters.';
+  if (username.length > 20) return 'Username must be 20 characters or fewer.';
+  if (!/^[a-z0-9_]+$/.test(username))
+    return 'Username can use only lowercase letters, numbers, and underscore.';
+  return null;
+}
+
 export function SignInPage() {
   const { session, loading } = useAuth();
   const me = useMe();
@@ -138,6 +150,8 @@ function friendlyAuthError(err: unknown, mode: 'signin' | 'signup'): string {
     return 'Wrong username or password. New here? Create an account below.';
   if (/user already registered|already been registered/i.test(msg))
     return 'That username is already taken. Try signing in instead.';
+  if (/email_confirmation_required/i.test(msg))
+    return 'Your account was created but sign-in is blocked by a server setting. Please contact support.';
   if (/password should be at least/i.test(msg))
     return 'Use a password of at least 6 characters.';
   return (
@@ -153,9 +167,23 @@ function AuthStep() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const uProblem = usernameProblem(username);
+  const pwTooShort = password.length > 0 && password.length < 6;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Validate on submit instead of silently disabling the button. The inline
+    // field hints already name a bad username/short password as the user types,
+    // so here we only stop the submit (and cover the empty-field fallback).
+    if (!USERNAME_RE.test(username)) {
+      if (!uProblem) setError('Enter a username to continue.');
+      return;
+    }
+    if (password.length < 6) {
+      if (password.length === 0) setError('Enter your password.');
+      return;
+    }
     setBusy(true);
     try {
       if (mode === 'signin') {
@@ -183,7 +211,9 @@ function AuthStep() {
     }
   }
 
-  const canSubmit = USERNAME_RE.test(username) && password.length >= 6 && !busy;
+  // Keep the button live whenever there's input so a click always yields
+  // feedback; correctness is checked in submit().
+  const canSubmit = !busy && username.length > 0 && password.length > 0;
 
   return (
     <div>
@@ -196,30 +226,43 @@ function AuthStep() {
 
       <div className="mt-8 flex flex-col gap-3">
         <form className="flex flex-col gap-3" onSubmit={submit}>
-          <TextInput
-            required
-            autoComplete="username"
-            aria-label="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value.toLowerCase())}
-            placeholder="Username"
-          />
-          <TextInput
-            type="password"
-            required
-            minLength={6}
-            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            aria-label="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password, at least 6 characters"
-          />
-          {mode === 'signup' && (
-            <p className="text-xs text-text-tertiary">
-              3 to 20 characters: lowercase letters, numbers, underscore. This is your
-              public handle and can't change.
-            </p>
-          )}
+          <div>
+            <TextInput
+              required
+              autoComplete="username"
+              aria-label="Username"
+              aria-invalid={uProblem ? true : undefined}
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase())}
+              placeholder="Username"
+            />
+            {uProblem ? (
+              <p className="mt-1 text-xs text-red">{uProblem}</p>
+            ) : mode === 'signup' ? (
+              <p className="mt-1 text-xs text-text-tertiary">
+                3 to 20 characters: lowercase letters, numbers, underscore. This is your
+                public handle and can't change.
+              </p>
+            ) : null}
+          </div>
+          <div>
+            <TextInput
+              type="password"
+              required
+              minLength={6}
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              aria-label="Password"
+              aria-invalid={pwTooShort ? true : undefined}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password, at least 6 characters"
+            />
+            {pwTooShort && (
+              <p className="mt-1 text-xs text-red">
+                Password must be at least 6 characters.
+              </p>
+            )}
+          </div>
           <PillButton type="submit" variant="primary" fullWidth disabled={!canSubmit}>
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </PillButton>
