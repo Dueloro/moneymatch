@@ -23,6 +23,8 @@ vi.mock('../hooks/useLinks', async () => {
   };
 });
 
+vi.mock('../hooks/useResetDemo', () => ({ useResetDemo: vi.fn() }));
+
 import { useAuth } from '../auth/useAuth';
 import { useMe, useSelfExclude } from '../hooks/useMe';
 import {
@@ -31,9 +33,11 @@ import {
   useRefreshLink,
   type GameLink,
 } from '../hooks/useLinks';
+import { useResetDemo } from '../hooks/useResetDemo';
 
 const createMutate = vi.fn();
 const selfExcludeMutate = vi.fn();
+const resetMutate = vi.fn();
 const verifyCurrentPassword = vi.fn();
 const changePassword = vi.fn();
 
@@ -135,6 +139,10 @@ describe('ProfilePage', () => {
         ],
       },
     } as unknown as ReturnType<typeof useLinks>);
+    vi.mocked(useResetDemo).mockReturnValue({
+      mutate: resetMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useResetDemo>);
   });
 
   it('renders LINKED / BLOCKED, the skill badge + win streak, and editable limits', () => {
@@ -211,6 +219,29 @@ describe('ProfilePage', () => {
     renderWithProviders(<ProfilePage />);
     expect(
       screen.queryByRole('button', { name: 'Change password' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers a demo reset that confirms before resetting', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      signOut: vi.fn(),
+      isDemo: true,
+      verifyCurrentPassword,
+      changePassword,
+    } as unknown as ReturnType<typeof useAuth>);
+    renderWithProviders(<ProfilePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset demo' }));
+    // Two-step: nothing resets until the second confirm.
+    expect(resetMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, reset the demo' }));
+    expect(resetMutate).toHaveBeenCalled();
+  });
+
+  it('hides the demo reset for real accounts', () => {
+    renderWithProviders(<ProfilePage />); // isDemo false by default
+    expect(
+      screen.queryByRole('button', { name: 'Reset demo' }),
     ).not.toBeInTheDocument();
   });
 });

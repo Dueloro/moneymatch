@@ -45,6 +45,10 @@ export interface PoolView {
   room_bar: number;
   your_bar: number | null;
   bar_delta: number | null;
+  // Live result while the window runs: did your played match clear the room bar,
+  // and the value it hit. Null until you've played (or on a host outage).
+  your_cleared: boolean | null;
+  your_current: number | null;
   entry_cents: number;
   pot_cents: number;
   prize_cents: number;

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useAuth } from '../auth/useAuth';
 import { GettingStarted } from '../components/GettingStarted';
 import { ModeSwitcher } from '../components/ModeSwitcher';
 import { Card } from '../components/ui/Card';
@@ -236,6 +235,7 @@ export function PoolsPage() {
                         buttonLabel="Join pool"
                         disabled={busy}
                         joining={enter.isPending}
+                        requireConfirm
                         onJoin={(entry) =>
                           enter.mutate({
                             game: markets!.game,
@@ -295,8 +295,6 @@ function PoolStatusBanner({
 }
 
 function RoomBanner({ pool }: { pool: PoolView }) {
-  const { isDemo } = useAuth();
-  const leave = useLeavePool();
   const gameName = gameMeta(pool.game).name;
   return (
     <Card className="mb-6 p-5" data-testid="room-card">
@@ -324,17 +322,6 @@ function RoomBanner({ pool }: { pool: PoolView }) {
         Your {formatCurrency(pool.entry_cents)} is in escrow, so you can now play your{' '}
         {gameName} game. Clear the room bar in your next match to take your share.
       </p>
-      {isDemo && (
-        <div className="mt-4">
-          <PillButton
-            variant="outline"
-            onClick={() => leave.mutate()}
-            disabled={leave.isPending}
-          >
-            New pool
-          </PillButton>
-        </div>
-      )}
     </Card>
   );
 }

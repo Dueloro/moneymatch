@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..constants import (
@@ -351,10 +351,18 @@ async def _process_due_pools(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
     async with sm() as session:
+        # Due at window end, OR flagged ready early: every entrant's result is in,
+        # so the outcome is already final (see `_refresh_live_snapshots`). Settling
+        # now moves the contest out of "In play" / "Room formed" the moment it is
+        # decided instead of stranding it until the window closes.
         ids = list(
             await session.scalars(
                 select(SoloPool.id).where(
-                    SoloPool.state == "LOCKED", SoloPool.window_ends_at <= now
+                    SoloPool.state == "LOCKED",
+                    or_(
+                        SoloPool.window_ends_at <= now,
+                        SoloPool.outcome_detail["live_ready"].astext == "true",
+                    ),
                 )
             )
         )
@@ -373,6 +381,17 @@ async def _process_due_pools(
                 )
             )
             grades = await telemetry_fetch.grade_pool(session, pool, entries)
+            # Early path: only settle if the authoritative grade confirms every
+            # entry is verified. If the live flag was optimistic (a grade still
+            # comes back unverifiable), leave the pool for a later cycle / the
+            # window-end path, which refunds the unverifiable entries correctly.
+            window_over = pool.window_ends_at <= now
+            all_verified = bool(grades) and all(
+                g.cleared is not None for g in grades.values()
+            )
+            if not window_over and not all_verified:
+                await session.rollback()
+                continue
             try:
                 await pool_engine.settle_pool(session, pool, grades)
                 await session.commit()
@@ -516,6 +535,13 @@ async def _refresh_live_snapshots(
             )
             snapshot = await live_activity_service.build_pool_snapshot(pool, entries)
             await _upsert_live(session, "pool", pid, snapshot, now)
+            # Flag a fully-decided pool so `_process_due_pools` settles it early
+            # (next cycle) rather than waiting for the window to close.
+            if live_activity_service.pool_all_decided(snapshot):
+                pool.outcome_detail = {
+                    **(pool.outcome_detail or {}),
+                    "live_ready": True,
+                }
             await session.commit()
             report.live_refreshed += 1
 

@@ -10,6 +10,8 @@ vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
 vi.mock('./ui/Ticker', () => ({ Ticker: () => null }));
 // Same for the rail, which reads wallet + activity + queue.
 vi.mock('./rail/SideRail', () => ({ SideRail: () => null }));
+// The SSE listener needs the auth + query context the shell test doesn't provide.
+vi.mock('../hooks/useEventStream', () => ({ useEventStream: () => {} }));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({ data: { available_cents: 100_800, escrow_cents: 0 } }),
 }));

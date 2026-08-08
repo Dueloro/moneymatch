@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 
+import { useEventStream } from '../hooks/useEventStream';
 import { useMe } from '../hooks/useMe';
 import { isExcludedState, stateName } from '../lib/usStates';
 import { SideRail } from './rail/SideRail';
@@ -32,6 +33,9 @@ import { Ticker } from './ui/Ticker';
  */
 export function AppShell() {
   const { pathname } = useLocation();
+  // One app-wide SSE listener: server-pushed lifecycle events refresh the rail
+  // and Activity instantly instead of waiting on the per-hook polls.
+  useEventStream();
 
   return (
     <div className="flex min-h-screen flex-col bg-bg text-text md:h-screen md:flex-row md:overflow-hidden">

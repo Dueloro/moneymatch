@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 
-import { useAuth } from '../../auth/useAuth';
 import { useActivity, type ActivityItem } from '../../hooks/useActivity';
 import { useWaiting } from '../../hooks/useMatchmaking';
 import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
@@ -10,6 +9,7 @@ import { gameMeta } from '../../lib/games';
 import { LiveLine } from '../activity/LiveLine';
 import { Card } from '../ui/Card';
 import { ClearBar } from '../ui/ClearBar';
+import { GameBadge } from '../ui/GameBadge';
 import { PillButton } from '../ui/PillButton';
 import { SectionHeader } from '../ui/SectionHeader';
 
@@ -86,7 +86,12 @@ function InPlayCard({ item }: { item: ActivityItem }) {
           {formatCurrency(item.entry_cents)}
         </p>
       </div>
-      <p className="mt-0.5 truncate text-xs text-text-secondary">{item.market_label}</p>
+      <div className="mt-0.5 flex items-center gap-1.5">
+        <GameBadge game={item.game} />
+        <span className="truncate text-xs text-text-secondary">
+          {item.market_label}
+        </span>
+      </div>
       {pool ? (
         <div className="mt-3">
           <ClearBar
@@ -113,7 +118,6 @@ function InPlayCard({ item }: { item: ActivityItem }) {
  * page. PoolsPage keeps a copy inline below `xl`, where there is no rail.
  */
 function RoomFormed() {
-  const { isDemo } = useAuth();
   const { data: status } = usePoolStatus();
   const leave = useLeavePool();
 
@@ -153,9 +157,10 @@ function RoomFormed() {
     <Card className="p-3" data-testid="rail-room-card">
       <div className="flex items-center gap-2">
         <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-live" />
-        <p className="truncate text-sm font-medium capitalize text-text">
+        <p className="min-w-0 flex-1 truncate text-sm font-medium capitalize text-text">
           {pool.difficulty} {pool.metric_label}
         </p>
+        <GameBadge game={pool.game} />
       </div>
       <p className="mt-0.5 text-xs text-text-secondary">
         {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
@@ -165,20 +170,33 @@ function RoomFormed() {
         <ClearBar size="sm" current={pool.your_bar} target={pool.room_bar} />
       </div>
       <p className="mt-1 text-xs text-text-tertiary">Room bar {pool.room_bar}</p>
-      <p className="mt-3 text-xs text-text" data-testid="rail-room-play-cue">
-        Your {formatCurrency(pool.entry_cents)} is in escrow, so you can now play your{' '}
-        {gameMeta(pool.game).name} game.
-      </p>
-      {isDemo && (
-        <PillButton
-          className="mt-3"
-          size="sm"
-          variant="outline"
-          onClick={() => leave.mutate()}
-          disabled={leave.isPending}
-        >
-          New pool
-        </PillButton>
+      {pool.your_cleared === true ? (
+        <p className="mt-3 text-xs font-medium text-green" data-testid="rail-room-live">
+          Cleared ✓
+          {pool.your_current != null && (
+            <span className="text-text-secondary">
+              {' '}
+              · your {pool.metric_label} {pool.your_current}
+            </span>
+          )}{' '}
+          · settling now.
+        </p>
+      ) : pool.your_cleared === false ? (
+        <p className="mt-3 text-xs text-text" data-testid="rail-room-live">
+          Not over the bar yet
+          {pool.your_current != null && (
+            <span className="text-text-secondary">
+              {' '}
+              · your {pool.metric_label} {pool.your_current}
+            </span>
+          )}
+          . Play again to beat {pool.room_bar}.
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-text" data-testid="rail-room-play-cue">
+          Your {formatCurrency(pool.entry_cents)} is in escrow, so you can now play your{' '}
+          {gameMeta(pool.game).name} game.
+        </p>
       )}
     </Card>
   );
@@ -252,8 +270,11 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
                     {w.username ?? 'A player'}
                   </span>
                 </span>
-                <span className="shrink-0 text-text-tertiary">
-                  {formatCurrency(w.entry_cents)}
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <GameBadge game={w.game} />
+                  <span className="text-text-tertiary">
+                    {formatCurrency(w.entry_cents)}
+                  </span>
                 </span>
               </li>
             ))}

@@ -9,12 +9,13 @@ commits — the caller owns the transaction boundary.
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.notification import Notification
@@ -23,6 +24,12 @@ from . import push_service
 log = structlog.get_logger(__name__)
 
 _DEFAULT_LIMIT = 50
+
+# Postgres LISTEN/NOTIFY channel the SSE stream (`routers/events.py`) subscribes
+# to. Every emit publishes here so a connected client refreshes the instant the
+# event's transaction commits — the notify is queued now and delivered by
+# Postgres on COMMIT, so a rolled-back transition never pushes a phantom event.
+_EVENTS_CHANNEL = "moneymatch_events"
 
 # Copy for the browser push, per kind → (title, body, deep-link). Kinds absent
 # here (refund / system) stay in-app only.
@@ -67,6 +74,17 @@ async def emit(
     row = Notification(user_id=user_id, kind=kind, payload=payload)
     session.add(row)
     await session.flush()
+
+    # Publish a lightweight event on the LISTEN/NOTIFY channel (delivered at
+    # commit). The client only needs "something changed for you" to refetch, so
+    # the payload is just the recipient + kind — never money, never PII.
+    await session.execute(
+        text("SELECT pg_notify(:channel, :payload)"),
+        {
+            "channel": _EVENTS_CHANNEL,
+            "payload": json.dumps({"user_id": str(user_id), "kind": kind}),
+        },
+    )
 
     copy = _PUSH_COPY.get(kind)
     if copy is not None:

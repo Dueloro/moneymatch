@@ -37,6 +37,7 @@ export function WagerCard({
   onJoin,
   disabled = false,
   joining = false,
+  requireConfirm = false,
 }: {
   gameName: string;
   /** Difficulty, field size, or speed. One word where possible. */
@@ -59,6 +60,9 @@ export function WagerCard({
   onJoin: (entryCents: number) => void;
   disabled?: boolean;
   joining?: boolean;
+  /** Two-step join: the first click reveals a confirm button under the card
+   * (for money-commitment contests you can't back out of once matched). */
+  requireConfirm?: boolean;
 }) {
   // Default to the middle preset: the one most people pick, and it makes the
   // segmented control's purpose obvious at a glance.
@@ -66,6 +70,8 @@ export function WagerCard({
     () => entryOptions[Math.floor(entryOptions.length / 2)] ?? entryOptions[0],
   );
   const selected = entryOptions.includes(entry) ? entry : entryOptions[0];
+  // Armed = the first tap happened; a confirm button is showing beneath.
+  const [armed, setArmed] = useState(false);
 
   return (
     <Card className="flex flex-col p-4" interactive>
@@ -121,14 +127,41 @@ export function WagerCard({
       </div>
 
       <div className="mt-4">
-        <PillButton
-          fullWidth
-          size="lg"
-          disabled={disabled || joining}
-          onClick={() => onJoin(selected)}
-        >
-          {joining ? 'Joining…' : buttonLabel}
-        </PillButton>
+        {requireConfirm && armed && !disabled ? (
+          // Second step: a confirm button pops up under the card. No blurb —
+          // the amount is on the button, and the commitment is the whole point.
+          <div className="flex flex-col gap-2">
+            <PillButton
+              fullWidth
+              size="lg"
+              disabled={joining}
+              onClick={() => {
+                onJoin(selected);
+                setArmed(false);
+              }}
+            >
+              {joining ? 'Joining…' : `Confirm · ${formatCurrency(selected)}`}
+            </PillButton>
+            <PillButton
+              fullWidth
+              size="sm"
+              variant="text"
+              disabled={joining}
+              onClick={() => setArmed(false)}
+            >
+              Cancel
+            </PillButton>
+          </div>
+        ) : (
+          <PillButton
+            fullWidth
+            size="lg"
+            disabled={disabled || joining}
+            onClick={() => (requireConfirm ? setArmed(true) : onJoin(selected))}
+          >
+            {joining ? 'Joining…' : buttonLabel}
+          </PillButton>
+        )}
       </div>
     </Card>
   );

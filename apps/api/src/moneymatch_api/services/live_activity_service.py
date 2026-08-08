@@ -103,6 +103,18 @@ async def build_pool_snapshot(
     }
 
 
+def pool_all_decided(snapshot: dict[str, Any]) -> bool:
+    """True when every member of a pool snapshot has a *verified* result
+    (``cleared`` or ``missed``) — the pool's outcome is final and it can settle
+    before its window ends. A member still ``waiting``/``unavailable`` (hasn't
+    played, or a host read failed) keeps this False, so an incomplete or
+    unverifiable pool always falls through to window-end settlement."""
+    members = list((snapshot.get("members") or {}).values())
+    return bool(members) and all(
+        m.get("status") in ("cleared", "missed") for m in members
+    )
+
+
 async def build_match_snapshot(
     match: Match, seats: list[MatchPlayer]
 ) -> dict[str, Any] | None:
