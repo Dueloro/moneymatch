@@ -11,6 +11,7 @@ import { useCreateChallenge } from '../../hooks/useChallenges';
 import { useFileDispute, type ContestRefType } from '../../hooks/useDisputes';
 import { AmountText } from '../ui/AmountText';
 import { ExpandableCard } from '../ui/ExpandableCard';
+import { GameBadge } from '../ui/GameBadge';
 import { PillButton } from '../ui/PillButton';
 import { LiveLine } from './LiveLine';
 
@@ -285,7 +286,12 @@ export function ActivityCard({ item }: { item: ActivityItem }) {
       left={
         <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${dotClass(item)}`} />
       }
-      title={title(item)}
+      title={
+        <span className="flex min-w-0 items-center gap-2">
+          <GameBadge game={item.game} />
+          <span className="truncate">{title(item)}</span>
+        </span>
+      }
       subline={
         <>
           {stateLabel(item)}

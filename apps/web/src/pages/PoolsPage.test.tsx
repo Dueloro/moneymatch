@@ -96,13 +96,17 @@ describe('PoolsPage', () => {
     expect(screen.getByText('$56.25')).toBeInTheDocument();
   });
 
-  it('joining a pool uses the entry selected inside that card', () => {
+  it('confirms in the card before joining, using the selected entry', () => {
     renderWithProviders(<PoolsPage />);
     const card = screen.getByText('Clear 1.8').closest('.rounded-card')!;
-    // Defaults to the middle preset ($10).
-    fireEvent.click(
-      within(card as HTMLElement).getByRole('button', { name: 'Join pool' }),
-    );
+    const wc = within(card as HTMLElement);
+
+    // First tap arms the card; nothing commits until the confirm underneath.
+    fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
+    expect(enterMutate).not.toHaveBeenCalled();
+
+    // The confirm button carries the selected amount (default middle preset $10).
+    fireEvent.click(wc.getByRole('button', { name: 'Confirm · $10.00' }));
     expect(enterMutate).toHaveBeenCalledWith({
       game: 'cs2.faceit',
       metric: 'cs2_kd_ratio',
@@ -111,10 +115,9 @@ describe('PoolsPage', () => {
     });
 
     // Changing the entry inside the card changes what gets joined.
-    fireEvent.click(within(card as HTMLElement).getByRole('tab', { name: '$25.00' }));
-    fireEvent.click(
-      within(card as HTMLElement).getByRole('button', { name: 'Join pool' }),
-    );
+    fireEvent.click(wc.getByRole('tab', { name: '$25.00' }));
+    fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
+    fireEvent.click(wc.getByRole('button', { name: 'Confirm · $25.00' }));
     expect(enterMutate).toHaveBeenLastCalledWith({
       game: 'cs2.faceit',
       metric: 'cs2_kd_ratio',

@@ -42,15 +42,22 @@ from ..errors import APIError
 from ..models.chat import Conversation, ConversationMember, Message
 from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer
+from ..models.pools import SoloEntry, SoloPool
 from ..models.skill import MetricModel
 from ..models.social import Friendship
+from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
+from ..models.wallet import SIGNUP_GRANT_CENTS
 from ..schemas.links import CreateLinkRequest, LinksResponse
 from ..services import (
+    admin_contests_service,
     challenge_service,
     chat_service,
     linking_service,
+    matchmaking,
     money_math,
+    pool_engine,
+    tournament_engine,
     wallet_service,
 )
 from ..services.user_service import (
@@ -841,3 +848,107 @@ async def demo_relink(
     await linking_service.rebind(session, user, body.game, body.username)
     await session.commit()
     return await _links_response(session, user.id)
+
+
+class DemoResetResponse(BaseModel):
+    ok: bool = True
+
+
+async def _reset_demo_state(session: AsyncSession, user: User) -> None:
+    """Return the shared demo account to its fresh-login state.
+
+    Formed rooms are deliberately uncancelable for real accounts, so testers need
+    a way to start over once the "New pool" escape hatch is gone. This refunds and
+    clears every in-flight contest (tickets, pools, matches, tournaments), restores
+    the wallet to the starting funded balance, then re-applies the idempotent seed
+    so the sample Activity + friends are present again. Every money move goes
+    through the normal ledger paths, so reconciliation still holds afterwards.
+    """
+    # 1. Waiting tickets (no escrow held yet) across all three modes.
+    await matchmaking.cancel(session, user)
+    await tournament_engine.cancel(session, user)
+
+    # 2. In-flight head-to-head matches → void (CANCEL + full refund).
+    match_ids = list(
+        await session.scalars(
+            select(Match.id)
+            .join(MatchPlayer, MatchPlayer.match_id == Match.id)
+            .where(
+                MatchPlayer.user_id == user.id,
+                Match.state.in_(("PENDING", "ACTIVE", "AWAITING_RESULT")),
+            )
+        )
+    )
+    for match_id in match_ids:
+        await admin_contests_service.void_match(session, match_id, reason="demo reset")
+
+    # 3. Forming/formed pools the demo is in → refund every entry. `cancel` covers
+    #    a waiting ticket or the demo's own formed room; the query mops up any
+    #    other OPEN/LOCKED pool the demo entered.
+    for _ in range(10):
+        if not await pool_engine.cancel(session, user):
+            break
+    pool_ids = list(
+        await session.scalars(
+            select(SoloPool.id)
+            .join(SoloEntry, SoloEntry.pool_id == SoloPool.id)
+            .where(
+                SoloEntry.user_id == user.id,
+                SoloPool.state.in_(("OPEN", "LOCKED")),
+            )
+        )
+    )
+    for pool_id in pool_ids:
+        pool = await session.get(SoloPool, pool_id)
+        if pool is not None:
+            await pool_engine.cancel_pool(session, pool, reason="demo reset")
+
+    # 4. In-flight tournaments the demo entered → cancel + refund the field.
+    tournament_ids = list(
+        await session.scalars(
+            select(Tournament.id)
+            .join(TournamentEntry, TournamentEntry.tournament_id == Tournament.id)
+            .where(
+                TournamentEntry.user_id == user.id,
+                Tournament.state.in_(("OPEN", "LOCKED")),
+            )
+        )
+    )
+    for tournament_id in tournament_ids:
+        tournament = await session.get(Tournament, tournament_id)
+        if tournament is not None:
+            await tournament_engine.cancel_tournament(
+                session, tournament, reason="demo reset"
+            )
+
+    # 5. Restore the wallet to the starting funded balance ($1,000, zero escrow).
+    #    Refunds above have already released escrow back to available; a ledger
+    #    adjustment (booked against platform:promo) squares the balance.
+    await session.flush()
+    wallet = await wallet_service.get_wallet(session, user.id)
+    delta = SIGNUP_GRANT_CENTS - wallet.available_cents
+    if delta > 0:
+        await wallet_service.credit(
+            session, user.id, delta, memo="demo reset", created_by="demo-reset"
+        )
+    elif delta < 0:
+        await wallet_service.debit(
+            session, user.id, -delta, memo="demo reset", created_by="demo-reset"
+        )
+
+    # 6. Re-apply the seed (idempotent) so fixtures/history/social are present.
+    await _ensure_demo_fixture(session, user)
+    await _ensure_demo_history(session, user)
+    await _ensure_demo_social(session, user)
+
+
+@router.post("/reset", response_model=DemoResetResponse)
+async def demo_reset(
+    user: CurrentUser, session: AsyncSession = Depends(get_session)
+) -> DemoResetResponse:
+    """Reset the shared demo account to its fresh-login state (demo user only)."""
+    if user.auth_id != DEMO_AUTH_ID:
+        raise APIError("not_found", "Not found.", status_code=404)
+    await _reset_demo_state(session, user)
+    await session.commit()
+    return DemoResetResponse()

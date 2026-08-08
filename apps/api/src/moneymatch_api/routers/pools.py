@@ -25,6 +25,7 @@ from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
+from ..models.live import LiveSnapshot
 from ..models.pools import SoloEntry, SoloPool
 from ..models.user import User
 from ..schemas.pools import (
@@ -37,7 +38,7 @@ from ..schemas.pools import (
     PoolStatusResponse,
     PoolView,
 )
-from ..services import money_math, pool_engine
+from ..services import live_activity_service, money_math, pool_engine
 from ..services.pool_engine import PoolEnqueueResult
 
 router = APIRouter(prefix="/pools", tags=["pools"])
@@ -72,6 +73,17 @@ async def _pool_view(session: AsyncSession, pool: SoloPool, user: User) -> PoolV
         for e in entries
     ]
     your_bar = your.personal_bar if your else None
+    # Reflect the live result while the window runs, read host-free from the cached
+    # snapshot the worker maintains (never a host call on the request path).
+    your_cleared: bool | None = None
+    your_current: float | None = None
+    if pool.state == "LOCKED":
+        snap = await session.get(LiveSnapshot, ("pool", pool.id))
+        if snap is not None:
+            view = live_activity_service.view_for("pool", snap.data, user.id)
+            if view is not None:
+                your_cleared = view.get("cleared")
+                your_current = view.get("current")
     return PoolView(
         id=pool.id,
         game=pool.game,
@@ -81,6 +93,8 @@ async def _pool_view(session: AsyncSession, pool: SoloPool, user: User) -> PoolV
         room_bar=pool.room_bar,
         your_bar=your_bar,
         bar_delta=round(pool.room_bar - your_bar, 4) if your_bar is not None else None,
+        your_cleared=your_cleared,
+        your_current=your_current,
         entry_cents=pool.entry_cents,
         pot_cents=pool.pot_cents,
         prize_cents=pool.prize_cents,

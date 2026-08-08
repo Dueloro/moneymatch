@@ -75,9 +75,23 @@ describe('SideRail', () => {
     expect(card).toHaveTextContent('medium K/D ratio');
     expect(card).toHaveTextContent('Room bar 1.75');
     expect(card).toHaveTextContent('4 players · pot $40.00');
+    // The room names its game (the CS2 short label).
+    expect(card).toHaveTextContent('Counter Strike');
     expect(screen.getByTestId('rail-room-play-cue')).toHaveTextContent(
       /you can now play your .* game/i,
     );
+  });
+
+  it('reflects a cleared live result instead of the play cue', () => {
+    mockStatus({
+      ...FORMED,
+      pool: { ...FORMED.pool, your_cleared: true, your_current: 2.1 },
+    });
+    renderWithProviders(<SideRail />);
+    // Once your played match clears the bar, the room shows it (and stops
+    // prompting you to play) — the reflect-live fix for "doesn't reflect".
+    expect(screen.getByTestId('rail-room-live')).toHaveTextContent(/Cleared/);
+    expect(screen.queryByTestId('rail-room-play-cue')).not.toBeInTheDocument();
   });
 
   it('keeps the section in place with a cue when no room is running', () => {

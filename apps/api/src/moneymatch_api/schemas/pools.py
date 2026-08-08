@@ -59,6 +59,10 @@ class PoolView(BaseModel):
     room_bar: float
     your_bar: float | None
     bar_delta: float | None  # room_bar − your_bar (shown on the room card)
+    # Live result while the window runs (from the cached snapshot, not settlement):
+    # whether your played match cleared the room bar, and the value it hit.
+    your_cleared: bool | None = None
+    your_current: float | None = None
     entry_cents: int
     pot_cents: int
     prize_cents: int

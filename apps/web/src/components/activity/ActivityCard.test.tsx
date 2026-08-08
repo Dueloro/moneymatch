@@ -40,6 +40,12 @@ function match(overrides: Partial<ActivityItem> = {}): ActivityItem {
 }
 
 describe('ActivityCard', () => {
+  it('names the host game on the row', () => {
+    renderWithProviders(<ActivityCard item={match()} />);
+    // The CS2 match carries a game badge so the row is not game-ambiguous.
+    expect(screen.getByText('Counter Strike')).toBeInTheDocument();
+  });
+
   it('expands to show per-match stats and a contest action', () => {
     renderWithProviders(<ActivityCard item={match()} />);
     // Collapsed: detail not shown yet.

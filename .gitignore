@@ -27,6 +27,7 @@ coverage/
 .vscode/
 playwright-report/
 test-results/
+.playwright-mcp/
 
 #other
 .claude

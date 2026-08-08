@@ -14,6 +14,7 @@ from moneymatch_api.adapters.base import NormGame
 from moneymatch_api.models.pools import SoloEntry, SoloPool
 from moneymatch_api.models.tournaments import Tournament, TournamentEntry
 from moneymatch_api.services import (
+    live_activity_service,
     pool_engine,
     reconciliation_service,
     tournament_engine,
@@ -227,6 +228,116 @@ async def test_live_snapshot_written_for_inflight_pool(monkeypatch):
         view = live_activity_service.view_for("pool", row.data, users[0][0].id)
         assert view["status"] == "cleared" and view["cleared"] is True
         assert view["target"] == round(room_bar, 2)
+
+
+async def test_pool_all_decided_predicate():
+    """Every member verified (cleared|missed) ⇒ ready; any waiting/unavailable
+    member ⇒ not ready; an empty snapshot ⇒ not ready. (Async only to satisfy the
+    module-wide asyncio mark; the predicate itself is pure.)"""
+    assert live_activity_service.pool_all_decided(
+        {"members": {"a": {"status": "cleared"}, "b": {"status": "missed"}}}
+    )
+    assert not live_activity_service.pool_all_decided(
+        {"members": {"a": {"status": "cleared"}, "b": {"status": "waiting"}}}
+    )
+    assert not live_activity_service.pool_all_decided(
+        {"members": {"a": {"status": "unavailable"}}}
+    )
+    assert not live_activity_service.pool_all_decided({"members": {}})
+
+
+async def test_pool_settles_early_when_all_members_decided(monkeypatch):
+    """A still-in-window pool whose every entrant has a final result settles now
+    (moves out of In play / Room formed) instead of waiting for the window end."""
+    sm = new_sessionmaker()
+    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
+    async with sm() as s:
+        users = []
+        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+            u, host = await _player(s, f"E{i}", mu=mu)
+            users.append((u, host))
+        for u, _ in users[:3]:
+            await pool_engine.enqueue(
+                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            )
+        res = await pool_engine.enqueue(
+            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+        )
+        pool_id = res.pool.id
+        room_bar = res.pool.room_bar
+        start = res.pool.window_starts_at  # window is open — ends in the future
+        await s.commit()
+
+    mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
+    # Every member has a decided in-window match → the outcome is already final.
+    games = {
+        users[0][1]: [_game(mid_ms, room_bar + 0.5)],  # clears
+        users[1][1]: [_game(mid_ms, room_bar + 0.5)],  # clears
+        users[2][1]: [_game(mid_ms, 0.3)],  # misses
+        users[3][1]: [_game(mid_ms, 0.3)],  # misses
+    }
+    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
+
+    # Cycle 1: the live refresh flags the pool ready but does not settle it yet
+    # (settlement runs before the refresh within a cycle).
+    r1 = await settlement_worker.run_cycle(sm)
+    assert r1.pools_settled == 0
+    async with sm() as s:
+        pool = await s.get(SoloPool, pool_id)
+        assert pool.state == "LOCKED"
+        assert (pool.outcome_detail or {}).get("live_ready") is True
+
+    # Cycle 2: the ready flag settles it before the window closes.
+    r2 = await settlement_worker.run_cycle(sm)
+    assert r2.pools_settled == 1
+    async with sm() as s:
+        pool = await s.get(SoloPool, pool_id)
+        assert pool.state == "SETTLED"
+        assert pool.window_ends_at > datetime.now(UTC)  # early, not at window end
+        entries = list(
+            await s.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool_id))
+        )
+        assert len([e for e in entries if e.status == "CLEARED"]) == 2
+        assert (await reconciliation_service.check_all(s)).ok
+
+
+async def test_pool_not_settled_early_while_a_member_is_still_playing(monkeypatch):
+    """If any entrant has no result yet, the pool stays in play until its window
+    ends — early settlement never strands a still-playing member's stake."""
+    sm = new_sessionmaker()
+    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
+    async with sm() as s:
+        users = []
+        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+            u, host = await _player(s, f"W{i}", mu=mu)
+            users.append((u, host))
+        for u, _ in users[:3]:
+            await pool_engine.enqueue(
+                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            )
+        res = await pool_engine.enqueue(
+            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+        )
+        pool_id = res.pool.id
+        room_bar = res.pool.room_bar
+        start = res.pool.window_starts_at
+        await s.commit()
+
+    mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
+    # Only two of four have played — the other two are still "waiting".
+    games = {
+        users[0][1]: [_game(mid_ms, room_bar + 0.5)],
+        users[2][1]: [_game(mid_ms, 0.3)],
+    }
+    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
+
+    r1 = await settlement_worker.run_cycle(sm)
+    r2 = await settlement_worker.run_cycle(sm)
+    assert r1.pools_settled == 0 and r2.pools_settled == 0
+    async with sm() as s:
+        pool = await s.get(SoloPool, pool_id)
+        assert pool.state == "LOCKED"
+        assert not (pool.outcome_detail or {}).get("live_ready")
 
 
 # --------------------------------------------------------------------------- #

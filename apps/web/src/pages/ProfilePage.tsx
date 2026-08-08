@@ -6,6 +6,7 @@ import { LinkGames } from '../components/LinkGames';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
+import { useResetDemo } from '../hooks/useResetDemo';
 import { formatCurrency } from '../lib/format';
 import { disablePush, enablePush, isPushSupported, isSubscribed } from '../lib/push';
 
@@ -113,6 +114,58 @@ export function ProfilePage() {
           </button>
         )}
       </div>
+
+      {isDemo && <ResetDemo />}
+    </div>
+  );
+}
+
+/**
+ * Reset the shared demo to its fresh-login state. This replaces the old per-room
+ * "New pool" escape hatch: formed rooms are (correctly) uncancelable, so testers
+ * get one deliberate "start over" here instead. Inline two-step confirm, matching
+ * the page's other irreversible actions.
+ */
+function ResetDemo() {
+  const reset = useResetDemo();
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="mt-10 border-t border-hairline pt-6">
+      <p className="text-sm font-medium text-text">Reset demo</p>
+      <p className="mt-1 max-w-read text-xs text-text-secondary">
+        Clear any in-flight contests, restore your $1,000 demo balance, and refresh the
+        sample activity. This resets the shared demo account for everyone.
+      </p>
+      {confirming ? (
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              reset.mutate(undefined, { onSettled: () => setConfirming(false) })
+            }
+            disabled={reset.isPending}
+            className="text-sm font-semibold text-text hover:opacity-80 disabled:opacity-40"
+          >
+            {reset.isPending ? 'Resetting…' : 'Yes, reset the demo'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="text-sm text-text-secondary hover:text-text"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <PillButton
+          variant="outline"
+          className="mt-3"
+          onClick={() => setConfirming(true)}
+        >
+          Reset demo
+        </PillButton>
+      )}
     </div>
   );
 }
