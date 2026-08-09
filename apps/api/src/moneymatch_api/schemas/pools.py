@@ -48,6 +48,11 @@ class PoolMemberView(BaseModel):
     status: str
     payout_cents: int
     is_you: bool
+    # What they actually did on the graded match, once the pool has settled.
+    # `None` while the window is open, or for an entry that never produced a
+    # qualifying match. The bar alone cannot say who beat whom by how much, and
+    # a settled room is the one place a player is owed both numbers.
+    result_value: float | None = None
 
 
 class PoolView(BaseModel):

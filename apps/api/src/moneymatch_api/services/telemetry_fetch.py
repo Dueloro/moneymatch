@@ -162,6 +162,20 @@ async def grade_tournament(
     n = tournament.score_matches
     grades: dict[uuid.UUID, TournamentGrade] = {}
     for entry in entries:
+        # A practice opponent has no real host account, so ask its adapter
+        # nothing: the username does not resolve and the call is wasted. It
+        # posts a deliberately losing score instead of no score at all, because
+        # `compute_standings` drops an unscored entry and a field of one
+        # cancels the whole contest (see `test_opponents.practice_score`).
+        if test_opponents.graded_as_failed(entry.host_account_id):
+            score = test_opponents.practice_score(metric)
+            grades[entry.id] = TournamentGrade(
+                values=[] if score is None else [score],
+                score=score,
+                counted=0,
+                telemetry={metric: score, "practice_opponent": True},
+            )
+            continue
         games = await _window_games(
             tournament.game,
             entry.host_account_id,

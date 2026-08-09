@@ -70,6 +70,7 @@ async def _pool_view(session: AsyncSession, pool: SoloPool, user: User) -> PoolV
             status=e.status,
             payout_cents=e.payout_cents,
             is_you=e.user_id == user.id,
+            result_value=(e.telemetry or {}).get(pool.metric),
         )
         for e in entries
     ]
