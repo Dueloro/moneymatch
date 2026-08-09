@@ -83,9 +83,21 @@ async def test_preview_quotes_bars_from_own_baseline(session):
     for difficulty, k in POOL_DIFFICULTY_K.items():
         assert by_diff[difficulty]["bar"] == fairness.personal_bar(1.50, 0.30, k, 0.05)
     assert by_diff["easy"]["bar"] < by_diff["hard"]["bar"]  # harder asks for more
-    # Disclosed clear rates, not odds: 1 − Φ(k).
-    assert by_diff["medium"]["clear_rate"] == pytest.approx(
-        fairness.p_target_for_k(POOL_DIFFICULTY_K["medium"]), abs=1e-3
+
+    # Disclosed clear rates, not odds. The promise is that the rate shown is the
+    # one implied by the bar *actually quoted*, so that is what is pinned here.
+    # It drifts off the nominal 1 − Φ(k) because the bar is rounded to the
+    # metric's quoting increment: at k=0.842, μ+kσ is 1.7526 and the card can
+    # only say 1.75, which is a slightly easier bar than the tier nominally asks
+    # for. Reporting 1 − Φ(k) instead would advertise a rate for a bar nobody is
+    # graded against.
+    medium = by_diff["medium"]
+    assert medium["clear_rate"] == pytest.approx(
+        fairness.clear_prob(medium["bar"], 1.50, 0.30, False), abs=1e-4
+    )
+    # And rounding is the only thing moving it: still near the design rate.
+    assert medium["clear_rate"] == pytest.approx(
+        fairness.p_target_for_k(POOL_DIFFICULTY_K["medium"]), abs=0.02
     )
 
 
