@@ -27,7 +27,7 @@ import structlog
 
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
-from ..constants import metric_label
+from ..constants import lower_is_better, metric_label
 from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
@@ -38,7 +38,11 @@ log = structlog.get_logger(__name__)
 
 
 async def _window_games(
-    game: str, host_account_id: str, starts_ms: int, ends_ms: int
+    game: str,
+    host_account_id: str,
+    starts_ms: int,
+    ends_ms: int,
+    rated_only: bool = True,
 ) -> list[NormGame] | None:
     """The account's finished games inside `[starts_ms, ends_ms]`, in adapter order
     (oldest-first). `None` on a host outage or an unregistered game — the card
@@ -49,7 +53,11 @@ async def _window_games(
         return None
     try:
         games = await adapter.poll_eligible_games(
-            host_account_id, starts_ms, GameFilters(rated_only=False)
+            # Same policy as settlement, so the live line never counts a game
+            # the grading would ignore.
+            host_account_id,
+            starts_ms,
+            GameFilters(rated_only=rated_only),
         )
     except HostError:
         log.info("live.host_unavailable", game=game, host=host_account_id)
@@ -87,7 +95,11 @@ async def build_pool_snapshot(
             members[str(entry.user_id)] = {"status": "waiting", "matches": len(games)}
             continue
         value = qualifying.metrics[pool.metric]
-        cleared = value >= pool.room_bar
+        cleared = (
+            value <= pool.room_bar
+            if lower_is_better(pool.metric)
+            else value >= pool.room_bar
+        )
         members[str(entry.user_id)] = {
             "status": "cleared" if cleared else "missed",
             "current": round(value, 2),

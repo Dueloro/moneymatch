@@ -51,14 +51,17 @@ from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from . import (
+    aggregate_metrics,
     fairness,
     geo_service,
     limits_service,
+    linking_service,
     matchmaking,
     money_math,
     notifications_service,
     pairing,
     sandbagging_service,
+    skill_prior,
     wallet_service,
 )
 from .feature_flags import get_boolean_flags
@@ -89,6 +92,11 @@ class TournamentGrade:
     """
 
     values: list[float] | None
+    #: Set for aggregate metrics (total wins, streak, fastest win), which are
+    #: scored over the whole window instead of averaged across first-N matches.
+    #: When present it is used verbatim as the entry's score.
+    score: float | None = None
+    counted: int | None = None
     telemetry: dict[str, Any] | None = None
     raw_payload_id: uuid.UUID | None = None
 
@@ -143,13 +151,7 @@ async def _metric_model(
 async def _require_link(
     session: AsyncSession, user_id: uuid.UUID, game: str
 ) -> LinkedAccount:
-    link = await session.scalar(
-        select(LinkedAccount).where(
-            LinkedAccount.user_id == user_id,
-            LinkedAccount.game == game,
-            LinkedAccount.status != "unbound",  # ignore soft-unbound history rows
-        )
-    )
+    link = await linking_service.get_link(session, user_id, game)
     if link is None or link.status != "active":
         raise TournamentError(
             "not_linked", f"Link a {game} account first.", status_code=409
@@ -157,9 +159,39 @@ async def _require_link(
     return link
 
 
+def host_rating(link: LinkedAccount) -> float | None:
+    """The linked account's rating on its primary speed.
+
+    Aggregate contests (wins, streak, fastest win) have no per-match rate model
+    to take a mean and spread from, so the field forms on the host's own rating
+    instead. Shared with `skill_prior`, which uses the same rating to seed a
+    pool baseline, so the two can never drift apart.
+    """
+    return skill_prior.host_rating(link)
+
+
 async def _build_baseline(
     session: AsyncSession, user: User, game: str, metric: str, link: LinkedAccount
 ) -> dict[str, Any]:
+    if aggregate_metrics.is_aggregate(metric):
+        rating = host_rating(link)
+        if rating is None:
+            raise TournamentError(
+                "no_stat_baseline",
+                "We could not read your rating from the host. "
+                "Refresh the game on your profile and try again.",
+                status_code=409,
+                detail={"metric": metric},
+            )
+        return {
+            "linked_account_id": str(link.id),
+            "host_account_id": link.host_account_id,
+            "metric": metric,
+            "mu": rating,
+            "sigma": aggregate_metrics.ELO_SIGMA,
+            "n": 1,
+        }
+
     model = await _metric_model(session, user.id, game, metric)
     if model is None or model.n < STAT_BASELINE_MIN_N:
         raise TournamentError(
@@ -194,7 +226,16 @@ async def _all_pairs_pairable(
 ) -> bool:
     for i in range(len(tickets)):
         for j in range(i + 1, len(tickets)):
-            if not await matchmaking.can_pair(session, tickets[i], tickets[j], now):
+            if not await matchmaking.can_pair(
+                session,
+                tickets[i],
+                tickets[j],
+                now,
+                # A bar is quoted from your own history, not compared against
+                # another player's stat line, so the head-to-head sample floor
+                # does not apply here. This surface has its own.
+                require_established_metric=False,
+            ):
                 return False
     return True
 
@@ -491,13 +532,18 @@ async def _entries(
 def compute_standings(
     entries: list[TournamentEntry],
     scores: dict[uuid.UUID, float | None],
+    *,
+    higher_is_better: bool = True,
 ) -> list[tuple[TournamentEntry, int]]:
-    """Rank scored entries (higher first); ties share a rank; forfeits rank last.
+    """Rank scored entries; ties share a rank; forfeits rank last.
 
-    Returns (entry, rank) best-first. Deterministic tie order by `enqueued_at`.
+    `higher_is_better=False` ranks smallest-first, which is what "fastest win"
+    (fewest moves) needs. Returns (entry, rank) best-first, with a deterministic
+    tie order by `enqueued_at`.
     """
+    sign = 1.0 if higher_is_better else -1.0
     ranked = [e for e in entries if scores.get(e.id) is not None]
-    ranked.sort(key=lambda e: (-scores[e.id], e.enqueued_at))  # type: ignore[operator]
+    ranked.sort(key=lambda e: (-sign * scores[e.id], e.enqueued_at))  # type: ignore[operator]
     out: list[tuple[TournamentEntry, int]] = []
     i = 0
     while i < len(ranked):
@@ -563,12 +609,19 @@ async def settle_tournament(
             unverifiable.append(e)
             scores[e.id] = None
             continue
-        avg, count = fairness.first_n_average(g.values, tournament.score_matches)
+        if aggregate_metrics.is_aggregate(tournament.ranking_metric):
+            avg, count = g.score, (g.counted or 0)
+        else:
+            avg, count = fairness.first_n_average(g.values, tournament.score_matches)
         e.score = avg
         e.matches_counted = count
         scores[e.id] = avg
 
-    ranked = compute_standings(entries, scores)
+    ranked = compute_standings(
+        entries,
+        scores,
+        higher_is_better=aggregate_metrics.higher_is_better(tournament.ranking_metric),
+    )
 
     if len(ranked) < tournament.min_ranked:
         return await _cancel(session, tournament, reason="min_ranked")

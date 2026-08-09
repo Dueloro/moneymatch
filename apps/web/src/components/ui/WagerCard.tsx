@@ -17,7 +17,7 @@ import { Segmented } from './Segmented';
  * from nine cards to three (16-ui-revamp-plan §1).
  *
  * The headline is the **clear bar**: the number to beat, drawn against your own
- * baseline. That is the product's actual idea, and it says what "Clears ≈ 16% of
+ * baseline. That is the product's actual idea, and it says what "Clears ≈ 20% of
  * the time" was trying to say without a sentence.
  */
 export function WagerCard({
@@ -27,6 +27,9 @@ export function WagerCard({
   subtitle,
   target,
   clearRate,
+  lowerIsBetter = false,
+  targetUnit,
+  targetNote,
   entryOptions,
   payoutFor,
   payoutLabel,
@@ -49,6 +52,17 @@ export function WagerCard({
   target?: number | null;
   /** Server's estimate (0..1) of how often you clear that bar. */
   clearRate?: number | null;
+  /** True when a smaller number wins (fewest moves), so the copy flips. */
+  lowerIsBetter?: boolean;
+  /** What the headline number counts, e.g. "moves". */
+  targetUnit?: string;
+  /**
+   * One short qualifier under the bar, for a condition the number alone cannot
+   * carry. "14 moves or fewer" reads as though any short game counts, so a
+   * win-only metric has to say so or a player who loses in ten is entitled to
+   * think they cleared it.
+   */
+  targetNote?: string;
   entryOptions: number[];
   /** Derived payout for the selected entry. */
   payoutFor: (entryCents: number) => number;
@@ -92,9 +106,15 @@ export function WagerCard({
             <span className="text-3xl font-semibold text-text">
               {Number.isInteger(target) ? target : target.toFixed(2)}
             </span>
-            <span className="text-xs text-text-secondary">to clear</span>
+            <span className="text-xs text-text-secondary">
+              {targetUnit ? `${targetUnit} ` : ''}
+              {lowerIsBetter ? 'or fewer' : 'or better'}
+            </span>
           </div>
           {clearRate != null && <ClearRate rate={clearRate} />}
+          {targetNote && (
+            <p className="mt-2 text-xs text-text-secondary">{targetNote}</p>
+          )}
         </div>
       ) : (
         subtitle && <p className="mt-3 text-sm text-text-secondary">{subtitle}</p>

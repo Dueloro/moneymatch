@@ -82,17 +82,31 @@ def h2h_multiplier_bps(rake_bps: int = DEFAULT_RAKE_BPS) -> int:
 
 
 def pool_multiplier_estimate_bps(
-    p_target: float, rake_bps: int = DEFAULT_RAKE_BPS
+    p_target: float,
+    rake_bps: int = DEFAULT_RAKE_BPS,
+    room_size: int = 4,
 ) -> int:
-    """Estimated pool tier multiplier ≈ `(1 − rake) / p_target`, in basis points.
+    """Estimated pool tier multiplier, in basis points, on your own entry.
 
-    This is an **estimate** for display only (02-design-system §4) — the real
-    payout is the entrant's share of the pool. Never a guaranteed/house-banked
-    multiplier. `p_target` is the difficulty's disclosed clear rate `1 − Φ(k)`.
+    The share model is `(1 − rake) / p_target`: if a `p_target` fraction of the
+    room clears, the clearers divide the pot, so each takes roughly their entry
+    over the clear rate, less rake.
+
+    **Capped at the pot.** A pool is peer funded, so the most anyone can take
+    home is every entry minus rake, i.e. `room_size · (1 − rake)`. Without the
+    cap a low clear rate divides by a vanishing number: a 0.04% tier quoted a
+    multiplier of 22,500x and the card advertised $225,000 on a $25 entry, which
+    is not a payout the pool could ever fund.
+
+    Still an estimate for display only (02-design-system §4); the real payout is
+    the entrant's share of the actual pot. Never a house-banked multiplier.
     """
+    take_home_bps = BPS_DENOMINATOR - rake_bps
+    cap_bps = max(0, room_size) * take_home_bps
     if p_target <= 0:
-        return 0
-    return round((BPS_DENOMINATOR - rake_bps) / p_target)
+        # Nobody is expected to clear, so anyone who does takes the whole pot.
+        return cap_bps
+    return min(round(take_home_bps / p_target), cap_bps)
 
 
 def split_weighted(

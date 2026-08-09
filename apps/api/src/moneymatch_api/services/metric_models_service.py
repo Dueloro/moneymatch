@@ -26,6 +26,7 @@ from ..constants import (
     METRIC_PROVISIONAL_MIN_N,
 )
 from ..models.skill import MetricModel
+from . import demo_mode
 
 # How far back to pull for the bootstrap (~last N finished matches; adapters cap
 # their own page sizes below this).
@@ -103,7 +104,12 @@ async def bootstrap(
 
     adapter = registry.get(game)
     games: list[NormGame] = await adapter.poll_eligible_games(
-        host_account_id, 0, GameFilters()
+        host_account_id,
+        0,
+        # Build the baseline from the same population it will be graded
+        # against, so a demo bar quoted from casual games is judged on casual
+        # games too.
+        GameFilters(rated_only=await demo_mode.rated_only_for(session, user_id)),
     )
     games = games[-_BOOTSTRAP_MATCH_LIMIT:]
 

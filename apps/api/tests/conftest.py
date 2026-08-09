@@ -65,7 +65,14 @@ def make_token(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def _schema() -> AsyncIterator[None]:
+async def _schema(request) -> AsyncIterator[None]:
+    # Nothing selected touches Postgres (e.g. `pytest -m nodb`), so do not
+    # connect. Decided over the whole selected set rather than per test because
+    # this fixture is session-scoped and builds the schema exactly once.
+    if all(item.get_closest_marker("nodb") for item in request.session.items):
+        yield
+        return
+
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext"))
@@ -80,8 +87,19 @@ async def _schema() -> AsyncIterator[None]:
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def _clean(_schema: None) -> AsyncIterator[None]:
-    """Reset user-owned tables and reseed feature flags before each test."""
+async def _clean(request, _schema: None) -> AsyncIterator[None]:
+    """Reset user-owned tables and reseed feature flags before each test.
+
+    A test marked `@pytest.mark.nodb` skips the truncate, so pure-function
+    suites (scoring maths, ranking direction) need no live Postgres. `_schema`
+    stays an ordinary parameter: resolving an async fixture imperatively with
+    `request.getfixturevalue` makes pytest-asyncio call `Runner.run()` inside
+    the already-running loop, which errors the setup of every database test in
+    the suite. `_schema` decides for itself whether to connect.
+    """
+    if request.node.get_closest_marker("nodb"):
+        yield
+        return
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
         # CASCADE from users clears wallets/limits/ledger_entries/linked_accounts/

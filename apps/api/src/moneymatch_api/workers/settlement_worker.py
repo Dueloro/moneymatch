@@ -47,6 +47,7 @@ from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..services import (
     challenge_service,
+    demo_mode,
     grading,
     live_activity_service,
     match_lifecycle,
@@ -138,7 +139,11 @@ async def resolve_match(session: AsyncSession, match: Match, now: datetime) -> s
 async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> str:
     """Grade + settle (or extend/expire) one claimed ACTIVE/AWAITING_RESULT match."""
     seats = await match_lifecycle.players(session, match.id)
-    outcome = await grading.grade(match, seats, now)
+    # A demo-account duel grades casual games too; a real one never does.
+    rated_only = all(
+        [await demo_mode.rated_only_for(session, seat.user_id) for seat in seats]
+    )
+    outcome = await grading.grade(match, seats, now, rated_only)
 
     if outcome.status == grading.PENDING:
         # Hard ceiling from matched_at → CANCEL + refund (outage can't strand money).

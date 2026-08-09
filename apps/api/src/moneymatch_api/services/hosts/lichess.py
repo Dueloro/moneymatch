@@ -59,8 +59,13 @@ async def get_user_games(
     since_ms: int,
     perf_types: set[str] | None = None,
     max_games: int = 50,
+    rated_only: bool = True,
 ) -> list[dict]:
-    """Fetch a user's rated games since ``since_ms`` (epoch ms), newest first.
+    """Fetch a user's games since ``since_ms`` (epoch ms), newest first.
+
+    ``rated_only`` (the default) asks Lichess for rated games only, so casual
+    and practice games never reach anything that builds a stat. Passing False
+    omits the filter entirely, which returns both.
 
     ``moves=true`` so plies are countable. Fails soft (``[]``) on any host error
     so a metric bootstrap / settlement poll degrades rather than crashes.
@@ -68,13 +73,14 @@ async def get_user_games(
     params = {
         "since": str(int(since_ms)),
         "max": str(max_games),
-        "rated": "true",
         "moves": "true",
         "pgnInJson": "false",
         "clocks": "false",
         "evals": "false",
         "opening": "false",
     }
+    if rated_only:
+        params["rated"] = "true"
     if perf_types:
         params["perfType"] = ",".join(sorted(perf_types))
     try:

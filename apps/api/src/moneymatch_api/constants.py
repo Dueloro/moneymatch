@@ -90,11 +90,11 @@ def game_flag_key(game_id: str) -> str:
 # Rate metrics we build EWMA skill models for, per game. Chess settles on `win`
 # only, so it models no per-metric skill here.
 # Metrics we build EWMA skill models for from host history (bootstrap polls
-# these on link). Chess has no per-match rate stat we fetch, so it models none
-# here — its `chess_accuracy` pool metric is a demo-seeded baseline (see the demo
-# fixture), not a live-polled one.
+# these on link). Chess models `chess_moves`, read straight off each game record
+# Lichess already returns. `chess_accuracy` is retained only because demo
+# fixtures seed it; it has no live source and is no longer offered for pools.
 GAME_RATE_METRICS: dict[str, tuple[str, ...]] = {
-    GAME_CHESS_LICHESS: (),
+    GAME_CHESS_LICHESS: ("chess_moves",),
     GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
     GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
     GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
@@ -208,21 +208,95 @@ TOURNAMENT_GAMES: tuple[str, ...] = REGISTERED_GAMES
 
 # Metrics offered for pools/tournaments per game (rate-based allowlist only).
 POOL_METRICS: dict[str, tuple[str, ...]] = {
-    GAME_CHESS_LICHESS: ("chess_accuracy",),
+    GAME_CHESS_LICHESS: ("chess_moves",),
     GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
     GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
     GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
-TOURNAMENT_METRICS: dict[str, tuple[str, ...]] = POOL_METRICS
+# Tournaments are no longer just "pools with a bigger field". Chess runs the
+# three aggregate contests the Lichess record actually supports (see
+# `services/aggregate_metrics.py`); every other game still scores its rate
+# metrics as a first-N mean.
+TOURNAMENT_METRICS: dict[str, tuple[str, ...]] = {
+    **POOL_METRICS,
+    GAME_CHESS_LICHESS: ("chess_win_streak", "chess_wins", "chess_fastest_win"),
+}
 
-# Personal-bar difficulty multipliers: bar = round(μ + k·σ). Implied clear rate
-# is 1 − Φ(k) (≈31% / 16% / 4%) — disclosed difficulty, never an odds line.
-POOL_DIFFICULTY_K: dict[str, float] = {"easy": 0.5, "medium": 1.0, "hard": 1.75}
+# Personal-bar difficulty multipliers, as z-scores. Implied clear rate is
+# 1 − Φ(k): disclosed difficulty, never an odds line.
+#
+#   easy   k = 0.385  ->  35%, about 1 game in 3
+#   medium k = 0.842  ->  20%, about 1 in 5
+#   hard   k = 1.282  ->  10%, about 1 in 10
+#
+# These were 0.5 / 1.0 / 1.75 (31% / 16% / 4%). A 4% tier is a bar you miss
+# nineteen times out of twenty, which reads as broken rather than hard, and it
+# sits so far into the tail that it is exactly where a fitted distribution is
+# least trustworthy. Ending on round odds also makes the card self-explaining.
+POOL_DIFFICULTY_K: dict[str, float] = {"easy": 0.385, "medium": 0.842, "hard": 1.282}
+
+# Metrics that measure a strictly positive quantity with a long right tail:
+# moves in a game, damage, duration. Their bars are placed on a lognormal
+# instead of a normal (see `fairness.personal_bar`), because `μ − k·σ` on a
+# normal can leave the scale entirely once σ approaches μ.
+METRIC_POSITIVE_SUPPORT: frozenset[str] = frozenset({"chess_moves"})
+
+# Metrics that only count when you WON the match.
+#
+# `chess_moves` without this is trivially exploitable in the wrong direction:
+# the bar is "come in at or under N moves", and resigning on move one scores 1.
+# A bot could clear every hard pool by instantly resigning, which is both the
+# cheapest possible action and a guaranteed win. Requiring the win makes the
+# only way to score the thing the card actually claims: a fast victory.
+#
+# The adapter enforces it by not emitting the metric at all for a game you did
+# not win, so a lost game contributes nothing to your baseline either: the
+# average becomes "moves I take to win", which is what a bar quoted in moves is
+# supposed to mean.
+METRIC_REQUIRES_WIN: frozenset[str] = frozenset({"chess_moves"})
+
+
+def requires_win(metric: str) -> bool:
+    """True when only won matches produce a value for this metric."""
+    return metric in METRIC_REQUIRES_WIN
+
+
+# The smallest value the metric can physically take. A backstop, not a tuning
+# knob: with a lognormal the bar should never approach it. Two full moves is
+# Fool's Mate, the shortest possible chess game.
+METRIC_FLOOR: dict[str, float] = {"chess_moves": 2.0}
+
+
+def positive_support(metric: str) -> bool:
+    """True when the metric cannot be zero or negative (use a lognormal bar)."""
+    return metric in METRIC_POSITIVE_SUPPORT
+
+
+def metric_floor(metric: str) -> float:
+    """The hard minimum a quoted bar may never fall below."""
+    return METRIC_FLOOR.get(metric, 0.0)
+
+
+# Metrics where a SMALLER number is the better result. For these the bar is
+# μ − k·σ and you clear by coming in at or under it, so a harder pool asks for
+# fewer moves rather than more.
+#
+# The maths stays symmetric: at bar = μ − k·σ the implied clear rate is
+# Φ((bar−μ)/σ) = Φ(−k) = 1 − Φ(k), exactly the rate a higher-is-better metric
+# gets at the same k. Difficulty means the same thing in both directions.
+METRIC_LOWER_IS_BETTER: frozenset[str] = frozenset({"chess_moves"})
+
+
+def lower_is_better(metric: str) -> bool:
+    """True when a smaller value wins (fewest moves), false for a rate stat."""
+    return metric in METRIC_LOWER_IS_BETTER
+
 
 # Rounding increment for a personal/room bar, per metric (bars are quoted to a
 # clean step so two players' bars are comparable and reproducible).
 METRIC_BAR_INCREMENT: dict[str, float] = {
     "chess_accuracy": 1.0,
+    "chess_moves": 1.0,
     "cs2_kd_ratio": 0.05,
     "cs2_adr": 1.0,
     "cs2_headshot_pct": 1.0,
@@ -242,7 +316,6 @@ POOL_MIN_ROOM = 3
 POOL_BAR_SPREAD_CAP_SIGMA = 1.5
 # The pool settlement window: your first qualifying match must land inside it.
 POOL_WINDOW_SECONDS = 24 * 3600
-
 # Tournament field. Formed under a μ-dispersion cap; scored on the mean of the
 # first-N qualifying matches; top places split per `TOURNAMENT_PRIZE_SPLIT`.
 TOURNAMENT_FIELD_SIZE = 10
@@ -277,6 +350,10 @@ WIN_STREAK_THRESHOLD = 8
 # Human labels for rate metrics (pool/tournament market rows + standings).
 METRIC_LABELS: dict[str, str] = {
     "chess_accuracy": "Accuracy",
+    "chess_moves": "Moves to win",
+    "chess_win_streak": "Longest win streak",
+    "chess_wins": "Total wins",
+    "chess_fastest_win": "Fastest win",
     "cs2_kd_ratio": "K/D ratio",
     "cs2_adr": "ADR",
     "cs2_headshot_pct": "Headshot %",

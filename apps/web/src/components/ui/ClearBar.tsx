@@ -4,7 +4,7 @@
  * MoneyMatch's whole idea is "here is a number quoted from your own baseline,
  * now beat it". This renders exactly that: your average sits on a track, the
  * target sits to the right of it, and the gap you have to cover is shaded. It
- * replaces the sentence "Clears ≈ 16% of the time" with a picture, and it
+ * replaces the sentence "Clears ≈ 20% of the time" with a picture, and it
  * encodes difficulty spatially, so a harder pool is visibly a longer reach.
  *
  * The same component appears on the contest card, the formed-room banner, the
@@ -16,7 +16,7 @@
  * rate but **not** your baseline, so a full ClearBar there would have to invent
  * the "you" end of it. This shows the real number instead: how often the server
  * expects you to clear that bar, as a meter rather than as the sentence
- * "Clears ≈ 31% of the time" repeated on every card.
+ * "Clears ≈ 35% of the time" repeated on every card.
  *
  * Harder bars read as visibly shorter meters, which is the difficulty signal
  * the three cards exist to communicate.

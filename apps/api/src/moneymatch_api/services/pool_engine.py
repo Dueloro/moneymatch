@@ -45,6 +45,9 @@ from ..constants import (
     QUEUE_TICKET_TTL_SECONDS,
     STAT_BASELINE_MIN_N,
     game_flag_key,
+    lower_is_better,
+    metric_floor,
+    positive_support,
 )
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
@@ -56,11 +59,13 @@ from . import (
     fairness,
     geo_service,
     limits_service,
+    linking_service,
     matchmaking,
     money_math,
     notifications_service,
     pairing,
     sandbagging_service,
+    skill_prior,
     wallet_service,
 )
 from .feature_flags import get_boolean_flags
@@ -144,16 +149,46 @@ async def _metric_model(
 async def _require_link(
     session: AsyncSession, user_id: uuid.UUID, game: str
 ) -> LinkedAccount:
-    link = await session.scalar(
-        select(LinkedAccount).where(
-            LinkedAccount.user_id == user_id,
-            LinkedAccount.game == game,
-            LinkedAccount.status != "unbound",  # ignore soft-unbound history rows
-        )
-    )
+    link = await linking_service.get_link(session, user_id, game)
     if link is None or link.status != "active":
         raise PoolError("not_linked", f"Link a {game} account first.", status_code=409)
     return link
+
+
+def _shape(metric: str) -> dict[str, Any]:
+    """The bar-placement options for a metric, in one place.
+
+    Both `preview_bars` (the number on the card) and `_build_baseline` (the
+    number you are graded against) must place bars identically, or the card
+    advertises a bar the pool does not use.
+    """
+    return {
+        "increment": METRIC_BAR_INCREMENT.get(metric, 0.01),
+        "lower_is_better": lower_is_better(metric),
+        "positive": positive_support(metric),
+        "floor": metric_floor(metric),
+    }
+
+
+def _corrected(
+    model: MetricModel, metric: str, link: LinkedAccount | None
+) -> tuple[float, float]:
+    """The (mu, sigma) a bar is actually placed from: shrunk, then spread-floored.
+
+    A raw mean and spread off a handful of games are mostly noise, so they are
+    blended toward what the player's rating predicts (`skill_prior`). Whatever
+    comes out of here is what gets frozen into the ticket, so the bar, the
+    disclosed clear rate and the room composition check all read the same
+    numbers.
+    """
+    rating = skill_prior.host_rating(link) if link is not None else None
+    mu, sigma = skill_prior.shrink(
+        float(model.mu),
+        float(model.sigma),
+        int(model.n),
+        skill_prior.prior_for(metric, rating),
+    )
+    return mu, fairness.effective_sigma(sigma, METRIC_BAR_INCREMENT.get(metric, 0.01))
 
 
 async def preview_bars(
@@ -164,15 +199,34 @@ async def preview_bars(
     model = await _metric_model(session, user.id, game, metric)
     n = model.n if model else 0
     provisional = n < STAT_BASELINE_MIN_N
-    increment = METRIC_BAR_INCREMENT.get(metric, 0.01)
+    shape = _shape(metric)
     cards: list[dict[str, Any]] = []
     if model is not None and not provisional:
+        # The same resolver `enqueue` uses, so the bar on the card is quoted
+        # from the account you will actually be graded on.
+        link = await linking_service.get_link(session, user.id, game)
+        mu, sigma = _corrected(model, metric, link)
         for difficulty, k in POOL_DIFFICULTY_K.items():
+            bar = fairness.personal_bar(mu, sigma, k, **shape)
             cards.append(
                 {
                     "difficulty": difficulty,
-                    "bar": fairness.personal_bar(model.mu, model.sigma, k, increment),
-                    "clear_rate": round(fairness.p_target_for_k(k), 4),
+                    "bar": bar,
+                    # From the bar actually quoted and the same (mu, sigma)
+                    # and distribution used to place it, so the number on the
+                    # card is the one the fairness check and settlement agree
+                    # with. Rounding to whole moves still shifts it off the
+                    # nominal rate.
+                    "clear_rate": round(
+                        fairness.clear_prob(
+                            bar,
+                            mu,
+                            sigma,
+                            shape["lower_is_better"],
+                            positive=shape["positive"],
+                        ),
+                        4,
+                    ),
                 }
             )
     return {"metric": metric, "provisional": provisional, "n": n, "cards": cards}
@@ -195,16 +249,19 @@ async def _build_baseline(
             status_code=409,
             detail={"metric": metric, "n": model.n if model else 0},
         )
-    increment = METRIC_BAR_INCREMENT.get(metric, 0.01)
+    mu, sigma_eff = _corrected(model, metric, link)
     bar = fairness.personal_bar(
-        model.mu, model.sigma, POOL_DIFFICULTY_K[difficulty], increment
+        mu, sigma_eff, POOL_DIFFICULTY_K[difficulty], **_shape(metric)
     )
     baseline = {
         "linked_account_id": str(link.id),
         "host_account_id": link.host_account_id,
         "metric": metric,
-        "mu": float(model.mu),
-        "sigma": float(model.sigma),
+        # The corrected centre and spread, frozen: the room composition check
+        # reads these back, and they must be what the bar was placed with.
+        # Storing the raw sample here instead is what made rooms uncomposable.
+        "mu": mu,
+        "sigma": sigma_eff,
         "n": int(model.n),
     }
     return baseline, bar
@@ -236,6 +293,8 @@ def _composes(
         bars=bars,
         sigmas=sigmas,
         spread_cap_sigma=POOL_BAR_SPREAD_CAP_SIGMA,
+        lower_is_better=lower_is_better(metric),
+        positive=positive_support(metric),
     )
     return bar, ok
 
@@ -245,7 +304,16 @@ async def _all_pairs_pairable(
 ) -> bool:
     for i in range(len(tickets)):
         for j in range(i + 1, len(tickets)):
-            if not await matchmaking.can_pair(session, tickets[i], tickets[j], now):
+            if not await matchmaking.can_pair(
+                session,
+                tickets[i],
+                tickets[j],
+                now,
+                # A bar is quoted from your own history, not compared against
+                # another player's stat line, so the head-to-head sample floor
+                # does not apply here. This surface has its own.
+                require_established_metric=False,
+            ):
                 return False
     return True
 
@@ -518,10 +586,20 @@ async def enqueue(
         session, user, game, metric, difficulty, entry_cents, baseline, bar, link, now
     )
 
-    # Demo: skip the "forming your room…" wait entirely. Escrow the entry and
-    # form a room of one against the personal bar so the click-through lands
-    # straight on "room formed · go play". Never fires for real accounts — the
-    # matcher below still gates them on a fair, similar-skill room.
+    pool = await _try_form_room(
+        session, user, ticket, game, metric, difficulty, entry_cents, now
+    )
+    if pool is not None:
+        return PoolEnqueueResult(status="formed", pool=pool)
+
+    # Demo: never sit in "forming your room…". Escrow the entry and form a room
+    # of one against the personal bar so the click-through lands straight on
+    # "room formed · go play".
+    #
+    # This runs *after* the real matcher, not instead of it: when practice
+    # opponents are waiting the demo gets a genuine multi-player room with a
+    # real pot, and only falls back to a room of one when there is nobody at
+    # all. Never fires for real accounts.
     if user.auth_id == DEMO_AUTH_ID:
         demo_room = await _form_room(
             session,
@@ -536,11 +614,6 @@ async def enqueue(
         )
         return PoolEnqueueResult(status="formed", pool=demo_room)
 
-    pool = await _try_form_room(
-        session, user, ticket, game, metric, difficulty, entry_cents, now
-    )
-    if pool is not None:
-        return PoolEnqueueResult(status="formed", pool=pool)
     return PoolEnqueueResult(status="searching", ticket=ticket)
 
 

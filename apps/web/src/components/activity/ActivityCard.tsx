@@ -278,10 +278,18 @@ function RematchButton({ item }: { item: ActivityItem }) {
   );
 }
 
-export function ActivityCard({ item }: { item: ActivityItem }) {
+export function ActivityCard({
+  item,
+  defaultOpen = false,
+}: {
+  item: ActivityItem;
+  /** Open on mount. Used for your latest finished contest. */
+  defaultOpen?: boolean;
+}) {
   const sub = statLine(item);
   return (
     <ExpandableCard
+      defaultOpen={defaultOpen}
       ariaLabel={`${title(item)}, details`}
       left={
         <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${dotClass(item)}`} />

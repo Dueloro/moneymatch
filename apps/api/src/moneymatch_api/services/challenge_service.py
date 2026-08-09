@@ -43,6 +43,7 @@ from ..models.user import User
 from . import (
     chat_service,
     friends_service,
+    linking_service,
     matchmaking,
     notifications_service,
     sandbagging_service,
@@ -139,13 +140,7 @@ def _validate_entry(entry_cents: int) -> None:
 async def _link_for(
     session: AsyncSession, user_id: uuid.UUID, game: str
 ) -> LinkedAccount | None:
-    return await session.scalar(
-        select(LinkedAccount).where(
-            LinkedAccount.user_id == user_id,
-            LinkedAccount.game == game,
-            LinkedAccount.status != "unbound",  # ignore soft-unbound history rows
-        )
-    )
+    return await linking_service.get_link(session, user_id, game)
 
 
 async def _assert_game_enabled(session: AsyncSession, game: str) -> None:

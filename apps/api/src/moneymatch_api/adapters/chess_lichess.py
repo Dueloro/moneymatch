@@ -60,13 +60,19 @@ class ChessLichessAdapter(GameAdapter):
     ) -> list[NormGame]:
         perf_types = filters.speeds or ({filters.speed} if filters.speed else None)
         raw_games = await lichess.get_user_games(
-            account_id, since_ms, perf_types=perf_types
+            account_id, since_ms, perf_types=perf_types, rated_only=filters.rated_only
         )
         out: list[NormGame] = []
         for g in raw_games:
             norm = self._normalize(g, account_id)
-            if norm is not None:
-                out.append(norm)
+            if norm is None:
+                continue
+            # The host filter above should already have excluded these, but a
+            # casual game must never reach a stat, so re-check locally rather
+            # than trusting the query string.
+            if filters.rated_only and not norm.rated:
+                continue
+            out.append(norm)
         out.sort(key=lambda x: x.created_at_ms)  # oldest first
         return out
 
@@ -213,12 +219,32 @@ class ChessLichessAdapter(GameAdapter):
         else:
             won = winner == my_color
 
+        moves = _move_count(g.get("moves"))
         return NormGame(
             id=g.get("id", ""),
             speed=g.get("speed", "blitz"),
             rated=bool(g.get("rated", False)),
             created_at_ms=int(g.get("createdAt", 0)),
-            moves=_move_count(g.get("moves")),
+            moves=moves,
             won=won,
             drawn=drawn,
+            # Chess had no per-match rate stat, which left `chess_accuracy` in
+            # constants.py with no data source behind it: pools and tournaments
+            # on chess could never grade. Lichess only reports accuracy for
+            # games a player has requested analysis on, so it is not usable as a
+            # settlement input.
+            #
+            # `chess_moves` is the honest stand-in: it comes straight off the
+            # game record we already fetch, with no extra call.
+            #
+            # Emitted **only for a game you won**. The bar reads "at or under N
+            # moves", so counting every game would make resigning on move one a
+            # perfect score, and instantly resigning is both free and always
+            # available. Requiring the win also makes the baseline mean what the
+            # card says: the moves you take to win, not the moves you last.
+            #
+            # Caveat that remains: a player can still stall a won position to
+            # inflate their average and earn a roomier bar, so this wants a
+            # sandbagging look before it carries real money at scale.
+            metrics=({"chess_moves": float(moves)} if won else {}),
         )

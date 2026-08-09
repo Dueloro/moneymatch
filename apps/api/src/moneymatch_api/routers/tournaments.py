@@ -40,7 +40,7 @@ from ..schemas.tournaments import (
     TournamentStatusResponse,
     TournamentView,
 )
-from ..services import tournament_engine
+from ..services import aggregate_metrics, test_opponents, tournament_engine
 from ..services.tournament_engine import TournamentEnqueueResult
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
@@ -179,19 +179,28 @@ async def get_markets(
     )
     metrics = []
     for metric in TOURNAMENT_METRICS[game]:
-        model = await session.scalar(
-            select(MetricModel).where(
-                MetricModel.user_id == user.id,
-                MetricModel.game == game,
-                MetricModel.metric == metric,
+        if aggregate_metrics.is_aggregate(metric):
+            # Total wins / streak / fastest win are scored straight off the host
+            # record over the window, so there is no per-match rate model to
+            # gate on. The field forms on the host rating instead, which is what
+            # `tournament_engine._build_baseline` requires, so mirror that here.
+            provisional = (
+                linked is None or tournament_engine.host_rating(linked) is None
             )
-        )
-        n = model.n if model else 0
+        else:
+            model = await session.scalar(
+                select(MetricModel).where(
+                    MetricModel.user_id == user.id,
+                    MetricModel.game == game,
+                    MetricModel.metric == metric,
+                )
+            )
+            provisional = (model.n if model else 0) < STAT_BASELINE_MIN_N
         metrics.append(
             TournamentMetric(
                 metric=metric,
                 label=metric_label(metric),
-                provisional=n < STAT_BASELINE_MIN_N,
+                provisional=provisional,
             )
         )
     return TournamentMarketsResponse(
@@ -218,6 +227,20 @@ async def enter(
         metric=body.metric,
         entry_cents=body.entry_preset_cents,
     )
+
+    # --- practice opponents (scaffolding, delete before launch) ------------- #
+    # With one real account nothing ever forms, so the whole fetch/grade/settle
+    # path is untestable. The demo account fills the bucket and re-polls, so the
+    # contest forms on this same request. Real signups never take this branch.
+    if test_opponents.is_enabled(user):
+        await test_opponents.fill_tournament(
+            session,
+            user,
+            game=body.game,
+            metric=body.metric,
+            entry_cents=body.entry_preset_cents,
+        )
+        result = await tournament_engine.poll_status(session, user)
     return await _status_view(session, result, user)
 
 

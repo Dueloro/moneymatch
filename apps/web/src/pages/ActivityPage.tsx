@@ -49,6 +49,10 @@ export function ActivityPage() {
     }
   }, [items]);
 
+  // The newest contest that has actually finished. `items` is newest first, so
+  // the first resolved row is the one you just played.
+  const newestFinished = items.find((i) => i.resolved_at != null);
+
   return (
     // Spans the column rather than capping at the reading measure: the rail
     // already balances the page, so a 640px cap only stranded ~160px of dead
@@ -79,7 +83,14 @@ export function ActivityPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {items.map((item) => (
-            <ActivityCard key={item.id} item={item} />
+            <ActivityCard
+              key={item.id}
+              item={item}
+              // Your latest finished contest opens on arrival, so the stat line
+              // you actually came to check is on screen without a click. Every
+              // older row stays collapsed.
+              defaultOpen={item.id === newestFinished?.id}
+            />
           ))}
         </div>
       )}

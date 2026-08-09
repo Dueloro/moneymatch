@@ -17,6 +17,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
+import { isLowerBetter, requiresWin } from '../lib/metrics';
 import { filledSpots } from '../lib/spots';
 import { useGameSelection } from '../hooks/useGameSelection';
 import {
@@ -224,9 +225,16 @@ export function PoolsPage() {
                         key={key}
                         gameName={m.label}
                         tag={c.difficulty}
-                        title={`Clear ${c.bar}`}
+                        title={m.label}
                         target={c.bar}
                         clearRate={c.clear_rate}
+                        lowerIsBetter={isLowerBetter(m.metric)}
+                        targetUnit={isLowerBetter(m.metric) ? 'moves' : undefined}
+                        targetNote={
+                          requiresWin(m.metric)
+                            ? 'Wins only. A loss or a draw does not count.'
+                            : undefined
+                        }
                         entryOptions={presets}
                         payoutFor={(entry) => estPrize(entry, c.est_multiplier_bps)}
                         payoutLabel="Est. win"

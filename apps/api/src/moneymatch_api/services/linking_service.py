@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,17 +68,47 @@ async def get_links(session: AsyncSession, user_id: uuid.UUID) -> list[LinkedAcc
     return list(rows)
 
 
-async def get_link(
-    session: AsyncSession, user_id: uuid.UUID, game: str
-) -> LinkedAccount | None:
-    """The user's live binding for a game (ignores soft-unbound history rows)."""
-    return await session.scalar(
-        select(LinkedAccount).where(
+#: Preference order when a user holds more than one live binding for a game.
+#: `active` outranks anything else that is merely not unbound (`pending`,
+#: `stale`), because an account we can currently read beats one we cannot.
+_LINK_RANK = case((LinkedAccount.status == "active", 0), else_=1)
+
+
+def live_links_for(user_id: uuid.UUID, game: str):
+    """The ordered SELECT behind `get_link`, for callers that need the query.
+
+    Ordering is the point. A user can accumulate several live rows for one
+    game: a seeded placeholder from a demo fixture, an older handle, then the
+    account they actually signed in and entered. Every call site filtered out
+    soft-unbound history but none of them ordered, so which row you got was
+    whatever the database happened to return first, and the answer could differ
+    between two calls in the same request. That decides which host account gets
+    polled for your results and graded for your money, so it cannot be
+    arbitrary.
+
+    Most recently linked wins, which is what "use the account I just entered"
+    means, with `active` preferred over any other live status.
+    """
+    return (
+        select(LinkedAccount)
+        .where(
             LinkedAccount.user_id == user_id,
             LinkedAccount.game == game,
             LinkedAccount.status != "unbound",
         )
+        .order_by(_LINK_RANK, LinkedAccount.created_at.desc())
     )
+
+
+async def get_link(
+    session: AsyncSession, user_id: uuid.UUID, game: str
+) -> LinkedAccount | None:
+    """The user's live binding for a game (ignores soft-unbound history rows).
+
+    The single place this question is answered. See `live_links_for` for why
+    the ordering matters.
+    """
+    return await session.scalar(live_links_for(user_id, game))
 
 
 async def _fetch_profile(game: str, method: str, username: str) -> ProfileSnapshot:

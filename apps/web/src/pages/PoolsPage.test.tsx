@@ -50,9 +50,11 @@ const KD_METRIC = {
   label: 'K/D ratio',
   provisional: false,
   cards: [
-    { difficulty: 'easy', bar: 1.65, clear_rate: 0.31, est_multiplier_bps: 29000 },
-    { difficulty: 'medium', bar: 1.8, clear_rate: 0.16, est_multiplier_bps: 56250 },
-    { difficulty: 'hard', bar: 2.0, clear_rate: 0.04, est_multiplier_bps: 225000 },
+    { difficulty: 'easy', bar: 1.65, clear_rate: 0.35, est_multiplier_bps: 25700 },
+    { difficulty: 'medium', bar: 1.8, clear_rate: 0.2, est_multiplier_bps: 36000 },
+    // Capped at room_size x (1 - rake). Before that cap this card advertised
+    // $225,000 on a $25 entry, which no pot could ever fund.
+    { difficulty: 'hard', bar: 2.0, clear_rate: 0.1, est_multiplier_bps: 36000 },
   ],
 };
 
@@ -89,11 +91,12 @@ describe('PoolsPage', () => {
     // 3 difficulties = 3 cards. Entry is a segmented control inside each card
     // rather than a third grid dimension, so no sentence repeats.
     expect(screen.getAllByRole('button', { name: 'Join pool' })).toHaveLength(3);
-    expect(screen.getByText('Clear 1.8')).toBeInTheDocument();
+    expect(screen.getAllByText('K/D ratio').length).toBeGreaterThan(0);
+    expect(screen.getByText('1.80')).toBeInTheDocument(); // headline bar
     // The clear rate is a meter carrying the real number, not a sentence.
-    expect(screen.getByText('16%')).toBeInTheDocument();
-    // Payout for the default (middle) entry on the medium bar: $10 -> $56.25.
-    expect(screen.getByText('$56.25')).toBeInTheDocument();
+    expect(screen.getByText('20%')).toBeInTheDocument();
+    // Payout for the default (middle) entry on the medium bar: $10 -> $36.00.
+    expect(screen.getAllByText('$36.00').length).toBeGreaterThan(0);
   });
 
   it('confirms in the card before joining, using the selected entry', () => {
