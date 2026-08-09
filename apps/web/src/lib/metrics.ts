@@ -27,7 +27,18 @@ export function requiresWin(metric: string): boolean {
   return REQUIRES_WIN.has(metric);
 }
 
-/** The headline on a contest card: what you have to do to clear the bar. */
+/**
+ * The card's heading. "Clear 1.8" is right for a rate stat you have to reach,
+ * but a win-required metric is not cleared by any short game, only by a short
+ * *win*, so it says so.
+ */
+export function barTitle(metric: string, bar: number): string {
+  // The number is interpolated raw, matching how the heading has always been
+  // rendered: 1.8 stays "1.8" rather than becoming "1.80".
+  return requiresWin(metric) ? `Win in ${bar}` : `Clear ${bar}`;
+}
+
+/** The long form, for surfaces with room for a sentence. */
 export function barHeadline(metric: string, bar: number, unit: string): string {
   const n = Number.isInteger(bar) ? bar : bar.toFixed(2);
   if (requiresWin(metric)) return `Win in ${n} ${unit} or fewer`;

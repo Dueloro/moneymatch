@@ -17,7 +17,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
-import { isLowerBetter, requiresWin } from '../lib/metrics';
+import { barTitle, isLowerBetter, requiresWin } from '../lib/metrics';
 import { filledSpots } from '../lib/spots';
 import { useGameSelection } from '../hooks/useGameSelection';
 import {
@@ -225,7 +225,7 @@ export function PoolsPage() {
                         key={key}
                         gameName={m.label}
                         tag={c.difficulty}
-                        title={m.label}
+                        title={barTitle(m.metric, c.bar)}
                         target={c.bar}
                         clearRate={c.clear_rate}
                         lowerIsBetter={isLowerBetter(m.metric)}

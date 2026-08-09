@@ -155,7 +155,6 @@ function QueuingCard({
 /** The pool you are actually in, once a room has formed. */
 function RoomFormed() {
   const { data: status } = usePoolStatus();
-  const leave = useLeavePool();
 
   const pool = status?.status === 'formed' ? status.pool : null;
   if (!pool) return null;
