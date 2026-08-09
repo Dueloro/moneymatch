@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
+from moneymatch_api.constants import POOL_DIFFICULTY_K
 from moneymatch_api.models.pools import SoloEntry, SoloPool
 from moneymatch_api.services import (
     fairness,
@@ -77,12 +78,14 @@ async def test_preview_quotes_bars_from_own_baseline(session):
     preview = await pool_engine.preview_bars(session, user, CS2, KD)
     assert preview["provisional"] is False
     by_diff = {c["difficulty"]: c for c in preview["cards"]}
-    # Easy 1.65, Medium 1.80, Hard 2.00 (μ + k·σ rounded to 0.05).
-    assert by_diff["easy"]["bar"] == 1.65
-    assert by_diff["medium"]["bar"] == 1.80
+    # μ + k·σ rounded to 0.05, derived from the tier constants rather than
+    # written down, so retuning difficulty moves the expectation with it.
+    for difficulty, k in POOL_DIFFICULTY_K.items():
+        assert by_diff[difficulty]["bar"] == fairness.personal_bar(1.50, 0.30, k, 0.05)
+    assert by_diff["easy"]["bar"] < by_diff["hard"]["bar"]  # harder asks for more
     # Disclosed clear rates, not odds: 1 − Φ(k).
     assert by_diff["medium"]["clear_rate"] == pytest.approx(
-        fairness.p_target_for_k(1.0), abs=1e-3
+        fairness.p_target_for_k(POOL_DIFFICULTY_K["medium"]), abs=1e-3
     )
 
 
@@ -179,7 +182,10 @@ async def test_room_bar_reproduces_byte_for_byte_from_snapshots(session):
     # Re-derive each personal bar from the stored baseline, then the room bar.
     redrawn_bars = [
         fairness.personal_bar(
-            e.baseline_snapshot["mu"], e.baseline_snapshot["sigma"], 1.0, 0.05
+            e.baseline_snapshot["mu"],
+            e.baseline_snapshot["sigma"],
+            POOL_DIFFICULTY_K["medium"],
+            0.05,
         )
         for e in entries
     ]
@@ -201,13 +207,14 @@ async def test_composition_refuses_a_shark(session):
 
 async def test_baseline_frozen_against_model_refresh(session):
     u1, _ = await pool_player(session, "a", mu=1.50)
-    await enq(session, u1)  # freezes bar at μ=1.50 → 1.80
+    frozen = fairness.personal_bar(1.50, 0.30, POOL_DIFFICULTY_K["medium"], 0.05)
+    await enq(session, u1)  # freezes the bar at μ=1.50
     # Refresh the model to something wild after queueing.
     model = await pool_engine._metric_model(session, u1.id, CS2, KD)
     model.mu = 5.0
     await session.flush()
     ticket = await pool_engine.get_waiting_ticket(session, u1.id)
-    assert ticket.personal_bar == 1.80  # unchanged (frozen at enqueue)
+    assert ticket.personal_bar == frozen  # unchanged (frozen at enqueue)
 
 
 # --- settlement invariants ------------------------------------------------ #
