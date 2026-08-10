@@ -60,12 +60,14 @@ describe('SideRail', () => {
     } as unknown as ReturnType<typeof useLeavePool>);
   });
 
-  it('stacks the board as balance, in play, queue, then room formed', () => {
+  it('stacks the board as balance, then one In play section', () => {
     renderWithProviders(<SideRail />);
     expect(screen.getByText('Balance')).toBeInTheDocument();
+    // Queue is gone, and the formed room no longer gets a section of its own:
+    // a contest moves through "In play" in place.
     expect(
       screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
-    ).toEqual(['In play', 'Queue', 'Room formed']);
+    ).toEqual(['In play']);
   });
 
   it('shows the formed room in the rail, not above the grid', () => {
@@ -97,15 +99,48 @@ describe('SideRail', () => {
   it('keeps the section in place with a cue when no room is running', () => {
     renderWithProviders(<SideRail />);
     expect(screen.queryByTestId('rail-room-card')).not.toBeInTheDocument();
-    expect(screen.getByText(/No room yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing running/)).toBeInTheDocument();
   });
 
-  it('offers a cancel while the room is still forming', () => {
+  it('moves a formed room into In play rather than a section beside it', () => {
+    mockStatus(FORMED);
+    renderWithProviders(<SideRail />);
+    const inPlay = screen
+      .getAllByRole('heading', { level: 3 })
+      .find((h) => h.textContent === 'In play')!;
+    // The room card is inside the In play section, not a sibling of it.
+    expect(inPlay.closest('section')).toContainElement(
+      screen.getByTestId('rail-room-card'),
+    );
+    expect(screen.queryByText(/Nothing running/)).not.toBeInTheDocument();
+  });
+
+  it('separates queuing from in play, with a cancel while forming', () => {
     mockStatus({ status: 'searching', pool: null });
     renderWithProviders(<SideRail />);
+
+    // Waiting for a room is its own labelled state, not "In play". Calling both
+    // the same left you unable to tell whether you were matching or playing.
+    const headings = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent);
+    expect(headings).toEqual(['Queuing', 'In play']);
+
     expect(screen.getByTestId('rail-pool-status')).toHaveTextContent(
-      'Finding your room',
+      'Finding your pool room',
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    // And In play says the contest will arrive, rather than "join a pool".
+    expect(screen.getByText(/lands here once it forms/)).toBeInTheDocument();
+  });
+
+  it('drops the Queuing section once the room has formed', () => {
+    mockStatus(FORMED);
+    renderWithProviders(<SideRail />);
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
+    ).toEqual(['In play']);
+    expect(screen.queryByTestId('rail-pool-status')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rail-room-card')).toBeInTheDocument();
   });
 });

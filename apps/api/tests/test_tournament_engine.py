@@ -214,3 +214,22 @@ async def test_under_min_ranked_cancels_and_refunds_all(session):
         assert (await _bal(session, u)) == (10000, 0)
     recon = await reconciliation_service.check(session, "tournament", tournament.id)
     assert recon.ok and recon.totals["rake"] == 0
+
+
+async def test_lone_scorer_with_forfeits_settles_and_pays(session):
+    tournament, _ = await _form(session, 10)
+    entries = await _entries(session, tournament.id)
+    # One real score; the rest played and produced nothing (values=[], a
+    # forfeit — not a host outage). The field still has 10 participants, so it
+    # settles and the sole scorer takes the pot rather than cancelling.
+    grades = {e.id: TournamentGrade(values=[]) for e in entries}
+    grades[entries[0].id] = TournamentGrade(values=[1.5])
+    await tournament_engine.settle_tournament(session, tournament, grades)
+    assert tournament.state == "SETTLED"
+    settled = {e.id: e for e in await _entries(session, tournament.id)}
+    assert settled[entries[0].id].status == "RANKED"
+    assert settled[entries[0].id].payout_cents > 1000  # more than their stake
+    assert settled[entries[1].id].status == "OUT"
+    assert settled[entries[1].id].payout_cents == 0
+    recon = await reconciliation_service.check(session, "tournament", tournament.id)
+    assert recon.ok

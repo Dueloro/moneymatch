@@ -54,9 +54,22 @@ async def get_boolean_flags(session: AsyncSession) -> dict[str, bool]:
 
 
 async def list_flags(session: AsyncSession) -> list[FeatureFlag]:
-    """Every flag row (key, enabled, payload) for the admin flags table."""
+    """Every flag for the admin table: stored rows, plus any declared default
+    that has never been written.
+
+    A flag added in code has no row until someone toggles it, so listing only
+    stored rows made new flags invisible in the admin UI and therefore
+    impossible to turn on. The synthetic rows are detached (never added to the
+    session), so nothing is persisted until an actual toggle upserts them.
+    """
     result = await session.execute(select(FeatureFlag).order_by(FeatureFlag.key))
-    return list(result.scalars().all())
+    rows = list(result.scalars().all())
+    stored = {r.key for r in rows}
+    for key, enabled in DEFAULT_FLAGS.items():
+        if key not in stored:
+            rows.append(FeatureFlag(key=key, enabled=enabled, payload={}))
+    rows.sort(key=lambda r: r.key)
+    return rows
 
 
 async def get_flag(session: AsyncSession, key: str) -> FeatureFlag | None:

@@ -84,12 +84,17 @@ def _first_qualifying_game(games: list[NormGame], matched_ms: int) -> NormGame |
 
 
 async def _player_result(
-    match: Match, market: MarketDef, seat: MatchPlayer
+    match: Match, market: MarketDef, seat: MatchPlayer, rated_only: bool = True
 ) -> _PlayerResult:
     """Fetch this seat's first qualifying match after `matched_at` (win + stat)."""
     adapter = registry.get(match.game)
     games = await adapter.poll_eligible_games(
-        seat.host_account_id, _matched_ms(match), GameFilters(rated_only=False)
+        # Rated only for real accounts: a casual game should not settle a money
+        # duel. Brokered chess is unaffected, since it grades the exact game id
+        # it created rather than scanning history.
+        seat.host_account_id,
+        _matched_ms(match),
+        GameFilters(rated_only=rated_only),
     )
     game = _first_qualifying_game(games, _matched_ms(match))
     if game is None:
@@ -141,12 +146,16 @@ async def _grade_brokered(
 
 
 async def _grade_coordinated(
-    match: Match, market: MarketDef, seats: list[MatchPlayer], now: datetime
+    match: Match,
+    market: MarketDef,
+    seats: list[MatchPlayer],
+    now: datetime,
+    rated_only: bool = True,
 ) -> GradeOutcome:
     """CS2/Dota: grade each seat's first finished match after `matched_at`."""
     a, b = seats
-    ra = await _player_result(match, market, a)
-    rb = await _player_result(match, market, b)
+    ra = await _player_result(match, market, a, rated_only)
+    rb = await _player_result(match, market, b, rated_only)
 
     stat_lines: dict[uuid.UUID, dict[str, Any]] = {}
     if market.kind == KIND_STAT_RACE and market.metric is not None:
@@ -199,8 +208,17 @@ def _decide(
     return GradeOutcome(WIN, winner_user_id=winner.user_id)
 
 
-async def grade(match: Match, seats: list[MatchPlayer], now: datetime) -> GradeOutcome:
-    """Resolve a match to a `GradeOutcome`. Host outage → PENDING(host_error)."""
+async def grade(
+    match: Match,
+    seats: list[MatchPlayer],
+    now: datetime,
+    rated_only: bool = True,
+) -> GradeOutcome:
+    """Resolve a match to a `GradeOutcome`. Host outage → PENDING(host_error).
+
+    `rated_only` comes from the caller because grading has no session: the
+    settlement worker resolves it per seat (`demo_mode.rated_only_for`).
+    """
     market = get_market(match.game, match.market)
     if market is None:
         return GradeOutcome(CANCEL, detail={"reason": "unknown_market"})
@@ -208,7 +226,7 @@ async def grade(match: Match, seats: list[MatchPlayer], now: datetime) -> GradeO
         if market.kind == KIND_WIN_H2H:
             return await _grade_brokered(match, seats, now)
         if market.kind in (KIND_WIN_NEXT, KIND_STAT_RACE):
-            return await _grade_coordinated(match, market, seats, now)
+            return await _grade_coordinated(match, market, seats, now, rated_only)
     except HostUnavailable:
         log.warning("grade.host_unavailable", match_id=str(match.id), game=match.game)
         return GradeOutcome(PENDING, host_error=True)

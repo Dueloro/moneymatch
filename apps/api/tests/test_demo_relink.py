@@ -30,6 +30,18 @@ CHESS = "chess.lichess"
 LI = "https://lichess.org/api/user"
 
 
+def _lichess_games(ndjson: str = "") -> None:
+    """Mock the game export that linking polls to bootstrap metric models.
+
+    Chess gained a per-match metric (`chess_moves`), so `bind` now bootstraps a
+    model at link time and that reaches the export endpoint. Empty by default:
+    these suites are about the binding, not about what the model computes.
+    """
+    respx.get(url__regex=r"https://lichess\.org/api/games/user/.*").mock(
+        return_value=httpx.Response(200, text=ndjson)
+    )
+
+
 @pytest_asyncio.fixture
 async def demo_client() -> AsyncIterator[AsyncClient]:
     """An ASGI client whose app has the demo router mounted (demo_login on)."""
@@ -75,9 +87,11 @@ async def test_rebind_swaps_existing_link_to_new_handle(session):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user("magnus"))
     )
+    _lichess_games()
     respx.get(f"{LI}/hikaru").mock(
         return_value=httpx.Response(200, json=_lichess_user("hikaru"))
     )
+    _lichess_games()
     user = await factories.create_user(session)
     await linking_service.bind(session, user, CHESS, "magnus")
 
@@ -106,6 +120,7 @@ async def test_rebind_with_no_existing_link_just_binds(session):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user("magnus"))
     )
+    _lichess_games()
     user = await factories.create_user(session)
 
     link = await linking_service.rebind(session, user, CHESS, "magnus")
@@ -124,6 +139,7 @@ async def test_demo_relink_swaps_placeholder_to_real(demo_client, session):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user("magnus"))
     )
+    _lichess_games()
 
     r = await demo_client.post(
         "/api/v1/demo/relink",
@@ -144,6 +160,7 @@ async def test_relink_rejected_for_non_demo_user(demo_client, session):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user("magnus"))
     )
+    _lichess_games()
     r = await demo_client.post(
         "/api/v1/demo/relink",
         json={"game": CHESS, "username": "magnus"},
@@ -157,6 +174,7 @@ async def test_bad_handle_rolls_back_and_keeps_old_link(demo_client, session):
     """An unknown handle leaves the original placeholder binding intact."""
     await _seed_demo_user_with_placeholder(session, CHESS)
     respx.get(f"{LI}/ghost").mock(return_value=httpx.Response(404))
+    _lichess_games()
 
     r = await demo_client.post(
         "/api/v1/demo/relink",

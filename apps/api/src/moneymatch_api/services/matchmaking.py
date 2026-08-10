@@ -44,11 +44,13 @@ from ..schemas.profile import ProfileSnapshot
 from . import (
     analytics,
     geo_service,
+    linking_service,
     money_math,
     notifications_service,
     pairing,
     sandbagging_service,
     skill_rating,
+    test_opponents,
 )
 from .feature_flags import get_boolean_flags
 from .markets import (
@@ -112,13 +114,7 @@ def _resolve_market(game: str, market_key: str, speed: str | None) -> MarketDef:
 async def _require_link(
     session: AsyncSession, user_id: uuid.UUID, game: str
 ) -> LinkedAccount:
-    link = await session.scalar(
-        select(LinkedAccount).where(
-            LinkedAccount.user_id == user_id,
-            LinkedAccount.game == game,
-            LinkedAccount.status != "unbound",  # ignore soft-unbound history rows
-        )
-    )
+    link = await linking_service.get_link(session, user_id, game)
     if link is None:
         raise MatchmakingError(
             "not_linked",
@@ -243,13 +239,26 @@ async def _recent_pair_exists(
 
 
 async def can_pair(
-    session: AsyncSession, me: QueueTicket, cand: QueueTicket, now: datetime
+    session: AsyncSession,
+    me: QueueTicket,
+    cand: QueueTicket,
+    now: datetime,
+    *,
+    require_established_metric: bool = True,
 ) -> bool:
     """Whether two waiting tickets are allowed to be paired (anti-collusion).
 
     Rejects: the same platform user, the same linked host account, a re-pair of
     the same two accounts within the cooldown, and (stat races) a provisional
     metric on either frozen baseline.
+
+    `require_established_metric` is the head-to-head rule: a duel is settled by
+    comparing two stat lines, so a barely-sampled baseline cannot back one.
+    Pools and tournaments are played against a bar quoted from your own history
+    rather than against another player's stat, and they set their own entry
+    floor (`STAT_BASELINE_MIN_N`), so they pass False. Leaving it on there meant
+    anyone with fewer than `METRIC_PROVISIONAL_MIN_N` samples could join a pool
+    queue and never be matched into a room.
     """
     if me.user_id == cand.user_id:
         return False
@@ -257,7 +266,9 @@ async def can_pair(
         "host_account_id"
     ):
         return False
-    if "metric" in me.baseline_snapshot or "metric" in cand.baseline_snapshot:
+    if require_established_metric and (
+        "metric" in me.baseline_snapshot or "metric" in cand.baseline_snapshot
+    ):
         if (
             me.baseline_snapshot.get("n", 0) < METRIC_PROVISIONAL_MIN_N
             or cand.baseline_snapshot.get("n", 0) < METRIC_PROVISIONAL_MIN_N
@@ -806,7 +817,12 @@ async def list_waiting(
     if game is not None:
         conds.append(QueueTicket.game == game)
     rows = await session.scalars(
-        select(QueueTicket).where(and_(*conds)).order_by(QueueTicket.created_at.asc())
+        # Practice opponents never appear as real activity, on the waiting list
+        # or in the ticker it feeds (services/test_opponents.py).
+        select(QueueTicket)
+        .join(User, User.id == QueueTicket.user_id)
+        .where(and_(*conds, test_opponents.test_user_filter()))
+        .order_by(QueueTicket.created_at.asc())
     )
     return list(rows)
 

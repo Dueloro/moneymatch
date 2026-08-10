@@ -106,7 +106,12 @@ async def test_bootstrap_is_idempotent_upsert(session, monkeypatch):
     assert len(rows) == 1  # upserted, not duplicated
 
 
-async def test_bootstrap_noop_for_win_only_game(session, monkeypatch):
+async def test_bootstrap_noop_for_a_game_with_no_rate_metrics(session, monkeypatch):
+    """A game the registry has no per-match metric for never reaches its host.
+
+    Chess used to be the example here. It now carries `chess_moves`, so it
+    bootstraps like any other game; this pins the general rule instead.
+    """
     user = await create_user(session)
     called = False
 
@@ -116,5 +121,7 @@ async def test_bootstrap_noop_for_win_only_game(session, monkeypatch):
         return _FakeCS2Adapter([])
 
     monkeypatch.setattr(registry, "get", _get)
+    monkeypatch.setitem(svc.GAME_RATE_METRICS, "chess.lichess", ())
+
     assert await svc.bootstrap(session, user.id, "chess.lichess", "magnus") == []
     assert called is False  # no rate metrics → adapter never polled

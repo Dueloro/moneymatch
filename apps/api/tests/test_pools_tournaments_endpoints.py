@@ -7,8 +7,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import func, select, text
 
+from moneymatch_api.constants import POOL_DIFFICULTY_K
 from moneymatch_api.models.user import User
 from moneymatch_api.models.wallet import LedgerEntry, Wallet
+from moneymatch_api.services import fairness
 
 from .conftest import auth_headers, new_sessionmaker
 from .factories import create_linked_account, create_metric_model, cs2_profile
@@ -84,7 +86,10 @@ async def test_pool_markets_quote_bars_from_own_baseline(client):
     kd = next(m for m in body["metrics"] if m["metric"] == KD)
     assert kd["provisional"] is False
     by_diff = {c["difficulty"]: c for c in kd["cards"]}
-    assert by_diff["medium"]["bar"] == 1.80  # μ + 1·σ = 1.50 + 0.30
+    # μ + k·σ at the medium tier, derived so a retune moves it too.
+    assert by_diff["medium"]["bar"] == fairness.personal_bar(
+        1.50, 0.30, POOL_DIFFICULTY_K["medium"], 0.05
+    )
     # Estimated multiplier is disclosed as an estimate, never an odds line.
     assert by_diff["medium"]["est_multiplier_bps"] > 0
 

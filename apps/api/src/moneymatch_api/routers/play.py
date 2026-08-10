@@ -36,7 +36,7 @@ from ..schemas.play import (
     WaitingResponse,
     WaitingRow,
 )
-from ..services import dispute_service, matchmaking, money_math
+from ..services import dispute_service, matchmaking, money_math, test_opponents
 from ..services.markets import (
     KIND_STAT_RACE,
     KIND_WIN_H2H,
@@ -245,6 +245,21 @@ async def join_queue(
         entry_cents=body.entry_preset_cents,
         speed=body.speed,
     )
+
+    # --- practice opponents (scaffolding, delete before launch) ------------- #
+    # With one real account nothing ever forms, so the whole fetch/grade/settle
+    # path is untestable. The demo account fills the bucket and re-polls, so the
+    # contest forms on this same request. Real signups never take this branch.
+    if test_opponents.is_enabled(user):
+        await test_opponents.fill_queue(
+            session,
+            user,
+            game=body.game,
+            market=body.market,
+            speed=body.speed,
+            entry_cents=body.entry_preset_cents,
+        )
+        result = await matchmaking.poll_status(session, user)
     return await _status_view(session, result, user)
 
 

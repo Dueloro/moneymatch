@@ -89,7 +89,11 @@ export function useTournamentStatus() {
   return useQuery({
     queryKey: ['tournament-status', session?.user.id],
     enabled: !!session,
-    refetchInterval: 5000,
+    // The rail mounts this app-wide, so only poll hard while a field is
+    // actually forming. Idle and formed both change off the back of something
+    // that already invalidates the key (a join, a leave, a settlement).
+    refetchInterval: (query) =>
+      query.state.data?.status === 'searching' ? 2500 : 10_000,
     queryFn: async (): Promise<TournamentStatus> => {
       const { data, error } = await api.GET('/api/v1/tournaments/queue/status');
       if (error) throw new Error('Failed to load tournament status');

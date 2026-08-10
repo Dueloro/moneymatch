@@ -34,6 +34,18 @@ def _lichess_user(username="magnus", rating=2800):
     }
 
 
+def _lichess_games(ndjson: str = "") -> None:
+    """Mock the game export that linking polls to bootstrap metric models.
+
+    Chess gained a per-match metric (`chess_moves`), so `bind` now bootstraps a
+    model at link time and that reaches the export endpoint. Empty by default:
+    these suites are about the binding, not about what the model computes.
+    """
+    respx.get(url__regex=r"https://lichess\.org/api/games/user/.*").mock(
+        return_value=httpx.Response(200, text=ndjson)
+    )
+
+
 def _mock_dota(account_id="70388657"):
     respx.get(f"{OD}/players/{account_id}").mock(
         return_value=httpx.Response(
@@ -72,6 +84,7 @@ async def test_link_lichess_success(client):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user())
     )
+    _lichess_games()
     r = await client.post(
         "/api/v1/links",
         json={"game": CHESS, "username": "magnus"},
@@ -93,6 +106,7 @@ async def test_link_lichess_success(client):
 @respx.mock
 async def test_unknown_username_is_404(client):
     respx.get(f"{LI}/ghost").mock(return_value=httpx.Response(404))
+    _lichess_games()
     r = await client.post(
         "/api/v1/links",
         json={"game": CHESS, "username": "ghost"},
@@ -135,6 +149,7 @@ async def test_second_user_cannot_bind_bound_account(client):
     respx.get(url__regex=r"https://lichess\.org/api/user/[Mm]agnus").mock(
         return_value=httpx.Response(200, json=_lichess_user())
     )
+    _lichess_games()
     ok = await client.post(
         "/api/v1/links",
         json={"game": CHESS, "username": "magnus"},
@@ -155,9 +170,11 @@ async def test_relinking_same_game_conflicts(client):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user())
     )
+    _lichess_games()
     respx.get(f"{LI}/hikaru").mock(
         return_value=httpx.Response(200, json=_lichess_user("hikaru"))
     )
+    _lichess_games()
     await client.post(
         "/api/v1/links",
         json={"game": CHESS, "username": "magnus"},
@@ -176,6 +193,7 @@ async def test_second_game_links_independently(client):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user())
     )
+    _lichess_games()
     _mock_dota()
     await client.post(
         "/api/v1/links",
@@ -198,6 +216,7 @@ async def test_refresh_updates_snapshot(client):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user(rating=2800))
     )
+    _lichess_games()
     await client.post(
         "/api/v1/links",
         json={"game": CHESS, "username": "magnus"},
@@ -207,6 +226,7 @@ async def test_refresh_updates_snapshot(client):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user(rating=2850))
     )
+    _lichess_games()
     r = await client.get(
         f"/api/v1/links/{CHESS}/profile", headers=auth_headers("refresh")
     )
@@ -237,6 +257,7 @@ async def test_unlink_requires_admin(client):
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user())
     )
+    _lichess_games()
     await client.post(
         "/api/v1/links",
         json={"game": CHESS, "username": "magnus"},
