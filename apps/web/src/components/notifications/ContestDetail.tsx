@@ -1,6 +1,6 @@
 import { usePool, type PoolMember } from '../../hooks/usePools';
 import { useTournament } from '../../hooks/useTournaments';
-import { formatCurrency } from '../../lib/format';
+import { formatCurrency, formatStat as stat } from '../../lib/format';
 import { isLowerBetter } from '../../lib/metrics';
 import { AmountText } from '../ui/AmountText';
 import { ListRow } from '../ui/ListRow';
@@ -21,11 +21,6 @@ import { ListRow } from '../ui/ListRow';
 
 function Line({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-text-secondary">{children}</p>;
-}
-
-/** Value formatting shared by both panels: whole numbers stay whole. */
-function stat(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 export function PoolDetail({ poolId }: { poolId: string }) {

@@ -1,88 +1,46 @@
 """A demo tournament must settle, not cancel.
 
-Pools and tournaments treat a silent entrant differently, and that difference
-made the demo tournament untestable.
-
 A pool grades each entrant against *their own* bar, so a practice opponent that
-never plays is graded as a miss (`graded_as_failed`) and the pool settles with
-a winner. A tournament *ranks* entries against each other, and
-`compute_standings` drops anyone without a score. Nine silent opponents
-therefore left a field of one, which is below `TOURNAMENT_MIN_RANKED`, so
-`settle_tournament` cancelled and refunded everybody. You could enter, play
-well, wait out the 48 hour window, and be handed your stake back.
-
-The fix is that a practice opponent posts a deliberately losing score, so the
-field ranks and a real entrant who plays at all finishes first.
+never plays is a miss and the pool settles with a winner. A tournament *ranks*
+entries against each other, so a practice opponent has no score. It forfeits —
+a participant that played nothing — and `settle_tournament` counts forfeits
+toward the field and ranks them last, so a field of one real entrant and nine
+forfeits settles and pays the entrant instead of cancelling.
 """
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
-from moneymatch_api.constants import TOURNAMENT_MIN_RANKED
-from moneymatch_api.services import aggregate_metrics, test_opponents
+from moneymatch_api.models.tournaments import Tournament, TournamentEntry
+from moneymatch_api.services import telemetry_fetch, test_opponents
 
-pytestmark = pytest.mark.nodb
+pytestmark = pytest.mark.asyncio
 
-CHESS_AGGREGATES = ("chess_win_streak", "chess_wins", "chess_fastest_win")
-
-
-@pytest.mark.parametrize("metric", CHESS_AGGREGATES)
-def test_a_practice_opponent_posts_a_score_at_all(metric):
-    """Scoring `None` is what dropped them from the standings."""
-    assert test_opponents.practice_score(metric) is not None
+METRICS = ("chess_win_streak", "chess_wins", "chess_fastest_win", "cs2_kd_ratio")
 
 
-@pytest.mark.parametrize("metric", CHESS_AGGREGATES)
-def test_the_practice_score_is_the_losing_end_of_the_metric(metric):
-    """Worst possible in the metric's own direction, not merely low."""
-    spec = aggregate_metrics.get(metric)
-    score = test_opponents.practice_score(metric)
-    if spec.higher_is_better:
-        assert score == 0.0  # nothing achieved
-    else:
-        assert score > 500  # a game length no real result reaches
+def _bot_entry() -> TournamentEntry:
+    handle = "testbot_bo"
+    return TournamentEntry(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        host_account_id=f"{test_opponents.TEST_AUTH_PREFIX}{handle}",
+    )
 
 
-@pytest.mark.parametrize("metric", CHESS_AGGREGATES)
-def test_any_real_result_beats_a_practice_opponent(metric):
-    """The point of the exercise: play at all and you finish above them."""
-    spec = aggregate_metrics.get(metric)
-    bot = test_opponents.practice_score(metric)
-    # A modest but genuine result: one win, a streak of one, a 30-move win.
-    real = 1.0 if spec.higher_is_better else 30.0
-    better = real > bot if spec.higher_is_better else real < bot
-    assert better, (metric, real, bot)
-
-
-def test_a_metric_with_no_aggregate_spec_still_forfeits():
-    """Unknown metrics must not invent a score."""
-    assert test_opponents.practice_score("cs2_kd_ratio") is None
-
-
-def test_the_field_now_clears_the_ranking_floor():
-    """The arithmetic that used to cancel the contest.
-
-    One real entrant plus nine practice opponents. Before, only the real score
-    counted toward `min_ranked`.
-    """
-    scored_before = 1
-    scored_after = 1 + 9
-    assert scored_before < TOURNAMENT_MIN_RANKED  # cancelled, everyone refunded
-    assert scored_after >= TOURNAMENT_MIN_RANKED  # settles and pays
-
-
-@pytest.mark.parametrize("metric", CHESS_AGGREGATES)
-def test_a_practice_opponent_never_outranks_a_real_entrant(metric):
-    """Ten bots and one real player: the real player must come first.
-
-    Mirrors `compute_standings`, which sorts by score in the metric's direction.
-    """
-    spec = aggregate_metrics.get(metric)
-    real = 2.0 if spec.higher_is_better else 25.0
-    field = [("you", real)] + [
-        (f"bot{i}", test_opponents.practice_score(metric)) for i in range(9)
-    ]
-    sign = 1.0 if spec.higher_is_better else -1.0
-    field.sort(key=lambda row: -sign * row[1])
-    assert field[0][0] == "you", field[:3]
+@pytest.mark.parametrize("metric", METRICS)
+async def test_a_practice_opponent_forfeits_without_a_fabricated_score(metric):
+    """No invented score: a practice opponent grades as a played-nothing
+    forfeit (values=[], score None). The adapter is never polled, so `session`
+    is unused on this branch."""
+    tournament = Tournament(
+        game="chess.lichess", ranking_metric=metric, score_matches=3
+    )
+    entry = _bot_entry()
+    grades = await telemetry_fetch.grade_tournament(None, tournament, [entry])
+    grade = grades[entry.id]
+    assert grade.values == [] and grade.score is None
+    assert grade.telemetry["practice_opponent"] is True

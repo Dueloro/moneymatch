@@ -38,7 +38,7 @@ from ..constants import METRIC_BAR_INCREMENT
 from ..models.linked_account import LinkedAccount
 from ..models.skill import MetricModel
 from ..models.user import User
-from . import aggregate_metrics, demo_mode, linking_service, skill_prior
+from . import demo_mode, linking_service, skill_prior
 from .user_service import provision_new_user
 
 log = structlog.get_logger(__name__)
@@ -67,10 +67,6 @@ _HANDLES = (
 # settlement instead: they never play, so they miss the bar and forfeit
 # (see `graded_as_failed`).
 _MU_FACTOR = 1.0
-
-# A move count no real game reaches, so a practice opponent always ranks below
-# any genuine "fastest win". The longest recorded master games run to ~270.
-_PRACTICE_WORST_MOVES = 9999
 
 
 def is_enabled(user: User) -> bool:
@@ -336,28 +332,6 @@ def graded_as_failed(host_account_id: str) -> bool:
     return host_account_id.startswith(TEST_AUTH_PREFIX)
 
 
-def practice_score(metric: str) -> float | None:
-    """The score a practice opponent posts in a tournament: a losing one.
-
-    The pool equivalent is `graded_as_failed`, but a tournament cannot use the
-    same trick. A pool grades each entrant against their own bar, so an entry
-    that simply misses is still a settled result. A tournament *ranks* entries,
-    and `compute_standings` drops anyone without a score, so nine silent
-    opponents leave a field of one. That is below `TOURNAMENT_MIN_RANKED`, and
-    the whole contest cancels and refunds instead of paying anybody.
-
-    Posting a deliberately terrible score keeps the field ranked, so a real
-    entrant who plays at all finishes first and the prize split actually runs.
-    `None` for a metric with no sensible worst value, which forfeits as before.
-    """
-    spec = aggregate_metrics.get(metric)
-    if spec is None:
-        return None
-    # Worst possible in the metric's own direction: nothing achieved when more
-    # is better, an implausibly long game when fewer is better.
-    return 0.0 if spec.higher_is_better else float(_PRACTICE_WORST_MOVES)
-
-
 def test_user_filter() -> Any:
     """SQLAlchemy predicate for excluding practice opponents from a query."""
     return ~User.auth_id.like(f"{TEST_AUTH_PREFIX}%")
@@ -385,7 +359,6 @@ async def purge(session: AsyncSession) -> int:
 __all__ = [
     "TEST_AUTH_PREFIX",
     "graded_as_failed",
-    "practice_score",
     "fill_pool",
     "fill_queue",
     "fill_tournament",

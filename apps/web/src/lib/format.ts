@@ -35,6 +35,11 @@ export function formatPct(prob: number): string {
   return `${Math.round(prob * 100)}%`;
 }
 
+/** Format a metric stat: whole numbers stay whole, else two decimals. */
+export function formatStat(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
 /** Compact relative time for ledger rows, e.g. "just now", "5m ago", "3d ago". */
 export function formatRelativeTime(iso: string, now: Date = new Date()): string {
   const seconds = Math.round((now.getTime() - new Date(iso).getTime()) / 1000);
