@@ -27,7 +27,6 @@ from ..constants import (
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
-from ..models.linked_account import LinkedAccount
 from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
@@ -40,7 +39,12 @@ from ..schemas.tournaments import (
     TournamentStatusResponse,
     TournamentView,
 )
-from ..services import aggregate_metrics, test_opponents, tournament_engine
+from ..services import (
+    aggregate_metrics,
+    linking_service,
+    test_opponents,
+    tournament_engine,
+)
 from ..services.tournament_engine import TournamentEnqueueResult
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
@@ -170,13 +174,9 @@ async def get_markets(
             f"No tournaments for {game}.",
             status_code=404,
         )
-    linked = await session.scalar(
-        select(LinkedAccount).where(
-            LinkedAccount.user_id == user.id,
-            LinkedAccount.game == game,
-            LinkedAccount.status != "unbound",
-        )
-    )
+    # Deterministic ordering (active first, most-recent next) so the readiness
+    # shown matches the account settlement actually grades on.
+    linked = await linking_service.get_link(session, user.id, game)
     metrics = []
     for metric in TOURNAMENT_METRICS[game]:
         if aggregate_metrics.is_aggregate(metric):

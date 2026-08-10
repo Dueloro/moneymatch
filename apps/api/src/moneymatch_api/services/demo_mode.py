@@ -30,7 +30,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..constants import DEMO_AUTH_ID
+from ..constants import DEMO_AUTH_ID, rated_only_game
 from ..models.user import User
 
 
@@ -49,12 +49,15 @@ async def is_demo_user_id(session: AsyncSession, user_id: uuid.UUID) -> bool:
     return demo is not None and demo == user_id
 
 
-async def rated_only_for(session: AsyncSession, user_id: uuid.UUID) -> bool:
-    """Whether this user's stats should be built from rated games only.
+async def rated_only_for(session: AsyncSession, user_id: uuid.UUID, game: str) -> bool:
+    """Whether this user's stats for `game` should be built from rated games only.
 
-    True for everyone except the demo account. Callers pass the result into
-    `GameFilters(rated_only=...)`, so the same code path serves both.
+    Only rated-only games (chess) filter, and never for the demo account.
+    Callers pass the result into `GameFilters(rated_only=...)`, so the same code
+    path serves both.
     """
+    if not rated_only_game(game):
+        return False
     return not await is_demo_user_id(session, user_id)
 
 

@@ -317,10 +317,6 @@ async def fill_queue(
     return 0
 
 
-async def is_test_user(user: User) -> bool:
-    return (user.auth_id or "").startswith(TEST_AUTH_PREFIX)
-
-
 def graded_as_failed(host_account_id: str) -> bool:
     """True for a practice opponent's contest entry, which always misses its bar.
 
@@ -367,7 +363,6 @@ __all__ = [
     "fill_queue",
     "fill_tournament",
     "is_enabled",
-    "is_test_user",
     "purge",
     "test_user_filter",
 ]

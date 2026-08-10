@@ -40,8 +40,14 @@ class AggregateMetric:
     counted: Callable[[list[NormGame]], int]
 
 
+def _is_win(g: NormGame) -> bool:
+    # A won record with no move list (moves == 0) is an aborted/empty game, not
+    # a real win. Excluded everywhere so wins, streak and fastest-win agree.
+    return g.won is True and g.moves > 0
+
+
 def _wins(games: list[NormGame]) -> list[NormGame]:
-    return [g for g in games if g.won is True]
+    return [g for g in games if _is_win(g)]
 
 
 def _total_wins(games: list[NormGame]) -> float | None:
@@ -59,7 +65,7 @@ def _longest_streak(games: list[NormGame]) -> float | None:
         return None
     best = run = 0
     for g in reversed(games):
-        if g.won is True:
+        if _is_win(g):
             run += 1
             best = max(best, run)
         else:
@@ -74,7 +80,7 @@ def _fastest_win(games: list[NormGame]) -> float | None:
     is won by resigning on move one, which would make the contest a race to
     forfeit. Requiring the win makes it what it sounds like: quickest checkmate.
     """
-    won = [g for g in _wins(games) if g.moves > 0]
+    won = _wins(games)
     return float(min(g.moves for g in won)) if won else None
 
 

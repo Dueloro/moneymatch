@@ -292,6 +292,17 @@ def lower_is_better(metric: str) -> bool:
     return metric in METRIC_LOWER_IS_BETTER
 
 
+# Games settled from rated matches only. Chess needs it — a casual or
+# vs-computer game is trivial to farm, and a brokered chess duel is itself
+# casual — while other hosts count casual games as they always have.
+RATED_ONLY_GAMES: frozenset[str] = frozenset({GAME_CHESS_LICHESS})
+
+
+def rated_only_game(game: str) -> bool:
+    """True when this game must be settled from rated matches only."""
+    return game in RATED_ONLY_GAMES
+
+
 # Rounding increment for a personal/room bar, per metric (bars are quoted to a
 # clean step so two players' bars are comparable and reproducible).
 METRIC_BAR_INCREMENT: dict[str, float] = {

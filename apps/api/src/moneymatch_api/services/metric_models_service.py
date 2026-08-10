@@ -109,7 +109,7 @@ async def bootstrap(
         # Build the baseline from the same population it will be graded
         # against, so a demo bar quoted from casual games is judged on casual
         # games too.
-        GameFilters(rated_only=await demo_mode.rated_only_for(session, user_id)),
+        GameFilters(rated_only=await demo_mode.rated_only_for(session, user_id, game)),
     )
     games = games[-_BOOTSTRAP_MATCH_LIMIT:]
 

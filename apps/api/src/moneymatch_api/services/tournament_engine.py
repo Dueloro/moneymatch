@@ -623,7 +623,15 @@ async def settle_tournament(
         higher_is_better=aggregate_metrics.higher_is_better(tournament.ranking_metric),
     )
 
-    if len(ranked) < tournament.min_ranked:
+    # A real contest needs enough genuine participants (readable account, window
+    # elapsed) and at least one scorer to hand the pool to. Forfeits — played
+    # and lost, or never played — count as participants but rank last and are
+    # paid nothing, so a field of one winner and many forfeits still settles and
+    # pays the winner instead of cancelling. Unverifiable (host outage) entries
+    # are refunded off the top and never count.
+    unverifiable_ids = {e.id for e in unverifiable}
+    participants = [e for e in entries if e.id not in unverifiable_ids]
+    if len(participants) < tournament.min_ranked or not ranked:
         return await _cancel(session, tournament, reason="min_ranked")
 
     # Unverifiable refunded off the top; their stake leaves the prize pool.

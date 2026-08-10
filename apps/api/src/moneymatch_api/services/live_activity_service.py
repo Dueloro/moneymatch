@@ -24,6 +24,7 @@ import uuid
 from typing import Any
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
@@ -32,7 +33,7 @@ from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
-from . import markets
+from . import demo_mode, markets
 
 log = structlog.get_logger(__name__)
 
@@ -75,7 +76,7 @@ def _ms(dt) -> int:
 
 
 async def build_pool_snapshot(
-    pool: SoloPool, entries: list[SoloEntry]
+    session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
 ) -> dict[str, Any]:
     """Each member's progress toward the shared `room_bar`, keyed by user id.
 
@@ -84,8 +85,9 @@ async def build_pool_snapshot(
     starts_ms, ends_ms = _ms(pool.window_starts_at), _ms(pool.window_ends_at)
     members: dict[str, Any] = {}
     for entry in entries:
+        rated_only = await demo_mode.rated_only_for(session, entry.user_id, pool.game)
         games = await _window_games(
-            pool.game, entry.host_account_id, starts_ms, ends_ms
+            pool.game, entry.host_account_id, starts_ms, ends_ms, rated_only
         )
         if games is None:
             members[str(entry.user_id)] = {"status": "unavailable"}
@@ -128,7 +130,7 @@ def pool_all_decided(snapshot: dict[str, Any]) -> bool:
 
 
 async def build_match_snapshot(
-    match: Match, seats: list[MatchPlayer]
+    session: AsyncSession, match: Match, seats: list[MatchPlayer]
 ) -> dict[str, Any] | None:
     """A neutral H2H snapshot: chess board state, or both seats' stat/result.
 
@@ -168,8 +170,9 @@ async def build_match_snapshot(
     seat_views: dict[str, Any] = {}
     any_data = False
     for seat in seats:
+        rated_only = await demo_mode.rated_only_for(session, seat.user_id, match.game)
         games = await _window_games(
-            match.game, seat.host_account_id, starts_ms, ends_ms
+            match.game, seat.host_account_id, starts_ms, ends_ms, rated_only
         )
         if games is None:
             seat_views[str(seat.user_id)] = {"status": "unavailable"}

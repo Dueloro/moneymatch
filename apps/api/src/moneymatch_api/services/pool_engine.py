@@ -30,7 +30,6 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..constants import (
-    DEMO_AUTH_ID,
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
     METRIC_BAR_INCREMENT,
@@ -56,6 +55,7 @@ from ..models.pools import SoloEntry, SoloPool
 from ..models.skill import MetricModel
 from ..models.user import User
 from . import (
+    demo_mode,
     fairness,
     geo_service,
     limits_service,
@@ -572,7 +572,7 @@ async def enqueue(
     # Sandbagging block (metric wagers) — with the personal-bar feature. Skipped
     # for the synthetic demo account: the detector polls real host history, which
     # doesn't exist for a demo handle (the host API 400s on it).
-    if user.auth_id != DEMO_AUTH_ID:
+    if not demo_mode.is_demo_user(user):
         await sandbagging_service.assert_not_sandbagging(
             session, user, game, metric, link.host_account_id
         )
@@ -600,7 +600,7 @@ async def enqueue(
     # opponents are waiting the demo gets a genuine multi-player room with a
     # real pot, and only falls back to a room of one when there is nobody at
     # all. Never fires for real accounts.
-    if user.auth_id == DEMO_AUTH_ID:
+    if demo_mode.is_demo_user(user):
         demo_room = await _form_room(
             session,
             [ticket],
@@ -652,7 +652,7 @@ async def cancel(session: AsyncSession, user: User) -> bool:
     # Demo: a formed room's money is committed and isn't cancelable for real
     # accounts, but the demo user can dismiss it — refund the entry and free the
     # queue so the pool click-through is replayable.
-    if user.auth_id == DEMO_AUTH_ID:
+    if demo_mode.is_demo_user(user):
         pool = await _current_pool_for_user(session, user.id)
         if pool is not None and pool.state == "LOCKED":
             await cancel_pool(session, pool, reason="demo reset")

@@ -246,5 +246,9 @@ class ChessLichessAdapter(GameAdapter):
             # Caveat that remains: a player can still stall a won position to
             # inflate their average and earn a roomier bar, so this wants a
             # sandbagging look before it carries real money at scale.
-            metrics=({"chess_moves": float(moves)} if won else {}),
+            #
+            # `moves > 0` guards a won record with no move list (aborted/empty):
+            # a 0-move "win" would sit below every bar and clear for free, and
+            # drag the baseline mean toward zero. No value ⇒ unqualified match.
+            metrics=({"chess_moves": float(moves)} if won and moves > 0 else {}),
         )

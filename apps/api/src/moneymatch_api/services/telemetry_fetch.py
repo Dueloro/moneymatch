@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
-from ..constants import lower_is_better, requires_win
+from ..constants import lower_is_better, metric_floor, requires_win
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
@@ -81,7 +81,7 @@ def _evidence(
 async def grade_pool(
     session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
 ) -> dict[uuid.UUID, PoolGrade]:
-    """Grade every entry's first in-window match against `room_bar`."""
+    """Grade every entry's first qualifying in-window match against `room_bar`."""
     grades: dict[uuid.UUID, PoolGrade] = {}
     for entry in entries:
         # Practice opponents never play, so they miss the bar and forfeit their
@@ -95,24 +95,41 @@ async def grade_pool(
             entry.host_account_id,
             pool.window_starts_at,
             pool.window_ends_at,
-            await demo_mode.rated_only_for(session, entry.user_id),
+            await demo_mode.rated_only_for(session, entry.user_id, pool.game),
         )
         if games is None or not games:
             grades[entry.user_id] = PoolGrade(cleared=None)  # unverifiable → refund
             continue
 
-        graded = games[0]
+        # The first match that produces a value is the graded attempt, not the
+        # first match played: for a win-required metric a loss carries no value,
+        # so grading `games[0]` would let one early loss forfeit a later win
+        # that clears the bar. Taking the *first* qualifying game (not the best)
+        # keeps it a single priced attempt, so the advertised clear rate holds.
+        # A value below the metric floor is physically impossible and dropped as
+        # bad evidence rather than allowed to clear beneath the floor.
+        floor = metric_floor(pool.metric)
+        graded = next(
+            (
+                g
+                for g in games
+                if (v := g.metrics.get(pool.metric)) is not None and v >= floor
+            ),
+            games[0],
+        )
         value = graded.metrics.get(pool.metric)
+        if value is not None and value < floor:
+            value = None
         payload = await raw_payload_service.persist(
             session,
             f"grade:{pool.game}",
-            _evidence(entry.id, pool.metric, games[:1]),
+            _evidence(entry.id, pool.metric, [graded]),
             memo=f"pool {pool.metric}",
         )
         if value is None:
             # No value on a match that was actually played. For a win-required
-            # metric that means the graded game was not a win, which is a
-            # definite **miss**: they had their attempt and did not make it.
+            # metric that means no win in the window, which is a definite
+            # **miss**: they had their attempts and did not make it.
             # Refunding here would turn entering and losing into a free option,
             # and would hand a loss the same outcome as never playing at all.
             # Any other metric keeps the old reading: we could not measure it,
@@ -150,7 +167,7 @@ async def grade_tournament(
             entry.host_account_id,
             tournament.window_starts_at,
             tournament.window_ends_at,
-            await demo_mode.rated_only_for(session, entry.user_id),
+            await demo_mode.rated_only_for(session, entry.user_id, tournament.game),
         )
         if games is None:
             grades[entry.id] = TournamentGrade(values=None)  # host outage → refund
@@ -210,7 +227,7 @@ async def live_standings(
             entry.host_account_id,
             tournament.window_starts_at,
             tournament.window_ends_at,
-            await demo_mode.rated_only_for(session, entry.user_id),
+            await demo_mode.rated_only_for(session, entry.user_id, tournament.game),
         )
         spec = aggregate_metrics.get(metric)
         if spec is not None:

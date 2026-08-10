@@ -83,8 +83,8 @@ def h2h_multiplier_bps(rake_bps: int = DEFAULT_RAKE_BPS) -> int:
 
 def pool_multiplier_estimate_bps(
     p_target: float,
+    room_size: int,
     rake_bps: int = DEFAULT_RAKE_BPS,
-    room_size: int = 4,
 ) -> int:
     """Estimated pool tier multiplier, in basis points, on your own entry.
 

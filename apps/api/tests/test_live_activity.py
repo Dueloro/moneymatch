@@ -59,7 +59,7 @@ async def test_chess_live_snapshot_orients_turn_and_moves(monkeypatch):
 
     monkeypatch.setattr(lichess, "get_live_game", fake_live)
 
-    snap = await live_activity_service.build_match_snapshot(match, seats)
+    snap = await live_activity_service.build_match_snapshot(None, match, seats)
     assert snap["format"] == "chess" and snap["status"] == "live"
     assert snap["moves"] == 2
 
@@ -95,7 +95,7 @@ async def test_chess_finished_maps_result_per_viewer(monkeypatch):
         }
 
     monkeypatch.setattr(lichess, "get_live_game", fake_live)
-    snap = await live_activity_service.build_match_snapshot(match, seats)
+    snap = await live_activity_service.build_match_snapshot(None, match, seats)
     assert snap["status"] == "finished"
     assert live_activity_service.view_for("match", snap, u_white)["result"] == "you"
     assert live_activity_service.view_for("match", snap, u_black)["result"] == "opp"
@@ -141,7 +141,7 @@ async def test_stat_race_snapshot_leader_per_viewer(monkeypatch):
     games = {"alice": [_game(mid, 1.6)], "bob": [_game(mid, 1.2)]}
     monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(games))
 
-    snap = await live_activity_service.build_match_snapshot(match, seats)
+    snap = await live_activity_service.build_match_snapshot(None, match, seats)
     assert snap["format"] == "stat_race" and snap["status"] == "live"
 
     you_view = live_activity_service.view_for("match", snap, u_you)
@@ -154,4 +154,4 @@ async def test_stat_race_snapshot_leader_per_viewer(monkeypatch):
 async def test_no_snapshot_before_pairing():
     """A match with no live window yet (unpaired) has no live view."""
     match = Match(game=CS2, market="kd_ratio", brokered=False, matched_at=None)
-    assert await live_activity_service.build_match_snapshot(match, []) is None
+    assert await live_activity_service.build_match_snapshot(None, match, []) is None

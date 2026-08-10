@@ -141,7 +141,10 @@ async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> 
     seats = await match_lifecycle.players(session, match.id)
     # A demo-account duel grades casual games too; a real one never does.
     rated_only = all(
-        [await demo_mode.rated_only_for(session, seat.user_id) for seat in seats]
+        [
+            await demo_mode.rated_only_for(session, seat.user_id, match.game)
+            for seat in seats
+        ]
     )
     outcome = await grading.grade(match, seats, now, rated_only)
 
@@ -538,7 +541,9 @@ async def _refresh_live_snapshots(
             entries = list(
                 await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pid))
             )
-            snapshot = await live_activity_service.build_pool_snapshot(pool, entries)
+            snapshot = await live_activity_service.build_pool_snapshot(
+                session, pool, entries
+            )
             await _upsert_live(session, "pool", pid, snapshot, now)
             # Flag a fully-decided pool so `_process_due_pools` settles it early
             # (next cycle) rather than waiting for the window to close.
@@ -572,7 +577,7 @@ async def _refresh_live_snapshots(
                 )
             )
             match_snapshot = await live_activity_service.build_match_snapshot(
-                match, seats
+                session, match, seats
             )
             if match_snapshot is None:
                 continue
