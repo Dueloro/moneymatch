@@ -34,6 +34,8 @@ export interface PoolMember {
   status: string;
   payout_cents: number;
   is_you: boolean;
+  /** What they scored on the graded match. Null while the window is open. */
+  result_value?: number | null;
 }
 
 export interface PoolView {
@@ -111,6 +113,31 @@ export function usePoolStatus() {
       const { data, error } = await api.GET('/api/v1/pools/queue/status');
       if (error) throw new Error('Failed to load pool status');
       return data as PoolStatus;
+    },
+  });
+}
+
+/**
+ * One settled or in-flight room, by id.
+ *
+ * Used by the notification feed, where a row is opened to see who is in the
+ * room and how it finished. `enabled` is what makes it lazy: the row only
+ * mounts this when the card is expanded, so the feed costs nothing to render.
+ */
+export function usePool(poolId: string | null) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ['pool', poolId],
+    enabled: !!session && !!poolId,
+    // A room's roster and result do not change once settled, and while it is
+    // live the rail is already polling status.
+    staleTime: 30_000,
+    queryFn: async (): Promise<PoolView> => {
+      const { data, error } = await api.GET('/api/v1/pools/{pool_id}', {
+        params: { path: { pool_id: poolId as string } },
+      });
+      if (error) throw new Error('Failed to load the room');
+      return data as PoolView;
     },
   });
 }

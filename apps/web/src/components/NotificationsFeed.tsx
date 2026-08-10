@@ -7,6 +7,7 @@ import {
   type NotificationItem,
 } from '../hooks/useNotifications';
 import { formatRelativeTime } from '../lib/format';
+import { PoolDetail, TournamentDetail } from './notifications/ContestDetail';
 import { EmptyState } from './ui/EmptyState';
 import { ExpandableCard } from './ui/ExpandableCard';
 import { PillButton } from './ui/PillButton';
@@ -84,6 +85,13 @@ function NotificationRow({ note }: { note: NotificationItem }) {
       ? (p.match_id as string)
       : null;
 
+  // A contest notification carries the id of the thing it is about, so the row
+  // can open into the room itself: who is in it, and once it settles, what
+  // everyone did. Anything else stays a plain row.
+  const poolId = p.kind === 'pool' ? ((p.pool_id as string) ?? null) : null;
+  const tournamentId =
+    p.kind === 'tournament' ? ((p.tournament_id as string) ?? null) : null;
+
   async function onAccept() {
     if (!challengeId) return;
     const res = await accept.mutateAsync(challengeId);
@@ -92,6 +100,9 @@ function NotificationRow({ note }: { note: NotificationItem }) {
 
   return (
     <ExpandableCard
+      ariaLabel={
+        poolId || tournamentId ? `${describe(note)}, open for detail` : undefined
+      }
       left={
         <span
           aria-label={note.read ? 'read' : 'unread'}
@@ -126,6 +137,12 @@ function NotificationRow({ note }: { note: NotificationItem }) {
           </PillButton>
         ) : undefined
       }
-    />
+    >
+      {poolId ? (
+        <PoolDetail poolId={poolId} />
+      ) : tournamentId ? (
+        <TournamentDetail tournamentId={tournamentId} />
+      ) : undefined}
+    </ExpandableCard>
   );
 }

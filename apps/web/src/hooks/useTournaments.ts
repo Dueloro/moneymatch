@@ -112,6 +112,23 @@ function useInvalidate() {
   };
 }
 
+/** One tournament by id, for the notification feed's expanded standings. */
+export function useTournament(tournamentId: string | null) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ['tournament', tournamentId],
+    enabled: !!session && !!tournamentId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<TournamentView> => {
+      const { data, error } = await api.GET('/api/v1/tournaments/{tournament_id}', {
+        params: { path: { tournament_id: tournamentId as string } },
+      });
+      if (error) throw new Error('Failed to load the tournament');
+      return data as TournamentView;
+    },
+  });
+}
+
 export function useEnterTournament() {
   const invalidate = useInvalidate();
   return useMutation({

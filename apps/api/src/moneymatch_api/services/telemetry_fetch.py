@@ -162,6 +162,19 @@ async def grade_tournament(
     n = tournament.score_matches
     grades: dict[uuid.UUID, TournamentGrade] = {}
     for entry in entries:
+        # A practice opponent has no real host account, so ask its adapter
+        # nothing: the username does not resolve and the call would be wasted.
+        # It forfeits — a participant that played nothing, ranked last and paid
+        # nothing — so `settle_tournament` still counts it toward the field and a
+        # lone real entrant's contest settles instead of cancelling.
+        if test_opponents.graded_as_failed(entry.host_account_id):
+            grades[entry.id] = TournamentGrade(
+                values=[],
+                score=None,
+                counted=0,
+                telemetry={metric: None, "practice_opponent": True},
+            )
+            continue
         games = await _window_games(
             tournament.game,
             entry.host_account_id,
@@ -222,6 +235,19 @@ async def live_standings(
 
     rows: list[dict[str, Any]] = []
     for entry in entries:
+        # A practice opponent forfeits (see grade_tournament): show it unranked
+        # rather than polling a host id that cannot resolve, so the live view
+        # matches how it settles.
+        if test_opponents.graded_as_failed(entry.host_account_id):
+            rows.append(
+                {
+                    "user_id": str(entry.user_id),
+                    "username": usernames.get(entry.user_id),
+                    "score": None,
+                    "matches": 0,
+                }
+            )
+            continue
         games = await _window_games(
             tournament.game,
             entry.host_account_id,

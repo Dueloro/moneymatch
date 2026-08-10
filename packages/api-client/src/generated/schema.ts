@@ -547,6 +547,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Ticket
+         * @description Trade the bearer token (header auth) for a single-use SSE ticket.
+         */
+        post: operations["issue_ticket_api_v1_events_ticket_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream */
+        get: operations["stream_api_v1_events_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/disputes": {
         parameters: {
             query?: never;
@@ -1343,6 +1380,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Demo Reset
+         * @description Reset the shared demo account to its fresh-login state (demo user only).
+         */
+        post: operations["demo_reset_api_v1_demo_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1918,6 +1975,14 @@ export interface components {
              * @default demo@dueloro.com
              */
             email: string;
+        };
+        /** DemoResetResponse */
+        DemoResetResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
         };
         /** DemoWithdrawalRequest */
         DemoWithdrawalRequest: {
@@ -2521,6 +2586,8 @@ export interface components {
             payout_cents: number;
             /** Is You */
             is_you: boolean;
+            /** Result Value */
+            result_value?: number | null;
         };
         /** PoolMetric */
         PoolMetric: {
@@ -2566,6 +2633,10 @@ export interface components {
             your_bar: number | null;
             /** Bar Delta */
             bar_delta: number | null;
+            /** Your Cleared */
+            your_cleared?: boolean | null;
+            /** Your Current */
+            your_current?: number | null;
             /** Entry Cents */
             entry_cents: number;
             /** Pot Cents */
@@ -4383,6 +4454,70 @@ export interface operations {
             };
         };
     };
+    issue_ticket_api_v1_events_ticket_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_api_v1_events_stream_get: {
+        parameters: {
+            query: {
+                ticket: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     file_contest_dispute_api_v1_disputes_post: {
         parameters: {
             query?: never;
@@ -5928,6 +6063,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LinksResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_reset_api_v1_demo_reset_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoResetResponse"];
                 };
             };
             /** @description Validation Error */
