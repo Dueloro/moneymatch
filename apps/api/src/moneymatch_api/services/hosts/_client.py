@@ -43,6 +43,13 @@ def _slow_host_ms() -> int:
     return get_settings().slow_host_ms
 
 
+# Host error messages are ASCII on purpose. They travel into structlog, which
+# prints them, and a Windows console is cp1252: a single "→" in an error
+# string raises UnicodeEncodeError *inside the logger*, turning a handled 400
+# into a crashed request. Steam answering 400 for a private profile is the
+# normal case, so this was every CS2 link failing locally.
+
+
 async def request_json(
     host: str,
     method: str,
@@ -100,14 +107,14 @@ async def request_json(
                         threshold_ms=_slow_host_ms(),
                     )
             if response.status_code == 404:
-                raise HostNotFound(host, f"{method} {url} → 404")
+                raise HostNotFound(host, f"{method} {url} -> 404")
             if response.status_code >= 500:
-                raise HostUnavailable(host, f"{method} {url} → {response.status_code}")
+                raise HostUnavailable(host, f"{method} {url} -> {response.status_code}")
             # Any other non-2xx (400/401/403/422/429…) is a typed, non-retryable
             # HostError — never a raw httpx exception — so every `except HostError`
             # guard degrades gracefully (a bad seed id 400 must not crash a cycle).
             if response.status_code >= 400:
-                raise HostError(host, f"{method} {url} → {response.status_code}")
+                raise HostError(host, f"{method} {url} -> {response.status_code}")
             return response
     # Unreachable: reraise=True re-raises the last error rather than exiting.
     raise HostUnavailable(host, "retry loop exhausted")  # pragma: no cover

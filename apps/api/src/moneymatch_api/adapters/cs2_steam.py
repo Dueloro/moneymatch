@@ -19,13 +19,28 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
+
 from ..db.session import get_sessionmaker
 from ..schemas.profile import ProfileSnapshot
 from ..services import cs2_matches
 from ..services.hosts import steam
 from .base import GameAdapter, GameFilters, NormGame, TelemetrySample
 
+log = structlog.get_logger(__name__)
+
 _GAME = "cs2.steam"
+
+
+def _ban_label(bans: steam.BanStatus | None) -> str | None:
+    """What to show about a player's standing.
+
+    `None` from Steam means *unknown*, not *clean*. On a product where money
+    moves, those must not render as the same thing.
+    """
+    if bans is None:
+        return "Ban status unknown"
+    return "VAC ban" if not bans.is_clean else None
 
 
 def _won(row: Any, line: dict[str, Any]) -> bool | None:
@@ -60,9 +75,18 @@ class CS2SteamAdapter(GameAdapter):
                 "Steam rather than typing a name."
             )
 
+        # The SteamID is already proven at this point: OpenID verified it with
+        # Steam itself. Everything below is enrichment, so a Steam Web API
+        # outage or a missing key must not throw away a verified identity. It
+        # degrades to a profile carrying the SteamID and an explicit unknown.
         summary = await steam.get_player_summary(steam_id)
         if summary is None:
-            raise ValueError(f"Steam profile '{steam_id}' could not be read.")
+            log.warning(
+                "cs2.steam_profile_unavailable",
+                steam_id=steam_id,
+                key_configured=steam.is_configured(),
+            )
+            summary = {}
 
         # A lifetime K/D is the only skill signal available before the user has
         # played anything through us. It is cumulative across casual, deathmatch
@@ -86,7 +110,7 @@ class CS2SteamAdapter(GameAdapter):
             draw_rate=0.0,
             total_games=stats.total_matches_played if stats else 0,
             rating=None,
-            rank_label="VAC ban" if bans and not bans.is_clean else None,
+            rank_label=_ban_label(bans),
             kd=round(kd, 4) if kd is not None else None,
             avatar_url=summary.get("avatarfull") or None,
         )
