@@ -1,7 +1,8 @@
 # MoneyMatch Runbook
 
-Operational reference for the MoneyMatch MVP (Phase 7 · `10-phase-7-hardening-beta.md`
-§4). Written to be followed by someone who did **not** build the system — if a
+Operational reference for the MoneyMatch MVP (see
+[`implementation-guide/implementation-summary.md`](./implementation-guide/implementation-summary.md)).
+Written to be followed by someone who did **not** build the system — if a
 step here is ambiguous, that is a bug in the runbook; fix it.
 
 The one rule that overrides everything below: **the ledger is the source of
@@ -26,7 +27,8 @@ misconfigured deploy never boots half-working.
 
 Environments: **staging** (full stack, host APIs live, seed cohort) and
 **production**. Promote staging → production only after the acceptance
-walk-through ([`12-mvp-acceptance.md`](./implementation-guide/12-mvp-acceptance.md)).
+walk-through (acceptance sign-off tracked in
+[`implementation-guide/BACKLOG.md`](./implementation-guide/BACKLOG.md)).
 
 ---
 

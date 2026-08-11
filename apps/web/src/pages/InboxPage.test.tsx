@@ -48,7 +48,7 @@ const CONVERSATIONS = {
     {
       id: 'c-support',
       kind: 'support' as const,
-      title: 'MoneyMatch Support',
+      title: 'Dueloro Support',
       peer_user_id: null,
       peer_username: null,
       online: true,
@@ -153,7 +153,7 @@ describe('InboxPage (chat)', () => {
     // Notifications keep their home in the Inbox — pinned, and selected first.
     expect(screen.getByText('Everything the platform sent you')).toBeInTheDocument();
     expect(screen.getByText('jordn_cs')).toBeInTheDocument();
-    expect(screen.getByText('MoneyMatch Support')).toBeInTheDocument();
+    expect(screen.getByText('Dueloro Support')).toBeInTheDocument();
   });
 
   it('opens a friend thread and renders its messages, invite card, and composer', () => {

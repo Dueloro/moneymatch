@@ -2,12 +2,15 @@
 
 **Last updated:** 2026-07-15 (migrated from the PoC repo `clutchbook`)
 
-> **Migration note.** **Stage A (the no-money MVP) is now being executed in this
-> repo via the [implementation guide](../implementation-guide/00-README.md)** —
-> the guide supersedes A1–A4 for engineering detail (it extends Stage A with
-> the design-PDF frontend, admin tools, demo payment rails, and payments/KYC
-> readiness). Stages B and C remain the forward plan after the MVP ships.
-> PoC code paths (`api/…`, `src/…`) resolve under [`/poc-reference`](../../poc-reference/).
+> **Note.** **Stage A (the no-money MVP) is built** — see the
+> [implementation summary](../implementation-guide/implementation-summary.md) for
+> the as-built system (it extended Stage A with the design-system frontend, admin
+> tools, demo payment rails, and payments/KYC readiness). What remains of Stage A
+> is deploy + the internal-beta sign-off; see
+> [`BACKLOG.md`](../implementation-guide/BACKLOG.md). **Stages B and C remain the
+> forward plan.** Inline PoC code paths (`api/…`, `src/…`) refer to the original
+> `clutchbook` repo (no longer vendored here); current code lives under
+> `apps/api` / `apps/web`.
 
 This is the master plan from today's play-money demo to a real-money launch, in
 three stages. It is both a product and a technical roadmap: every milestone has
@@ -19,7 +22,7 @@ Supporting analysis (read once, reference often):
 [`integrity-audit.md`](../legal/integrity-audit.md) ·
 [`business-and-competition.md`](../business/business-and-competition.md) ·
 [`gtm-prelaunch.md`](../business/gtm-prelaunch.md) ·
-[`IMPLEMENTATION.md`](../../poc-reference/POC-IMPLEMENTATION.md) (code ground truth) ·
+[`implementation-summary.md`](../implementation-guide/implementation-summary.md) (as-built system) ·
 [`overview.md`](./overview.md) (product definition)
 
 **The invariant model never changes:** peer-to-peer / pooled, rake-only, no

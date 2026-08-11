@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/testUtils';
 import { TournamentPage } from './TournamentPage';
 
+vi.mock('../auth/useAuth', () => ({
+  useAuth: () => ({ isDemo: false, session: null }),
+}));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },

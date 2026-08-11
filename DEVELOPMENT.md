@@ -1,7 +1,7 @@
-# Contributing to MoneyMatch
+# Money Match — Development Guide
 
 Engineering standards live in
-[`docs/implementation-guide/00-README.md`](./docs/implementation-guide/00-README.md) §3.
+[`docs/implementation-guide/implementation-summary.md`](./docs/implementation-guide/implementation-summary.md) §3.
 This file is the operational summary. Read §3 before your first PR — those
 invariants are non-negotiable and enforced in review.
 
@@ -59,8 +59,8 @@ CI runs on every PR:
 - **api**: `ruff`, `mypy`, `pytest`
 - **web**: `eslint`, `prettier --check`, `tsc --noEmit`, `vitest`, `build`
 
-Money-math and settlement paths **require** tests. Port the PoC invariant
-suites first — they are the spec. Run locally before pushing:
+Money-math and settlement paths **require** tests — the settlement-invariant
+suites are the spec. Run locally before pushing:
 
 ```bash
 make test        # api + web

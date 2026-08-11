@@ -142,7 +142,7 @@ export function ConversationList({
               <LifebuoyIcon className="h-5 w-5" />
             </span>
           }
-          title="MoneyMatch Support"
+          title="Dueloro Support"
           subline={
             support?.last_message_preview ??
             (supportPending ? 'Opening…' : 'Questions about a contest or payout')

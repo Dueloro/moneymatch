@@ -1,39 +1,111 @@
-# MoneyMatch
+# Money Match
 
-**Peer-to-peer skill wagering on games you already play.** Players stake equal
-entries into an escrowed pot, play a real match on a connected game (Chess via
-Lichess, CS2 via FaceIt, Dota 2 via OpenDota), results are auto-verified against
-the host game's API, and the winner takes the pot minus a fixed, disclosed rake —
-the platform's only revenue. Never house-banked, never odds-priced.
+> **Peer-to-peer skill wagering on the games you already play.**
+> Stake an equal entry into an escrowed pot, play a real match on a connected
+> game, and the winner takes the pot minus a small, disclosed fee. We hold the
+> pot. We never take a side.
 
-This repo is the **MVP build** (demo money, real everything else), developed
-from the validated PoC in the `clutchbook` repo.
+Money Match is a neutral-operator, contest-of-skill platform — the same legal
+structure as Skillz and Triumph, run **on top of games people already play**
+(Chess via Lichess, CS2 via FACEIT, Dota 2 via OpenDota, PUBG). Players stake into
+a shared pot, results are **auto-verified against the host game's API**, and the
+winner takes the pot minus a **fixed, disclosed rake** — the platform's only
+revenue. Never house-banked, never odds-priced.
 
-## Where things are
+This repository is the **MVP build**: everything a real launch needs except live
+payment rails, running on **demo money that flows through the same real ledger**.
 
-- **[`docs/implementation-guide/`](./docs/implementation-guide/00-README.md)** —
-  the phased implementation plan (start at `00-README.md`). This is the
-  authoritative guide for building the MVP in this repo.
-- [`docs/design/moneymatch-design.pdf`](./docs/design/moneymatch-design.pdf) —
-  the visual design source of truth.
-- [`docs/`](./docs/README.md) — product, legal, and business docs (index inside).
-- [`poc-reference/`](./poc-reference/README.md) — frozen copy of the PoC's
-  reusable code and tests. **Reference only:** port from it, never import it.
+_Money Match is the product. [Dueloro](https://dueloro.com) is the company._
 
-## Running it locally
+---
+
+## Why it's built the way it is
+
+The whole system is organized around five invariants. They are what make the
+model legally defensible and the ledger auditable — not incidental engineering
+preferences.
+
+1. **`sum(payouts) + rake == sum(entries)`** on every settlement path. The
+   platform's books never carry outcome risk; only the rake accrues.
+2. **The server owns every number.** No client-supplied amount, timestamp,
+   telemetry, or result is ever trusted. Clients send _intents with ids_; the
+   server computes the rest.
+3. **Settlements are host-API-verified.** No self-reporting, no screenshots.
+4. **Rake only when a prize distributes.** Refunds and pushes rake nothing, so the
+   platform never profits from a player failing.
+5. **Money is integer cents**, in an append-only ledger; balances are derived and
+   reconciled continuously.
+
+Read [`docs/decisions.md`](./docs/decisions.md) for the settled architecture and
+product decisions and the reasoning behind each.
+
+---
+
+## Start here (documentation map)
+
+For onboarding a developer, briefing a reviewer, or pointing an AI agent at the
+codebase — read in roughly this order:
+
+| Doc                                                                                                            | What it gives you                                                                    |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [`docs/implementation-guide/implementation-summary.md`](./docs/implementation-guide/implementation-summary.md) | **The as-built system** — architecture, stack, per-area feature inventory, standards |
+| [`docs/decisions.md`](./docs/decisions.md)                                                                     | The "do not relitigate" architecture & product decisions + why                       |
+| [`docs/data-model.md`](./docs/data-model.md)                                                                   | Map of the database: tables, the ledger, the invariants                              |
+| [`docs/design-guidelines.md`](./docs/design-guidelines.md)                                                     | The UI design system: tokens, type, components, patterns, copy                       |
+| [`docs/adding-a-game.md`](./docs/adding-a-game.md)                                                             | How a new title plugs in via the `GameAdapter` seam                                  |
+| [`docs/product/overview.md`](./docs/product/overview.md)                                                       | The full product definition and the peer-to-peer / rake-only rationale               |
+| [`docs/legal/`](./docs/legal/) · [`docs/business/`](./docs/business/)                                          | Compliance posture, integrity threat model, economics, GTM                           |
+| [`docs/implementation-guide/BACKLOG.md`](./docs/implementation-guide/BACKLOG.md)                               | What's pending / not yet built                                                       |
+| [`docs/`](./docs/README.md)                                                                                    | Full index of every doc                                                              |
+
+---
+
+## Architecture at a glance
+
+A React SPA talks **only** to a FastAPI service that owns all state; a dedicated
+worker settles contests in the background against host-game APIs.
+
+```
+Browser (React SPA) ──HTTPS──▶ FastAPI service ──▶ Postgres (ledger + queue)
+   auth via Supabase JWT          owns every number        ▲
+                                        │                  │
+                              Settlement worker ──polls──▶ host game APIs
+                              (grades + settles)           (Lichess / FACEIT / …)
+```
+
+| Layer         | Choice                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Frontend      | React 18 + TypeScript + Vite, Tailwind (CSS-var tokens), TanStack Query                                              |
+| Backend       | Python 3.12 FastAPI (long-running), async SQLAlchemy 2 + Alembic, Pydantic v2                                        |
+| Database      | Postgres 16 (append-only ledger + `FOR UPDATE SKIP LOCKED` queue)                                                    |
+| Auth          | Supabase Auth (email + Google); the API verifies the JWT and owns all other state — the browser never touches the DB |
+| Background    | Dedicated settlement worker; host-API-verified grading                                                               |
+| Types         | Pydantic → OpenAPI → generated TS client (`packages/api-client`)                                                     |
+| Observability | structlog JSON logs, Sentry, PostHog                                                                                 |
+| Deploy        | Render (`api` + `worker` + Postgres/Neon); web on Vercel                                                             |
+
+### Repo layout
+
+```
+apps/web            React + Vite SPA (talks only to the API)
+apps/api            FastAPI service (owns every number; verifies Supabase JWTs)
+apps/worker         Settlement worker entrypoint
+packages/api-client Generated TypeScript client (OpenAPI → TS)
+docs/               Implementation summary, decisions, design guidelines,
+                    data model, product, legal, business
+```
+
+---
+
+## Quickstart (local development)
 
 Prerequisites: **Docker**, **Node 20+** with `pnpm` (via `corepack enable pnpm`),
 and [**uv**](https://docs.astral.sh/uv/) for the Python API.
 
 ```bash
-# 1. Configure env (fill in the Supabase keys — see the Supabase note below).
-cp .env.example .env
-
-# 2. Install all dependencies (pnpm workspace + API venv).
-make install
-
-# 3. Start Postgres + API + web together.
-make dev
+cp .env.example .env   # fill in the Supabase keys — see the note below
+make install           # pnpm workspace + API venv
+make dev               # Postgres + API + web together
 ```
 
 Then open http://localhost:5173, sign in with Google or email, complete
@@ -54,11 +126,32 @@ Individual pieces (each reads the root `.env`):
 
 **Supabase:** create a project, enable Email + Google auth, and copy the project
 URL, JWT secret, and publishable/anon key into `.env` (`SUPABASE_*` and
-`VITE_SUPABASE_*`). The API verifies Supabase JWTs and owns all other state; the
-browser never touches the database.
+`VITE_SUPABASE_*`).
 
-**Port note:** if `5432` is already taken, set `DB_PORT` in `.env` and update the
-port in `DATABASE_URL` to match.
+**Port note:** if `5432` is taken, set `DB_PORT` in `.env` and update the port in
+`DATABASE_URL` to match.
+
+---
+
+## Status
+
+**The MVP is feature-complete.** Delivered end-to-end: account creation + auth,
+identity & game linking across four adapters, the full head-to-head flow with the
+background settlement worker, solo pools & tournaments, wallet & append-only
+ledger with demo deposits/withdrawals, social & retention (friends, invites,
+inbox, leaderboard), the admin surface + instrumentation, and a security &
+resilience hardening pass (payments/KYC-ready seams, chaos tests, authorization
+matrix, rate limits).
+
+What remains is operational, not code: stand up staging + production, run a short
+internal beta, and complete acceptance sign-off. See
+[`BACKLOG.md`](./docs/implementation-guide/BACKLOG.md) and the runbook
+([`docs/runbook.md`](./docs/runbook.md)).
+
+Payments and KYC ship as **integration-ready seams** guarded in code — real rails
+attach only after counsel + underwriting.
+
+---
 
 ## Admin & operations
 
@@ -80,37 +173,9 @@ admin **Reconciliation** tab.
 
 **Analytics (PostHog).** With `POSTHOG_API_KEY` (server) and `VITE_POSTHOG_KEY`
 (web) set, money/liquidity events (`entry_queued`, `match_found`,
-`contest_settled`, `rake_collected`, `refund_issued`) are captured server-side
-and the activation funnel (`landing → signup → account_linked →
-first_contest_joined → first_settlement`) client-side. Build two dashboards in
-PostHog and link them here:
+`contest_settled`, `rake_collected`, `refund_issued`) are captured server-side and
+the activation funnel (`landing → signup → account_linked → first_contest_joined →
+first_settlement`) client-side. Link the two dashboards once built in PostHog:
 
 - **Activation funnel:** _add your PostHog funnel URL_
 - **Liquidity (queue depth · matches · rake):** _add your PostHog dashboard URL_
-
-## Repo layout
-
-```
-apps/web            React + Vite SPA (talks only to the API)
-apps/api            FastAPI service (owns every number; verifies Supabase JWTs)
-packages/api-client Generated TypeScript client (OpenAPI → TS)
-docs/               Implementation guide, product, legal, design
-poc-reference/      Frozen PoC — reference only, never imported
-```
-
-## Status
-
-Phases 0–6 complete: foundation, wallet & ledger, identity & game linking,
-head-to-head flow with the settlement worker, pools & tournaments, social &
-retention, and the admin surface + instrumentation (kill switches, PostHog
-events, reconciliation, worker heartbeat). Next: Phase 7 — hardening &
-internal beta.
-
-## Invariants (memorize these)
-
-1. `sum(payouts) + rake == sum(entries)` on every settlement path.
-2. The server owns every number — no client-supplied amounts, timestamps,
-   telemetry, or results.
-3. Settlements are host-API-verified. No self-reporting, no screenshots.
-4. Rake only when a prize distributes; refunds and pushes rake nothing.
-5. Money is integer cents.

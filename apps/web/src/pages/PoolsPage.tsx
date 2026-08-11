@@ -19,6 +19,7 @@ import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { barTitle, isLowerBetter, requiresWin } from '../lib/metrics';
 import { filledSpots } from '../lib/spots';
+import { useAuth } from '../auth/useAuth';
 import { useGameSelection } from '../hooks/useGameSelection';
 import {
   estPrize,
@@ -36,6 +37,7 @@ const POOL_CAPACITY = 4;
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'];
 
 export function PoolsPage() {
+  const { isDemo } = useAuth();
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
   const {
@@ -239,7 +241,7 @@ export function PoolsPage() {
                         payoutFor={(entry) => estPrize(entry, c.est_multiplier_bps)}
                         payoutLabel="Est. win"
                         capacity={POOL_CAPACITY}
-                        filled={filledSpots(key, POOL_CAPACITY)}
+                        filled={isDemo ? filledSpots(key, POOL_CAPACITY) : undefined}
                         buttonLabel="Join pool"
                         disabled={busy}
                         joining={enter.isPending}

@@ -18,6 +18,7 @@ import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { filledSpots } from '../lib/spots';
+import { useAuth } from '../auth/useAuth';
 import { useGameSelection } from '../hooks/useGameSelection';
 import {
   useEnterTournament,
@@ -29,6 +30,7 @@ import {
 
 /** The Tournament section: browse joinable skill fields as cards. */
 export function TournamentPage() {
+  const { isDemo } = useAuth();
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
   const {
@@ -178,7 +180,7 @@ export function TournamentPage() {
                     payoutFor={(entry) => entry * fieldSize}
                     payoutLabel="Pot if full"
                     capacity={fieldSize}
-                    filled={filledSpots(key, fieldSize)}
+                    filled={isDemo ? filledSpots(key, fieldSize) : undefined}
                     buttonLabel="Join tournament"
                     disabled={busy}
                     joining={enter.isPending}

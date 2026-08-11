@@ -68,7 +68,10 @@ export function WagerCard({
   payoutFor: (entryCents: number) => number;
   payoutLabel: string;
   capacity: number;
-  filled: number;
+  /** Synthetic "seats filled" count. Demo-only — omit it in authenticated
+   * production, where pools/tournaments form via matchmaking and there is no
+   * real roster to read, so no fabricated count is shown. */
+  filled?: number;
   oneVsOne?: boolean;
   buttonLabel: string;
   onJoin: (entryCents: number) => void;
@@ -141,9 +144,11 @@ export function WagerCard({
             {formatCurrency(payoutFor(selected))}
           </p>
         </div>
-        <p className="text-xs text-text-tertiary">
-          {oneVsOne ? '1v1' : `${filled} of ${capacity} in`}
-        </p>
+        {(oneVsOne || filled != null) && (
+          <p className="text-xs text-text-tertiary">
+            {oneVsOne ? '1v1' : `${filled} of ${capacity} in`}
+          </p>
+        )}
       </div>
 
       <div className="mt-4">

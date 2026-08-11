@@ -1,11 +1,13 @@
 # Integrity & Anti-Abuse Audit (code-verified)
 
-**Last updated:** 2026-07-15 (migrated from the PoC repo `clutchbook`)
-**Scope:** how easy it was, *in the PoC code*, to fake results, forge money, field bots/smurfs, or collude — and what has to change at each launch stage. File references are to the PoC layout and resolve under [`/poc-reference`](../../poc-reference/) in this repo.
+**Last updated:** 2026-08-10 (originally migrated from the PoC repo `clutchbook`)
+**Scope:** how easy it was, *in the original PoC code*, to fake results, forge money, field bots/smurfs, or collude — and what has to change at each launch stage. Inline file references are to the PoC layout; the current code lives under `apps/api` / `apps/web`.
 
-> **Migration note.** This audit is the reason the MVP architecture is
-> server-authoritative. Vulnerabilities #1–#5 and #10 are designed out by the
-> [implementation guide](../implementation-guide/00-README.md) (Phases 0–3);
+> **Note.** This audit is the reason the MVP architecture is
+> server-authoritative. Vulnerabilities #1–#5 and #10 are **designed out in the
+> built MVP** (server owns every number, host-verified settlement, append-only
+> ledger) — see the
+> [implementation summary](../implementation-guide/implementation-summary.md);
 > the per-stage exit tests in §7 remain the release gates. The legacy Electron
 > overlay (#12) was **not migrated** to this repo.
 

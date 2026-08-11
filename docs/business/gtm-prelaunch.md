@@ -1,15 +1,21 @@
 # GTM & Pre-Launch Infrastructure
 
-**Last updated:** 2026-07-15 (migrated from the PoC repo `clutchbook`. PoC code paths resolve under [`/poc-reference`](../../poc-reference/). The analytics items in §1 are implemented by [implementation-guide Phase 6](../implementation-guide/09-phase-6-admin-ops.md); the invite-link mechanics in §3.2 by [Phase 5](../implementation-guide/08-phase-5-social-retention.md).)
+**Last updated:** 2026-08-10 (originally migrated from the PoC repo `clutchbook`). The analytics items in §1 and the invite-link mechanics in §3.2 are **built** in the MVP (see the [implementation summary](../implementation-guide/implementation-summary.md)); inline `api/…` / `src/…` code paths refer to the original PoC, current code lives under `apps/api` / `apps/web`.
 **Scope:** what to measure now for the investor story, the waitlist/community gaps in the current codebase, and referral mechanics. Retention design lives in [`business-and-competition.md`](./business-and-competition.md) §3.
 
 ---
 
 ## 1. Metrics to capture now (even in the demo)
 
-### 1.1 Current state (code-verified)
+### 1.1 Current state
 
-The seam exists and is empty: `src/utils/telemetry.ts` defines 12 stable event names (`entry_queued`, `match_found`, `contest_settled`, `rake_collected`, …) but `track()` only `console.debug`s in dev. `@vercel/analytics` gives anonymous page views only. **Nothing user-level is captured — every demo session's story evaporates.**
+The instrumentation is **now wired** (Phase 6): money/liquidity events
+(`entry_queued`, `match_found`, `contest_settled`, `rake_collected`,
+`refund_issued`) are captured server-side and the activation funnel client-side,
+both into **PostHog** (`POSTHOG_API_KEY` server, `VITE_POSTHOG_KEY` web). The
+remaining manual step is building the funnel + liquidity dashboards in the
+PostHog UI during the beta. *(Historical: in the PoC, `track()` only
+`console.debug`d and nothing user-level was captured.)*
 
 ### 1.2 The investor-story metrics, by narrative
 

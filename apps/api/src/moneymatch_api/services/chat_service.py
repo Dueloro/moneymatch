@@ -41,9 +41,9 @@ from . import friends_service, push_service
 
 log = structlog.get_logger(__name__)
 
-SUPPORT_TITLE = "MoneyMatch Support"
+SUPPORT_TITLE = "Dueloro Support"
 SUPPORT_GREETING = (
-    "Hey — this is MoneyMatch Support. Ask us anything about a contest, a "
+    "Hey — this is Dueloro Support. Ask us anything about a contest, a "
     "payout, or your account and we'll pick it up here."
 )
 # Support is staffed asynchronously; the auto-ack sets the expectation instead of

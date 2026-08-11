@@ -1,26 +1,22 @@
-# Marketing website recommendations (dueloro.vercel.app)
+# Marketing website recommendations (dueloro.com)
 
 **Context.** These are recommendations for the public marketing site at
-`dueloro.vercel.app`, written while giving the beta app the same visual language
+`dueloro.com`, written while giving the beta app the same visual language
 (acid-lime accent, triangle mark, near-black + glow, highlight-marker headlines,
-live VS card, mono micro-labels). The app now uses the **Money Match** wordmark
-while the marketing site is branded **Dueloro** — reconcile the two names before
-launch (see recommendation 0). The notes below are about the *site*.
+live VS card, mono micro-labels). The notes below are about the *site*.
 
 The site was reviewed by rendering it headless (it is a client-rendered SPA).
 Some observations are therefore about how it renders to a first paint / crawler,
 not just how it looks after full hydration + scroll.
 
-## 0. Reconcile the product name (do this first)
+## 0. Product name (resolved)
 
-The app's wordmark is now **Money Match**; the site is **Dueloro**. Whichever
-name wins, make the site, the app wordmark, the OG titles, and the domain agree —
-a visitor who clicks "Join the beta" should not feel handed to a different
-product. Everything else below assumes one consistent name.
-
-The site was reviewed by rendering it headless (it is a client-rendered SPA).
-Some observations are therefore about how it renders to a first paint / crawler,
-not just how it looks after full hydration + scroll.
+**Money Match is the product; Dueloro is the company.** The site is the
+company's marketing surface at **dueloro.com** and may lead with the Dueloro
+brand, but the product it sells — and everything a visitor is handed when they
+click "Join the beta" — is **Money Match**. Keep the wordmark, OG titles, and
+in-app copy on **Money Match**; "Dueloro" is only the company/site and support
+identity. See [`../brand-and-name.md`](../brand-and-name.md).
 
 ---
 
