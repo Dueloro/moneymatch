@@ -48,9 +48,7 @@ def upgrade() -> None:
         unique=True,
         postgresql_where=_ACTIVE,
     )
-    op.drop_constraint(
-        "ck_linked_accounts_status", "linked_accounts", type_="check"
-    )
+    op.drop_constraint("ck_linked_accounts_status", "linked_accounts", type_="check")
     op.create_check_constraint(
         "ck_linked_accounts_status",
         "linked_accounts",
@@ -59,9 +57,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "ck_linked_accounts_status", "linked_accounts", type_="check"
-    )
+    op.drop_constraint("ck_linked_accounts_status", "linked_accounts", type_="check")
     op.create_check_constraint(
         "ck_linked_accounts_status",
         "linked_accounts",

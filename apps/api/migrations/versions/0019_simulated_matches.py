@@ -61,9 +61,7 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_index(
-        "ix_simulated_matches_user_id", "simulated_matches", ["user_id"]
-    )
+    op.create_index("ix_simulated_matches_user_id", "simulated_matches", ["user_id"])
     op.create_index(
         "ix_simulated_matches_lookup",
         "simulated_matches",
