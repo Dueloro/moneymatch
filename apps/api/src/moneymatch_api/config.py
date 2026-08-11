@@ -50,6 +50,22 @@ class Settings(BaseSettings):
     # lookups fail soft (link "can't right now") rather than crash.
     pubg_api_key: str | None = None
 
+    # Steam Web API (steamcommunity.com/dev/apikey). Used for ban checks at
+    # link time and the lifetime-K/D prior. Without it those degrade to a
+    # default prior and an unknown ban status rather than failing the link.
+    steam_api_key: str | None = None
+
+    # Steam OpenID sign-in. `steam_openid_realm` is the site Steam shows the
+    # user and must match the return URL's origin, or Steam refuses the login.
+    steam_openid_realm: str = "http://localhost:5173"
+    steam_openid_return_url: str = "http://localhost:5173/auth/steam/callback"
+
+    # The Game Coordinator sidecar (phase 2). It can read match data for
+    # arbitrary users, so it binds to loopback and is shared-secret protected;
+    # it must never face the internet.
+    gc_sidecar_url: str = "http://127.0.0.1:8787"
+    gc_shared_secret: str | None = None
+
     # Web Push (VAPID). Without a keypair, push is disabled (no-op) — the app
     # degrades to in-app notifications only.
     vapid_public_key: str | None = None
