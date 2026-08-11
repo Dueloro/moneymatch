@@ -28,11 +28,26 @@ DEFAULT_GAME = ChessLichessAdapter.id
 
 
 def get(game_id: str) -> GameAdapter:
-    """Resolve the adapter for a game id, or raise `ValueError` if unregistered."""
+    """Resolve the adapter for a game id, or raise `ValueError` if unregistered.
+
+    When `DEMO_SIMULATE_ENABLED` is set the adapter is wrapped so injected demo
+    matches appear alongside real host history. Every consumer of match history
+    resolves through here, which is what lets a simulated result settle a wager
+    without a single `if simulated` branch downstream. With the flag off the
+    untouched adapter is returned and the wrapper is never constructed.
+    """
     try:
-        return _ADAPTERS[game_id]
+        adapter = _ADAPTERS[game_id]
     except KeyError:
         raise ValueError(f"No adapter registered for game '{game_id}'") from None
+
+    from ..services import demo_simulation
+
+    if demo_simulation.is_enabled():
+        from .simulated import SimulatedGamesAdapter
+
+        return SimulatedGamesAdapter(adapter)
+    return adapter
 
 
 def all_ids() -> list[str]:

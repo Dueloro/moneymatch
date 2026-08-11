@@ -97,6 +97,14 @@ class Settings(BaseSettings):
     # never enable on a real-money deployment.
     demo_login_enabled: bool = Field(default=False)
 
+    # Demo escape hatch (IMPLEMENTATION_PROMPT phase 0). Lets an admin inject a
+    # finished match and force a contest to settle, so a live demo does not
+    # depend on a 40-minute CS2 match completing in front of an audience.
+    # Injected results enter at the same seam a real host feed does, so nothing
+    # downstream can tell them apart — which is exactly why this must default
+    # off and never be set on a real-money deployment.
+    demo_simulate_enabled: bool = Field(default=False)
+
     # Run the settlement worker loop *inside* the API process (a background asyncio
     # task started on lifespan startup) instead of as a separate service. This is
     # for hosts with no free/available Background Worker (e.g. Render's free tier):
