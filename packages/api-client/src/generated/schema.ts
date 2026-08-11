@@ -176,6 +176,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cs2/steam/login-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Steam Login Url
+         * @description Where to send the user to sign in through Steam.
+         */
+        get: operations["steam_login_url_api_v1_cs2_steam_login_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cs2/steam/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Steam Callback
+         * @description Verify a Steam sign-in and bind the SteamID64 to the current user.
+         */
+        post: operations["steam_callback_api_v1_cs2_steam_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cs2/sharecode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Share Code
+         * @description Resolve a share code, verify it is the user's match, and store it.
+         *
+         *     Every rejection carries a reason the player can act on. "Invalid" is not a
+         *     message anyone can do anything with, and the most common cause is a code
+         *     copied from the wrong place.
+         */
+        post: operations["submit_share_code_api_v1_cs2_sharecode_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cs2/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gc Health
+         * @description Whether the Game Coordinator sidecar is up, for the status page.
+         */
+        get: operations["gc_health_api_v1_cs2_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/play/markets": {
         parameters: {
             query?: never;
@@ -1400,6 +1484,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/simulate_result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Simulate Result
+         * @description Inject a finished match so a wager can settle without playing one.
+         *
+         *     The row is written against the target's **linked host account**, and the
+         *     adapter merges it into `poll_eligible_games` alongside real history. So the
+         *     settlement worker, the pool engine and the payout path all read it through
+         *     the same call they use for a real match, and none of them has a branch for
+         *     it. That is the point: a demo that proves the real path works.
+         */
+        post: operations["simulate_result_api_v1_demo_simulate_result_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/force_settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force Settle
+         * @description Settle one pool or tournament now, instead of at its window close.
+         *
+         *     Runs the worker's own grade-then-settle sequence for a single contest. It
+         *     does not shortcut grading: the contest is graded from whatever match history
+         *     the adapters return, so a forced settlement still reflects real (or injected)
+         *     results rather than a fabricated outcome.
+         */
+        post: operations["force_settle_api_v1_demo_force_settle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2058,6 +2193,40 @@ export interface components {
             /** Flags */
             flags: components["schemas"]["FlagItem"][];
         };
+        /** ForceSettleRequest */
+        ForceSettleRequest: {
+            /**
+             * Contest Id
+             * Format: uuid
+             */
+            contest_id: string;
+        };
+        /** ForceSettleResponse */
+        ForceSettleResponse: {
+            /**
+             * Simulated
+             * @default true
+             */
+            simulated: boolean;
+            /**
+             * Warning
+             * @default Settlement was forced by an admin, not by the contest window.
+             */
+            warning: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Contest Id
+             * Format: uuid
+             */
+            contest_id: string;
+            /** State */
+            state: string;
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /**
          * Forecast
          * @description The duel-forecast disclosure for a stat/chess pairing.
@@ -2149,6 +2318,13 @@ export interface components {
              * @default 0
              */
             win_streak: number;
+        };
+        /** GcHealthResponse */
+        GcHealthResponse: {
+            /** Ready */
+            ready: boolean;
+            /** Queue Depth */
+            queue_depth: number;
         };
         /**
          * GettingStarted
@@ -2328,6 +2504,11 @@ export interface components {
         LinksResponse: {
             /** Games */
             games: components["schemas"]["GameLink"][];
+        };
+        /** LoginUrlResponse */
+        LoginUrlResponse: {
+            /** Url */
+            url: string;
         };
         /**
          * MarkReadRequest
@@ -2938,6 +3119,120 @@ export interface components {
             body?: string | null;
             invite?: components["schemas"]["InviteDraft"] | null;
         };
+        /** ShareCodePlayer */
+        ShareCodePlayer: {
+            /** Steam Id */
+            steam_id: string;
+            /** Kills */
+            kills: number;
+            /** Deaths */
+            deaths: number;
+            /** Headshots */
+            headshots: number;
+            /** Is You */
+            is_you: boolean;
+        };
+        /** ShareCodeRequest */
+        ShareCodeRequest: {
+            /** Share Code */
+            share_code: string;
+        };
+        /** ShareCodeResponse */
+        ShareCodeResponse: {
+            /** Share Code */
+            share_code: string;
+            /**
+             * Match Time
+             * Format: date-time
+             */
+            match_time: string;
+            /** Map Name */
+            map_name: string | null;
+            /** Rounds */
+            rounds: number;
+            /** Score */
+            score: string;
+            /** Demo Expired */
+            demo_expired: boolean;
+            /** Your Metrics */
+            your_metrics: {
+                [key: string]: number;
+            };
+            /** Players */
+            players: components["schemas"]["ShareCodePlayer"][];
+        };
+        /** SimulateResultRequest */
+        SimulateResultRequest: {
+            /**
+             * Game
+             * @default cs2.faceit
+             */
+            game: string;
+            /** User Id */
+            user_id?: string | null;
+            /**
+             * Metrics
+             * @default {}
+             */
+            metrics: {
+                [key: string]: number;
+            };
+            /**
+             * Rounds
+             * @default 0
+             */
+            rounds: number;
+            /**
+             * Moves
+             * @default 0
+             */
+            moves: number;
+            /**
+             * Won
+             * @default true
+             */
+            won: boolean | null;
+            /**
+             * Drawn
+             * @default false
+             */
+            drawn: boolean;
+            /** Played At */
+            played_at?: string | null;
+        };
+        /** SimulateResultResponse */
+        SimulateResultResponse: {
+            /**
+             * Simulated
+             * @default true
+             */
+            simulated: boolean;
+            /**
+             * Warning
+             * @default This is an injected result, not a real match. It is indistinguishable from a real one downstream by design.
+             */
+            warning: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Game */
+            game: string;
+            /** Host Account Id */
+            host_account_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Created At Ms */
+            created_at_ms: number;
+            /** Metrics */
+            metrics: {
+                [key: string]: number;
+            };
+        };
         /** StandingRow */
         StandingRow: {
             /**
@@ -2957,6 +3252,28 @@ export interface components {
             is_you: boolean;
             /** Payout Cents */
             payout_cents: number;
+        };
+        /**
+         * SteamCallbackRequest
+         * @description Every `openid.*` parameter Steam put on the return URL, unmodified.
+         *
+         *     They are forwarded to Steam verbatim for verification, so the client must
+         *     not filter or reorder them.
+         */
+        SteamCallbackRequest: {
+            /** Params */
+            params: {
+                [key: string]: string;
+            };
+        };
+        /** SteamCallbackResponse */
+        SteamCallbackResponse: {
+            /** Steam Id */
+            steam_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Linked */
+            linked: boolean;
         };
         /** ThreadResponse */
         ThreadResponse: {
@@ -3631,6 +3948,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    steam_login_url_api_v1_cs2_steam_login_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginUrlResponse"];
+                };
+            };
+        };
+    };
+    steam_callback_api_v1_cs2_steam_callback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SteamCallbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SteamCallbackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_share_code_api_v1_cs2_sharecode_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gc_health_api_v1_cs2_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GcHealthResponse"];
                 };
             };
         };
@@ -6094,6 +6521,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemoResetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    simulate_result_api_v1_demo_simulate_result_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateResultRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulateResultResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    force_settle_api_v1_demo_force_settle_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForceSettleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForceSettleResponse"];
                 };
             };
             /** @description Validation Error */

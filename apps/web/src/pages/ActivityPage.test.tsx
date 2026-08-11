@@ -13,6 +13,22 @@ vi.mock('../hooks/useActivity', async () => {
   return { ...actual, useActivity: vi.fn() };
 });
 
+// Activity now carries the CS2 share-code card, which reads the viewer's links
+// and the match service. Neither is what this file is about, so both are
+// stubbed to their quiet state.
+vi.mock('../hooks/useLinks', () => ({
+  useLinks: () => ({ data: { games: [] } }),
+}));
+vi.mock('../hooks/useCs2', () => ({
+  useSteamLoginUrl: () => ({ data: 'https://steamcommunity.com/openid/login' }),
+  useGcHealth: () => ({ data: { ready: true, queue_depth: 0 } }),
+  useSubmitShareCode: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+  }),
+}));
+
 import { useActivity, type ActivityItem } from '../hooks/useActivity';
 
 function item(overrides: Partial<ActivityItem>): ActivityItem {
