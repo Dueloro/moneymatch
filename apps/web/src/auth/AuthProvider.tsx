@@ -109,6 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // loud with a message the UI can explain instead.
         if (!data.session) throw new Error('email_confirmation_required');
       },
+      signInWithGoogle: async () => {
+        // Full-page redirect to Google and back to /signin, where the flow
+        // resumes: detectSessionInUrl adopts the returned session and
+        // onAuthStateChange advances a new user into onboarding. Because a Google
+        // account carries a real email, emailToUsername() returns null and the
+        // onboarding step prompts for a handle (username accounts skip that).
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: `${window.location.origin}/signin` },
+        });
+        if (error) throw error;
+      },
       verifyCurrentPassword: async (currentPassword: string) => {
         const email = session?.user.email;
         if (!email) return false;

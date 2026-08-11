@@ -15,15 +15,18 @@ const mockUseAuth = vi.mocked(useAuth);
 const mockUseMe = vi.mocked(useMe);
 
 const signInWithUsername = vi.fn();
+const signInWithGoogle = vi.fn();
 
 describe('SignInPage', () => {
   beforeEach(() => {
     signInWithUsername.mockReset();
+    signInWithGoogle.mockReset();
     mockUseAuth.mockReturnValue({
       session: null,
       loading: false,
       signInWithUsername,
       signUpWithUsername: vi.fn(),
+      signInWithGoogle,
       verifyCurrentPassword: vi.fn(),
       changePassword: vi.fn(),
       isDemo: false,
@@ -34,15 +37,24 @@ describe('SignInPage', () => {
     >);
   });
 
-  it('renders the auth step with username + password and demo options, no Google', () => {
+  it('renders the auth step with Google, username + password, and demo options', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
     expect(
-      screen.queryByRole('button', { name: /continue with google/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: /continue with google/i }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('Username')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /enter the demo/i })).toBeInTheDocument();
+  });
+
+  it('starts the Google flow when the Google button is clicked', async () => {
+    signInWithGoogle.mockResolvedValue(undefined);
+    renderWithProviders(<SignInPage />, { route: '/signin' });
+    await userEvent.click(
+      screen.getByRole('button', { name: /continue with google/i }),
+    );
+    expect(signInWithGoogle).toHaveBeenCalledOnce();
   });
 
   it('shows the 3-step progress bar', () => {
