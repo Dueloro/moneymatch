@@ -2,6 +2,11 @@
 // matchmaking, so there's no literal roster to read; this gives each card a
 // stable, plausible fill (always at least one open seat so the card is joinable)
 // derived from its key, so the same card shows the same number across renders.
+//
+// DEMO-ONLY. This is a synthetic count, not a real roster. It must only be shown
+// in the demo, never in authenticated production — call sites gate it on
+// `isDemo` and omit the `filled` prop otherwise (see WagerCard). Showing it to
+// real users would be fabricated social proof on a money product.
 
 function hash(key: string): number {
   let h = 2166136261;

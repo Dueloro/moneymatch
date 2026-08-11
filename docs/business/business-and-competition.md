@@ -1,6 +1,6 @@
 # Business Model & Competitive Landscape
 
-**Last updated:** 2026-07-15 (migrated from the PoC repo `clutchbook`; PoC code paths resolve under [`/poc-reference`](../../poc-reference/))
+**Last updated:** 2026-08-10 (originally migrated from the PoC repo `clutchbook`). Inline `api/…` / `src/…` code paths refer to the original PoC; current code lives under `apps/api` / `apps/web`.
 **Scope:** monetization audit under skill-gaming law, competitive positioning, retention mechanics across the no-money → gems → money arc. Gems legal structure lives in [`legal-compliance.md`](../legal/legal-compliance.md) §6; this doc covers the economy/retention design on top of it.
 
 ---
@@ -9,7 +9,7 @@
 
 ### 1.1 Current mechanics (code-verified)
 
-- Fixed, disclosed rake per objective: **8%** win-the-match, **12%** win-under-moves, 10% default (`api/_lib/skill_rating.rake_for`).
+- Fixed, disclosed rake: **10%** default, config-driven per game/format in basis points (`services/money_math.py::DEFAULT_RAKE_BPS = 1000`) — the same fee whoever wins. (The PoC's per-objective 8%/12% split is retained as a config *capability*, not a live differentiator in the MVP.)
 - Invariant `sum(payouts) + rake = sum(entries)` enforced on every settlement path and covered by the pytest suite.
 - Rake is taken **only when a prize distributes**; refunds/cancellations rake nothing (solo pools with no clearers refund fully).
 
@@ -17,7 +17,7 @@
 
 This is the right structure. The legally load-bearing properties, all currently true:
 
-1. **Fixed and disclosed, not outcome-priced.** A fee that varied with who wins would re-create a house position (vig). The per-objective differentiation (8% vs 12%) is fine — it prices *contest type*, not outcome.
+1. **Fixed and disclosed, not outcome-priced.** A fee that varied with who wins would re-create a house position (vig). The per-format differentiation the rake config supports is fine — it prices *contest type*, not outcome.
 2. **Neutral-operator revenue.** The platform never profits from a player losing — including the "no clearers → full refund, zero rake" solo branch, which is a genuinely strong fact pattern (many sweepstakes operators died on "the house wins when players fail").
 3. **No rake on refunds** keeps the fee a service charge for a *completed* contest, not consideration retained regardless of service.
 

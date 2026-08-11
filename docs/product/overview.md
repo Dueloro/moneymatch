@@ -2,13 +2,13 @@
 
 **Last updated:** 2026-07-15 (migrated from the PoC repo `clutchbook`)
 
-> **Migration note.** The product definition, legal frame, and money mechanics
-> here are current and normative for the MVP. Sections describing the *demo
-> architecture* (§8) describe the **PoC**; the MVP architecture now lives in
-> [`../implementation-guide/01-architecture.md`](../implementation-guide/01-architecture.md).
-> Code paths of the form `api/…` / `src/…` refer to the PoC and resolve in this
-> repo under [`/poc-reference`](../../poc-reference/) (`poc-reference/api/…`,
-> `poc-reference/frontend/src/…`).
+> **Note.** The product definition, legal frame, and money mechanics here are
+> current and normative for the MVP. The MVP is now **built** — see
+> [`../implementation-guide/implementation-summary.md`](../implementation-guide/implementation-summary.md)
+> for the as-built architecture. Sections describing the *demo architecture*
+> (§8) are retained as historical background; inline code paths of the form
+> `api/…` / `src/…` refer to the original PoC (the `clutchbook` repo, no longer
+> vendored here) — the current equivalents live under `apps/api` and `apps/web`.
 
 > Companion documents: [`roadmap.md`](./roadmap.md) (the master plan: demo → no-money MVP → gems → real money) and the research set indexed in [`README.md`](../README.md) — [`legal-compliance.md`](../legal/legal-compliance.md), [`integrity-audit.md`](../legal/integrity-audit.md), [`business-and-competition.md`](../business/business-and-competition.md), [`gtm-prelaunch.md`](../business/gtm-prelaunch.md). Read this file first for product definition.
 >
@@ -181,9 +181,14 @@ Out of scope for the demo. The production milestone (see roadmap) implements dep
 
 ## 8. Architecture
 
-### 8.1 The existing demo is a house-banked simplification
+### 8.1 The original demo was a house-banked simplification (now superseded)
 
-The current shipped demo is **single-player, house-banked, play-money** (you accept a stat-derived "contract" against the platform). That framing predates this pivot and is **deprecated**. It survives only as a UX/data-pipeline sandbox. The roadmap carries a milestone to re-architect it into the peer-to-peer head-to-head model described here. Until then, treat the demo as a play-money prototype of the *surfaces*, not of the *legal/economic model*.
+> **This section is historical.** The re-architecture it describes is **done**:
+> the peer-to-peer / pooled, server-authoritative model described in this doc is
+> the built MVP (see the implementation summary). §8.2–8.5 below record the PoC
+> demo's stack and the migration plan for context only.
+
+The original PoC demo was **single-player, house-banked, play-money** (you accepted a stat-derived "contract" against the platform). That framing predated the pivot and was **deprecated**; it survived only as a UX/data-pipeline sandbox before being re-architected into the peer-to-peer head-to-head + pooled model described here.
 
 ### 8.2 Current stack (carried into the demo)
 

@@ -1,4 +1,4 @@
-# Pre-commit hooks. Install with `pre-commit install` (see CONTRIBUTING.md).
+# Pre-commit hooks. Install with `pre-commit install` (see DEVELOPMENT.md).
 # Mirrors the CI gates in .github/workflows/ci.yml so failures surface locally.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

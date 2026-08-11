@@ -1,6 +1,6 @@
 # Legal & Compliance Analysis
 
-**Last updated:** 2026-07-15 (migrated from the PoC repo `clutchbook`; PoC code paths resolve under [`/poc-reference`](../../poc-reference/))
+**Last updated:** 2026-08-10 (originally migrated from the PoC repo `clutchbook`). Inline `api/…` / `src/…` code paths refer to the original PoC; the current equivalents live under `apps/api` / `apps/web`.
 **Status:** Research memo — working model for the team and a brief for gaming counsel. **Nothing here is legal advice**; every conclusion marked ⚖️ must be validated by specialist counsel before real money moves.
 
 > Companion docs: [`integrity-audit.md`](./integrity-audit.md) (the product-side risks that create legal exposure), [`business-and-competition.md`](../business/business-and-competition.md) (rake/gems economics), [`roadmap.md`](../product/roadmap.md) (when each compliance workstream must land).
@@ -133,7 +133,7 @@ The strategic point: **breadth of titles is not the moat — verified auto-settl
 - **AML monitoring:** velocity rules on deposit/entry/withdrawal; same-instrument-in/out default; flag deposit→minimal-play→withdraw patterns (classic laundering through P2P wagers — and note our anti-collusion analytics double as AML detection, see `integrity-audit.md` §5).
 - **SAR capability** on the audit ledger (roadmap Phase 2 ledger is the substrate).
 - **Tax:** collect W-9 and issue **1099-MISC at $600+ net winnings/year**; per-state withholding rules ⚖️.
-- **Responsible gaming:** the demo's loss cap is currently cosmetic (`useWallet.canJoin` bug — see `poc-reference/POC-IMPLEMENTATION.md` §14.1); it must be genuinely enforced, with self-exclusion, cool-downs, and limits raisable only after delay. Processors and states audit this.
+- **Responsible gaming:** limits are now enforced server-side in the MVP (`services/limits_service.py`) — the PoC's cosmetic `useWallet.canJoin` loss cap was fixed in the rebuild — with self-exclusion and limits raisable only after a cool-down. Real-money launch still needs these audited by processors and states.
 
 ---
 
