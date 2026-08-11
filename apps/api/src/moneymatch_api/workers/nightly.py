@@ -35,6 +35,7 @@ class NightlyReport:
     accounts_refreshed: int = 0
     sandbag_flags: int = 0
     win_streak_flags: int = 0
+    pair_cap_flags: int = 0
     errors: int = 0
 
 
@@ -92,6 +93,16 @@ async def run_nightly(
         except Exception:  # noqa: BLE001
             await session.rollback()
             log.exception("nightly.win_streak_failed")
+
+    async with sm() as session:
+        try:
+            report.pair_cap_flags = await risk_detectors.detect_pair_cap_breaches(
+                session
+            )
+            await session.commit()
+        except Exception:  # noqa: BLE001
+            await session.rollback()
+            log.exception("nightly.pair_cap_failed")
 
     log.info("nightly.complete", **report.__dict__)
     return report
