@@ -28,17 +28,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, uuid_pk
 
-# `sandbagging` blocks metric wagers until cleared; `win_streak` is an
-# informational derived signal (nightly detector) that only surfaces in the admin
-# risk queue and never blocks play.
-RISK_FLAG_KINDS = ("sandbagging", "win_streak")
+# `sandbagging` blocks metric wagers until cleared; `win_streak` and `pair_cap`
+# are informational derived signals (nightly detectors) that only surface in the
+# admin risk queue and never block play.
+RISK_FLAG_KINDS = ("sandbagging", "win_streak", "pair_cap")
 
 
 class RiskFlag(Base):
     __tablename__ = "risk_flags"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('sandbagging', 'win_streak')", name="ck_risk_flags_kind"
+            "kind IN ('sandbagging', 'win_streak', 'pair_cap')",
+            name="ck_risk_flags_kind",
         ),
     )
 

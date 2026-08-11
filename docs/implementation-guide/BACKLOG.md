@@ -80,10 +80,10 @@ Discovered during Phase 2 (identity & linking):
   id). FaceIt nicknames and Lichess usernames are mutable, so a rename breaks
   the binding + settlement poll key. Store the immutable host id (FaceIt
   `player_id`, Lichess canonical id) — lands naturally with OAuth binding.
-- **Nightly metric-model refresh job** — Phase 2 refreshes `metric_models` at
-  link time and on the `/links/{game}/profile` refresh; the settlement-time
-  refresh is Phase 3 and the *nightly* recompute needs the worker (Phase 3+).
-  Until then, models only move when a user links/refreshes.
+- **Nightly metric-model refresh job** — *(done — the nightly worker pass now
+  recomputes `metric_models`; see "Resolved 2026-07-20" above.)* Original note:
+  Phase 2 refreshed `metric_models` only at link time and on the
+  `/links/{game}/profile` refresh; the *nightly* recompute needed the worker.
 - **Raw-payload back-reference from derived records** — `raw_payloads` retains
   link/profile evidence now; the FK from grading records (matches/entries →
   `raw_payload_id`) lands with those tables in Phase 3/4. *(Done in Phase 3:
@@ -91,14 +91,18 @@ Discovered during Phase 2 (identity & linking):
 
 Discovered during Phase 3 (head-to-head flow):
 
-- **Browser e2e test-auth seam** — the two-context Playwright spec
+- **Browser e2e test-auth seam** — *(done — see "Resolved 2026-07-20" above;
+  `POST /dev/e2e/token` + `VITE_E2E_AUTH`.)* Original note: the two-context
+  Playwright spec
   (`apps/web/e2e/h2h.spec.ts`) is written but can't run in CI because auth is
   Supabase-JWT and each context needs a real session. Add a local sign-in bypass
   that mints a session for a seeded user (dev/e2e only) so the flow runs headless
   without a live Supabase project. Until then the exact settlement math is proven
   by `test_settlement_worker.py` (winner +$18 / loser −$10 / rake $2, invariant
   asserted). Rationale: unblocks automated end-to-end coverage of exit criterion #1.
-- **Settlement-time metric-model refresh** — Phase 2 backlog noted the *nightly*
+- **Settlement-time metric-model refresh** — *(done — see "Resolved 2026-07-20"
+  above; best-effort refresh isolated from the settlement txn.)* Original note:
+  Phase 2 backlog noted the *nightly*
   recompute needs the worker; the *per-settlement* refresh (recompute the two
   players' `metric_models` after a match settles) is likewise deferred. Fairness
   is unaffected: in-flight matches use frozen baselines, and models still refresh
@@ -117,17 +121,17 @@ Discovered during Phase 3 (head-to-head flow):
 
 Discovered during Phase 4 (pools & tournaments):
 
-- **Extend the sandbagging block to H2H stat duels** — the detector currently
-  gates pool/tournament enqueue (where personal bars live). Tanking a baseline
-  also helps a stat *duel* (lower μ → paired vs a weaker forecast). Deferred to
-  avoid adding a host call + fixture-stubbing churn to the Phase-3 matchmaking
-  path; wire `sandbagging_service.assert_not_sandbagging` into
-  `matchmaking._assert_eligible` for `stat_race` markets. Rationale: same attack,
-  one call site.
-- **Cache the sandbagging evaluation** — `assert_not_sandbagging` polls the host
-  adapter on *every* pool/tournament enqueue. Cache the result (or fold detection
-  into the nightly metric refresh) and keep only the cheap `risk_flags` check on
-  the hot path. Rationale: enqueue latency + host quota.
+- **Extend the sandbagging block to H2H stat duels** — *(done — `matchmaking._assert_eligible`
+  calls `sandbagging_service.assert_not_flagged` for `stat_race` markets at
+  `matchmaking.py:178`, honoring an existing nightly-sweep flag with no per-enqueue
+  host call.)* Original note: the detector gated only pool/tournament enqueue;
+  tanking a baseline also helps a stat *duel* (lower μ → paired vs a weaker forecast).
+- **Cache the sandbagging evaluation** — *(partly done — the H2H hot path now uses
+  the cheap `risk_flags` check (`assert_not_flagged`); the **pool** and
+  **tournament** enqueue paths still call `assert_not_sandbagging`, which host-polls
+  on every enqueue (`pool_engine.py:576`, `tournament_engine.py:470`).)* Remaining:
+  fold pool/tournament detection into the nightly refresh + keep only the flag
+  check on their hot paths. Rationale: enqueue latency + host quota.
 - **Exact fair-room subset search** — `pool_engine._try_form_room` is greedy
   (nearest bars + composition check); a fair subset can exist that greedy misses
   in a mixed queue. Rationale: marginally higher fill rate once queues are deep;
@@ -135,23 +139,23 @@ Discovered during Phase 4 (pools & tournaments):
 - **Admin sandbagging-review queue** — `risk_flags` rows persist now; the review
   UI + clear/resolve action lands with the Phase-6 admin surface. Rationale: v1
   blocks + records; a human still needs to clear a false positive.
-- **Pool/tournament e2e test-auth seam** — same gap as the H2H e2e: the
-  Playwright specs need a local sign-in bypass minting sessions for seeded, linked
-  users to run in CI. The exact settlement math is proven executably by
-  `test_pool_engine.py` / `test_tournament_engine.py` / `test_worker_contests.py`.
-- **Nightly metric-model refresh job** (deepened from Phase 2/3) — a stale μ/σ
-  now skews personal bars and dispersion fields, not just pairings. The worker
-  exists; add the nightly recompute. Rationale: bars must track real form.
+- **Pool/tournament e2e test-auth seam** — *(seam landed — `POST /dev/e2e/token`
+  + `VITE_E2E_AUTH`, see "Resolved 2026-07-20"; remaining is CI wiring, tracked
+  under Phase 7 "e2e suite can't run headless yet".)* The exact settlement math is
+  proven executably by `test_pool_engine.py` / `test_tournament_engine.py` /
+  `test_worker_contests.py`.
+- **Nightly metric-model refresh job** (deepened from Phase 2/3) — *(done — the
+  self-throttled nightly worker pass recomputes the metric models alongside the
+  sandbagging sweep + derived detectors; see "Resolved 2026-07-20" above.)*
 
 Discovered during Phase 5 (social & retention):
 
-- **Invite-link e2e test-auth seam** — `apps/web/e2e/invite.spec.ts` is written
-  but (like the H2H/pool specs) can't run in CI: the funnel needs a fresh,
-  un-onboarded Supabase session for user B and a seeded/linked session for A. The
-  funnel is proven executably by the API tests (`test_challenge_service.py`:
-  single-use token, expiry, fresh-signup accept, unlinked-prompt;
-  `test_challenges_endpoints.py`: public preview + accept). Pair with the same
-  seam the H2H/pool specs need.
+- **Invite-link e2e test-auth seam** — *(seam landed — `POST /dev/e2e/token` +
+  `VITE_E2E_AUTH`, see "Resolved 2026-07-20"; remaining is CI wiring, tracked under
+  Phase 7 "e2e suite can't run headless yet".)* `apps/web/e2e/invite.spec.ts` is
+  written; the funnel is also proven executably by the API tests
+  (`test_challenge_service.py`: single-use token, expiry, fresh-signup accept,
+  unlinked-prompt; `test_challenges_endpoints.py`: public preview + accept).
 - **Pair rake-cap exact-count race** — `challenge_service` recomputes `friendly`
   at *accept* time, but several challenges created under the cap could each accept
   near-simultaneously and momentarily exceed it before the next recompute reads
@@ -159,28 +163,28 @@ Discovered during Phase 5 (social & retention):
   wants a serialized per-pair counter (or the directional value-flow monitoring
   already backlogged). Rationale: soft anti-collusion control, not a money
   invariant — the ledger is unaffected.
-- **Sandbagging on friend stat-duel challenges** — challenges intentionally skip
-  the provisional/forecast-fairness gates (friends consent to skill gaps with
-  disclosure). A tanked baseline still can't move money unfairly in a *friendly*,
-  but a rake-bearing friend challenge on a stat market inherits the same
-  unguarded-duel gap noted in Phase 4. Pair with that item's single call site.
-- **Friend-code collision retry** — `gen_friend_code()` has a vanishing but
-  nonzero collision chance against the unique constraint; provisioning should
-  retry on the rare `IntegrityError` (as onboarding does for usernames).
-  Rationale: one-in-a-billion today, but a clean signup should never 500.
-- **Challenge "Respond" deep-link polish** — the Inbox Respond pill accepts and
-  routes to `/play?match=…`; the Play screen doesn't yet auto-open that match
-  slip from the query param. Wire the `?match=` param into `PlayPage` so Respond
-  lands directly on the confirm card. Rationale: closes the last click of the
-  challenge loop; the match is reachable via Activity meanwhile.
+- **Sandbagging on friend stat-duel challenges** — *(done — rake-bearing
+  challenge-accept now honors an existing flag via the cheap `risk_flags` check
+  (no per-accept host call); see "Resolved 2026-07-20" above. Friendlies still
+  intentionally skip the provisional/forecast-fairness gates.)*
+- **Friend-code collision retry** — *(done — `user_service.py` retries a fresh
+  `gen_friend_code()` on the unique-constraint `IntegrityError`; see "Resolved
+  2026-07-20" above.)*
+- **Challenge "Respond" deep-link polish** — *(done — `PlayPage.tsx:62-63` reads
+  the `?match=` param via `useSearchParams` and opens that match's slip; see
+  "Resolved 2026-07-20" above.)*
 - **Email/push for the social fan-out** — `notifications.channel_sent` is ready;
   friend requests, challenges, and settlements are the first events worth an
   out-of-band nudge (return-trigger layer). Pairs with the backlog email/push item.
 
 Discovered during Phase 6 (admin & instrumentation):
 
-- **Soft-unbind with contest history** — `admin_service.force_unbind` hard-deletes
-  a `linked_accounts` row and returns a clean 409 when a `match_players` /
+- **Soft-unbind with contest history** — *(done — `admin_service.force_unbind`
+  now sets `status='unbound'` (row + FK history retained; partial unique indexes
+  on `status <> 'unbound'`, migration 0010) so a played account frees its slot and
+  can be rebound; `admin_service.py:137`. See "Resolved 2026-07-20" above.)*
+  Original note: `force_unbind` hard-deleted
+  a `linked_accounts` row and returned a clean 409 when a `match_players` /
   `queue_tickets` FK (RESTRICT) references it, so an account that has *played*
   can't be rebound. A real rebind needs a soft-unbind (nullable/append-only
   binding table or a `status='unbound'` + freed unique slot) that preserves
@@ -193,17 +197,16 @@ Discovered during Phase 6 (admin & instrumentation):
   `solo_pool` / `tournament` refs. Rationale: matches are the representative,
   tested path; the contest detail (money trail + reconciliation) already covers
   all three types.
-- **Disputes model for the risk view** — the risk dashboard reports
-  `dispute_count = 0` because there is no dispute entity yet. Add a `disputes`
-  table (ref + reason + state) and a user-facing "flag this result" path, then
-  surface counts + a queue in `/admin/risk`. Rationale: needed before real money;
-  self-report is deliberately absent, so disputes must be operator-mediated.
-- **Derived risk detectors (streaks / pair-cap)** — the flag queue surfaces the
-  persisted sandbagging `risk_flags`; "abnormal win streaks" and "pair-cap
-  breaches" are named in the phase doc but not yet computed as flags. Add
-  detectors (nightly, alongside the metric refresh) that write `risk_flags` rows
-  of new kinds. Rationale: the risk *rates* view already exposes drift; the
-  streak/pair signals are additive and want their own detector + migration.
+- **Disputes model for the risk view** — *(done — `models/dispute.py` +
+  `routers/disputes.py`; the operator-mediated review path and admin risk surface
+  are wired, self-report deliberately absent.)*
+- **Derived risk detectors (streaks / pair-cap)** — *(done 2026-08-11 — both
+  detectors ship: `win_streak` (`risk_detectors.py::detect_win_streaks`, migration
+  0009) and `pair_cap` (`risk_detectors.py::detect_pair_cap_breaches`, `kind`
+  widened in migration 0018), both run in the nightly sweep (`workers/nightly.py`)
+  and surfaced generically in the `/admin/risk` flag queue. `pair_cap` flags a pair
+  whose rake-bearing count strictly exceeds the daily/weekly cap — informational,
+  never blocks play.)*
 - **Reconciliation sweep is O(all contests)** — `check_contests` iterates every
   match/pool/tournament each call. Fine at MVP volume; add a windowed / incremental
   sweep (or a materialized per-ref check) before the book is large. Rationale:
@@ -212,10 +215,8 @@ Discovered during Phase 6 (admin & instrumentation):
   the README has link placeholders; the dashboards themselves are built in the
   PostHog UI during the beta (they can't be provisioned from the repo). Rationale:
   exit-criterion "PostHog shows a complete funnel" is verified live in Phase 7.
-- **Admin nav entry-point** — the `/admin` tree is reachable by URL and guarded by
-  role, but there's no in-app link from the consumer shell for admins. Add a small
-  role-gated "Admin" affordance in `AppShell`. Rationale: operators can bookmark
-  `/admin` meanwhile; keeping the consumer shell clean was the Phase-6 priority.
+- **Admin nav entry-point** — *(done — role-gated "Admin" link in `SidebarNav.tsx`;
+  see "Resolved 2026-07-20" above.)*
 
 Discovered during Phase 7 (hardening & internal beta):
 
@@ -229,21 +230,28 @@ Discovered during Phase 7 (hardening & internal beta):
   fixed-window store, correct for the single-instance MVP. Horizontal scaling
   needs a shared store (Redis) or an edge/WAF limiter so the budget is global.
   Rationale: the limit is per-process today; fine at beta scale, wrong at N>1.
-- **Tighten the web CSP** — `apps/web/vercel.json` ships `connect-src 'self'
-  https:` and `style-src 'unsafe-inline'` to stay functional without knowing the
-  API/Supabase/PostHog/Sentry origins at build time. Pin `connect-src` to the
-  explicit origins and drop `unsafe-inline` (hash/nonce the few injected styles).
-  Rationale: functional-but-broad now; exact origins are a deploy-time follow-up.
+- **Tighten the web CSP** *(connect-src done 2026-08-11)* — `apps/web/vercel.json`
+  now pins `connect-src` to the explicit origins (API `moneymatch.onrender.com`,
+  Supabase project `https`+`wss`, PostHog `us.i`/`us-assets.i`, and the Sentry
+  ingest hosts) instead of the former wildcard `connect-src 'self' https:`. The
+  origins are hardcoded, so a domain change is a manual edit here; browser Sentry
+  is allowed via `https://*.ingest[.us].sentry.io` (no DSN pinned). **Not done and
+  deliberately left:** `style-src 'unsafe-inline'` must stay — the app has 40+
+  runtime-computed inline `style={{…}}` props (e.g. `ClearBar` widths) that can't
+  be hashed/nonced, so dropping it would break the clear bars, standings, and
+  game-accent colors. `img-src ... https:` is also intentionally broad (host
+  avatar CDNs). Remaining follow-up: move the hardcoded origins to a build-time
+  meta-CSP derived from the `VITE_` env if hand-editing per deploy becomes a chore.
 - **Dev-only dependency advisories** — CI audits production deps (clean). The
   vite dev-server advisories (`GHSA-fx2h-pf6j-xcff` et al.) affect the local dev
   server, not the shipped static bundle, so they are scoped out of the gate. Bump
   vite (major) to clear them once the build is validated on the new major.
-- **e2e suite can't run headless yet** — the Playwright specs
-  (`apps/web/e2e/*.spec.ts`) and the k6 load script both need real Supabase
-  sessions per user; the dev/e2e sign-in bypass (already backlogged as "Browser
-  e2e test-auth seam") is the single blocker. Until it lands, the money paths are
-  proven executably by the API + chaos suites and the e2e run is manual against
-  staging. This is why the "e2e green nightly" exit box is not yet checkable in CI.
+- **e2e suite can't run headless yet** — *(seam now landed — `routers/dev.py`
+  `POST /dev/e2e/token` mints an HS256 JWT for a seeded `auth_id` (dev/e2e only,
+  code-guarded off in prod), and the web app reads `mm.e2e.access_token` under
+  `VITE_E2E_AUTH`.)* Remaining: wire the specs + k6 into a CI job against a live
+  dev stack and flip on the "e2e green nightly" exit box. Money paths stay proven
+  executably by the API + chaos suites meanwhile.
 - **Deploy execution + internal beta week + non-author sign-off** — the code-side
   Phase-7 deliverables (seams, hardening, chaos tests, CI audits, runbook, deploy
   blueprint) are complete and evidenced. The remaining exit criteria are human/

@@ -15,6 +15,7 @@
 | Legal | [`legal/legal-compliance.md`](./legal/legal-compliance.md) | State-law posture, publisher ToS, payments/KYC/AML, gems rules |
 | Legal | [`legal/integrity-audit.md`](./legal/integrity-audit.md) | Threat model + integrity release gates |
 | Business | [`business/business-and-competition.md`](./business/business-and-competition.md) | Rake economics, competitive landscape, retention, liquidity |
+| Business | [`business/unit-economics.md`](./business/unit-economics.md) | Illustrative bottom-up unit economics for the pitch deck (per-payer / per-DAU, PUBG & CS2, acquisition) |
 | Business | [`business/gtm-prelaunch.md`](./business/gtm-prelaunch.md) | Metrics, waitlist/community, referral mechanics |
 | Business | [`business/website-recommendations.md`](./business/website-recommendations.md) | Marketing-site (dueloro.com) recommendations |
 | Game | [`game/`](./game/) | Host API references (chess) + local end-to-end testing notes |
