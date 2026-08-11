@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useSteamLoginUrl } from '../hooks/useCs2';
 import { useDemoRelink, useLinks, type GameLink } from '../hooks/useLinks';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { PillButton } from './ui/PillButton';
@@ -73,6 +74,13 @@ function HandleRow({ link }: { link: GameLink }) {
     );
   };
 
+  // CS2 identity is a SteamID64, which only Steam can vouch for. A username
+  // box here could never succeed, so the row offers the sign-in instead of a
+  // text field that is guaranteed to fail on submit.
+  if (link.game === 'cs2.steam') {
+    return <SteamRow link={link} accent={meta.accent} name={meta.name} />;
+  }
+
   return (
     <form onSubmit={submit} className="py-3">
       <div className="flex items-center gap-3">
@@ -101,5 +109,58 @@ function HandleRow({ link }: { link: GameLink }) {
         <p className="mt-1 text-xs text-text-secondary">Linked — pulling real stats.</p>
       )}
     </form>
+  );
+}
+
+/**
+ * The CS2 row: sign in through Steam, rather than type a name.
+ *
+ * Steam OpenID is a full-page redirect. You leave the app, approve on
+ * steamcommunity.com, and come back to `/auth/steam/callback`, which verifies
+ * the reply with Steam before anything is linked.
+ */
+function SteamRow({
+  link,
+  accent,
+  name,
+}: {
+  link: GameLink;
+  accent: string;
+  name: string;
+}) {
+  const { data: loginUrl, isLoading } = useSteamLoginUrl();
+  const linked = link.status === 'LINKED';
+
+  return (
+    <div className="py-3">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold" style={{ color: accent }}>
+            {name}
+          </p>
+          <p className="truncate text-xs text-text-secondary">
+            {linked && link.host_username
+              ? `SteamID ${link.host_username}`
+              : 'not linked'}
+          </p>
+        </div>
+        {loginUrl ? (
+          <a
+            href={loginUrl}
+            className="shrink-0 rounded-full bg-action px-4 py-1.5 text-sm font-semibold text-bg"
+            data-testid="steam-signin"
+          >
+            {linked ? 'Reconnect Steam' : 'Sign in through Steam'}
+          </a>
+        ) : (
+          <span className="text-xs text-text-tertiary">
+            {isLoading ? 'Loading…' : 'Steam sign-in unavailable'}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-text-tertiary">
+        Steam opens in this tab and brings you straight back.
+      </p>
+    </div>
   );
 }
