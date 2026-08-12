@@ -84,11 +84,26 @@ async def grade_pool(
     """Grade every entry's first qualifying in-window match against `room_bar`."""
     grades: dict[uuid.UUID, PoolGrade] = {}
     for entry in entries:
-        # Practice opponents never play, so they miss the bar and forfeit their
-        # entry. Without this they would grade as unverifiable and be refunded,
-        # which would make a test pool pay nothing to anyone.
-        if test_opponents.graded_as_failed(entry.host_account_id):
-            grades[entry.user_id] = PoolGrade(cleared=False)
+        # Practice opponents never play, so they are graded rather than looked
+        # up. Most miss and forfeit their entry: without that they would grade
+        # as unverifiable and be refunded, and a test pool would pay nobody.
+        #
+        # One is built to clear (`CLEARING_HANDLES`), because a pool where only
+        # you can win never exercises the rule that decides the money — clearers
+        # *split* the pot. With a clearing opponent in the room, clearing your
+        # bar splits it and missing yours hands it over, which is the real
+        # behaviour a single real player otherwise cannot reach.
+        if test_opponents.is_practice_opponent(entry.host_account_id):
+            cleared = test_opponents.clears_its_bar(entry.host_account_id)
+            grades[entry.user_id] = PoolGrade(
+                cleared=cleared,
+                telemetry={
+                    pool.metric: round(float(pool.room_bar) * 1.15, 2)
+                    if cleared
+                    else None,
+                    "practice_opponent": True,
+                },
+            )
             continue
         games = await _window_games(
             pool.game,

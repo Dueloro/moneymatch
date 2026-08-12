@@ -317,6 +317,36 @@ async def fill_queue(
     return 0
 
 
+#: The practice opponents that beat their bar instead of missing it.
+#:
+#: Every dummy missing meant a pool only ever had one possible outcome: you
+#: clear and take the whole prize, or you miss and everything is refunded. The
+#: rule that actually governs a pool -- clearers *split* the pot -- was never
+#: reachable with one real player, so the demo could not show the thing the
+#: product does.
+#:
+#: One clearer is enough to show both halves. Clear your bar and you split with
+#: it; miss, and it takes the pot off you. Keyed by handle so it is the same
+#: opponent every time: a demo whose outcome moves around is not a demo.
+CLEARING_HANDLES = frozenset({"testbot_ada"})
+
+
+def is_practice_opponent(host_account_id: str) -> bool:
+    """True for any practice opponent, whatever it is graded as.
+
+    Keyed off the host id rather than a user lookup, so settlement needs no
+    extra query.
+    """
+    return host_account_id.startswith(TEST_AUTH_PREFIX)
+
+
+def clears_its_bar(host_account_id: str) -> bool:
+    """True for the practice opponent built to clear (see `CLEARING_HANDLES`)."""
+    if not is_practice_opponent(host_account_id):
+        return False
+    return host_account_id[len(TEST_AUTH_PREFIX) :] in CLEARING_HANDLES
+
+
 def graded_as_failed(host_account_id: str) -> bool:
     """True for a practice opponent's contest entry, which always misses its bar.
 
