@@ -22,7 +22,7 @@ import time
 
 from ...config import get_settings
 from ._client import request_json
-from .errors import HostError, HostNotConfigured, HostNotFound
+from .errors import HostError, HostNotConfigured, HostNotFound, HostUnavailable
 
 HOST = "pubg"
 PUBG_BASE = "https://api.pubg.com/shards"
@@ -91,10 +91,12 @@ async def get_player_by_id(account_id: str, shard: str = "steam") -> dict | None
             f"{PUBG_BASE}/{shard}/players/{account_id}",
             headers=_headers(),
         )
-    except HostNotFound:
-        return None
+    except HostUnavailable:
+        # Outage / rate-limit (429): propagate so settlement grading extends the
+        # window instead of reading it as "no such player / no qualifying game".
+        raise
     except HostError:
-        return None
+        return None  # 404 / other 4xx → "no such player / unreadable"
     try:
         return (response.json() or {}).get("data")
     except ValueError:
@@ -117,6 +119,9 @@ async def get_lifetime(account_id: str, shard: str = "steam") -> dict | None:
             timeout_s=10.0,
         )
     except HostError:
+        # Deliberately fail-soft on ALL host errors (incl. outages): lifetime is a
+        # soft profile / bracketing signal, never settlement. A momentary gap must
+        # not fail linking; the profile just computes from what modes returned.
         return None
     try:
         attrs = ((response.json() or {}).get("data") or {}).get("attributes") or {}
@@ -144,8 +149,12 @@ async def get_match(match_id: str, shard: str = "steam") -> dict | None:
             timeout_s=10.0,
         )
         data = response.json()
+    except HostUnavailable:
+        # An unreadable match might be the qualifying one — propagate so grading
+        # extends the window rather than silently grading a later match.
+        raise
     except (HostError, ValueError):
-        return None
+        return None  # 404 (expired match) / other 4xx / bad JSON → skip this match
     _match_cache[match_id] = (time.monotonic(), data)
     return data
 
