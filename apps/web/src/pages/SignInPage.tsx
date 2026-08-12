@@ -384,8 +384,98 @@ function CheckEmailNotice({ email }: { email: string }) {
     </div>
   );
 }
-function EnterCodeForm(_: { email: string; onBack: () => void }) {
-  return <div />;
+function EnterCodeForm({ email: initial, onBack }: { email: string; onBack: () => void }) {
+  const { sendLoginCode, verifyLoginCode } = useAuth();
+  const [email, setEmail] = useState(initial);
+  const [sent, setSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!email.includes('@')) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await sendLoginCode(email);
+      setSent(true);
+    } catch (err) {
+      setError((err as Error)?.message || 'Could not send a code. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await verifyLoginCode(email, code.trim());
+    } catch {
+      setError("That code didn't work or expired — send a new one.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <h1 className="text-center text-xl font-semibold">
+        {sent ? 'Enter your code' : 'Email me a code'}
+      </h1>
+      <p className="mt-2 text-center text-sm text-text-secondary">
+        {sent
+          ? `We sent a 6-digit code to ${email}.`
+          : "We’ll email you a one-time login code."}
+      </p>
+
+      {!sent ? (
+        <form className="mt-8 flex flex-col gap-3" onSubmit={send}>
+          <TextInput
+            type="email"
+            required
+            autoComplete="email"
+            aria-label="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value.trim())}
+            placeholder="you@example.com"
+          />
+          <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
+            {busy ? 'Sending…' : 'Send code'}
+          </PillButton>
+          {error && <p className="text-center text-sm text-red">{error}</p>}
+        </form>
+      ) : (
+        <form className="mt-8 flex flex-col gap-3" onSubmit={verify}>
+          <TextInput
+            required
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            aria-label="Login code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="123456"
+          />
+          <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
+            {busy ? 'Verifying…' : 'Verify'}
+          </PillButton>
+          {error && <p className="text-center text-sm text-red">{error}</p>}
+        </form>
+      )}
+
+      <button
+        type="button"
+        className="mt-6 w-full text-center text-sm text-text-secondary hover:text-text"
+        onClick={onBack}
+      >
+        ← Back to sign in
+      </button>
+    </div>
+  );
 }
 function ResetRequestForm(_: { email: string; onBack: () => void }) {
   return <div />;

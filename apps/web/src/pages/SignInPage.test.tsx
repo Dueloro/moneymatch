@@ -76,6 +76,35 @@ describe('SignInPage', () => {
     expect(screen.getByLabelText(/step 1 of 3/i)).toBeInTheDocument();
   });
 
+  it('sends and verifies an email login code', async () => {
+    const sendLoginCode = vi.fn().mockResolvedValue(undefined);
+    const verifyLoginCode = vi.fn().mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({
+      session: null,
+      loading: false,
+      isDemo: false,
+      isPasswordRecovery: false,
+      signUpWithEmail: vi.fn(),
+      signInWithEmail,
+      sendLoginCode,
+      verifyLoginCode,
+      sendPasswordReset: vi.fn(),
+      setNewPassword: vi.fn(),
+      signInWithGoogle,
+      verifyCurrentPassword: vi.fn(),
+      changePassword: vi.fn(),
+      signOut: vi.fn(),
+    });
+    renderWithProviders(<SignInPage />, { route: '/signin' });
+    await userEvent.click(screen.getByRole('button', { name: /email me a code/i }));
+    await userEvent.type(screen.getByLabelText('Email'), 'kv@example.com');
+    await userEvent.click(screen.getByRole('button', { name: /send code/i }));
+    expect(sendLoginCode).toHaveBeenCalledWith('kv@example.com');
+    await userEvent.type(await screen.findByLabelText(/code/i), '123456');
+    await userEvent.click(screen.getByRole('button', { name: /verify/i }));
+    expect(verifyLoginCode).toHaveBeenCalledWith('kv@example.com', '123456');
+  });
+
   it('shows check-your-email after a signup that needs verification', async () => {
     const signUpWithEmail = vi.fn().mockResolvedValue({ needsVerification: true });
     mockUseAuth.mockReturnValue({
