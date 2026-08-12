@@ -115,7 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       },
       verifyLoginCode: async (email: string, token: string) => {
-        const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+        const { error } = await supabase.auth.verifyOtp({
+          email,
+          token,
+          type: 'email',
+        });
         if (error) throw error;
       },
       sendPasswordReset: async (email: string) => {

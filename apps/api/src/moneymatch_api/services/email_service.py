@@ -61,14 +61,14 @@ def _render_html(body: str, url: str | None) -> str:
     button = (
         f'<tr><td style="padding:8px 0 4px"><a href="{url}" '
         'style="display:inline-block;background:#C6F440;color:#0B0B0C;'
-        'padding:12px 22px;border-radius:9999px;text-decoration:none;'
+        "padding:12px 22px;border-radius:9999px;text-decoration:none;"
         'font-weight:700;font-size:15px">Open Money Match</a></td></tr>'
         if url
         else ""
     )
     fallback = (
         f'<tr><td style="padding:12px 0 0;font-size:12px;color:#6b7280">'
-        f'Button not working? Paste this link: <br>{url}</td></tr>'
+        f"Button not working? Paste this link: <br>{url}</td></tr>"
         if url
         else ""
     )
@@ -84,18 +84,18 @@ def _render_html(body: str, url: str | None) -> str:
         'style="vertical-align:middle;border-radius:8px">'
         '<span style="color:#ffffff;font-weight:600;font-size:15px;'
         'vertical-align:middle;margin-left:10px">Money Match</span>'
-        '</td></tr>'
+        "</td></tr>"
         # Light body.
         '<tr><td style="padding:28px">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
         f'<tr><td style="font-size:16px;line-height:1.5;color:#111827">{body}</td></tr>'
         f"{button}{fallback}"
-        '</table></td></tr>'
+        "</table></td></tr>"
         # Dark footer band.
         '<tr><td style="background:#0B0B0C;padding:16px 28px;font-size:12px;'
         'color:#9ca3af">Money Match · peer-to-peer skill wagering<br>'
-        'Need help? Contact Dueloro Support.</td></tr>'
-        '</table></div>'
+        "Need help? Contact Dueloro Support.</td></tr>"
+        "</table></div>"
     )
 
 

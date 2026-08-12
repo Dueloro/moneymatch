@@ -18,7 +18,6 @@ import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
-
 export function SignInPage() {
   const { session, loading, isPasswordRecovery } = useAuth();
   const me = useMe();
@@ -358,8 +357,8 @@ function CheckEmailNotice({ email }: { email: string }) {
     <div className="text-center">
       <h1 className="text-xl font-semibold">Check your email</h1>
       <p className="mt-2 text-sm text-text-secondary">
-        We sent a verification link to <span className="text-text">{email}</span>.
-        Click it to finish creating your account.
+        We sent a verification link to <span className="text-text">{email}</span>. Click
+        it to finish creating your account.
       </p>
       <p className="mt-6 text-sm text-text-tertiary">
         Didn't get it? Check spam, or{' '}
@@ -386,7 +385,13 @@ function CheckEmailNotice({ email }: { email: string }) {
     </div>
   );
 }
-function EnterCodeForm({ email: initial, onBack }: { email: string; onBack: () => void }) {
+function EnterCodeForm({
+  email: initial,
+  onBack,
+}: {
+  email: string;
+  onBack: () => void;
+}) {
   const { sendLoginCode, verifyLoginCode } = useAuth();
   const [email, setEmail] = useState(initial);
   const [sent, setSent] = useState(false);
@@ -432,7 +437,7 @@ function EnterCodeForm({ email: initial, onBack }: { email: string; onBack: () =
       <p className="mt-2 text-center text-sm text-text-secondary">
         {sent
           ? `We sent a 6-digit code to ${email}.`
-          : "We’ll email you a one-time login code."}
+          : 'We’ll email you a one-time login code.'}
       </p>
 
       {!sent ? (
@@ -479,7 +484,13 @@ function EnterCodeForm({ email: initial, onBack }: { email: string; onBack: () =
     </div>
   );
 }
-function ResetRequestForm({ email: initial, onBack }: { email: string; onBack: () => void }) {
+function ResetRequestForm({
+  email: initial,
+  onBack,
+}: {
+  email: string;
+  onBack: () => void;
+}) {
   const { sendPasswordReset } = useAuth();
   const [email, setEmail] = useState(initial);
   const [sent, setSent] = useState(false);
@@ -509,8 +520,8 @@ function ResetRequestForm({ email: initial, onBack }: { email: string; onBack: (
       <div className="text-center">
         <h1 className="text-xl font-semibold">Check your email</h1>
         <p className="mt-2 text-sm text-text-secondary">
-          If <span className="text-text">{email}</span> has an account, a reset
-          link is on its way.
+          If <span className="text-text">{email}</span> has an account, a reset link is
+          on its way.
         </p>
         <button
           type="button"

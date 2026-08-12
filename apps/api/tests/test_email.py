@@ -42,9 +42,7 @@ async def _make_user(session, *, email: str) -> User:
 async def test_send_is_noop_without_key(session):
     user = await _make_user(session, email="real@example.com")
     # Unconfigured → returns False without ever building an HTTP client.
-    sent = await email_service.send_to_user(
-        session, user.id, subject="Hi", body="Body"
-    )
+    sent = await email_service.send_to_user(session, user.id, subject="Hi", body="Body")
     assert sent is False
 
 
@@ -117,8 +115,11 @@ async def test_html_uses_hybrid_brand(session, monkeypatch):
             return_value=httpx.Response(200, json={"id": "e1"})
         )
         await email_service.send_to_user(
-            session, user.id, subject="Your contest settled",
-            body="Your result is in.", link_path="/activity",
+            session,
+            user.id,
+            subject="Your contest settled",
+            body="Your result is in.",
+            link_path="/activity",
         )
     html = json.loads(route.calls.last.request.content)["html"]
     # Brand: hosted logo, the lime CTA, and the Dueloro support footer.
