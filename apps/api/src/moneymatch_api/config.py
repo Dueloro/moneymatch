@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     # Warn when a host-API call exceeds this (ops signal — 09-phase-6 · d.4).
     slow_host_ms: int = Field(default=2_000)
 
+    # Transactional email (Resend). With no key the email seam is a no-op — in-app
+    # + push notifications still deliver. Synthetic username addresses
+    # (@users.moneymatch.app) have no inbox and are never emailed; only real
+    # addresses (e.g. Google sign-in) receive mail.
+    resend_api_key: str | None = None
+    # RFC 5322 From header for outbound mail; the domain must be verified in
+    # Resend (SPF/DKIM) or delivery is rejected.
+    email_from: str = Field(default="Money Match <noreply@moneymatch.app>")
+
     # Payments/KYC readiness (10-phase-7 §1). These are the *only* switches for
     # real rails, and they are guarded in code: turning either on with no live
     # provider compiled in raises at the resolver, so a config flip alone can
