@@ -124,3 +124,30 @@ def test_missing_your_bar_hands_the_pot_to_the_opponent():
     entry, rake = 2500, 0.10
     prize = entry * 4 * (1 - rake)
     assert round(prize) == 9000  # all of it, to the one clearer
+
+
+# --------------------------------------------------------------------------- #
+# The score shown for the clearing opponent.
+# --------------------------------------------------------------------------- #
+
+
+def test_kills_are_whole_numbers():
+    """An opponent credited with 18.4 kills reads as a bug, not an opponent."""
+    value = telemetry_fetch._clearing_value("cs2_kills", 16.0)
+    assert value == int(value)
+
+
+def test_the_shown_score_always_beats_the_bar_it_cleared():
+    """Snapping to an increment must never round back under the bar."""
+    for metric, bar in (
+        ("cs2_kills", 16.0),
+        ("cs2_kd_ratio", 1.10),
+        ("cs2_headshot_pct", 56.0),
+    ):
+        assert telemetry_fetch._clearing_value(metric, bar) > bar, metric
+
+
+def test_a_kd_score_lands_on_a_real_increment():
+    """K/D moves in 0.05 steps, so 1.265 is not a score anyone could post."""
+    value = telemetry_fetch._clearing_value("cs2_kd_ratio", 1.10)
+    assert round(value / 0.05) == pytest.approx(value / 0.05, abs=1e-6)
