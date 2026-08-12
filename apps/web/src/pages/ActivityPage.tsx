@@ -7,8 +7,6 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PillButton } from '../components/ui/PillButton';
 import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
-import { SubmitMatchCard } from '../components/cs2/SubmitMatchCard';
-import { useLinks } from '../hooks/useLinks';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
@@ -52,12 +50,6 @@ export function ActivityPage() {
     }
   }, [items]);
 
-  // Steam is what ties a submitted match to you, so the card asks for
-  // sign-in first rather than failing on submit.
-  const { data: links } = useLinks();
-  const cs2Linked =
-    links?.games.some((g) => g.game === 'cs2.steam' && g.status === 'LINKED') ?? false;
-
   // The newest contest that has actually finished. `items` is newest first, so
   // the first resolved row is the one you just played.
   const newestFinished = items.find((i) => i.resolved_at != null);
@@ -71,12 +63,11 @@ export function ActivityPage() {
         Activity
       </SectionHeader>
 
-      {/* CS2 has no public per-match stats API, so a played match only becomes
-       * a settled wager once its share code is pasted. This is the place you
-       * land after playing, so it is the place to ask for it. */}
+      {/* This is where you land after playing, so it is where setup belongs:
+       * the card collapses to a one-line confirmation once connected, and
+       * disappears from your way entirely. */}
       <div className="mb-6">
-        <Cs2SetupCard linked={cs2Linked} />
-        <SubmitMatchCard linked={cs2Linked} />
+        <Cs2SetupCard />
       </div>
 
       {isError ? (

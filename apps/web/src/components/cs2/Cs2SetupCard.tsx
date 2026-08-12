@@ -6,6 +6,7 @@ import {
   useSteamLoginUrl,
   useSyncChain,
 } from '../../hooks/useCs2';
+import { useLinks } from '../../hooks/useLinks';
 import { Card } from '../ui/Card';
 import { PillButton } from '../ui/PillButton';
 
@@ -64,9 +65,19 @@ function Step({
   );
 }
 
-export function Cs2SetupCard({ linked = true }: { linked?: boolean }) {
+export function Cs2SetupCard() {
   const { data: status } = useChainStatus();
   const { data: loginUrl } = useSteamLoginUrl();
+  const { data: links } = useLinks();
+
+  const steamLink = links?.games.find((game) => game.game === 'cs2.steam');
+  // The SteamID64 is the identity and lives on the profile. `host_username` is
+  // the persona name, which is mutable and must never be treated as the id. A
+  // real SteamID64 is 17 digits, so anything else is a seeded placeholder
+  // rather than a connected account, and calling that "linked" would be a lie.
+  const steamId = steamLink?.profile?.username ?? '';
+  const linked = steamLink?.status === 'LINKED' && /^\d{17}$/.test(steamId);
+  const profile = steamLink?.profile;
   const connect = useConnectChain();
   const sync = useSyncChain();
   const [authCode, setAuthCode] = useState('');
@@ -153,9 +164,31 @@ export function Cs2SetupCard({ linked = true }: { linked?: boolean }) {
             </a>
           )}
           {linked && (
-            <p className="text-xs text-text-tertiary">
-              Your SteamID is what ties a match to you.
-            </p>
+            <>
+              <p className="text-xs text-text">{profile?.display_name ?? steamId}</p>
+              <p className="text-xs text-text-tertiary">
+                SteamID {steamId}
+                {profile?.rank_label ? ` · ${profile.rank_label}` : ''}
+              </p>
+              {(profile?.total_games || profile?.extra?.total_kills) && (
+                <p className="mt-0.5 text-xs text-text-tertiary">
+                  {profile?.total_games ? `${profile.total_games} matches` : null}
+                  {profile?.extra?.total_kills
+                    ? `${profile?.total_games ? ' · ' : ''}${Number(
+                        profile.extra.total_kills,
+                      ).toLocaleString()} kills`
+                    : null}
+                </p>
+              )}
+              {loginUrl && (
+                <a
+                  href={loginUrl}
+                  className="mt-1 inline-block text-xs text-text-tertiary underline"
+                >
+                  Reconnect Steam
+                </a>
+              )}
+            </>
           )}
         </Step>
 

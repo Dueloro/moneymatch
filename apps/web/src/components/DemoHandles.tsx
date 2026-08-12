@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-import { useSteamLoginUrl } from '../hooks/useCs2';
 import { useDemoRelink, useLinks, type GameLink } from '../hooks/useLinks';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { PillButton } from './ui/PillButton';
@@ -74,12 +73,10 @@ function HandleRow({ link }: { link: GameLink }) {
     );
   };
 
-  // CS2 identity is a SteamID64, which only Steam can vouch for. A username
-  // box here could never succeed, so the row offers the sign-in instead of a
-  // text field that is guaranteed to fail on submit.
-  if (link.game === 'cs2.steam') {
-    return <SteamRow link={link} accent={meta.accent} name={meta.name} />;
-  }
+  // CS2 is not swappable by handle: its identity is a SteamID64 that only
+  // Steam can vouch for, and connecting it lives in the CS2 setup card rather
+  // than being duplicated here.
+  if (link.game === 'cs2.steam') return null;
 
   return (
     <form onSubmit={submit} className="py-3">
@@ -119,92 +116,3 @@ function HandleRow({ link }: { link: GameLink }) {
  * steamcommunity.com, and come back to `/auth/steam/callback`, which verifies
  * the reply with Steam before anything is linked.
  */
-function SteamRow({
-  link,
-  accent,
-  name,
-}: {
-  link: GameLink;
-  accent: string;
-  name: string;
-}) {
-  const { data: loginUrl, isLoading } = useSteamLoginUrl();
-  const profile = link.profile;
-  // A placeholder handle is not a Steam identity. A real SteamID64 is 17
-  // digits, so anything else means the seeded demo row, not a connected
-  // account, and saying "LINKED" for one would be a lie.
-  // The SteamID64 is the identity and lives on the profile. `host_username` is
-  // the persona name, which is mutable and must never be treated as the id.
-  const steamId = profile?.username ?? '';
-  const linked = link.status === 'LINKED' && /^\d{17}$/.test(steamId);
-  const kills = profile?.extra?.total_kills;
-  const hours = profile?.extra?.hours_played;
-
-  return (
-    <div className="py-3">
-      <div className="flex items-center gap-3">
-        {linked && profile?.avatar_url && (
-          <img
-            src={profile.avatar_url}
-            alt=""
-            className="h-9 w-9 shrink-0 rounded-full"
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold" style={{ color: accent }}>
-            {name}
-          </p>
-          {linked ? (
-            <>
-              <p className="truncate text-xs text-text">
-                {profile?.display_name ?? link.host_username ?? steamId}
-              </p>
-              <p className="truncate text-xs text-text-tertiary">
-                SteamID {steamId}
-                {profile?.rank_label ? ` · ${profile.rank_label}` : ''}
-              </p>
-            </>
-          ) : (
-            <p className="truncate text-xs text-text-secondary">not linked</p>
-          )}
-        </div>
-        {loginUrl ? (
-          <a
-            href={loginUrl}
-            className="shrink-0 rounded-full bg-action px-4 py-1.5 text-sm font-semibold text-bg"
-            data-testid="steam-signin"
-          >
-            {linked ? 'Reconnect Steam' : 'Sign in through Steam'}
-          </a>
-        ) : (
-          <span className="text-xs text-text-tertiary">
-            {isLoading ? 'Loading…' : 'Steam sign-in unavailable'}
-          </span>
-        )}
-      </div>
-      {linked ? (
-        <p className="mt-2 text-xs text-text-secondary" data-testid="steam-stats">
-          {profile?.total_games ? `${profile.total_games} matches` : null}
-          {kills
-            ? `${profile?.total_games ? ' · ' : ''}${kills.toLocaleString()} kills`
-            : null}
-          {profile?.kd ? ` · ${profile.kd.toFixed(2)} K/D` : null}
-          {hours ? ` · ${hours.toLocaleString()}h played` : null}
-          {!profile?.total_games && !kills && !profile?.kd ? (
-            // Steam answers 400 for GetUserStatsForGame unless the profile's
-            // Game details are public, which most are not. Say so, rather than
-            // showing an empty row that reads as broken.
-            <>
-              Lifetime stats are hidden. Set your Steam profile&rsquo;s{' '}
-              <span className="text-text">Game details</span> to public to show them.
-            </>
-          ) : null}
-        </p>
-      ) : (
-        <p className="mt-1 text-xs text-text-tertiary">
-          Steam opens in this tab and brings you straight back.
-        </p>
-      )}
-    </div>
-  );
-}

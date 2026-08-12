@@ -10,6 +10,27 @@ let chain: {
   last_error?: string | null;
 } = { connected: false };
 let connectState = { isPending: false, isError: false, error: null as Error | null };
+// Steam state now comes from the links hook rather than a prop, because the
+// card owns the whole setup: step 1 is the link, not a precondition for it.
+let steamLinked = true;
+
+const STEAM_ID = '76561198748110372';
+
+vi.mock('../../hooks/useLinks', () => ({
+  useLinks: () => ({
+    data: {
+      games: steamLinked
+        ? [
+            {
+              game: 'cs2.steam',
+              status: 'LINKED',
+              profile: { username: STEAM_ID, display_name: 'demo', total_games: 2 },
+            },
+          ]
+        : [{ game: 'cs2.steam', status: 'UNLINKED', profile: null }],
+    },
+  }),
+}));
 
 vi.mock('../../hooks/useCs2', () => ({
   useSteamLoginUrl: () => ({ data: 'https://steamcommunity.com/openid/login' }),
@@ -26,9 +47,14 @@ vi.mock('../../hooks/useCs2', () => ({
 import { Cs2SetupCard } from './Cs2SetupCard';
 
 function setup(
-  overrides: Partial<{ chain: typeof chain; connectState: typeof connectState }> = {},
+  overrides: Partial<{
+    chain: typeof chain;
+    connectState: typeof connectState;
+    steamLinked: boolean;
+  }> = {},
 ) {
   chain = overrides.chain ?? { connected: false };
+  steamLinked = overrides.steamLinked ?? true;
   connectState = overrides.connectState ?? {
     isPending: false,
     isError: false,
@@ -41,14 +67,14 @@ function setup(
 describe('Cs2SetupCard', () => {
   it('asks for both codes in one place, so setup is one pass', () => {
     setup();
-    render(<Cs2SetupCard linked />);
+    render(<Cs2SetupCard />);
     expect(screen.getByLabelText(/authentication code/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/share code/i)).toBeInTheDocument();
   });
 
   it('saves both codes together', async () => {
     setup();
-    render(<Cs2SetupCard linked />);
+    render(<Cs2SetupCard />);
     await userEvent.type(screen.getByLabelText(/authentication code/i), 'ABCD-EFGHI');
     await userEvent.type(
       screen.getByLabelText(/share code/i),
@@ -65,15 +91,15 @@ describe('Cs2SetupCard', () => {
   it('cannot be submitted before Steam is connected', () => {
     // The codes are meaningless without a SteamID to attach them to, and a
     // request that can only fail is worse than a disabled button.
-    setup();
-    render(<Cs2SetupCard linked={false} />);
+    setup({ steamLinked: false });
+    render(<Cs2SetupCard />);
     expect(screen.getByRole('button', { name: /finish setup/i })).toBeDisabled();
     expect(screen.getByLabelText(/authentication code/i)).toBeDisabled();
   });
 
   it('offers Steam sign-in when that step is outstanding', () => {
-    setup();
-    render(<Cs2SetupCard linked={false} />);
+    setup({ steamLinked: false });
+    render(<Cs2SetupCard />);
     expect(
       screen.getByRole('link', { name: /sign in through steam/i }),
     ).toBeInTheDocument();
@@ -82,7 +108,7 @@ describe('Cs2SetupCard', () => {
   it('links straight to the authentication code page', () => {
     // Buried in Steam support. Describing where to click loses people.
     setup();
-    render(<Cs2SetupCard linked />);
+    render(<Cs2SetupCard />);
     const link = screen.getByRole('link', { name: /create yours/i });
     expect(link).toHaveAttribute('href', expect.stringContaining('appid=730'));
   });
@@ -90,7 +116,7 @@ describe('Cs2SetupCard', () => {
   it('stops asking once it is set up', () => {
     // The whole promise: enter these once and never think about them again.
     setup({ chain: { connected: true, state: 'active' } });
-    render(<Cs2SetupCard linked />);
+    render(<Cs2SetupCard />);
     expect(screen.queryByLabelText(/authentication code/i)).not.toBeInTheDocument();
     expect(screen.getByText(/collecting automatically/i)).toBeInTheDocument();
   });
@@ -103,7 +129,7 @@ describe('Cs2SetupCard', () => {
         last_error: 'Steam rejected your authentication code.',
       },
     });
-    render(<Cs2SetupCard linked />);
+    render(<Cs2SetupCard />);
     expect(screen.getByTestId('cs2-chain-broken')).toHaveTextContent(/rejected/i);
     // And the form comes back, because reconnecting is the fix.
     expect(screen.getByLabelText(/authentication code/i)).toBeInTheDocument();
@@ -119,7 +145,7 @@ describe('Cs2SetupCard', () => {
         error: new Error('That share code is not from a match on this Steam account.'),
       },
     });
-    render(<Cs2SetupCard linked />);
+    render(<Cs2SetupCard />);
     expect(screen.getByTestId('cs2-connect-error')).toHaveTextContent(
       /not from a match on this Steam account/i,
     );
@@ -131,8 +157,24 @@ describe('Cs2SetupCard · changing codes', () => {
     // Steam can regenerate an authentication code, which silently invalidates
     // ours. Without this the only route back is waiting for collection to fail.
     setup({ chain: { connected: true, state: 'active' } });
-    render(<Cs2SetupCard linked />);
+    render(<Cs2SetupCard />);
     await userEvent.click(screen.getByRole('button', { name: /change codes/i }));
     expect(screen.getByLabelText(/authentication code/i)).toBeInTheDocument();
+  });
+});
+
+describe('Cs2SetupCard · the connected Steam account', () => {
+  it('shows which account is connected, not just that one is', () => {
+    // "Linked" alone is unverifiable from the outside. Naming the account is
+    // how someone confirms the wager is reading the right profile.
+    setup();
+    render(<Cs2SetupCard />);
+    expect(screen.getByText(new RegExp(STEAM_ID))).toBeInTheDocument();
+  });
+
+  it('offers a way to reconnect a different Steam account', () => {
+    setup();
+    render(<Cs2SetupCard />);
+    expect(screen.getByRole('link', { name: /reconnect steam/i })).toBeInTheDocument();
   });
 });
