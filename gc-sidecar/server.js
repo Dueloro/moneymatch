@@ -25,6 +25,7 @@
 
 'use strict';
 
+const crypto = require('crypto');
 const http = require('http');
 const SteamUser = require('steam-user');
 const GlobalOffensive = require('globaloffensive');
@@ -32,6 +33,21 @@ const GlobalOffensive = require('globaloffensive');
 const PORT = Number(process.env.GC_PORT || 8787);
 const HOST = '127.0.0.1';
 const SHARED_SECRET = process.env.GC_SHARED_SECRET || '';
+
+// Fail closed. Authentication used to be skipped entirely when the secret was
+// unset -- it warned, and served every request anyway. A service that can read
+// any player's match history must not be reachable by anyone who can reach the
+// port, and "we logged a hint at startup" is not access control. Refusing to
+// boot is the only version of this nobody can ignore.
+if (!SHARED_SECRET) {
+  console.error(
+    'GC_SHARED_SECRET is not set. This service can read match data for arbitrary',
+  );
+  console.error(
+    'players, so it will not start without one. Put a long random string in .env.',
+  );
+  process.exit(1);
+}
 const REFRESH_TOKEN = process.env.GC_REFRESH_TOKEN || '';
 
 /**
@@ -323,13 +339,32 @@ function readJson(req) {
   });
 }
 
+/**
+ * Whether a request carries the shared secret.
+ *
+ * Compared in constant time. A byte-by-byte `!==` returns sooner the earlier it
+ * finds a difference, which over enough requests leaks the secret one character
+ * at a time — cheap to avoid, and this service can read any player's match
+ * history.
+ */
+function authorised(req) {
+  const given = req.headers['x-gc-secret'];
+  if (typeof given !== 'string') return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(SHARED_SECRET);
+  // timingSafeEqual throws on a length mismatch, which would itself be a
+  // length oracle, so equalise first and let the content decide.
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     send(res, 200, { ready: gcReady, queueDepth: queue.length });
     return;
   }
 
-  if (SHARED_SECRET && req.headers['x-gc-secret'] !== SHARED_SECRET) {
+  if (!authorised(req)) {
     log('gc.rejected_unauthenticated', { url: req.url });
     send(res, 401, { error: 'unauthorized' });
     return;
@@ -415,9 +450,4 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   log('gc.listening', { host: HOST, port: PORT, authenticated: Boolean(SHARED_SECRET) });
-  if (!SHARED_SECRET) {
-    log('gc.no_shared_secret', {
-      hint: 'Set GC_SHARED_SECRET. This service can read match data for arbitrary users.',
-    });
-  }
 });
