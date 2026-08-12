@@ -238,13 +238,55 @@ references, ~38 web references, ~30 test files and live database rows; doing it
 before the Steam path existed would have broken every CS2 test with nothing to
 replace them. Same end state, tree stays green throughout.
 
-**Phase 4, automatic share codes.** A cron walking
-`GetNextMatchSharingCode` with a per-user auth code and cursor, so codes arrive
-without pasting. It feeds the *same* resolve-and-settle path; only the source of
-the code changes.
+**Phase 4, automatic share codes — shipped 2026-08-12.** See *Automatic
+collection* below.
 
 **Phase 5, demos.** Download, parse, ADR, tamper-proofing, two-chain
-verification. Tickets only.
+verification. Tickets only. Until this exists there is no ADR, which is why CS2
+offers a kills market instead — a market nothing can grade would take money for
+a wager that could never settle.
+
+---
+
+## Automatic collection
+
+Pasting a code after every match is fine for a demo and hopeless as a product.
+Valve stores a player's matches as a linked list, so `GetNextMatchSharingCode`
+turns one code they own into the next, forever. A cursor is all that persists
+(`cs2_share_chains`, one row per user).
+
+Setup is three things, once: sign in through Steam, create a **match
+authentication code**, and name any one match as the starting cursor. All three
+live in a single card, because the steps are not independent — the auth code is
+meaningless without the link, and the cursor is meaningless without both.
+
+**Every player needs their own authentication code.** It is issued per Steam
+account and reads only that account's history, so nobody's code covers anyone
+else. It is not a password and cannot spend anything, but it is a secret: stored
+and never returned by the API, which reports whether a chain is connected rather
+than what it was connected with.
+
+The status codes are the entire contract and are not interchangeable:
+
+| Code | Meaning | What happens |
+| --- | --- | --- |
+| `200` | a newer match exists | resolve it, store it, advance the cursor |
+| `202` | caught up | **normal**, and the common case — not an error |
+| `412` | cursor is not this player's | stop and re-prompt; retrying can never work |
+| `403` | auth code rejected | chain marked broken until they reconnect |
+| `429`/`5xx` | rate limited or down | back off, cursor untouched, chain stays healthy |
+
+Getting the permanent failures wrong matters beyond one user: Valve temporarily
+blocks an API key that keeps presenting bad auth codes, so a single stale cursor
+retried in a loop would take settlement down for everyone.
+
+A walk is capped at `MAX_CODES_PER_SYNC`, so a player returning after a long
+absence catches up over successive syncs instead of stalling a worker cycle. The
+sync runs *before* pools settle: a match played minutes before a window closes
+has to be in the database by the time that pool is graded, or it grades as
+unverifiable and refunds a wager the player won.
+
+Off by default behind `VALVE_CHAIN_ENABLED`.
 
 ---
 
