@@ -6,7 +6,7 @@ and are stamped immediately. Existing rows are backfilled to now() so historical
 accounts (already bootstrapped under the old code) aren't re-swept.
 
 Revision ID: 0019_link_bootstrap_at
-Revises: 0017_chat
+Revises: 0018_risk_flag_pair_cap
 Create Date: 2026-08-12
 """
 
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0019_link_bootstrap_at"
-down_revision: str | None = "0017_chat"
+down_revision: str | None = "0018_risk_flag_pair_cap"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
