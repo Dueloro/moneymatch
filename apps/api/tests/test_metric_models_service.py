@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import httpx
+import respx
 from sqlalchemy import select
 
 from moneymatch_api.adapters import registry
@@ -125,3 +127,101 @@ async def test_bootstrap_noop_for_a_game_with_no_rate_metrics(session, monkeypat
 
     assert await svc.bootstrap(session, user.id, "chess.lichess", "magnus") == []
     assert called is False  # no rate metrics → adapter never polled
+
+
+# --------------------------------------------------------------------------- #
+# Worker sweep — deferred (PUBG) accounts bootstrapped out-of-band
+# --------------------------------------------------------------------------- #
+
+
+@respx.mock
+async def test_worker_bootstraps_pending_pubg_link(session, monkeypatch):
+    from sqlalchemy import select as _select
+
+    from moneymatch_api.config import get_settings
+    from moneymatch_api.db.session import get_sessionmaker
+    from moneymatch_api.models.linked_account import LinkedAccount
+    from moneymatch_api.models.skill import MetricModel
+    from moneymatch_api.services.hosts import pubg
+    from moneymatch_api.workers import settlement_worker
+
+    sm = get_sessionmaker()
+
+    monkeypatch.setattr(get_settings(), "pubg_api_key", "test-key")
+    pubg.clear_match_cache()
+    user = await create_user(session)
+    account = "account.pending"
+    link = LinkedAccount(
+        user_id=user.id,
+        game="pubg.steam",
+        host_account_id=account,
+        host_username="pending",
+        models_bootstrapped_at=None,  # bootstrap owed
+    )
+    session.add(link)
+    await session.commit()
+
+    shard = "https://api.pubg.com/shards/steam"
+    match_ids = [f"m{i}" for i in range(12)]
+    respx.get(f"{shard}/players/{account}").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": {
+                    "id": account,
+                    "attributes": {"name": "pending"},
+                    "relationships": {
+                        "matches": {
+                            "data": [{"type": "match", "id": m} for m in match_ids]
+                        }
+                    },
+                }
+            },
+        )
+    )
+    for i, m in enumerate(match_ids):
+        respx.get(f"{shard}/matches/{m}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "id": m,
+                        "attributes": {
+                            "gameMode": "squad-fpp",
+                            "matchType": "official",
+                            "isCustomMatch": False,
+                            "createdAt": f"2026-07-{i + 1:02d}T00:00:00Z",
+                        },
+                    },
+                    "included": [
+                        {
+                            "type": "participant",
+                            "attributes": {
+                                "stats": {
+                                    "playerId": account,
+                                    "kills": 4 + i,
+                                    "headshotKills": 1,
+                                    "damageDealt": 300.0 + i,
+                                    "winPlace": 1 if i % 2 else 5,
+                                }
+                            },
+                        }
+                    ],
+                },
+            )
+        )
+
+    count = await settlement_worker._bootstrap_pending_models(sm)
+    assert count == 1
+
+    n = await session.scalar(
+        _select(MetricModel.n).where(
+            MetricModel.user_id == user.id,
+            MetricModel.game == "pubg.steam",
+            MetricModel.metric == "pubg_kills",
+        )
+    )
+    assert n is not None and n >= 10  # Issue 1: stat duels no longer provisional
+    refreshed = await session.get(LinkedAccount, link.id)
+    await session.refresh(refreshed)
+    assert refreshed.models_bootstrapped_at is not None  # stamped once
