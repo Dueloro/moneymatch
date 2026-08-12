@@ -26,7 +26,13 @@ from ..constants import GAME_CS2_STEAM
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
-from ..services import cs2_submission, gc_client, linking_service, steam_openid
+from ..services import (
+    cs2_prior,
+    cs2_submission,
+    gc_client,
+    linking_service,
+    steam_openid,
+)
 from ..services.steam_openid import SteamAuthError
 
 log = structlog.get_logger(__name__)
@@ -115,6 +121,12 @@ async def steam_callback(
         link = await linking_service.rebind(session, user, GAME_CS2_STEAM, steam_id)
     elif link is None:
         link = await linking_service.bind(session, user, GAME_CS2_STEAM, steam_id)
+
+    # A player who has just signed in has no results here, and a pool quotes
+    # its bar from your results. Without a prior the answer to "join a wager"
+    # is "play a match first", which is a poor thing to say to someone who has
+    # just connected an account.
+    await cs2_prior.seed(session, user.id, steam_id)
     await session.commit()
 
     snapshot = link.profile_snapshot or {}
