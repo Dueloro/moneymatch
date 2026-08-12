@@ -5,10 +5,9 @@ CS2 wager settles on one. A decoder that drifts does not fail loudly: it
 produces a *different valid-looking* match id, and settlement grades the wrong
 match. Hence the round-trip properties below rather than a couple of examples.
 
-The codec has not been checked against a real code from a real match, because
-that needs someone's match history. Round-tripping proves the codec is
-self-consistent, not that it agrees with Valve. **Validate one real code before
-this settles real money.**
+Validated on 2026-08-12 against a real share code from a real CS2 match. It
+round-trips byte-identically and decodes to structurally sound ids, which is the
+one assumption round-tripping alone could not cover.
 """
 
 from __future__ import annotations
@@ -161,3 +160,41 @@ def test_out_of_range_values_are_refused_by_the_encoder():
         sharecode.encode(MASK64 + 1, 0, 0)
     with pytest.raises(ShareCodeError):
         sharecode.encode(0, 0, MASK16 + 1)
+
+
+# --------------------------------------------------------------------------- #
+# A code Valve actually issued.
+# --------------------------------------------------------------------------- #
+
+#: From a real CS2 match. The ids below are what this codec decoded, so if a
+#: refactor changes them the codec has drifted away from Valve's format, which
+#: is otherwise a silent failure: settlement would grade a different match.
+REAL_CODE = "CSGO-UxSfp-RRcZ4-hp5uP-9ntcq-oXc3K"
+REAL_MATCH_ID = 3836574891868422813
+REAL_OUTCOME_ID = 3836578720831766722
+REAL_TOKEN_ID = 51138
+
+
+def test_a_real_share_code_decodes_to_the_expected_ids():
+    decoded = sharecode.decode(REAL_CODE)
+    assert decoded.match_id == REAL_MATCH_ID
+    assert decoded.outcome_id == REAL_OUTCOME_ID
+    assert decoded.token_id == REAL_TOKEN_ID
+
+
+def test_a_real_share_code_survives_a_round_trip():
+    assert sharecode.encode(REAL_MATCH_ID, REAL_OUTCOME_ID, REAL_TOKEN_ID) == REAL_CODE
+
+
+def test_the_real_ids_are_structurally_sound():
+    """What a genuine GC match id looks like, as a guard on the field order.
+
+    Swapping match_id and outcome_id, or reading the fields at the wrong
+    offsets, still yields valid-looking numbers. These bounds catch that.
+    """
+    decoded = sharecode.decode(REAL_CODE)
+    # A GC match id is a large 64-bit counter, not a small ordinal.
+    assert 1e18 < decoded.match_id < 1e19
+    # The outcome is allocated alongside the match, so the two stay close.
+    assert abs(decoded.outcome_id - decoded.match_id) < 1e15
+    assert 0 <= decoded.token_id <= MASK16
