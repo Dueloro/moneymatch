@@ -9,7 +9,7 @@ import { PillButton } from './ui/PillButton';
 import { PresetSelector } from './ui/PresetSelector';
 
 const GAMES = [
-  { id: 'cs2.faceit', label: 'CS2' },
+  { id: 'cs2.steam', label: 'CS2' },
   { id: 'chess.lichess', label: 'Chess' },
   { id: 'dota2.opendota', label: 'Dota 2' },
 ];

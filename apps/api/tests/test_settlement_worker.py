@@ -31,7 +31,7 @@ pytestmark = pytest.mark.asyncio
 
 
 class FakeCS2Adapter:
-    id = "cs2.faceit"
+    id = "cs2.steam"
     brokered = False
 
     def __init__(self, games_by_host=None, *, raise_host=False):
@@ -40,7 +40,7 @@ class FakeCS2Adapter:
 
     async def poll_eligible_games(self, host, since_ms, filters):
         if self.raise_host:
-            raise HostUnavailable("faceit", "down")
+            raise HostUnavailable("steam", "down")
         return self.games_by_host.get(host, [])
 
 

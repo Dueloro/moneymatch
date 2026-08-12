@@ -13,14 +13,12 @@ from __future__ import annotations
 from ..constants import game_flag_key
 from .base import GameAdapter
 from .chess_lichess import ChessLichessAdapter
-from .cs2_faceit import CS2FaceitAdapter
 from .cs2_steam import CS2SteamAdapter
 from .dota2_opendota import Dota2OpenDotaAdapter
 from .pubg import PubgAdapter
 
 _ADAPTERS: dict[str, GameAdapter] = {
     ChessLichessAdapter.id: ChessLichessAdapter(),
-    CS2FaceitAdapter.id: CS2FaceitAdapter(),
     CS2SteamAdapter.id: CS2SteamAdapter(),
     Dota2OpenDotaAdapter.id: Dota2OpenDotaAdapter(),
     PubgAdapter.id: PubgAdapter(),

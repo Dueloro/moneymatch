@@ -48,9 +48,12 @@ def test_compute_ewma_weights_recent_samples_more():
 def test_provisional_and_history_floors():
     assert svc.is_provisional(MetricModel(n=9)) is True
     assert svc.is_provisional(MetricModel(n=10)) is False
-    assert svc.meets_history_floor("cs2.faceit", 25) is True
-    assert svc.meets_history_floor("cs2.faceit", 24) is False
     assert svc.meets_history_floor("chess.lichess", 20) is True
+    assert svc.meets_history_floor("chess.lichess", 19) is False
+    # CS2 over Steam has no floor by design: a player starts with no history in
+    # our system, and their prior comes from Steam lifetime stats instead, so
+    # gating on match count would lock every new account out of its own game.
+    assert svc.meets_history_floor("cs2.steam", 0) is True
 
 
 # --------------------------------------------------------------------------- #
@@ -69,15 +72,15 @@ class _FakeCS2Adapter:
 async def test_bootstrap_writes_metric_models(session, monkeypatch):
     user = await create_user(session)
     games = [
-        _norm("1", cs2_kd_ratio=1.0, cs2_adr=70.0, cs2_headshot_pct=40.0),
-        _norm("2", cs2_kd_ratio=1.4, cs2_adr=90.0, cs2_headshot_pct=50.0),
+        _norm("1", cs2_kd_ratio=1.0, cs2_kills=70.0, cs2_headshot_pct=40.0),
+        _norm("2", cs2_kd_ratio=1.4, cs2_kills=90.0, cs2_headshot_pct=50.0),
     ]
     monkeypatch.setattr(registry, "get", lambda gid: _FakeCS2Adapter(games))
 
-    written = await svc.bootstrap(session, user.id, "cs2.faceit", "s1mple")
+    written = await svc.bootstrap(session, user.id, "cs2.steam", "s1mple")
     assert {m.metric for m in written} == {
         "cs2_kd_ratio",
-        "cs2_adr",
+        "cs2_kills",
         "cs2_headshot_pct",
     }
     assert all(m.n == 2 for m in written)
@@ -91,15 +94,15 @@ async def test_bootstrap_writes_metric_models(session, monkeypatch):
 async def test_bootstrap_is_idempotent_upsert(session, monkeypatch):
     user = await create_user(session)
     monkeypatch.setattr(
-        registry, "get", lambda gid: _FakeCS2Adapter([_norm("1", cs2_adr=80.0)])
+        registry, "get", lambda gid: _FakeCS2Adapter([_norm("1", cs2_kills=80.0)])
     )
-    await svc.bootstrap(session, user.id, "cs2.faceit", "s1mple")
-    await svc.bootstrap(session, user.id, "cs2.faceit", "s1mple")  # re-run
+    await svc.bootstrap(session, user.id, "cs2.steam", "s1mple")
+    await svc.bootstrap(session, user.id, "cs2.steam", "s1mple")  # re-run
 
     rows = list(
         await session.scalars(
             select(MetricModel).where(
-                MetricModel.user_id == user.id, MetricModel.metric == "cs2_adr"
+                MetricModel.user_id == user.id, MetricModel.metric == "cs2_kills"
             )
         )
     )

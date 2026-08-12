@@ -18,7 +18,7 @@ from .factories import create_linked_account, create_metric_model, cs2_profile
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 KD = "cs2_kd_ratio"
 
 

@@ -33,7 +33,7 @@ from .factories import (
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 KD = "cs2_kd_ratio"
 
 

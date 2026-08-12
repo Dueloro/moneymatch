@@ -3247,7 +3247,7 @@ export interface components {
         SimulateResultRequest: {
             /**
              * Game
-             * @default cs2.faceit
+             * @default cs2.steam
              */
             game: string;
             /** User Id */

@@ -67,13 +67,6 @@ const GAMES: Record<string, GameMeta> = {
     accent: '#f0883e',
     Icon: CrosshairIcon,
   },
-  'cs2.faceit': {
-    id: 'cs2.faceit',
-    name: 'Counter Strike 2',
-    short: 'Counter Strike',
-    accent: '#f0883e',
-    Icon: CrosshairIcon,
-  },
   'dota2.opendota': {
     id: 'dota2.opendota',
     name: 'Dota 2',
@@ -92,9 +85,34 @@ const GAMES: Record<string, GameMeta> = {
 
 /** Presentation for a game id. Falls back to a passed-in display name (with the
  * host suffix stripped) for any game not in the map. */
+/**
+ * Games that no longer exist but still appear in settled history.
+ *
+ * A contest that paid out keeps the game id it settled under -- rewriting it
+ * would claim it settled somewhere it did not. But a row reading 'cs2.faceit'
+ * is not a label, it is a leaked database value, so retired ids keep a display
+ * name here. Nothing else about them survives: there is no adapter, no market
+ * and no way to enter one.
+ */
+const RETIRED_GAMES: Record<string, { name: string; short: string }> = {
+  'cs2.faceit': { name: 'Counter-Strike 2', short: 'CS2' },
+};
+
 export function gameMeta(id: string, fallbackName?: string): GameMeta {
   const known = GAMES[id];
   if (known) return known;
+
+  const retired = RETIRED_GAMES[id];
+  if (retired) {
+    return {
+      id,
+      name: retired.name,
+      short: retired.short,
+      accent: 'var(--text-secondary)',
+      Icon: CrosshairIcon,
+    };
+  }
+
   const name = (fallbackName ?? id).split(/[·—-]/)[0].trim() || id;
   return { id, name, short: name, accent: 'var(--text-secondary)', Icon: DotIcon };
 }

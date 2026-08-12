@@ -29,7 +29,7 @@ from .factories import (
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 CHESS = "chess.lichess"
 KD = "cs2_kd_ratio"
 
@@ -44,7 +44,7 @@ async def cs2_player(session, name, *, mu=1.0, sigma=0.5, n=15, rating=1500, hos
         profile=cs2_profile(name, rating=rating),
     )
     # Seed all CS2 stat metrics so any CS2 market is queueable in tests.
-    for metric in ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"):
+    for metric in ("cs2_kd_ratio", "cs2_kills", "cs2_headshot_pct"):
         await create_metric_model(session, user, CS2, metric, mu=mu, sigma=sigma, n=n)
     return user
 
@@ -98,7 +98,7 @@ async def test_different_market_does_not_pair(session):
     alice = await cs2_player(session, "alice")
     bob = await cs2_player(session, "bob")
     await enq_cs2(session, alice, market="kd_ratio")
-    assert (await enq_cs2(session, bob, market="adr")).status == "searching"
+    assert (await enq_cs2(session, bob, market="kills")).status == "searching"
 
 
 async def test_chess_is_brokered_with_colors(session):
@@ -410,7 +410,7 @@ async def test_excluded_state_is_geo_blocked_from_h2h(session):
 
     user = await create_user(session, username="flguy", residence_state="FL")
     await create_linked_account(session, user, CS2, profile=cs2_profile("flguy"))
-    for metric in ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"):
+    for metric in ("cs2_kd_ratio", "cs2_kills", "cs2_headshot_pct"):
         await create_metric_model(session, user, CS2, metric, mu=1.0, sigma=0.5, n=15)
 
     with pytest.raises(RegionBlockedError):

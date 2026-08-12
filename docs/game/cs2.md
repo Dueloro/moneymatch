@@ -1,5 +1,12 @@
 # CS2 (FaceIt) — live API responses
 
+> **Retired.** FACEIT was removed on 2026-08-12; CS2 now settles from
+> Valve share codes via `cs2.steam`. Kept as the record of what the FACEIT
+> integration actually returned, which is why the parsing decisions in
+> `docs/game/cs2-steam.md` look the way they do. Nothing here describes
+> current behaviour.
+
+
 Real responses captured on **2026-08-11** by calling the FaceIt Data API v4 with
 the exact parameters `services/hosts/faceit.py` sends. Nothing here is
 hand-written or trimmed except where marked, so what you see is what the adapter

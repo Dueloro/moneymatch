@@ -27,7 +27,7 @@ import pytest
 
 from moneymatch_api.adapters import registry
 from moneymatch_api.adapters.base import GameFilters
-from moneymatch_api.adapters.cs2_faceit import CS2FaceitAdapter
+from moneymatch_api.adapters.cs2_steam import CS2SteamAdapter
 from moneymatch_api.adapters.simulated import SimulatedGamesAdapter
 from moneymatch_api.config import get_settings
 from moneymatch_api.services import demo_simulation
@@ -36,7 +36,7 @@ from .factories import create_linked_account, create_user, cs2_profile
 
 pytestmark = pytest.mark.asyncio
 
-GAME = "cs2.faceit"
+GAME = "cs2.steam"
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def simulation_off(monkeypatch):
 
 async def test_the_adapter_is_untouched_when_the_flag_is_off(simulation_off):
     assert demo_simulation.is_enabled() is False
-    assert type(registry.get(GAME)) is CS2FaceitAdapter
+    assert type(registry.get(GAME)) is CS2SteamAdapter
 
 
 async def test_the_adapter_is_wrapped_when_the_flag_is_on(simulation_on):
@@ -108,7 +108,7 @@ async def test_an_injected_match_appears_in_match_history(session, simulation_on
         user_id=user.id,
         game=GAME,
         host_account_id="nick2",
-        metrics={"cs2_kd_ratio": 1.62, "cs2_adr": 91.3},
+        metrics={"cs2_kd_ratio": 1.62, "cs2_kills": 91.3},
         won=True,
         rounds=22,
         played_at=datetime.now(UTC),
@@ -269,7 +269,7 @@ async def test_simulate_result_says_loudly_that_it_is_simulated(
         json={
             "game": GAME,
             "user_id": str(admin.id),
-            "metrics": {"cs2_kd_ratio": 1.62, "cs2_adr": 91.3},
+            "metrics": {"cs2_kd_ratio": 1.62, "cs2_kills": 91.3},
             "rounds": 22,
             "won": True,
         },

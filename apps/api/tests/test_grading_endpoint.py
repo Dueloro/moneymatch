@@ -11,7 +11,7 @@ from .conftest import auth_headers
 from .factories import create_linked_account, cs2_profile
 
 V1 = "/api/v1"
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 
 
 async def _user(session, auth_id, name):

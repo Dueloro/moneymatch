@@ -11,23 +11,13 @@ import httpx
 import pytest
 import respx
 
-from moneymatch_api.config import get_settings
-from moneymatch_api.services.hosts import faceit, lichess, opendota
+from moneymatch_api.services.hosts import lichess, opendota
 from moneymatch_api.services.hosts._client import request_json
 from moneymatch_api.services.hosts.errors import (
     HostError,
     HostNotFound,
     HostUnavailable,
 )
-
-
-@pytest.fixture
-def faceit_key(monkeypatch):
-    monkeypatch.setattr(get_settings(), "faceit_api_key", "test-key")
-    faceit.clear_match_cache()
-    yield
-    faceit.clear_match_cache()
-
 
 URL = "https://example.test/x"
 
@@ -111,31 +101,6 @@ async def test_lichess_games_fail_soft_on_outage():
 # --------------------------------------------------------------------------- #
 # FaceIt
 # --------------------------------------------------------------------------- #
-
-
-async def test_faceit_no_key_returns_none(monkeypatch):
-    monkeypatch.setattr(get_settings(), "faceit_api_key", None)
-    assert await faceit.get_player("ZywOo") is None
-
-
-@respx.mock
-async def test_faceit_get_player_ok(faceit_key):
-    respx.get("https://open.faceit.com/data/v4/players").mock(
-        return_value=httpx.Response(200, json={"player_id": "abc", "nickname": "ZywOo"})
-    )
-    player = await faceit.get_player("ZywOo")
-    assert player["nickname"] == "ZywOo"
-
-
-@respx.mock
-async def test_faceit_match_stats_ttl_cached(faceit_key):
-    route = respx.get("https://open.faceit.com/data/v4/matches/m1/stats").mock(
-        return_value=httpx.Response(200, json={"rounds": []})
-    )
-    first = await faceit.get_match_stats("m1")
-    second = await faceit.get_match_stats("m1")
-    assert first == second == {"rounds": []}
-    assert route.call_count == 1  # second read served from cache
 
 
 # --------------------------------------------------------------------------- #

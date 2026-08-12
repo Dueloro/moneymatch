@@ -30,7 +30,7 @@ export function AdminContestsPage() {
         />
         <input
           style={styles.input}
-          placeholder="game (e.g. cs2.faceit)"
+          placeholder="game (e.g. cs2.steam)"
           value={game}
           onChange={(e) => setGame(e.target.value)}
         />

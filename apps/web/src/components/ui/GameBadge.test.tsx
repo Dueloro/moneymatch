@@ -10,8 +10,8 @@ describe('GameBadge', () => {
   });
 
   it('labels CS2 and Dota distinctly', () => {
-    const { rerender } = render(<GameBadge game="cs2.faceit" />);
-    expect(screen.getByText('Counter Strike')).toBeInTheDocument();
+    const { rerender } = render(<GameBadge game="cs2.steam" />);
+    expect(screen.getByText('CS2')).toBeInTheDocument();
     rerender(<GameBadge game="dota2.opendota" />);
     expect(screen.getByText('Dota 2')).toBeInTheDocument();
   });

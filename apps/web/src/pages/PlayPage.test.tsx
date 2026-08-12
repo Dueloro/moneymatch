@@ -77,7 +77,7 @@ describe('PlayPage', () => {
       data: {
         games: [
           {
-            game: 'cs2.faceit',
+            game: 'cs2.steam',
             display_name: 'CS2 — FACEIT',
             status: 'LINKED',
             host_username: 'me',
@@ -89,7 +89,7 @@ describe('PlayPage', () => {
     } as unknown as ReturnType<typeof useLinks>);
     vi.mocked(useMarkets).mockReturnValue({
       data: {
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
         markets: [KD_MARKET],
@@ -136,7 +136,7 @@ describe('PlayPage', () => {
     renderWithProviders(<PlayPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Find match' }));
     expect(joinMutate).toHaveBeenCalledWith({
-      game: 'cs2.faceit',
+      game: 'cs2.steam',
       market: 'kd_ratio',
       speed: undefined,
       entry_preset_cents: 1000,
@@ -161,7 +161,7 @@ describe('PlayPage', () => {
       status: 'matched',
       match: {
         id: 'm1',
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         market: 'kd_ratio',
         market_label: 'K/D ratio',
         kind: 'stat_race',
@@ -206,7 +206,7 @@ describe('PlayPage', () => {
     vi.mocked(useMatch).mockReturnValue({
       data: {
         id: 'deep1',
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         market: 'kd_ratio',
         market_label: 'K/D ratio',
         kind: 'stat_race',
@@ -248,7 +248,7 @@ describe('PlayPage', () => {
     // A single market hides the filter bar entirely, so use two here.
     vi.mocked(useMarkets).mockReturnValue({
       data: {
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
         markets: [KD_MARKET, { ...KD_MARKET, key: 'adr', label: 'ADR' }],
@@ -264,7 +264,7 @@ describe('PlayPage', () => {
     // Two open markets so the Market chip row appears (hidden for a single one).
     vi.mocked(useMarkets).mockReturnValue({
       data: {
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
         markets: [

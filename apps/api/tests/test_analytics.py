@@ -75,11 +75,11 @@ async def test_capture_routes_to_posthog_when_enabled(monkeypatch):
     monkeypatch.setattr(analytics, "_initialized", True)
     monkeypatch.setattr(analytics, "_enabled", True)
 
-    analytics.capture("match_found", "user-9", {"game": "cs2.faceit"})
+    analytics.capture("match_found", "user-9", {"game": "cs2.steam"})
     assert recorded == [
         {
             "event": "match_found",
             "distinct_id": "user-9",
-            "properties": {"game": "cs2.faceit"},
+            "properties": {"game": "cs2.steam"},
         }
     ]

@@ -19,7 +19,7 @@ from moneymatch_api.services.hosts import lichess
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 KD = "cs2_kd_ratio"
 
 

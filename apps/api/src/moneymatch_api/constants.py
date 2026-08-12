@@ -7,7 +7,6 @@ Game ids are the canonical `<game>.<host>` identifiers used everywhere
 from __future__ import annotations
 
 GAME_CHESS_LICHESS = "chess.lichess"
-GAME_CS2_FACEIT = "cs2.faceit"
 GAME_CS2_STEAM = "cs2.steam"
 GAME_DOTA2_OPENDOTA = "dota2.opendota"
 GAME_PUBG_STEAM = "pubg.steam"
@@ -17,7 +16,6 @@ GAME_PUBG_STEAM = "pubg.steam"
 # here once its adapter and metrics exist.
 REGISTERED_GAMES: tuple[str, ...] = (
     GAME_CHESS_LICHESS,
-    GAME_CS2_FACEIT,
     GAME_CS2_STEAM,
     GAME_DOTA2_OPENDOTA,
     GAME_PUBG_STEAM,
@@ -35,7 +33,6 @@ CATALOG_GAMES: tuple[str, ...] = REGISTERED_GAMES + COMING_SOON_GAMES
 GAME_DISPLAY_NAMES: dict[str, str] = {
     GAME_CS2_STEAM: "Counter-Strike 2 (Steam)",
     GAME_CHESS_LICHESS: "Chess — Lichess",
-    GAME_CS2_FACEIT: "CS2 — FACEIT",
     GAME_DOTA2_OPENDOTA: "Dota 2 — OpenDota",
     GAME_PUBG_STEAM: "PUBG: Battlegrounds",
 }
@@ -132,7 +129,6 @@ def cs2_min_rounds(player_count: int) -> int:
 GAME_RATE_METRICS: dict[str, tuple[str, ...]] = {
     GAME_CS2_STEAM: CS2_STEAM_METRICS,
     GAME_CHESS_LICHESS: ("chess_moves",),
-    GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
     GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
     GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
@@ -157,7 +153,6 @@ GAME_HISTORY_FLOOR: dict[str, int] = {
     # their Steam lifetime stats instead, so nothing is gated on match count.
     GAME_CS2_STEAM: 0,
     GAME_CHESS_LICHESS: 20,  # rated games
-    GAME_CS2_FACEIT: 25,  # matches
     GAME_DOTA2_OPENDOTA: 25,  # matches
     GAME_PUBG_STEAM: 20,  # matches
 }
@@ -250,7 +245,6 @@ TOURNAMENT_GAMES: tuple[str, ...] = REGISTERED_GAMES
 POOL_METRICS: dict[str, tuple[str, ...]] = {
     GAME_CS2_STEAM: CS2_STEAM_METRICS,
     GAME_CHESS_LICHESS: ("chess_moves",),
-    GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
     GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
     GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }

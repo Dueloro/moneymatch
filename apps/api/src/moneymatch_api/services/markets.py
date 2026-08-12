@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 from ..constants import (
     GAME_CHESS_LICHESS,
-    GAME_CS2_FACEIT,
+    GAME_CS2_STEAM,
     GAME_DOTA2_OPENDOTA,
     GAME_PUBG_STEAM,
 )
@@ -69,28 +69,28 @@ MARKETS: tuple[MarketDef, ...] = (
     ),
     # CS2 — stat duels + next-match win.
     MarketDef(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         key="kd_ratio",
         label="K/D ratio",
         kind=KIND_STAT_RACE,
         metric="cs2_kd_ratio",
     ),
     MarketDef(
-        game=GAME_CS2_FACEIT,
-        key="adr",
-        label="ADR",
+        game=GAME_CS2_STEAM,
+        key="kills",
+        label="Kills",
         kind=KIND_STAT_RACE,
-        metric="cs2_adr",
+        metric="cs2_kills",
     ),
     MarketDef(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         key="headshot_pct",
         label="Headshot %",
         kind=KIND_STAT_RACE,
         metric="cs2_headshot_pct",
     ),
     MarketDef(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         key="win_next",
         label="Win your next match",
         kind=KIND_WIN_NEXT,

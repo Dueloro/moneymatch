@@ -1,5 +1,12 @@
 # CS2 demo — what works today, per game mode
 
+> **Retired.** FACEIT was removed on 2026-08-12; CS2 now settles from
+> Valve share codes via `cs2.steam`. Kept as the record of what the FACEIT
+> integration actually returned, which is why the parsing decisions in
+> `docs/game/cs2-steam.md` look the way they do. Nothing here describes
+> current behaviour.
+
+
 Written **2026-08-11** by reading the code and then running each mode against
 the live database inside a rolled-back transaction. Every number below is from
 an actual run, not from reading the source and hoping.

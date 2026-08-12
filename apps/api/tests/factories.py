@@ -88,9 +88,9 @@ def cs2_profile(
     return ProfileSnapshot(
         username=username,
         display_name=username,
-        url=f"https://faceit.com/players/{username}",
+        url=f"https://steamcommunity.com/profiles/{username}",
         link_method="username",
-        game="cs2.faceit",
+        game="cs2.steam",
         win_rate=0.5,
         total_games=total_games,
         rating=rating,

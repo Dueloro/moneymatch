@@ -21,7 +21,7 @@ import { track } from './telemetry';
 describe('telemetry sink', () => {
   it('is a no-op when no PostHog key is configured (test env)', () => {
     // env.posthogKey is undefined without VITE_POSTHOG_KEY → capture not called.
-    expect(() => track('entry_queued', { game: 'cs2.faceit' })).not.toThrow();
+    expect(() => track('entry_queued', { game: 'cs2.steam' })).not.toThrow();
     expect(mocks.capture).not.toHaveBeenCalled();
   });
 });

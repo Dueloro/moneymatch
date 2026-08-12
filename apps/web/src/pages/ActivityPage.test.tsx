@@ -46,7 +46,7 @@ function item(overrides: Partial<ActivityItem>): ActivityItem {
   return {
     type: 'match',
     id: 'm1',
-    game: 'cs2.faceit',
+    game: 'cs2.steam',
     market: 'kd_ratio',
     market_label: 'K/D ratio',
     kind: 'stat_race',

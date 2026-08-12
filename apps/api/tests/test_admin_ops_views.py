@@ -64,7 +64,7 @@ async def test_risk_view_and_clear_flag(client):
         flagged = await cs2_player(s, "tanker", mu=1.0, sigma=0.3)
         flag = RiskFlag(
             user_id=flagged.id,
-            game="cs2.faceit",
+            game="cs2.steam",
             metric="cs2_kd_ratio",
             kind="sandbagging",
             detail={"z": -2.0},

@@ -15,7 +15,7 @@ from .factories import create_linked_account
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 
 
 async def _onboard(client, auth_id, name, *, link=True):

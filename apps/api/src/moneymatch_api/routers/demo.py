@@ -29,7 +29,6 @@ from ..constants import (
     DEMO_RESIDENCE_STATE,
     DEMO_USERNAME,
     GAME_CHESS_LICHESS,
-    GAME_CS2_FACEIT,
     GAME_CS2_STEAM,
     GAME_DOTA2_OPENDOTA,
     GAME_PUBG_STEAM,
@@ -83,7 +82,6 @@ _TOKEN_TTL = timedelta(hours=12)
 _DEMO_METRIC_FIXTURE: dict[str, tuple[float, float]] = {
     "chess_accuracy": (85.0, 6.0),
     "cs2_kd_ratio": (1.15, 0.22),
-    "cs2_adr": (78.0, 12.0),
     "cs2_headshot_pct": (47.0, 8.0),
     "dota2_kda_ratio": (3.2, 0.8),
     "dota2_gpm": (520.0, 90.0),
@@ -97,9 +95,8 @@ _DEMO_METRIC_FIXTURE: dict[str, tuple[float, float]] = {
 _DEMO_METRIC_N = 25
 
 
-#: The demo's play set. CS2 is the Steam game: `cs2.faceit` quotes bars from a
-#: hand-written fixture and cannot settle from a share code, so showing both
-#: would offer two Counter-Strike tabs where only one of them works.
+#: The demo's play set. CS2 is the Steam game, which is now the only one:
+#: FACEIT was retired on 2026-08-12.
 _DEMO_ACTIVE_GAMES = [
     GAME_CS2_STEAM,
     GAME_PUBG_STEAM,
@@ -208,7 +205,7 @@ class _SampleMatch:
 # real games (a couple of wins, a couple of losses, one nail-biter).
 _SAMPLE_MATCHES: tuple[_SampleMatch, ...] = (
     _SampleMatch(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         market="kd_ratio",
         metric="cs2_kd_ratio",
         opponent="s1mple_fan",
@@ -237,7 +234,7 @@ _SAMPLE_MATCHES: tuple[_SampleMatch, ...] = (
         days_ago=0.3,
     ),
     _SampleMatch(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         market="kd_ratio",
         metric="cs2_kd_ratio",
         opponent="Rojo",
@@ -266,7 +263,7 @@ _SAMPLE_MATCHES: tuple[_SampleMatch, ...] = (
         days_ago=1.1,
     ),
     _SampleMatch(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         market="kd_ratio",
         metric="cs2_kd_ratio",
         opponent="kvem_",
@@ -576,7 +573,7 @@ _DAY = 60 * 24
 _DEMO_THREADS: tuple[_DemoThread, ...] = (
     _DemoThread(
         friend="s1mple_fan",
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         online=True,
         lines=(
             _ChatLine(False, 2 * _DAY + 40, "gg earlier, that dust2 half was rough"),
@@ -588,7 +585,7 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
                 None,
                 {
                     "invite_kind": "pool",
-                    "game": GAME_CS2_FACEIT,
+                    "game": GAME_CS2_STEAM,
                     "entry_cents": 1000,
                     "metric": "cs2_kd_ratio",
                     "difficulty": "medium",
@@ -636,7 +633,7 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
     ),
     _DemoThread(
         friend="kvem_",
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         online=False,
         lines=(
             _ChatLine(False, 4 * _DAY, "that inferno one came down to the last round"),
@@ -647,9 +644,9 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
                 None,
                 {
                     "invite_kind": "pool",
-                    "game": GAME_CS2_FACEIT,
+                    "game": GAME_CS2_STEAM,
                     "entry_cents": 2500,
-                    "metric": "cs2_adr",
+                    "metric": "cs2_kills",
                     "difficulty": "hard",
                     "status": "declined",
                 },
@@ -785,13 +782,13 @@ async def _ensure_demo_social(session: AsyncSession, demo: User) -> None:
     # One live head-to-head challenge from a friend: a *real* `challenges` row, so
     # the invite card in chat (and the Inbox pill) actually forms a match on
     # accept. Posted last so it's the newest thing in the Inbox.
-    challenger = await _demo_opponent(session, _DEMO_THREADS[0].friend, GAME_CS2_FACEIT)
+    challenger = await _demo_opponent(session, _DEMO_THREADS[0].friend, GAME_CS2_STEAM)
     try:
         await challenge_service.create_direct(
             session,
             challenger,
             challengee_id=demo.id,
-            game=GAME_CS2_FACEIT,
+            game=GAME_CS2_STEAM,
             market_key="kd_ratio",
             entry_cents=1000,
         )
@@ -993,7 +990,7 @@ async def demo_reset(
 
 
 class SimulateResultRequest(BaseModel):
-    game: str = GAME_CS2_FACEIT
+    game: str = GAME_CS2_STEAM
     user_id: uuid.UUID | None = None  # defaults to the demo user
     metrics: dict[str, float] = {}
     rounds: int = 0

@@ -107,7 +107,7 @@ describe('ProfilePage', () => {
       data: {
         games: [
           gameLink({
-            game: 'cs2.faceit',
+            game: 'cs2.steam',
             display_name: 'CS2 — FACEIT',
             status: 'LINKED',
             host_username: 's1mple',
@@ -117,7 +117,7 @@ describe('ProfilePage', () => {
               display_name: 's1mple',
               url: '',
               link_method: 'username',
-              game: 'cs2.faceit',
+              game: 'cs2.steam',
               account_age_days: null,
               win_rate: 0.6,
               draw_rate: 0,

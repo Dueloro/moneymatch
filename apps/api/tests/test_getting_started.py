@@ -28,12 +28,12 @@ async def test_progress_advances_with_games_and_link(client, session):
     await client.get(f"{V1}/me", headers=auth_headers("auth_gs_prog"))
     await client.patch(
         f"{V1}/me",
-        json={"active_games": ["cs2.faceit"]},
+        json={"active_games": ["cs2.steam"]},
         headers=auth_headers("auth_gs_prog"),
     )
     user = await session.scalar(select(User).where(User.auth_id == "auth_gs_prog"))
     await create_linked_account(
-        session, user, "cs2.faceit", host_account_id="h_gs", profile=cs2_profile("gs")
+        session, user, "cs2.steam", host_account_id="h_gs", profile=cs2_profile("gs")
     )
     await session.commit()
 
