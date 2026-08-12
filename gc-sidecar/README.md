@@ -18,6 +18,9 @@ npm install
 # in ~30 seconds and will not survive a restart.
 npm run token          # scan a QR code with the Steam mobile app
 npm run token:creds    # or username + password + Guard code
+
+npm start              # supervised: restarts itself, waits you out if you play
+npm run start:once     # a single process that exits on failure, for debugging
 ```
 
 `npm run token` prints a QR code in the terminal. Open the Steam mobile app ->

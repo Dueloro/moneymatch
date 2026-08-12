@@ -5,7 +5,8 @@
   "description": "Bridges a CS2 share code to the Game Coordinator scoreboard.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node supervise.js",
+    "start:once": "node server.js",
     "token": "node get-token.js",
     "token:creds": "node get-token.js --creds"
   },
