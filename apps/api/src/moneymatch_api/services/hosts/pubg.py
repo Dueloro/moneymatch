@@ -18,6 +18,7 @@ so a missing key degrades to "can't link right now" rather than a crash.
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 from ...config import get_settings
@@ -31,6 +32,49 @@ PUBG_BASE = "https://api.pubg.com/shards"
 # enough to cover a settlement poll / metric-model bootstrap fan-out.
 _MATCH_TTL_SECONDS = 3600.0
 _match_cache: dict[str, tuple[float, dict]] = {}
+
+
+class _TokenBucket:
+    """Async token bucket: `capacity` tokens, refilled continuously at
+    `capacity/60` per second. `acquire()` blocks until a token is free. The lock
+    is held across the wait so waiters are served in order."""
+
+    def __init__(self, rate_per_min: int) -> None:
+        self._capacity = float(max(1, rate_per_min))
+        self._tokens = self._capacity
+        self._refill_per_sec = self._capacity / 60.0
+        self._updated = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        async with self._lock:
+            while True:
+                now = time.monotonic()
+                self._tokens = min(
+                    self._capacity,
+                    self._tokens + (now - self._updated) * self._refill_per_sec,
+                )
+                self._updated = now
+                if self._tokens >= 1.0:
+                    self._tokens -= 1.0
+                    return
+                await asyncio.sleep((1.0 - self._tokens) / self._refill_per_sec)
+
+
+_bucket: _TokenBucket | None = None
+
+
+def _rate_limiter() -> _TokenBucket:
+    global _bucket
+    if _bucket is None:
+        _bucket = _TokenBucket(get_settings().pubg_rate_limit_per_min)
+    return _bucket
+
+
+def reset_rate_limiter() -> None:
+    """Drop the process bucket (tests / config reload)."""
+    global _bucket
+    _bucket = None
 
 
 def _api_key() -> str | None:
@@ -63,6 +107,7 @@ async def get_player_by_name(name: str, shard: str = "steam") -> dict | None:
     the adapter's "player not found" means exactly that."""
     if not _api_key():
         raise HostNotConfigured(HOST, "PUBG_API_KEY is not configured")
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,
@@ -84,6 +129,7 @@ async def get_player_by_id(account_id: str, shard: str = "steam") -> dict | None
     """Re-fetch a player resource by its stable ``account.…`` id."""
     if not _api_key():
         return None
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,
@@ -110,6 +156,7 @@ async def get_lifetime(account_id: str, shard: str = "steam") -> dict | None:
     """
     if not _api_key():
         return None
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,
@@ -140,6 +187,7 @@ async def get_match(match_id: str, shard: str = "steam") -> dict | None:
         return cached[1]
     if not _api_key():
         return None
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,

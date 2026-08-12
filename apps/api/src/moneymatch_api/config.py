@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # PUBG — direct to the official PUBG (gamelocker) API. Without it, PUBG
     # lookups fail soft (link "can't right now") rather than crash.
     pubg_api_key: str | None = None
+    # PUBG's public limit is ~10 req/min. A process-local token bucket in the PUBG
+    # host client throttles to this (keep headroom under 10). Caveat: API and
+    # worker are separate processes, each with its own bucket — PUBG traffic is
+    # worker-dominated, so a conservative per-process budget stays under the cap.
+    pubg_rate_limit_per_min: int = 9
 
     # Web Push (VAPID). Without a keypair, push is disabled (no-op) — the app
     # degrades to in-app notifications only.
