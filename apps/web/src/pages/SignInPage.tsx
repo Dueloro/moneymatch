@@ -20,7 +20,7 @@ const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
 
 export function SignInPage() {
-  const { session, loading } = useAuth();
+  const { session, loading, isPasswordRecovery } = useAuth();
   const me = useMe();
   // Post-profile onboarding runs two sub-steps: pick your games, then link them.
   const [postStep, setPostStep] = useState<'idle' | 'pick' | 'link'>('idle');
@@ -53,7 +53,9 @@ export function SignInPage() {
           <StepProgress step={!session ? 1 : me.data?.needs_onboarding ? 2 : 3} />
         </div>
 
-        {!session ? (
+        {isPasswordRecovery ? (
+          <ResetPasswordStep />
+        ) : !session ? (
           <AuthStep />
         ) : me.data?.needs_onboarding ? (
           <OnboardingStep onDone={() => setPostStep('pick')} />
@@ -477,8 +479,126 @@ function EnterCodeForm({ email: initial, onBack }: { email: string; onBack: () =
     </div>
   );
 }
-function ResetRequestForm(_: { email: string; onBack: () => void }) {
-  return <div />;
+function ResetRequestForm({ email: initial, onBack }: { email: string; onBack: () => void }) {
+  const { sendPasswordReset } = useAuth();
+  const [email, setEmail] = useState(initial);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!email.includes('@')) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await sendPasswordReset(email);
+      setSent(true);
+    } catch (err) {
+      setError((err as Error)?.message || 'Could not send a reset link.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="text-center">
+        <h1 className="text-xl font-semibold">Check your email</h1>
+        <p className="mt-2 text-sm text-text-secondary">
+          If <span className="text-text">{email}</span> has an account, a reset
+          link is on its way.
+        </p>
+        <button
+          type="button"
+          className="mt-6 w-full text-center text-sm text-text-secondary hover:text-text"
+          onClick={onBack}
+        >
+          ← Back to sign in
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-center text-xl font-semibold">Reset your password</h1>
+      <p className="mt-2 text-center text-sm text-text-secondary">
+        We'll email you a link to set a new one.
+      </p>
+      <form className="mt-8 flex flex-col gap-3" onSubmit={submit}>
+        <TextInput
+          type="email"
+          required
+          autoComplete="email"
+          aria-label="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value.trim())}
+          placeholder="you@example.com"
+        />
+        <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
+          {busy ? 'Sending…' : 'Send reset link'}
+        </PillButton>
+        {error && <p className="text-center text-sm text-red">{error}</p>}
+      </form>
+      <button
+        type="button"
+        className="mt-6 w-full text-center text-sm text-text-secondary hover:text-text"
+        onClick={onBack}
+      >
+        ← Back to sign in
+      </button>
+    </div>
+  );
+}
+
+function ResetPasswordStep() {
+  const { setNewPassword } = useAuth();
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (password.length < 6) {
+      setError('Use a password of at least 6 characters.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await setNewPassword(password);
+      // On success isPasswordRecovery clears and the normal flow resumes.
+    } catch (err) {
+      setError((err as Error)?.message || 'Could not update your password.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <h1 className="text-center text-xl font-semibold">Set a new password</h1>
+      <form className="mt-8 flex flex-col gap-3" onSubmit={submit}>
+        <TextInput
+          type="password"
+          required
+          minLength={6}
+          autoComplete="new-password"
+          aria-label="New password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="At least 6 characters"
+        />
+        <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
+          {busy ? 'Saving…' : 'Update password'}
+        </PillButton>
+        {error && <p className="text-center text-sm text-red">{error}</p>}
+      </form>
+    </div>
+  );
 }
 
 function OnboardingStep({ onDone }: { onDone: () => void }) {

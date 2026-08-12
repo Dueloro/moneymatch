@@ -132,4 +132,57 @@ describe('SignInPage', () => {
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
     expect(screen.getByText(/new@example.com/)).toBeInTheDocument();
   });
+
+  it('requests a password reset email', async () => {
+    const sendPasswordReset = vi.fn().mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({
+      session: null,
+      loading: false,
+      isDemo: false,
+      isPasswordRecovery: false,
+      signUpWithEmail: vi.fn(),
+      signInWithEmail,
+      sendLoginCode: vi.fn(),
+      verifyLoginCode: vi.fn(),
+      sendPasswordReset,
+      setNewPassword: vi.fn(),
+      signInWithGoogle,
+      verifyCurrentPassword: vi.fn(),
+      changePassword: vi.fn(),
+      signOut: vi.fn(),
+    });
+    renderWithProviders(<SignInPage />, { route: '/signin' });
+    await userEvent.click(screen.getByRole('button', { name: /forgot password/i }));
+    await userEvent.type(screen.getByLabelText('Email'), 'kv@example.com');
+    await userEvent.click(screen.getByRole('button', { name: /send reset link/i }));
+    expect(sendPasswordReset).toHaveBeenCalledWith('kv@example.com');
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
+  });
+
+  it('shows set-new-password when in recovery', async () => {
+    const setNewPassword = vi.fn().mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({
+      session: { user: { id: 'u1' } } as never,
+      loading: false,
+      isDemo: false,
+      isPasswordRecovery: true,
+      signUpWithEmail: vi.fn(),
+      signInWithEmail,
+      sendLoginCode: vi.fn(),
+      verifyLoginCode: vi.fn(),
+      sendPasswordReset: vi.fn(),
+      setNewPassword,
+      signInWithGoogle,
+      verifyCurrentPassword: vi.fn(),
+      changePassword: vi.fn(),
+      signOut: vi.fn(),
+    });
+    mockUseMe.mockReturnValue({ data: undefined, isLoading: false } as ReturnType<
+      typeof useMe
+    >);
+    renderWithProviders(<SignInPage />, { route: '/signin' });
+    await userEvent.type(screen.getByLabelText(/new password/i), 'brandnew1');
+    await userEvent.click(screen.getByRole('button', { name: /update password/i }));
+    expect(setNewPassword).toHaveBeenCalledWith('brandnew1');
+  });
 });
