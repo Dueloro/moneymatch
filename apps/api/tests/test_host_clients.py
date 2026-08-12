@@ -17,8 +17,35 @@ from moneymatch_api.services.hosts._client import request_json
 from moneymatch_api.services.hosts.errors import (
     HostError,
     HostNotFound,
+    HostRateLimited,
     HostUnavailable,
 )
+
+
+def test_rate_limited_is_a_host_unavailable_subclass():
+    # So every `except HostUnavailable` (grading watchdog) treats a 429 as a
+    # transient outage that extends the window, never a wrong settle.
+    assert issubclass(HostRateLimited, HostUnavailable)
+
+
+@respx.mock
+async def test_429_maps_to_host_rate_limited_and_is_not_retried():
+    route = respx.get("https://api.example.com/x").mock(
+        return_value=httpx.Response(429)
+    )
+    with pytest.raises(HostRateLimited):
+        await request_json("example", "GET", "https://api.example.com/x")
+    assert route.call_count == 1  # not retried — retrying only burns more budget
+
+
+@respx.mock
+async def test_5xx_still_retries_as_host_unavailable():
+    route = respx.get("https://api.example.com/y").mock(
+        return_value=httpx.Response(503)
+    )
+    with pytest.raises(HostUnavailable):
+        await request_json("example", "GET", "https://api.example.com/y")
+    assert route.call_count == 3  # 2 retries + original
 
 
 @pytest.fixture

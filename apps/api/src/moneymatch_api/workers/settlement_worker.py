@@ -26,6 +26,7 @@ import structlog
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from ..adapters import registry
 from ..constants import (
     FLAG_NIGHTLY_LAST_RUN,
     FLAG_QUEUE_PAUSED,
@@ -40,9 +41,11 @@ from ..constants import (
 )
 from ..db.session import get_sessionmaker
 from ..models.feature_flag import FeatureFlag
+from ..models.linked_account import LinkedAccount
 from ..models.live import LiveSnapshot
 from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
+from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..services import (
@@ -694,6 +697,70 @@ async def maybe_run_nightly(
     return True
 
 
+_BOOTSTRAP_BATCH_PER_CYCLE = 1
+
+
+def _deferred_bootstrap_games() -> list[str]:
+    return [gid for gid in registry.all_ids() if registry.get(gid).defer_bootstrap]
+
+
+async def _bootstrap_pending_models(
+    sm: async_sessionmaker[AsyncSession], now: datetime | None = None
+) -> int:
+    """Bootstrap metric models for freshly-linked accounts on deferred hosts
+    (PUBG) that left `models_bootstrapped_at` NULL. One account per call keeps
+    host calls under the rate limit; the account is stamped so it's done once. If
+    the account already has models (seeded/demo), just stamp — never clobber.
+
+    Lives in `run_forever` (not `run_cycle`) so the money cycle and its tests are
+    untouched, same posture as `maybe_run_nightly`."""
+    now = now or _now()
+    deferred = _deferred_bootstrap_games()
+    if not deferred:
+        return 0
+    async with sm() as session:
+        ids = list(
+            await session.scalars(
+                select(LinkedAccount.id)
+                .where(
+                    LinkedAccount.status == "active",
+                    LinkedAccount.game.in_(deferred),
+                    LinkedAccount.models_bootstrapped_at.is_(None),
+                )
+                .order_by(LinkedAccount.created_at)
+                .limit(_BOOTSTRAP_BATCH_PER_CYCLE)
+            )
+        )
+    done = 0
+    for link_id in ids:
+        async with sm() as session:
+            link = await session.get(LinkedAccount, link_id)
+            if link is None or link.models_bootstrapped_at is not None:
+                continue
+            has_models = await session.scalar(
+                select(MetricModel.user_id)
+                .where(
+                    MetricModel.user_id == link.user_id,
+                    MetricModel.game == link.game,
+                )
+                .limit(1)
+            )
+            try:
+                if has_models is None:
+                    await metric_models_service.bootstrap(
+                        session, link.user_id, link.game, link.host_account_id
+                    )
+                link.models_bootstrapped_at = now
+                await session.commit()
+                done += 1
+            except Exception:  # noqa: BLE001 — host hiccup: retry next cycle
+                await session.rollback()
+                log.warning(
+                    "bootstrap.pending_failed", link_id=str(link_id), exc_info=True
+                )
+    return done
+
+
 async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
     """Poll forever. `settlement_paused` idles the loop rather than exiting it."""
     sm = get_sessionmaker()
@@ -705,6 +772,7 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
                 log.info("settlement_worker.cycle", **report.__dict__)
             # The heavier nightly pass is self-throttled to once per interval.
             await maybe_run_nightly(sm)
+            await _bootstrap_pending_models(sm)
         except Exception:  # noqa: BLE001 — never let the loop die on one bad cycle
             log.exception("settlement_worker.cycle_failed")
         await asyncio.sleep(interval)
