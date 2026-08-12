@@ -75,4 +75,32 @@ describe('SignInPage', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
     expect(screen.getByLabelText(/step 1 of 3/i)).toBeInTheDocument();
   });
+
+  it('shows check-your-email after a signup that needs verification', async () => {
+    const signUpWithEmail = vi.fn().mockResolvedValue({ needsVerification: true });
+    mockUseAuth.mockReturnValue({
+      ...mockUseAuth.mock.results[0]?.value,
+      session: null,
+      loading: false,
+      isDemo: false,
+      isPasswordRecovery: false,
+      signUpWithEmail,
+      signInWithEmail,
+      sendLoginCode: vi.fn(),
+      verifyLoginCode: vi.fn(),
+      sendPasswordReset: vi.fn(),
+      setNewPassword: vi.fn(),
+      signInWithGoogle,
+      verifyCurrentPassword: vi.fn(),
+      changePassword: vi.fn(),
+      signOut: vi.fn(),
+    });
+    renderWithProviders(<SignInPage />, { route: '/signin' });
+    await userEvent.click(screen.getByRole('button', { name: /create an account/i }));
+    await userEvent.type(screen.getByLabelText('Email'), 'new@example.com');
+    await userEvent.type(screen.getByLabelText('Password'), 'longenough');
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
+    expect(screen.getByText(/new@example.com/)).toBeInTheDocument();
+  });
 });

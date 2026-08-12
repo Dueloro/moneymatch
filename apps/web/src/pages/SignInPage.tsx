@@ -348,8 +348,41 @@ function CredentialsForm({
   );
 }
 
-function CheckEmailNotice(_: { email: string }) {
-  return <div />;
+function CheckEmailNotice({ email }: { email: string }) {
+  const { signUpWithEmail } = useAuth();
+  const [resent, setResent] = useState(false);
+
+  return (
+    <div className="text-center">
+      <h1 className="text-xl font-semibold">Check your email</h1>
+      <p className="mt-2 text-sm text-text-secondary">
+        We sent a verification link to <span className="text-text">{email}</span>.
+        Click it to finish creating your account.
+      </p>
+      <p className="mt-6 text-sm text-text-tertiary">
+        Didn't get it? Check spam, or{' '}
+        <button
+          type="button"
+          className="text-text-secondary underline hover:text-text"
+          onClick={async () => {
+            // Re-issuing signUp for an unconfirmed address re-sends the link.
+            try {
+              await signUpWithEmail(email, crypto.randomUUID());
+            } catch {
+              /* already-registered / rate-limit are fine here */
+            }
+            setResent(true);
+          }}
+        >
+          resend it
+        </button>
+        .
+      </p>
+      {resent && (
+        <p className="mt-2 text-sm text-green">Sent — check your inbox again.</p>
+      )}
+    </div>
+  );
 }
 function EnterCodeForm(_: { email: string; onBack: () => void }) {
   return <div />;
