@@ -86,10 +86,25 @@ cs.on('disconnectedFromGC', (reason) => {
 });
 
 steam.on('error', (err) => {
+  const reason = String((err && err.eresult) || '');
+  const message = String((err && err.message) || err);
+
+  // The one failure a user can fix themselves, and the one they will hit
+  // first. Connecting to the Game Coordinator means telling Steam you are
+  // playing CS2, and an account can only do that in one place at a time, so
+  // signing in on your own PC evicts this session (or is evicted by it).
+  if (message.includes('LoggedInElsewhere') || reason === '6') {
+    log('gc.logged_in_elsewhere', {
+      error: message,
+      hint: 'This Steam account is signed in somewhere else. Either quit Steam on your PC while the sidecar runs, or give the sidecar its own Steam account that owns CS2. One account cannot play CS2 in two places.',
+    });
+    process.exit(2);
+  }
+
   // Exit rather than limp along half-connected: a process that is up but
   // cannot answer is worse than one that is visibly down, because the caller
   // keeps waiting on it. Let the supervisor restart us.
-  log('gc.steam_error', { error: String(err && err.message) });
+  log('gc.steam_error', { error: message });
   process.exit(1);
 });
 

@@ -53,6 +53,15 @@ It must have **played CS2**. A brand-new account is *limited* and may never
 attach to the GC. If yours is new, spend the $5 to unlock it before relying on
 this.
 
+**Give it its own account.** Attaching to the Game Coordinator means telling
+Steam you are playing CS2, and an account can only do that in one place at a
+time. Run this on the account you play on and the two sessions evict each
+other: you get `LoggedInElsewhere` and the sidecar exits.
+
+For a quick test you can quit Steam on your PC while the sidecar runs. For
+anything ongoing, a second Steam account that owns CS2 is the answer, and it
+resolves *anyone's* share code, so it does not need to have played the match.
+
 ## Rules that are not tuning knobs
 
 - **One request in flight, ~1.2s apart.** The GC is stateful and rate limited.
