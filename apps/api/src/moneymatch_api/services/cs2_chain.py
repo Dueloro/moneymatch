@@ -89,10 +89,16 @@ async def _ingest(
     try:
         resolved = await gc_client.resolve(code)
     except gc_client.GcError as exc:
-        # Not fatal to the walk: the cursor still advances, because a code that
-        # will not resolve now (an expired demo, a GC hiccup) must not wedge the
-        # chain behind it forever.
-        log.warning("cs2.chain_resolve_failed", share_code=code, error=str(exc))
+        if exc.retryable:
+            # The sidecar is down or busy. This match is fine and will resolve
+            # later, so it must not be skipped: raise, and let the caller stop
+            # the walk with the cursor still pointing at it. Advancing past a
+            # match because the *fetcher* was briefly unavailable loses a real
+            # result the player has already staked money on.
+            raise
+        # Permanently unresolvable (the GC does not know this code). Skipping is
+        # correct here, or the chain wedges behind it forever.
+        log.warning("cs2.chain_code_unresolvable", share_code=code, error=str(exc))
         return None
     return await cs2_matches.store(
         session, code=code, resolved=resolved, submitted_by_user_id=user_id
@@ -175,11 +181,24 @@ async def sync(session: AsyncSession, chain: Cs2ShareChain) -> list[Cs2Match]:
         if nxt is None:
             break  # Caught up. The normal ending, not an error.
 
-        match = await _ingest(
-            session, user_id=chain.user_id, steam_id=chain.steam_id, code=nxt
-        )
-        # The cursor advances whether or not the scoreboard could be fetched.
-        # It marks position in Valve's list, not what was successfully stored.
+        try:
+            match = await _ingest(
+                session, user_id=chain.user_id, steam_id=chain.steam_id, code=nxt
+            )
+        except gc_client.GcError:
+            # Leave the cursor on this code so the next sync picks it up again.
+            # The player played this match; losing it because the sidecar was
+            # restarting would be indistinguishable, to them, from the product
+            # not working.
+            log.warning(
+                "cs2.chain_ingest_deferred",
+                user_id=str(chain.user_id),
+                share_code=nxt,
+            )
+            break
+
+        # Only now does the cursor move. It marks the last code we are done
+        # with, not the last code Valve mentioned.
         cursor = nxt
         chain.known_code = nxt
         if match is not None:

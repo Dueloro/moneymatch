@@ -13,9 +13,11 @@ settlement down for everyone.
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import pytest
 
+from moneymatch_api.services import cs2_chain
 from moneymatch_api.services.hosts import steam
 from moneymatch_api.services.hosts.errors import HostError, HostUnavailable
 
@@ -130,3 +132,76 @@ def test_a_host_error_carries_its_status():
 
 def test_a_host_error_without_a_status_is_still_valid():
     assert HostError("steam", "boom").status_code is None
+
+
+# --------------------------------------------------------------------------- #
+# The cursor must not step over a match the sidecar merely could not fetch.
+# --------------------------------------------------------------------------- #
+
+
+class _Chain:
+    """Enough of a chain row for the walk."""
+
+    def __init__(self, cursor: str) -> None:
+        self.user_id = uuid.uuid4()
+        self.steam_id = "76561198748110372"
+        self.auth_code = "AAAA-BBBB"
+        self.known_code = cursor
+        self.state = "active"
+        self.last_error = None
+        self.last_polled_at = None
+        self.last_code_at = None
+
+    def is_active(self) -> bool:
+        return self.state == "active"
+
+
+class _Session:
+    async def flush(self):
+        return None
+
+
+def _walk(monkeypatch, resolve_error):
+    """Run one sync where Valve offers exactly one new code."""
+    chain = _Chain("CSGO-old")
+    codes = iter(["CSGO-new", None])
+
+    async def fake_next(*args, **kwargs):
+        return next(codes)
+
+    async def fake_get_by_share_code(*args, **kwargs):
+        return None
+
+    async def fake_resolve(code):
+        raise resolve_error
+
+    monkeypatch.setattr(steam, "get_next_share_code", fake_next)
+    monkeypatch.setattr(
+        cs2_chain.cs2_matches, "get_by_share_code", fake_get_by_share_code
+    )
+    monkeypatch.setattr(cs2_chain.gc_client, "resolve", fake_resolve)
+    asyncio.run(cs2_chain.sync(_Session(), chain))
+    return chain
+
+
+def test_a_sidecar_outage_does_not_skip_the_match(monkeypatch):
+    """The bug this exists for: a real match, dropped because the fetcher blinked.
+
+    The player staked money and played the game. Losing the result because the
+    Game Coordinator was restarting is, from their side, the product not working.
+    """
+    chain = _walk(monkeypatch, cs2_chain.gc_client.GcError("gc down", retryable=True))
+    assert chain.known_code == "CSGO-old"
+
+
+def test_a_code_the_gc_will_never_know_does_not_wedge_the_chain(monkeypatch):
+    """The opposite failure: one dead code must not block every later match."""
+    chain = _walk(monkeypatch, cs2_chain.gc_client.GcError("unknown", retryable=False))
+    assert chain.known_code == "CSGO-new"
+
+
+def test_an_outage_leaves_the_chain_healthy(monkeypatch):
+    """It is not the player's fault and needs no reconnecting."""
+    chain = _walk(monkeypatch, cs2_chain.gc_client.GcError("gc down", retryable=True))
+    assert chain.state == "active"
+    assert chain.last_error is None
