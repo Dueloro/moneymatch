@@ -28,6 +28,12 @@ os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
 os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
 os.environ["SUPABASE_JWT_AUDIENCE"] = "authenticated"
 os.environ["ENV"] = "local"
+# Mount the demo router. `create_app` only includes it when this is set, and the
+# `app` fixture is session-scoped, so without it every /demo/* route 404s no
+# matter what a per-test fixture does to the other demo flags -- which is a
+# confusing way for a test to fail, because the 404 looks like a rejected flag
+# check rather than a route that was never registered.
+os.environ["DEMO_LOGIN_ENABLED"] = "1"
 # The shared ASGI client fires many writes from one host across a session; keep
 # the global limiter out of its way. The limiter itself is proven in
 # test_security_middleware.py against a purpose-built low-limit app.
