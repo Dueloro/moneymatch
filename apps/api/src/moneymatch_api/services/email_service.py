@@ -22,6 +22,9 @@ log = structlog.get_logger(__name__)
 
 _RESEND_ENDPOINT = "https://api.resend.com/emails"
 
+# Hosted email logo (Decision B — beta domain for now; one-line change later).
+_LOGO_URL = "https://moneymatch-beta.vercel.app/email/logo.png"
+
 # The reserved subdomain that username sign-in maps handles onto — a mirror of
 # `AUTH_EMAIL_DOMAIN` in apps/web/src/lib/usernameAuth.ts. These addresses have
 # no inbox, so mailing them is guaranteed to bounce; skip them entirely.
@@ -53,25 +56,46 @@ def _app_url(link_path: str | None) -> str | None:
 
 
 def _render_html(body: str, url: str | None) -> str:
-    """Minimal branded HTML body. Kept inline so the seam has no template deps;
-    swap for a React Email template if richer mail is ever needed."""
+    """Hybrid-brand HTML: dark header/footer bands with the lime mark, light body,
+    lime CTA. Table-based + inline styles for email-client reliability."""
     button = (
-        f'<p style="margin:24px 0"><a href="{url}" '
-        'style="display:inline-block;background:#111;color:#fff;padding:12px 20px;'
-        'border-radius:9999px;text-decoration:none;font-weight:600">'
-        "Open Money Match</a></p>"
+        f'<tr><td style="padding:8px 0 4px"><a href="{url}" '
+        'style="display:inline-block;background:#C6F440;color:#0B0B0C;'
+        'padding:12px 22px;border-radius:9999px;text-decoration:none;'
+        'font-weight:700;font-size:15px">Open Money Match</a></td></tr>'
+        if url
+        else ""
+    )
+    fallback = (
+        f'<tr><td style="padding:12px 0 0;font-size:12px;color:#6b7280">'
+        f'Button not working? Paste this link: <br>{url}</td></tr>'
         if url
         else ""
     )
     return (
-        '<div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;'
-        'margin:0 auto;padding:24px;color:#111">'
-        f'<p style="font-size:16px;line-height:1.5">{body}</p>'
-        f"{button}"
-        '<hr style="border:none;border-top:1px solid #eee;margin:24px 0">'
-        '<p style="font-size:12px;color:#888">'
-        "Money Match · peer-to-peer skill wagering</p>"
-        "</div>"
+        '<div style="background:#f3f4f6;padding:24px 0;'
+        'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="max-width:600px;margin:0 auto;background:#ffffff;'
+        'border-radius:16px;overflow:hidden">'
+        # Dark header band with the mark + wordmark.
+        '<tr><td style="background:#0B0B0C;padding:20px 28px">'
+        f'<img src="{_LOGO_URL}" width="28" height="28" alt="Money Match" '
+        'style="vertical-align:middle;border-radius:8px">'
+        '<span style="color:#ffffff;font-weight:600;font-size:15px;'
+        'vertical-align:middle;margin-left:10px">Money Match</span>'
+        '</td></tr>'
+        # Light body.
+        '<tr><td style="padding:28px">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        f'<tr><td style="font-size:16px;line-height:1.5;color:#111827">{body}</td></tr>'
+        f"{button}{fallback}"
+        '</table></td></tr>'
+        # Dark footer band.
+        '<tr><td style="background:#0B0B0C;padding:16px 28px;font-size:12px;'
+        'color:#9ca3af">Money Match · peer-to-peer skill wagering<br>'
+        'Need help? Contact Dueloro Support.</td></tr>'
+        '</table></div>'
     )
 
 

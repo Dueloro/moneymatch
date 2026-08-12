@@ -105,3 +105,23 @@ async def test_send_swallows_provider_error(session, monkeypatch):
             session, user.id, subject="Hi", body="Body"
         )
     assert sent is False
+
+
+async def test_html_uses_hybrid_brand(session, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "resend_api_key", "re_test_key")
+    monkeypatch.setattr(settings, "web_origin", "https://moneymatch-beta.vercel.app")
+    user = await _make_user(session, email="real@example.com")
+    with respx.mock:
+        route = respx.post(email_service._RESEND_ENDPOINT).mock(
+            return_value=httpx.Response(200, json={"id": "e1"})
+        )
+        await email_service.send_to_user(
+            session, user.id, subject="Your contest settled",
+            body="Your result is in.", link_path="/activity",
+        )
+    html = json.loads(route.calls.last.request.content)["html"]
+    # Brand: hosted logo, the lime CTA, and the Dueloro support footer.
+    assert "/email/logo.png" in html
+    assert "Open Money Match" in html
+    assert "Dueloro" in html
