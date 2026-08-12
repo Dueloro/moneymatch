@@ -33,7 +33,7 @@ CATALOG_GAMES: tuple[str, ...] = REGISTERED_GAMES + COMING_SOON_GAMES
 
 # Human labels for the Profile "Games" rows (design PDF p.12).
 GAME_DISPLAY_NAMES: dict[str, str] = {
-    GAME_CS2_STEAM: "Counter-Strike 2 — Steam",
+    GAME_CS2_STEAM: "Counter-Strike 2 (Steam)",
     GAME_CHESS_LICHESS: "Chess — Lichess",
     GAME_CS2_FACEIT: "CS2 — FACEIT",
     GAME_DOTA2_OPENDOTA: "Dota 2 — OpenDota",

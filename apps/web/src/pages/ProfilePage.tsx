@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '../auth/useAuth';
+import { SubmitMatchCard } from '../components/cs2/SubmitMatchCard';
 import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
+import { useLinks } from '../hooks/useLinks';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
@@ -12,6 +14,10 @@ import { disablePush, enablePush, isPushSupported, isSubscribed } from '../lib/p
 
 export function ProfilePage() {
   const { signOut, isDemo } = useAuth();
+  const { data: links } = useLinks();
+  const cs2Linked = links?.games.some(
+    (g) => g.game === 'cs2.steam' && g.status === 'LINKED',
+  );
   const me = useMe();
   const selfExclude = useSelfExclude();
   const [confirming, setConfirming] = useState(false);
@@ -45,6 +51,20 @@ export function ProfilePage() {
         </p>
         <LinkGames />
       </Section>
+
+      {/* Right under the place you connect Steam, because that is the next
+       * thing you do: CS2 has no per-match stats API, so a match only becomes
+       * a settled wager once its share code is pasted. Also on Activity, which
+       * is where you land after playing. */}
+      {cs2Linked && (
+        <Section title="Submit a CS2 match">
+          <p className="mb-3 text-sm text-text-secondary">
+            After a Premier, Competitive or Wingman match, paste its share code here to
+            settle any wager you have open.
+          </p>
+          <SubmitMatchCard />
+        </Section>
+      )}
 
       {isDemo && (
         <Section title="Test with real accounts">

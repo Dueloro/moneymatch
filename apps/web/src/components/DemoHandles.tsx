@@ -133,7 +133,9 @@ function SteamRow({
   // A placeholder handle is not a Steam identity. A real SteamID64 is 17
   // digits, so anything else means the seeded demo row, not a connected
   // account, and saying "LINKED" for one would be a lie.
-  const steamId = link.host_username ?? '';
+  // The SteamID64 is the identity and lives on the profile. `host_username` is
+  // the persona name, which is mutable and must never be treated as the id.
+  const steamId = profile?.username ?? '';
   const linked = link.status === 'LINKED' && /^\d{17}$/.test(steamId);
   const kills = profile?.extra?.total_kills;
   const hours = profile?.extra?.hours_played;
@@ -155,7 +157,7 @@ function SteamRow({
           {linked ? (
             <>
               <p className="truncate text-xs text-text">
-                {profile?.display_name ?? steamId}
+                {profile?.display_name ?? link.host_username ?? steamId}
               </p>
               <p className="truncate text-xs text-text-tertiary">
                 SteamID {steamId}
