@@ -129,20 +129,42 @@ function SteamRow({
   name: string;
 }) {
   const { data: loginUrl, isLoading } = useSteamLoginUrl();
-  const linked = link.status === 'LINKED';
+  const profile = link.profile;
+  // A placeholder handle is not a Steam identity. A real SteamID64 is 17
+  // digits, so anything else means the seeded demo row, not a connected
+  // account, and saying "LINKED" for one would be a lie.
+  const steamId = link.host_username ?? '';
+  const linked = link.status === 'LINKED' && /^\d{17}$/.test(steamId);
+  const kills = profile?.extra?.total_kills;
+  const hours = profile?.extra?.hours_played;
 
   return (
     <div className="py-3">
       <div className="flex items-center gap-3">
+        {linked && profile?.avatar_url && (
+          <img
+            src={profile.avatar_url}
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-full"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold" style={{ color: accent }}>
             {name}
           </p>
-          <p className="truncate text-xs text-text-secondary">
-            {linked && link.host_username
-              ? `SteamID ${link.host_username}`
-              : 'not linked'}
-          </p>
+          {linked ? (
+            <>
+              <p className="truncate text-xs text-text">
+                {profile?.display_name ?? steamId}
+              </p>
+              <p className="truncate text-xs text-text-tertiary">
+                SteamID {steamId}
+                {profile?.rank_label ? ` · ${profile.rank_label}` : ''}
+              </p>
+            </>
+          ) : (
+            <p className="truncate text-xs text-text-secondary">not linked</p>
+          )}
         </div>
         {loginUrl ? (
           <a
@@ -158,9 +180,29 @@ function SteamRow({
           </span>
         )}
       </div>
-      <p className="mt-1 text-xs text-text-tertiary">
-        Steam opens in this tab and brings you straight back.
-      </p>
+      {linked ? (
+        <p className="mt-2 text-xs text-text-secondary" data-testid="steam-stats">
+          {profile?.total_games ? `${profile.total_games} matches` : null}
+          {kills
+            ? `${profile?.total_games ? ' · ' : ''}${kills.toLocaleString()} kills`
+            : null}
+          {profile?.kd ? ` · ${profile.kd.toFixed(2)} K/D` : null}
+          {hours ? ` · ${hours.toLocaleString()}h played` : null}
+          {!profile?.total_games && !kills && !profile?.kd ? (
+            // Steam answers 400 for GetUserStatsForGame unless the profile's
+            // Game details are public, which most are not. Say so, rather than
+            // showing an empty row that reads as broken.
+            <>
+              Lifetime stats are hidden. Set your Steam profile&rsquo;s{' '}
+              <span className="text-text">Game details</span> to public to show them.
+            </>
+          ) : null}
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-text-tertiary">
+          Steam opens in this tab and brings you straight back.
+        </p>
+      )}
     </div>
   );
 }

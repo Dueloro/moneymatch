@@ -102,12 +102,18 @@ async def steam_callback(
 
     link = await linking_service.get_link(session, user.id, GAME_CS2_STEAM)
     if link is not None and link.host_account_id != steam_id:
-        raise APIError(
-            "steam_already_linked",
-            "This account is already linked to a different Steam profile.",
-            status_code=409,
-        )
-    if link is None:
+        # A host id that is not a SteamID64 is a placeholder, not a rival
+        # claim: seeded demo rows look like `cs2.steam_demo`. Replacing one is
+        # the whole point of signing in, so only a genuine second Steam profile
+        # is a conflict.
+        if link.host_account_id.isdigit():
+            raise APIError(
+                "steam_already_linked",
+                "This account is already linked to a different Steam profile.",
+                status_code=409,
+            )
+        link = await linking_service.rebind(session, user, GAME_CS2_STEAM, steam_id)
+    elif link is None:
         link = await linking_service.bind(session, user, GAME_CS2_STEAM, steam_id)
     await session.commit()
 

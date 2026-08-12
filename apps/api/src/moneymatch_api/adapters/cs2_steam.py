@@ -113,6 +113,18 @@ class CS2SteamAdapter(GameAdapter):
             rank_label=_ban_label(bans),
             kd=round(kd, 4) if kd is not None else None,
             avatar_url=summary.get("avatarfull") or None,
+            # Lifetime counters, so the profile row can show something concrete
+            # rather than just an opaque 17-digit id. Absent when the profile
+            # keeps its game details private, which is the common case.
+            extra=(
+                {
+                    "total_kills": stats.total_kills,
+                    "total_deaths": stats.total_deaths,
+                    "hours_played": round(stats.total_time_played / 3600),
+                }
+                if stats
+                else {}
+            ),
         )
 
     async def poll_eligible_games(

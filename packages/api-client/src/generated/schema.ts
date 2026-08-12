@@ -2907,6 +2907,13 @@ export interface components {
             kd?: number | null;
             /** Avatar Url */
             avatar_url?: string | null;
+            /**
+             * Extra
+             * @default {}
+             */
+            extra: {
+                [key: string]: number;
+            };
         };
         /** PushKeys */
         PushKeys: {

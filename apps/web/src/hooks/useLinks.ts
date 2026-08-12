@@ -26,6 +26,8 @@ export interface ProfileSnapshot {
   rank_label: string | null;
   kd: number | null;
   avatar_url: string | null;
+  /** Title-specific extras (CS2 lifetime kills, hours). Display only. */
+  extra?: Record<string, number>;
 }
 
 export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED' | 'COMING_SOON';

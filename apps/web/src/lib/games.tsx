@@ -60,6 +60,13 @@ const GAMES: Record<string, GameMeta> = {
     accent: '#e6c65c',
     Icon: ChessIcon,
   },
+  'cs2.steam': {
+    id: 'cs2.steam',
+    name: 'Counter-Strike 2',
+    short: 'CS2',
+    accent: '#f0883e',
+    Icon: CrosshairIcon,
+  },
   'cs2.faceit': {
     id: 'cs2.faceit',
     name: 'Counter Strike 2',

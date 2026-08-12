@@ -29,6 +29,7 @@ from ..constants import (
     DEMO_RESIDENCE_STATE,
     DEMO_USERNAME,
     GAME_CS2_FACEIT,
+    GAME_CS2_STEAM,
     GAME_PUBG_STEAM,
     POOL_METRICS,
     REGISTERED_GAMES,
@@ -110,6 +111,11 @@ async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
         )
     }
     for game in REGISTERED_GAMES:
+        # A Steam identity cannot be faked. `cs2.steam` is keyed by a SteamID64
+        # that only Steam can vouch for, so a placeholder link there would be a
+        # lie that also blocks the real sign-in from ever binding.
+        if game == GAME_CS2_STEAM:
+            continue
         if game not in linked:
             session.add(
                 LinkedAccount(
