@@ -137,6 +137,13 @@ async def submit(
         resolved=resolved,
         submitted_by_user_id=user_id,
     )
+    # A stored match is new evidence about how this player actually performs,
+    # so the bars they are offered next should reflect it. Without this the
+    # baseline stays frozen at whatever was guessed when they signed in.
+    from . import cs2_baseline
+
+    await cs2_baseline.refresh(session, user_id, steam_id)
+
     log.info(
         "cs2.sharecode_accepted",
         share_code=decoded.code,
