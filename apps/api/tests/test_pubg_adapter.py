@@ -1,7 +1,8 @@
 """pubg.steam adapter — profile mapping, match normalization, telemetry, fail-soft.
 
 Host calls to the official PUBG API are respx-mocked — no live network. The
-adapter is dormant (not in the registry yet), so these exercise it directly.
+adapter is registered (`pubg.steam`); these exercise it directly against
+respx-mocked PUBG API responses.
 """
 
 from __future__ import annotations
@@ -67,12 +68,26 @@ def _lifetime():
 
 
 def _match(
-    match_id, *, kills, headshots, damage, win_place, created="2026-07-24T00:00:00Z"
+    match_id,
+    *,
+    kills,
+    headshots,
+    damage,
+    win_place,
+    created="2026-07-24T00:00:00Z",
+    game_mode="squad-fpp",
+    match_type="official",
+    is_custom=False,
 ):
     return {
         "data": {
             "id": match_id,
-            "attributes": {"gameMode": "squad-fpp", "createdAt": created},
+            "attributes": {
+                "gameMode": game_mode,
+                "matchType": match_type,
+                "isCustomMatch": is_custom,
+                "createdAt": created,
+            },
         },
         "included": [
             {"type": "roster", "attributes": {}},
@@ -250,3 +265,116 @@ async def test_missing_key_link_path_raises_not_configured(monkeypatch):
     monkeypatch.setattr(get_settings(), "pubg_api_key", None)
     with pytest.raises(HostNotConfigured):
         await pubg.get_player_by_name("x")
+
+
+# --------------------------------------------------------------------------- #
+# Official-mode filtering + newest-first early-exit
+# --------------------------------------------------------------------------- #
+
+
+def _ms(iso: str) -> int:
+    from datetime import datetime
+
+    return int(datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() * 1000)
+
+
+@respx.mock
+async def test_poll_skips_custom_and_event_matches(pubg_key):
+    respx.get(f"{SHARD}/players/{ACCOUNT}").mock(
+        return_value=httpx.Response(
+            200, json={"data": _player(["official", "custom", "event"])}
+        )
+    )
+    respx.get(f"{SHARD}/matches/official").mock(
+        return_value=httpx.Response(
+            200,
+            json=_match("official", kills=5, headshots=2, damage=500.0, win_place=1),
+        )
+    )
+    respx.get(f"{SHARD}/matches/custom").mock(
+        return_value=httpx.Response(
+            200,
+            json=_match(
+                "custom",
+                kills=9,
+                headshots=9,
+                damage=999.0,
+                win_place=1,
+                is_custom=True,
+            ),
+        )
+    )
+    respx.get(f"{SHARD}/matches/event").mock(
+        return_value=httpx.Response(
+            200,
+            json=_match(
+                "event",
+                kills=9,
+                headshots=9,
+                damage=999.0,
+                win_place=1,
+                game_mode="normal-squad",
+                match_type="event",
+            ),
+        )
+    )
+    from moneymatch_api.adapters.base import GameFilters
+
+    games = await ADAPTER.poll_eligible_games(ACCOUNT, 0, GameFilters())
+    assert [g.id for g in games] == ["official"]  # custom + event excluded
+
+
+@respx.mock
+async def test_poll_early_exits_on_first_out_of_window_match(pubg_key):
+    # Newest-first list: once a match older than since_ms is hit, stop fetching.
+    respx.get(f"{SHARD}/players/{ACCOUNT}").mock(
+        return_value=httpx.Response(
+            200, json={"data": _player(["new", "old", "older"])}
+        )
+    )
+    new_route = respx.get(f"{SHARD}/matches/new").mock(
+        return_value=httpx.Response(
+            200,
+            json=_match(
+                "new",
+                kills=3,
+                headshots=1,
+                damage=300.0,
+                win_place=2,
+                created="2026-07-24T00:00:00Z",
+            ),
+        )
+    )
+    old_route = respx.get(f"{SHARD}/matches/old").mock(
+        return_value=httpx.Response(
+            200,
+            json=_match(
+                "old",
+                kills=1,
+                headshots=0,
+                damage=100.0,
+                win_place=8,
+                created="2026-07-20T00:00:00Z",
+            ),
+        )
+    )
+    older_route = respx.get(f"{SHARD}/matches/older").mock(
+        return_value=httpx.Response(
+            200,
+            json=_match(
+                "older",
+                kills=1,
+                headshots=0,
+                damage=100.0,
+                win_place=8,
+                created="2026-07-10T00:00:00Z",
+            ),
+        )
+    )
+    from moneymatch_api.adapters.base import GameFilters
+
+    since = _ms("2026-07-23T00:00:00Z")
+    games = await ADAPTER.poll_eligible_games(ACCOUNT, since, GameFilters())
+    assert [g.id for g in games] == ["new"]
+    assert new_route.called and old_route.called
+    assert not older_route.called  # early-exit: never fetched the 3rd match
