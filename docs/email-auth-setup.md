@@ -3,8 +3,21 @@
 The app code and email templates ship in the repo; these dashboard steps turn on
 real email auth. **Prerequisite:** `send.dueloro.com` is verified in Resend.
 
+> **Sequencing — do NOT enable Custom SMTP until DNS is verified.** As of this
+> writing `send.dueloro.com` is **not yet** DNS-verified in Resend. Enabling
+> Custom SMTP with an unverified sender domain makes Resend reject every send, so
+> signup/OTP/reset emails fail silently — worse than leaving it off. Order:
+> 1. Add the SPF/DKIM records and confirm the domain shows **Verified** in Resend.
+> 2. **Then** enable Custom SMTP (step 1 below).
+>
+> To test the flows before DNS is done, leave Custom SMTP **off**: Supabase's
+> built-in sender delivers these templates to a few addresses at a low rate —
+> enough to walk through verify / "Email me a code" / "Forgot password" locally.
+> It is rate-limited and not for real traffic; flip Custom SMTP on once verified.
+
 ## 1. Custom SMTP (Resend)
-Auth → Settings → SMTP Settings → enable Custom SMTP:
+Auth → Settings → SMTP Settings → enable Custom SMTP (**only after the domain is
+verified — see the sequencing note above**):
 - Host: `smtp.resend.com`
 - Port: `465` (implicit TLS) or `587`
 - Username: `resend`
