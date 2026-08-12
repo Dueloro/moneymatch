@@ -32,6 +32,7 @@ from sqlalchemy import (
     String,
     false,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -144,7 +145,15 @@ class Cs2ShareChain(Base):
     #: `active`, or `broken` when Valve rejected the cursor or the auth code.
     #: A broken chain stops polling until the player reconnects it, because
     #: repeated bad auth codes get the whole API key temporarily blocked.
-    state: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    state: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="active",
+        # Declared on both sides: the Python default covers ORM inserts, the
+        # server default covers anything that writes without the model. Only
+        # one of them and `alembic check` reports drift on every run.
+        server_default=text("'active'"),
+    )
     #: Why it broke, in words the player can act on.
     last_error: Mapped[str | None] = mapped_column(String(200), nullable=True)
     last_polled_at: Mapped[datetime | None] = mapped_column(
