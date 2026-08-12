@@ -16,8 +16,18 @@ npm install
 
 # One-time: get a refresh token. Not a password and a Guard code, which expire
 # in ~30 seconds and will not survive a restart.
-npx steam-session
+npm run token          # scan a QR code with the Steam mobile app
+npm run token:creds    # or username + password + Guard code
 ```
+
+`npm run token` prints a QR code in the terminal. Open the Steam mobile app ->
+Steam Guard -> the QR button, and scan it. No password is typed anywhere; what
+comes back is a token, not a credential.
+
+(`npx steam-session` does not work: it is a library, not a CLI.)
+
+The token is a login to your Steam account. Keep it in `.env`, which is
+gitignored, and treat it like a password.
 
 Then set, in the repo `.env`:
 
