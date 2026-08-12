@@ -114,10 +114,16 @@ def compute(
     own_stat = _sample(own)
     cohort_stat = _sample(cohort, robust=True)
 
-    # A lifetime K/D nudges the starting point for a player with no matches
-    # here yet. It is cumulative across casual and bot games, so it is only
-    # ever a tiebreaker against the population number, never a substitute for
-    # real results.
+    # A brand new account has no matches here and usually no public stats
+    # either, so the population number is the whole answer for its first wager.
+    # That is the right default: it is what an average matchmaking player posts,
+    # so the first bar is neither free nor impossible, and one submitted match
+    # replaces most of it.
+    #
+    # Where lifetime stats are public they pull that starting point toward the
+    # player. Deliberately only halfway: the figure is cumulative across casual,
+    # deathmatch and bot games, so it says something about a player but not
+    # enough to be taken at face value.
     if lifetime_kd is not None and metric == "cs2_kd_ratio" and not own_stat:
         pop_mu = (pop_mu + lifetime_kd) / 2
 

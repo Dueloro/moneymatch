@@ -28,8 +28,10 @@ from ..constants import (
     DEMO_JWT_SECRET,
     DEMO_RESIDENCE_STATE,
     DEMO_USERNAME,
+    GAME_CHESS_LICHESS,
     GAME_CS2_FACEIT,
     GAME_CS2_STEAM,
+    GAME_DOTA2_OPENDOTA,
     GAME_PUBG_STEAM,
     POOL_METRICS,
     REGISTERED_GAMES,
@@ -95,6 +97,17 @@ _DEMO_METRIC_FIXTURE: dict[str, tuple[float, float]] = {
 _DEMO_METRIC_N = 25
 
 
+#: The demo's play set. CS2 is the Steam game: `cs2.faceit` quotes bars from a
+#: hand-written fixture and cannot settle from a share code, so showing both
+#: would offer two Counter-Strike tabs where only one of them works.
+_DEMO_ACTIVE_GAMES = [
+    GAME_CS2_STEAM,
+    GAME_PUBG_STEAM,
+    GAME_DOTA2_OPENDOTA,
+    GAME_CHESS_LICHESS,
+]
+
+
 async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
     """Link the demo user to every playable game + seed non-provisional metric
     models, so Solo Pools, Tournaments, and Head-to-Head are populated with
@@ -158,6 +171,9 @@ async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
                 existing.mu = mu
                 existing.sigma = sigma
                 existing.n = _DEMO_METRIC_N
+    # The play set drives the game tabs, so a reset must not put the demo back
+    # on the FACEIT game it can no longer settle.
+    user.active_games = list(_DEMO_ACTIVE_GAMES)
     await session.flush()
 
 
