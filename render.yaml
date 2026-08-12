@@ -18,10 +18,17 @@
 #
 # Set the sync:false secrets in the dashboard (or an env group named
 # `moneymatch-shared`): DATABASE_URL is wired from the managed DB below;
-# SUPABASE_*, FACEIT_API_KEY, PUBG_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are
-# per-environment. Without FACEIT_API_KEY / PUBG_API_KEY, that game's account
+# SUPABASE_*, STEAM_API_KEY, PUBG_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are
+# per-environment. Without STEAM_API_KEY / PUBG_API_KEY, that game's account
 # linking returns a `host_not_configured` error (503) — set both so CS2 and PUBG
 # are linkable in the deployed environment, not just locally.
+#
+# CS2 additionally needs the Game Coordinator sidecar to turn a share code into
+# a scoreboard: GC_SIDECAR_URL and GC_SHARED_SECRET. Without them share codes
+# resolve to a 503 and no CS2 wager can settle — the rest of the app is
+# unaffected. VALVE_CHAIN_ENABLED turns on automatic collection; leave it off
+# until the sidecar is reachable, or players connect a chain that cannot
+# deliver.
 
 databases:
   - name: moneymatch-postgres
