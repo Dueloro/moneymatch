@@ -68,7 +68,10 @@ class PubgAdapter(GameAdapter):
             raise HostNotConfigured("pubg", "PUBG_API_KEY is not configured")
         player = await pubg.get_player_by_name(identifier.strip(), self._shard)
         if player is None:
-            raise ValueError(f"PUBG player '{identifier}' not found")
+            raise ValueError(
+                f"PUBG player '{identifier}' not found — names are case-sensitive; "
+                "check the exact spelling and platform."
+            )
         account_id = player.get("id") or ""
         name = (player.get("attributes") or {}).get("name") or identifier
         profile = await self._profile_from(account_id, name)
@@ -186,6 +189,8 @@ class PubgAdapter(GameAdapter):
         wins = int(agg["wins"])
         losses = int(agg["losses"])
         win_rate = (wins / rounds) if rounds else 0.5
+        # PUBG's conventional K/D: kills per non-winning round (losses = rounds −
+        # wins), NOT kills/deaths. A soft profile/bracketing signal only.
         kd = (agg["kills"] / losses) if losses else agg["kills"]
 
         return ProfileSnapshot(
