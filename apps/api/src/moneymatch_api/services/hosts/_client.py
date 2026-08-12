@@ -23,11 +23,12 @@ import structlog
 from tenacity import (
     AsyncRetrying,
     retry_if_exception_type,
+    retry_if_not_exception_type,
     stop_after_attempt,
     wait_random_exponential,
 )
 
-from .errors import HostError, HostNotFound, HostUnavailable
+from .errors import HostError, HostNotFound, HostRateLimited, HostUnavailable
 
 log = structlog.get_logger(__name__)
 
@@ -63,7 +64,10 @@ async def request_json(
     async for retry in AsyncRetrying(
         stop=stop_after_attempt(_MAX_ATTEMPTS),
         wait=wait_random_exponential(multiplier=0.2, max=2.0),
-        retry=retry_if_exception_type(HostUnavailable),
+        retry=(
+            retry_if_exception_type(HostUnavailable)
+            & retry_if_not_exception_type(HostRateLimited)
+        ),
         reraise=True,
     ):
         with retry:
@@ -103,7 +107,9 @@ async def request_json(
                 raise HostNotFound(host, f"{method} {url} → 404")
             if response.status_code >= 500:
                 raise HostUnavailable(host, f"{method} {url} → {response.status_code}")
-            # Any other non-2xx (400/401/403/422/429…) is a typed, non-retryable
+            if response.status_code == 429:
+                raise HostRateLimited(host, f"{method} {url} → 429")
+            # Any other non-2xx (400/401/403/422…) is a typed, non-retryable
             # HostError — never a raw httpx exception — so every `except HostError`
             # guard degrades gracefully (a bad seed id 400 must not crash a cycle).
             if response.status_code >= 400:
