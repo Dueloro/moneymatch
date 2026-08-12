@@ -34,6 +34,19 @@ const HOST = '127.0.0.1';
 const SHARED_SECRET = process.env.GC_SHARED_SECRET || '';
 const REFRESH_TOKEN = process.env.GC_REFRESH_TOKEN || '';
 
+/**
+ * Seconds of idleness after which the sidecar logs out of Steam entirely.
+ *
+ * Zero means stay connected, which is what production wants: the account is
+ * dedicated to this service and nobody is playing on it.
+ *
+ * Set it when the sidecar shares an account with a person. Attaching to the GC
+ * means claiming to play CS2, so being connected evicts their Steam client.
+ * Idling out means the sidecar is dormant while they play, wakes for the few
+ * seconds it takes to resolve a share code, and lets go again.
+ */
+const IDLE_LOGOUT_SECONDS = Number(process.env.GC_IDLE_LOGOUT_SECONDS || 0);
+
 /** Minimum gap between GC requests. Below this the GC starts dropping them. */
 const REQUEST_SPACING_MS = 1200;
 /** A GC that has not answered by now is not going to. */
@@ -46,6 +59,8 @@ const steam = new SteamUser();
 const cs = new GlobalOffensive(steam);
 
 let gcReady = false;
+let loggedOn = false;
+let idleTimer = null;
 const queue = [];
 let working = false;
 let lastRequestAt = 0;
@@ -66,18 +81,53 @@ if (!REFRESH_TOKEN) {
   process.exit(1);
 }
 
-steam.logOn({ refreshToken: REFRESH_TOKEN });
+function connect() {
+  if (loggedOn) return;
+  loggedOn = true;
+  log('gc.connecting');
+  steam.logOn({ refreshToken: REFRESH_TOKEN });
+}
+
+function scheduleIdleLogout() {
+  if (!IDLE_LOGOUT_SECONDS) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    if (working || queue.length) {
+      scheduleIdleLogout();
+      return;
+    }
+    log('gc.idle_logout', { afterSeconds: IDLE_LOGOUT_SECONDS });
+    gcReady = false;
+    loggedOn = false;
+    try {
+      steam.gamesPlayed([]);
+      steam.logOff();
+    } catch (err) {
+      log('gc.logoff_failed', { error: String(err && err.message) });
+    }
+  }, IDLE_LOGOUT_SECONDS * 1000);
+}
 
 steam.on('loggedOn', () => {
   log('gc.steam_logged_on', { steamId: String(steam.steamID) });
   steam.setPersona(SteamUser.EPersonaState.Online);
-  steam.gamesPlayed([730]); // launching CS2 is what connects the GC
+  steam.gamesPlayed([730]); // claiming to play CS2 is what connects the GC
 });
+
+if (!IDLE_LOGOUT_SECONDS) {
+  connect();
+} else {
+  log('gc.lazy_mode', {
+    idleLogoutSeconds: IDLE_LOGOUT_SECONDS,
+    note: 'Dormant until a request arrives, so this account can be used to play in the meantime.',
+  });
+}
 
 cs.on('connectedToGC', () => {
   gcReady = true;
   log('gc.connected');
   pump();
+  scheduleIdleLogout();
 });
 
 cs.on('disconnectedFromGC', (reason) => {
@@ -121,7 +171,13 @@ function enqueue(task) {
 
 function pump() {
   if (working || queue.length === 0) return;
-  if (!gcReady) return; // requests wait rather than fail while reconnecting
+  if (!gcReady) {
+    // Requests wait rather than fail while (re)connecting. In lazy mode this
+    // is also what wakes the sidecar up.
+    connect();
+    return;
+  }
+  scheduleIdleLogout();
 
   working = true;
   const { task, resolve, reject } = queue.shift();
@@ -293,11 +349,13 @@ const server = http.createServer(async (req, res) => {
       send(res, 400, { error: 'shareCode is required' });
       return;
     }
-    if (!gcReady) {
+    if (!gcReady && !IDLE_LOGOUT_SECONDS) {
       send(res, 503, { error: 'gc_not_ready' });
       return;
     }
     try {
+      // In lazy mode a dormant sidecar wakes here; the request queues until
+      // the GC attaches rather than being refused.
       const match = await enqueue(() => requestMatch(shareCode));
       const shaped = shapeMatch(match);
       log('gc.resolved', {

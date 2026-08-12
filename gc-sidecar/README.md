@@ -58,9 +58,23 @@ Steam you are playing CS2, and an account can only do that in one place at a
 time. Run this on the account you play on and the two sessions evict each
 other: you get `LoggedInElsewhere` and the sidecar exits.
 
-For a quick test you can quit Steam on your PC while the sidecar runs. For
-anything ongoing, a second Steam account that owns CS2 is the answer, and it
-resolves *anyone's* share code, so it does not need to have played the match.
+For anything ongoing, a second Steam account that owns CS2 is the answer. It
+resolves *anyone's* share code, so it never needs to have played the match.
+
+### Sharing one account, for testing
+
+```bash
+GC_IDLE_LOGOUT_SECONDS=120 npm start
+```
+
+The sidecar stays dormant, holding no Steam session, so you can play normally.
+The first request wakes it, it attaches to the GC in about a second, resolves,
+and logs out again after the idle window. Your Steam client is only evicted for
+those few seconds, and only when you paste a code, which is after you have
+finished playing.
+
+Leave it unset in production: a dedicated account should stay connected, and
+reconnecting on every request is wasted work.
 
 ## Rules that are not tuning knobs
 
