@@ -96,3 +96,69 @@ export function useSubmitShareCode() {
     },
   });
 }
+
+/**
+ * Automatic collection: Valve's share-code chain.
+ *
+ * Once connected, matches arrive on their own — the paste step disappears.
+ * Setup costs one authentication code from Steam plus one share code as a
+ * starting cursor, and the server proves both work before it saves them.
+ */
+
+export interface ChainStatus {
+  connected: boolean;
+  state: string | null;
+  last_error: string | null;
+  last_polled_at: string | null;
+  last_code_at: string | null;
+}
+
+export function useChainStatus() {
+  return useQuery({
+    queryKey: ['cs2-chain'],
+    queryFn: async (): Promise<ChainStatus> => {
+      const { data, error } = await api.GET('/api/v1/cs2/chain');
+      if (error) throw new Error('Could not read automatic collection status');
+      return data as ChainStatus;
+    },
+  });
+}
+
+export function useConnectChain() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { authCode: string; knownCode: string }) => {
+      const { data, error } = await api.POST('/api/v1/cs2/chain', {
+        body: { auth_code: input.authCode, known_code: input.knownCode },
+      });
+      if (error || !data) {
+        // Two failures a player can cause, and they need different fixes: a
+        // cursor from someone else's match, and an auth code Steam rejects.
+        // Collapsing them into one message leaves them guessing which.
+        const detail = error as { message?: string } | undefined;
+        throw new Error(detail?.message ?? 'Could not connect automatic collection.');
+      }
+      return data as ChainStatus;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cs2-chain'] }),
+  });
+}
+
+export function useSyncChain() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await api.POST('/api/v1/cs2/chain/sync', {});
+      if (error || !data) {
+        const detail = error as { message?: string } | undefined;
+        throw new Error(detail?.message ?? 'Could not check for new matches.');
+      }
+      return data as { collected: number; more_available: boolean };
+    },
+    onSuccess: () => {
+      for (const key of ['cs2-chain', 'pool-status', 'activity', 'wallet']) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+}

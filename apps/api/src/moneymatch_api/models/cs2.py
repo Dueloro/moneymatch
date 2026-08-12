@@ -109,3 +109,60 @@ class Cs2Match(Base):
             if str(player.get("steamid")) == str(steam_id):
                 return player
         return None
+
+
+class Cs2ShareChain(Base):
+    """A player's place in Valve's share-code chain, so codes arrive on their own.
+
+    Valve stores a player's matches as a linked list: given one share code they
+    own, `GetNextMatchSharingCode` returns the next. Keeping the cursor here is
+    what turns a one-time setup into every future match arriving without a
+    paste.
+
+    `auth_code` is a per-user secret issued by Steam. It is not a password and
+    cannot spend anything, but it does read someone's match history, so it is
+    never logged and never returned by the API — the chain endpoints report
+    whether a chain is connected, not what it was connected with.
+
+    One row per user: a second cursor for the same account would race the first
+    and double-ingest every match.
+    """
+
+    __tablename__ = "cs2_share_chains"
+
+    id = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    steam_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    auth_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: The most recent code known to be this player's. Advances every poll.
+    known_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    #: `active`, or `broken` when Valve rejected the cursor or the auth code.
+    #: A broken chain stops polling until the player reconnects it, because
+    #: repeated bad auth codes get the whole API key temporarily blocked.
+    state: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    #: Why it broke, in words the player can act on.
+    last_error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    last_polled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: When this chain last produced a new match, for spotting a silent stall.
+    last_code_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    def is_active(self) -> bool:
+        return self.state == "active"

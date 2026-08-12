@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '../auth/useAuth';
+import { AutoCollectCard } from '../components/cs2/AutoCollectCard';
 import { SubmitMatchCard } from '../components/cs2/SubmitMatchCard';
 import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
@@ -63,6 +64,7 @@ export function ProfilePage() {
             settle any wager you have open.
           </p>
           <SubmitMatchCard />
+          <AutoCollectCard />
         </Section>
       )}
 

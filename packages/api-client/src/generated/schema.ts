@@ -240,6 +240,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cs2/chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chain Status
+         * @description Whether collection is connected. Never returns the auth code.
+         */
+        get: operations["chain_status_api_v1_cs2_chain_get"];
+        put?: never;
+        /**
+         * Connect Chain
+         * @description Connect automatic collection, verifying the credentials before saving.
+         *
+         *     Both failures a player can cause are told apart here, because they need
+         *     different fixes: a cursor from someone else's match, and an auth code that
+         *     Steam will not accept.
+         */
+        post: operations["connect_chain_api_v1_cs2_chain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cs2/chain/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Chain
+         * @description Pull in every match played since the last poll.
+         */
+        post: operations["sync_chain_api_v1_cs2_chain_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cs2/health": {
         parameters: {
             query?: never;
@@ -1898,6 +1946,33 @@ export interface components {
             available_cents: number;
             /** Escrow Cents */
             escrow_cents: number;
+        };
+        /** ChainConnectRequest */
+        ChainConnectRequest: {
+            /** Auth Code */
+            auth_code: string;
+            /** Known Code */
+            known_code: string;
+        };
+        /** ChainStatusResponse */
+        ChainStatusResponse: {
+            /** Connected */
+            connected: boolean;
+            /** State */
+            state?: string | null;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Polled At */
+            last_polled_at?: string | null;
+            /** Last Code At */
+            last_code_at?: string | null;
+        };
+        /** ChainSyncResponse */
+        ChainSyncResponse: {
+            /** Collected */
+            collected: number;
+            /** More Available */
+            more_available: boolean;
         };
         /**
          * ChallengeAcceptResponse
@@ -4036,6 +4111,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShareCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chain_status_api_v1_cs2_chain_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_chain_api_v1_cs2_chain_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChainConnectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_chain_api_v1_cs2_chain_sync_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainSyncResponse"];
                 };
             };
             /** @description Validation Error */

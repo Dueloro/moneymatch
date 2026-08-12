@@ -5,6 +5,9 @@ Two surfaces, and they are the whole CS2 loop:
     GET  /cs2/steam/login-url     where to send a user to sign in
     POST /cs2/steam/callback      verify the callback, link the SteamID64
     POST /cs2/sharecode           paste a code, resolve it, store the scoreboard
+    POST /cs2/chain               connect automatic collection (one-time setup)
+    POST /cs2/chain/sync          pull every match played since the last one
+    GET  /cs2/chain               is automatic collection connected and healthy
     GET  /cs2/health              is the Game Coordinator sidecar up
 
 Settlement is not here. A submitted match becomes ordinary match history for
@@ -26,7 +29,10 @@ from ..constants import GAME_CS2_STEAM
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
+from ..models.cs2 import Cs2ShareChain
+from ..models.user import User
 from ..services import (
+    cs2_chain,
     cs2_prior,
     cs2_submission,
     gc_client,
@@ -62,6 +68,30 @@ class SteamCallbackResponse(BaseModel):
 
 class ShareCodeRequest(BaseModel):
     share_code: str = Field(min_length=10, max_length=64)
+
+
+class ChainConnectRequest(BaseModel):
+    #: From Steam's help wizard (appid 730, issue 128). A per-user secret: it
+    #: is accepted here, never echoed back, and never logged.
+    auth_code: str = Field(min_length=8, max_length=32)
+    #: Any share code from a match on this account, as the starting cursor.
+    known_code: str = Field(min_length=10, max_length=64)
+
+
+class ChainStatusResponse(BaseModel):
+    connected: bool
+    state: str | None = None
+    #: Why it stopped, in words the player can act on.
+    last_error: str | None = None
+    last_polled_at: datetime | None = None
+    last_code_at: datetime | None = None
+
+
+class ChainSyncResponse(BaseModel):
+    collected: int
+    #: True when the walk stopped on its cap rather than running out of
+    #: matches, so the caller knows another sync has more to fetch.
+    more_available: bool
 
 
 class ShareCodePlayer(BaseModel):
@@ -191,6 +221,87 @@ async def submit_share_code(
             )
             for p in (match.players or [])
         ],
+    )
+
+
+def _chain_status(chain: Cs2ShareChain | None) -> ChainStatusResponse:
+    if chain is None:
+        return ChainStatusResponse(connected=False)
+    return ChainStatusResponse(
+        connected=True,
+        state=chain.state,
+        last_error=chain.last_error,
+        last_polled_at=chain.last_polled_at,
+        last_code_at=chain.last_code_at,
+    )
+
+
+async def _steam_id_or_409(session: AsyncSession, user: User) -> str:
+    link = await linking_service.get_link(session, user.id, GAME_CS2_STEAM)
+    if link is None:
+        raise APIError(
+            "not_linked",
+            "Sign in through Steam before setting up automatic collection.",
+            status_code=409,
+        )
+    return str(link.host_account_id)
+
+
+def _assert_chain_enabled() -> None:
+    if not cs2_chain.is_enabled():
+        raise APIError(
+            "chain_disabled",
+            "Automatic match collection is switched off on this server.",
+            status_code=404,
+        )
+
+
+@router.post("/chain", response_model=ChainStatusResponse)
+async def connect_chain(
+    body: ChainConnectRequest,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> ChainStatusResponse:
+    """Connect automatic collection, verifying the credentials before saving.
+
+    Both failures a player can cause are told apart here, because they need
+    different fixes: a cursor from someone else's match, and an auth code that
+    Steam will not accept.
+    """
+    _assert_chain_enabled()
+    steam_id = await _steam_id_or_409(session, user)
+    chain = await cs2_chain.connect(
+        session,
+        user_id=user.id,
+        steam_id=steam_id,
+        auth_code=body.auth_code,
+        known_code=body.known_code,
+    )
+    await session.commit()
+    return _chain_status(chain)
+
+
+@router.get("/chain", response_model=ChainStatusResponse)
+async def chain_status(
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> ChainStatusResponse:
+    """Whether collection is connected. Never returns the auth code."""
+    return _chain_status(await cs2_chain.get_chain(session, user.id))
+
+
+@router.post("/chain/sync", response_model=ChainSyncResponse)
+async def sync_chain(
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+) -> ChainSyncResponse:
+    """Pull in every match played since the last poll."""
+    _assert_chain_enabled()
+    matches = await cs2_chain.sync_user(session, user.id)
+    await session.commit()
+    return ChainSyncResponse(
+        collected=len(matches),
+        more_available=len(matches) >= cs2_chain.MAX_CODES_PER_SYNC,
     )
 
 

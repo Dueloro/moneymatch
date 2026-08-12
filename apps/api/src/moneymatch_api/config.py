@@ -120,6 +120,10 @@ class Settings(BaseSettings):
     # downstream can tell them apart — which is exactly why this must default
     # off and never be set on a real-money deployment.
     demo_simulate_enabled: bool = Field(default=False)
+    # Automatic share-code collection (Valve's GetNextMatchSharingCode chain).
+    # Off by default: it polls Steam on a schedule with per-user secrets, so it
+    # should be switched on deliberately rather than inherited by a deploy.
+    valve_chain_enabled: bool = Field(default=False)
 
     # Run the settlement worker loop *inside* the API process (a background asyncio
     # task started on lifespan startup) instead of as a separate service. This is

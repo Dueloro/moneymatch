@@ -107,14 +107,22 @@ async def request_json(
                         threshold_ms=_slow_host_ms(),
                     )
             if response.status_code == 404:
-                raise HostNotFound(host, f"{method} {url} -> 404")
+                raise HostNotFound(host, f"{method} {url} -> 404", 404)
             if response.status_code >= 500:
-                raise HostUnavailable(host, f"{method} {url} -> {response.status_code}")
+                raise HostUnavailable(
+                    host,
+                    f"{method} {url} -> {response.status_code}",
+                    response.status_code,
+                )
             # Any other non-2xx (400/401/403/422/429…) is a typed, non-retryable
             # HostError — never a raw httpx exception — so every `except HostError`
             # guard degrades gracefully (a bad seed id 400 must not crash a cycle).
             if response.status_code >= 400:
-                raise HostError(host, f"{method} {url} -> {response.status_code}")
+                raise HostError(
+                    host,
+                    f"{method} {url} -> {response.status_code}",
+                    response.status_code,
+                )
             return response
     # Unreachable: reraise=True re-raises the last error rather than exiting.
     raise HostUnavailable(host, "retry loop exhausted")  # pragma: no cover

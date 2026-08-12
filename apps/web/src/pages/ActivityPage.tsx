@@ -6,6 +6,7 @@ import { ActivityCard } from '../components/activity/ActivityCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PillButton } from '../components/ui/PillButton';
+import { AutoCollectCard } from '../components/cs2/AutoCollectCard';
 import { SubmitMatchCard } from '../components/cs2/SubmitMatchCard';
 import { useLinks } from '../hooks/useLinks';
 import { SectionHeader } from '../components/ui/SectionHeader';
@@ -75,6 +76,7 @@ export function ActivityPage() {
        * land after playing, so it is the place to ask for it. */}
       <div className="mb-6">
         <SubmitMatchCard linked={cs2Linked} />
+          <AutoCollectCard linked={cs2Linked} />
       </div>
 
       {isError ? (

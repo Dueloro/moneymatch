@@ -27,6 +27,17 @@ vi.mock('../hooks/useCs2', () => ({
     isPending: false,
     isError: false,
   }),
+  // Automatic collection sits alongside the paste box. Reported as not
+  // connected, so these tests exercise the page's own content rather than the
+  // setup form.
+  useChainStatus: () => ({ data: { connected: false } }),
+  useConnectChain: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useSyncChain: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    isSuccess: false,
+  }),
 }));
 
 import { useActivity, type ActivityItem } from '../hooks/useActivity';

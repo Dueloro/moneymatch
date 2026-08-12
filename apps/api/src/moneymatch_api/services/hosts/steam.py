@@ -29,7 +29,7 @@ import structlog
 
 from ...config import get_settings
 from ._client import request_json
-from .errors import HostError
+from .errors import HostError, HostNotConfigured
 
 HOST = "steam"
 STEAM_BASE = "https://api.steampowered.com"
@@ -162,7 +162,104 @@ async def resolve_vanity_url(vanity: str) -> str | None:
     return str(response.get("steamid")) or None
 
 
+class ChainError(Exception):
+    """A share-code chain poll that failed in a way the caller must act on.
+
+    `retryable` separates "try again later" from "this will never work until
+    the player does something". Retrying a 412 forever would hammer Valve with
+    a request that cannot succeed, and repeated bad auth codes get the whole
+    API key temporarily blocked -- one user's stale cursor would then take
+    settlement down for everyone.
+    """
+
+    def __init__(self, code: str, message: str, *, retryable: bool) -> None:
+        super().__init__(message)
+        self.code = code
+        self.retryable = retryable
+
+
+#: Returned by `get_next_share_code` when the player has no newer match.
+CAUGHT_UP = "caught_up"
+
+
+async def get_next_share_code(
+    steam_id: str, auth_code: str, known_code: str
+) -> str | None:
+    """The share code for the match *after* `known_code`, or None if caught up.
+
+    This is what removes the paste step. Valve stores a player's matches as a
+    linked list: given one code you own, it hands back the next, so a one-time
+    cursor turns into every future match arriving on its own.
+
+    The status codes carry the entire contract, and they are not interchangeable:
+
+    - **202** — no newer match yet. Normal, and the common case; a player who
+      has not played since the last poll is not an error.
+    - **412** — `known_code` is not this player's match. Their cursor is wrong
+      and no amount of retrying will fix it, so this stops and re-prompts.
+    - **403** — the auth code is bad or was regenerated. The link is broken
+      until they supply a new one.
+    - **429/5xx** — rate limited or down. Back off and try later.
+    """
+    key = _api_key()
+    if not key:
+        raise HostNotConfigured(HOST, "STEAM_API_KEY is not configured.")
+
+    try:
+        response = await request_json(
+            HOST,
+            "GET",
+            f"{STEAM_BASE}/ICSGOPlayers_730/GetNextMatchSharingCode/v1/",
+            # The auth code is a per-user secret. It goes in the query because
+            # Valve accepts nothing else, and it is never logged: `host.request`
+            # logs the URL, so anything secret must stay out of the path.
+            params={
+                "key": key,
+                "steamid": str(steam_id),
+                "steamidkey": auth_code,
+                "knowncode": known_code,
+            },
+        )
+    except HostError as exc:
+        status = exc.status_code
+        if status == 412:
+            raise ChainError(
+                "chain_cursor_not_yours",
+                "That share code is not from a match on this Steam account. "
+                "Paste one of your own to start the chain.",
+                retryable=False,
+            ) from exc
+        if status == 403:
+            raise ChainError(
+                "chain_auth_code_rejected",
+                "Steam rejected your authentication code. Create a new one and "
+                "reconnect.",
+                retryable=False,
+            ) from exc
+        raise ChainError(
+            "chain_unavailable",
+            "Steam would not answer just now. This will retry on its own.",
+            retryable=True,
+        ) from exc
+
+    # 202 is Valve's "nothing newer", and it carries no body worth reading.
+    if response.status_code == 202:
+        return None
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    code = ((payload or {}).get("result") or {}).get("nextcode")
+    # Valve answers "n/a" rather than 202 in some caught-up cases.
+    if not code or str(code).lower() in {"n/a", "none"}:
+        return None
+    return str(code)
+
+
 __all__ = [
+    "CAUGHT_UP",
+    "ChainError",
+    "get_next_share_code",
     "BanStatus",
     "LifetimeStats",
     "get_cs2_lifetime_stats",
