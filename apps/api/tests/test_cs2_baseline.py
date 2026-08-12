@@ -133,3 +133,86 @@ def test_the_source_is_reported_so_a_bar_can_be_explained():
     assert compute("cs2_kd_ratio", [], []).source == "population"
     assert "cohort" in kd([POOR_GAME]).source
     assert kd([0.4] * 6).source == "own"
+
+
+# --------------------------------------------------------------------------- #
+# Outliers. One game should not decide what you are asked for next month.
+# --------------------------------------------------------------------------- #
+
+
+def test_one_incredible_game_does_not_set_the_bar():
+    """A player who had the night of their life still gets their real bar."""
+    ordinary = [0.5, 0.55, 0.6, 0.45, 0.5, 0.55]
+    with_spike = [*ordinary, 4.0]
+    assert kd(with_spike).mu == pytest.approx(kd(ordinary).mu, abs=0.12)
+
+
+def test_one_disaster_game_does_not_hand_out_a_free_bar():
+    ordinary = [1.4, 1.5, 1.45, 1.55, 1.5, 1.4]
+    with_dud = [*ordinary, 0.05]
+    assert kd(with_dud).mu > kd(ordinary).mu - 0.12
+
+
+def test_trimming_waits_until_there_is_something_to_spare():
+    """With three matches, dropping the extremes discards most of the evidence."""
+    assert kd([0.4, 0.5, 2.0]).mu > kd([0.4, 0.5, 0.6]).mu
+
+
+# --------------------------------------------------------------------------- #
+# The ratchet: tanking a bar has to cost more than it pays.
+# --------------------------------------------------------------------------- #
+
+
+def test_an_established_bar_cannot_be_tanked_in_one_match():
+    from moneymatch_api.services.cs2_baseline import apply_ratchet
+
+    assert apply_ratchet(0.30, 1.50, 8) == pytest.approx(1.38)
+
+
+def test_a_bar_still_rises_freely():
+    """Getting better is not an exploit, and a stale bar is a free win."""
+    from moneymatch_api.services.cs2_baseline import apply_ratchet
+
+    assert apply_ratchet(2.4, 1.0, 20) == 2.4
+
+
+def test_a_new_player_converges_to_their_real_level_immediately():
+    """The original bug was a player who went 8-19 being asked for 1.25."""
+    from moneymatch_api.services.cs2_baseline import apply_ratchet
+
+    assert apply_ratchet(0.42, 1.00, 2) == 0.42
+
+
+def test_an_honest_decline_still_gets_there():
+    from moneymatch_api.services.cs2_baseline import apply_ratchet
+
+    mu = 1.50
+    for _ in range(12):
+        mu = apply_ratchet(0.60, mu, 10)
+    assert mu < 0.70
+
+
+# --------------------------------------------------------------------------- #
+# Anomalies: flagged for review, never auto-blocked.
+# --------------------------------------------------------------------------- #
+
+
+def test_a_sudden_jump_beyond_your_level_is_flagged():
+    """What an account looks like when somebody else starts playing on it."""
+    baseline = kd([0.5, 0.55, 0.6, 0.5, 0.55, 3.0, 3.2, 3.1])
+    assert "improbable_improvement" in baseline.anomalies
+
+
+def test_a_sustained_drop_is_flagged_as_possible_tanking():
+    baseline = kd([2.0, 2.1, 1.9, 2.0, 2.1, 0.1, 0.15, 0.1])
+    assert "sustained_underperformance" in baseline.anomalies
+
+
+def test_ordinary_variance_is_not_flagged():
+    """A player having a normal run must not land in a review queue."""
+    assert kd([1.0, 1.3, 0.8, 1.1, 0.9, 1.2, 1.0, 0.95]).anomalies == ()
+
+
+def test_a_short_history_is_never_flagged():
+    """Three matches cannot establish what is abnormal for anyone."""
+    assert kd([0.4, 3.5, 0.5]).anomalies == ()

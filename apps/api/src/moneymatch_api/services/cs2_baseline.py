@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import statistics
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import structlog
 from sqlalchemy import select
@@ -76,6 +76,28 @@ MIN_SPREAD_FRACTION = 0.18
 #: match reached.
 MAX_SPREAD_FRACTION = 0.45
 
+#: Below this many matches there is nothing to trim: dropping the extremes of
+#: three games throws away a third of the evidence.
+TRIM_MIN_MATCHES = 5
+
+#: How far a baseline may fall per submitted match, as a fraction.
+#:
+#: The bar has to move down when someone genuinely gets worse, and must not
+#: move down fast enough to be worth engineering. Tanking is the obvious attack
+#: on a wager quoted from your own history: lose four games on purpose, get a
+#: bar you can clear in your sleep, then play properly. A ratchet makes that
+#: cost more matches than the payout is worth, while an honest decline still
+#: reaches its true level within a handful of games.
+#:
+#: Rising is deliberately not limited. Improving is not an exploit, and a bar
+#: that lags real improvement is one the player beats every time.
+MAX_FALL_PER_MATCH = 0.08
+
+#: A result this many spreads above an established baseline is not a good day.
+#: It is not proof of anything either, which is why it raises a flag for review
+#: rather than blocking a payout.
+ANOMALY_SIGMA = 3.0
+
 
 @dataclass(frozen=True)
 class Baseline:
@@ -86,6 +108,57 @@ class Baseline:
     own_matches: int
     cohort_players: int
     source: str
+    #: Anything about this record that a human should look at. Never blocks a
+    #: payout on its own: an unusual run is evidence, not a verdict.
+    anomalies: tuple[str, ...] = ()
+
+
+def detect_anomalies(own: list[float], mu: float, sigma: float) -> tuple[str, ...]:
+    """Patterns in a player's own results worth a second look.
+
+    Two shapes matter on a wager product, and they are mirror images.
+
+    A sudden jump far above an established level is what an account looks like
+    when someone else starts playing on it, or when help arrives. A sustained
+    drop below it is what tanking looks like: a bar quoted from your own history
+    is only as honest as the history.
+
+    Neither is proof. A player can have the game of their life, and a player can
+    genuinely go on a bad run, so this raises a flag rather than blocking money.
+    """
+    if len(own) < TRIM_MIN_MATCHES or sigma <= 0:
+        return ()
+
+    flags: list[str] = []
+    recent, earlier = own[-3:], own[:-3]
+    if not earlier:
+        return ()
+
+    baseline = statistics.fmean(earlier)
+    latest = statistics.fmean(recent)
+    delta = (latest - baseline) / sigma
+
+    if delta >= ANOMALY_SIGMA:
+        flags.append("improbable_improvement")
+    elif delta <= -ANOMALY_SIGMA:
+        flags.append("sustained_underperformance")
+
+    if max(own) > 0 and max(own) >= baseline + ANOMALY_SIGMA * 2 * sigma:
+        flags.append("single_outlier_result")
+    return tuple(flags)
+
+
+def _trimmed(values: list[float]) -> list[float]:
+    """Drop the single best and worst result, once there are enough to spare.
+
+    One extraordinary game, in either direction, should not decide what someone
+    is asked to clear for the next month. Everybody has a 40-kill game and
+    everybody has a game where they disconnect at round three.
+    """
+    if len(values) < TRIM_MIN_MATCHES:
+        return values
+    ordered = sorted(values)
+    return ordered[1:-1]
 
 
 def _sample(values: list[float], robust: bool = False) -> tuple[float, float] | None:
@@ -111,7 +184,7 @@ def compute(
     """Blend the three sources into one centre and spread. Pure, so testable."""
     pop_mu, pop_sigma = POPULATION[metric]
 
-    own_stat = _sample(own)
+    own_stat = _sample(_trimmed(own))
     cohort_stat = _sample(cohort, robust=True)
 
     # A brand new account has no matches here and usually no public stats
@@ -165,6 +238,7 @@ def compute(
         own_matches=len(own),
         cohort_players=len(cohort),
         source=source,
+        anomalies=detect_anomalies(own, mu, sigma),
     )
 
 
@@ -215,9 +289,33 @@ async def refresh(
     for metric in CS2_STEAM_METRICS:
         own, cohort = await _samples(session, steam_id, metric)
         baseline = compute(metric, own, cohort, lifetime_kd)
-        out[metric] = baseline
-
         model = existing.get(metric)
+
+        if model is not None:
+            floored = apply_ratchet(baseline.mu, float(model.mu), int(model.n))
+            if floored != baseline.mu:
+                log.info(
+                    "cs2.baseline_ratcheted",
+                    user_id=str(user_id),
+                    metric=metric,
+                    computed=baseline.mu,
+                    held_at=round(floored, 4),
+                )
+                baseline = replace(baseline, mu=round(floored, 4))
+
+        if baseline.anomalies:
+            # Logged rather than acted on. These are shapes worth reviewing, not
+            # verdicts, and an automatic block on a player having a great night
+            # is worse than a missed catch.
+            log.warning(
+                "cs2.baseline_anomaly",
+                user_id=str(user_id),
+                steam_id=steam_id,
+                metric=metric,
+                anomalies=list(baseline.anomalies),
+                matches=baseline.own_matches,
+            )
+        out[metric] = baseline
         # `n` is what the engines read as "how much do we know". It is the count
         # of the player's own matches, never the cohort, or a bar would look
         # well-evidenced on the strength of other people's games.
@@ -252,4 +350,34 @@ async def refresh(
     return out
 
 
-__all__ = ["Baseline", "POPULATION", "compute", "refresh"]
+def apply_ratchet(new_mu: float, previous_mu: float, previous_n: int) -> float:
+    """Limit how fast an established baseline may fall.
+
+    A bar quoted from your own history invites exactly one attack: play badly on
+    purpose, collect a bar you can clear without trying, then play normally. The
+    ratchet does not prevent that, it prices it. Each tanked match buys at most
+    an 8% easier bar, so moving a bar far enough to matter costs more matches
+    than any single payout is worth, and the sustained drop is flagged while it
+    happens.
+
+    It deliberately does not apply until a baseline exists. A genuinely weak new
+    player must be allowed to converge to their real level immediately, because
+    the original complaint about this feature was a player who had just gone
+    8-19 being asked for 1.25 K/D. Making that player grind ten matches to earn
+    an honest bar would reintroduce the bug in slow motion.
+
+    Rising is never limited. Improvement is not an exploit.
+    """
+    if previous_n < TRIM_MIN_MATCHES or previous_mu <= 0:
+        return new_mu
+    return max(new_mu, previous_mu * (1 - MAX_FALL_PER_MATCH))
+
+
+__all__ = [
+    "Baseline",
+    "POPULATION",
+    "apply_ratchet",
+    "compute",
+    "detect_anomalies",
+    "refresh",
+]
