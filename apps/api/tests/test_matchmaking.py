@@ -301,7 +301,9 @@ async def test_provisional_metric_cannot_queue_a_stat_duel(session):
 async def _pubg_player(session, name, *, n):
     user = await create_user(session, username=name)
     await create_linked_account(session, user, "pubg.steam")
-    await create_metric_model(session, user, "pubg.steam", "pubg_kills", mu=4.5, sigma=2.0, n=n)
+    await create_metric_model(
+        session, user, "pubg.steam", "pubg_kills", mu=4.5, sigma=2.0, n=n
+    )
     return user
 
 

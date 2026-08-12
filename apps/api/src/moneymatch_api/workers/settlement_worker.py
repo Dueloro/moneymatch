@@ -26,6 +26,7 @@ import structlog
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from ..adapters import registry
 from ..constants import (
     FLAG_NIGHTLY_LAST_RUN,
     FLAG_QUEUE_PAUSED,
@@ -38,14 +39,13 @@ from ..constants import (
     TOURNAMENT_STANDINGS_REFRESH_SECONDS,
     WORKER_POLL_INTERVAL_SECONDS,
 )
-from ..adapters import registry
 from ..db.session import get_sessionmaker
 from ..models.feature_flag import FeatureFlag
 from ..models.linked_account import LinkedAccount
 from ..models.live import LiveSnapshot
 from ..models.play import Match, MatchPlayer
-from ..models.skill import MetricModel
 from ..models.pools import SoloEntry, SoloPool
+from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..services import (
