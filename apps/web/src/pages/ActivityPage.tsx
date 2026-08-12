@@ -6,7 +6,7 @@ import { ActivityCard } from '../components/activity/ActivityCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PillButton } from '../components/ui/PillButton';
-import { AutoCollectCard } from '../components/cs2/AutoCollectCard';
+import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { SubmitMatchCard } from '../components/cs2/SubmitMatchCard';
 import { useLinks } from '../hooks/useLinks';
 import { SectionHeader } from '../components/ui/SectionHeader';
@@ -75,8 +75,8 @@ export function ActivityPage() {
        * a settled wager once its share code is pasted. This is the place you
        * land after playing, so it is the place to ask for it. */}
       <div className="mb-6">
+        <Cs2SetupCard linked={cs2Linked} />
         <SubmitMatchCard linked={cs2Linked} />
-          <AutoCollectCard linked={cs2Linked} />
       </div>
 
       {isError ? (

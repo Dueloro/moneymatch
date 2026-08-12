@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '../auth/useAuth';
-import { AutoCollectCard } from '../components/cs2/AutoCollectCard';
+import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { SubmitMatchCard } from '../components/cs2/SubmitMatchCard';
 import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
@@ -63,8 +63,8 @@ export function ProfilePage() {
             After a Premier, Competitive or Wingman match, paste its share code here to
             settle any wager you have open.
           </p>
+          <Cs2SetupCard />
           <SubmitMatchCard />
-          <AutoCollectCard />
         </Section>
       )}
 
