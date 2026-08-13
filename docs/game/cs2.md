@@ -1,359 +1,246 @@
-# CS2 (FaceIt) — live API responses
+# CS2 — what the APIs actually return
 
-> **Retired.** FACEIT was removed on 2026-08-12; CS2 now settles from
-> Valve share codes via `cs2.steam`. Kept as the record of what the FACEIT
-> integration actually returned, which is why the parsing decisions in
-> `docs/game/cs2-steam.md` look the way they do. Nothing here describes
-> current behaviour.
+Real responses captured on **2026-08-13** against SteamID `76561198748110372`,
+using the exact parameters the code sends. Keys and per-user secrets are
+redacted; nothing else is edited, so what you see is what the adapter parses.
 
+Two entirely separate systems feed CS2, and confusing them is the first thing
+that goes wrong:
 
-Real responses captured on **2026-08-11** by calling the FaceIt Data API v4 with
-the exact parameters `services/hosts/faceit.py` sends. Nothing here is
-hand-written or trimmed except where marked, so what you see is what the adapter
-parses.
-
-Sample account: **`donk666`** (an active pro, so recent matches always exist).
-Swap the nickname in any URL below to see your own.
-
-Unlike Lichess, **every call needs a server-side API key**
-(`Authorization: Bearer $FACEIT_API_KEY`). Without it `faceit.is_configured()`
-is false and the link path raises `HostNotConfigured` rather than pretending the
-player does not exist.
-
-Four endpoints are used for the read path, and one of them runs **once per
-match**, which is the main cost difference from chess.
-
----
-
-## 1. Player — `GET /players?nickname={nickname}&game=cs2`
-
-Called by `faceit.get_player()`, parsed by `CS2FaceitAdapter._to_profile()`.
-Used on link, on refresh, and to resolve a nickname to the `player_id` that
-every other endpoint is keyed by.
-
-```
-https://open.faceit.com/data/v4/players?nickname=donk666&game=cs2
-```
-
-```jsonc
-{
-  "player_id": "e5e8e2a6-d716-4493-b949-e16965f41654",  // the key for every other call
-  "nickname": "donk666",
-  "avatar": "https://distribution.faceit-cdn.net/images/30b3a5e8-....jpg",
-  "country": "kr",
-  "faceit_url": "https://www.faceit.com/{lang}/players/donk666",  // {lang} is ours to fill
-  "steam_id_64": "76561198386265483",
-  "verified": true,
-  "activated_at": "2017-10-27T06:09:38.834Z",
-  "memberships": ["premium", "esea"],
-  "games": {
-    "cs2": {
-      "region": "EU",
-      "game_player_id": "76561198386265483",
-      "game_player_name": "king",
-      "skill_level": 10,           // -> rank_label "Level 10"
-      "faceit_elo": 4627           // -> rating
-    },
-    "csgo": {                      // legacy block, still present on old accounts
-      "skill_level": 10,
-      "faceit_elo": 5977           // a DIFFERENT number; not ours to read
-    }
-  },
-  "infractions": { /* ... */ },
-  "platforms": { /* ... */ },
-  "settings": { /* ... */ }
-}
-```
-
-**How it maps to `ProfileSnapshot`:**
-
-| FaceIt field | Our field | Note |
+| | Steam Web API | Game Coordinator |
 | --- | --- | --- |
-| `nickname` | `username`, `display_name` | |
-| `faceit_url` | `url` | `{lang}` is replaced with `en` |
-| `avatar` | `avatar_url` | |
-| `games.cs2.faceit_elo` | `rating` | The Elo you would matchmake on |
-| `games.cs2.skill_level` | `rank_label` | Rendered as `Level 10` |
+| Transport | HTTPS + JSON | protobuf over the Steam network |
+| Auth | an API key | a signed-in Steam account |
+| Reachable from Python | yes | **no** — hence `gc-sidecar/` |
+| Gives you | identity, bans, and *which share code comes next* | the **scoreboard** |
 
-Three things worth knowing:
-
-**The `csgo` block is a trap.** Old accounts carry both, with different Elo
-(5977 vs 4627 here). The adapter reads `games.cs2` only. If a player has a
-`csgo` block and no `cs2` block, `fetch_profile` raises rather than inventing a
-profile that could never settle a CS2 match.
-
-**A 404 does not mean the player is missing.** `?game=cs2` 404s for an account
-without that block, so `get_player()` retries the lookup without the filter. Of
-the eight pro nicknames tried while capturing this, `s1mple` and `NiKo` 404
-either way; `donk666`, `ZywOo`, `m0NESY`, `device`, `ropz` and `broky` resolve.
-
-**No account age gate.** `activated_at` is captured but unused; chess uses
-`createdAt` for `account_age_days`, CS2 leaves it null.
+The Web API never returns per-match statistics. It will tell you a match
+*exists* — that is what the share-code chain is — but the kills, deaths and
+headshots a wager settles on come only from the Game Coordinator.
 
 ---
 
-## 2. Lifetime stats — `GET /players/{player_id}/stats/cs2`
+## Steam Web API
 
-Called by `faceit.get_player_stats()`, which returns the `lifetime` block only.
-Used for the overall record shown on the profile card.
+### `GetPlayerSummaries` — identity, and who is playing right now
 
+```http
+GET /ISteamUser/GetPlayerSummaries/v2/?key=<redacted>&steamids=76561198748110372
 ```
-https://open.faceit.com/data/v4/players/e5e8e2a6-.../stats/cs2
-```
 
-```jsonc
+```json
 {
-  "lifetime": {
-    "Matches": "7199",
-    "Wins": "4364",
-    "Win Rate %": "61",
-    "Average K/D Ratio": "1.45",     // <- the one the adapter reads
-    "K/D Ratio": "10419.3",          // <- cumulative total, NOT a ratio
-    "ADR": "114.15",
-    "Average Headshots %": "60",
-    "Current Win Streak": "1",
-    "Longest Win Streak": "22",
-    "Recent Results": ["1", "1", "1", "0", "1"],   // 1 = win, newest last
-    // ~30 more: entry rates, flash stats, utility damage, 1v1/1v2 clutches
+  "response": {
+    "players": [
+      {
+        "steamid": "76561198748110372",
+        "communityvisibilitystate": 3,
+        "personaname": "lifeunicorn",
+        "profileurl": "https://steamcommunity.com/profiles/76561198748110372/",
+        "avatar": "https://avatars.steamstatic.com/fef49e7f….jpg",
+        "avatarmedium": "https://avatars.steamstatic.com/fef49e7f…_medium.jpg",
+        "avatarfull": "https://avatars.steamstatic.com/fef49e7f…_full.jpg",
+        "avatarhash": "fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb",
+        "lastlogoff": 1786582724,
+        "personastate": 1,
+        "primaryclanid": "103582791429521408",
+        "timecreated": 1768503605,
+        "personastateflags": 0,
+        "gameextrainfo": "Counter-Strike 2",
+        "gameid": "730"
+      }
+    ]
   }
 }
 ```
 
-**How it maps:**
+`personaname` is a display name and is mutable — the identity is `steamid`, and
+nothing keys off the name.
 
-| FaceIt field | Our field | Note |
-| --- | --- | --- |
-| `Matches` | `total_games` | Gates `GAME_HISTORY_FLOOR` (CS2: 25) |
-| `Win Rate %` | `win_rate` | Divided by 100; defaults to 0.5 when absent |
-| `Average K/D Ratio` | `kd` | |
+**`gameid` is load-bearing.** It appears only while the account is in a game,
+and `"730"` means CS2. The sidecar supervisor reads it to decide whether it may
+connect, because connecting *announces* that the account is playing CS2 and
+would evict whoever actually is. The check is a plain read: no sign-in, nobody
+evicted.
 
-**Every value is a string**, including the numbers. `_to_float()` exists for
-exactly this, and returns `None` rather than raising on anything unparseable.
+One trap: while the sidecar is connected, this field reports `730` for that same
+account, because from Steam's side the sidecar is playing CS2. The answer only
+distinguishes a human from the sidecar while the sidecar is down — which is
+exactly, and only, when it is consulted.
 
-**`K/D Ratio` in this block is not a K/D ratio.** It reads `10419.3` for a
-player whose actual average is `1.45`, so it is a running total of something,
-not a rate. The adapter correctly reads `Average K/D Ratio`. Anyone adding a
-metric here should check the value against a known player before trusting the
-field name.
+### `GetPlayerBans` — checked at link time
 
-`draw_rate` is hardcoded to `0.0`: CS2 matchmaking does not draw.
-
----
-
-## 3. Match history — `GET /players/{player_id}/history?game=cs2`
-
-Called by `faceit.get_player_history()`, parsed by `_normalize()`. This is the
-settlement and metric-modelling feed.
-
-Exact query the adapter sends:
-
-```
-https://open.faceit.com/data/v4/players/{player_id}/history
-  ?game=cs2
-  &limit=20        // the adapter's default
-  &from=1786455803 // epoch SECONDS, and 60s earlier than asked for (clock skew)
+```http
+GET /ISteamUser/GetPlayerBans/v1/?key=<redacted>&steamids=76561198748110372
 ```
 
-One full item, unedited apart from trimming the player lists:
-
-```jsonc
+```json
 {
-  "match_id": "1-98cf6a9c-c1a0-46ca-8d85-c1103fcde074",
-  "game_id": "cs2",
-  "region": "EU",
-  "game_mode": "5v5",
-  "match_type": "",
-  "max_players": 10,
-  "teams_size": 5,
-  "competition_id": "...",
-  "competition_name": "Europe 5v5 Queue",
-  "competition_type": "matchmaking",     // vs "championship" for organised play
-  "organizer_id": "faceit",
-  "status": "finished",                  // anything else is skipped
-  "started_at": 1786455863,              // epoch SECONDS -> created_at_ms (x1000)
-  "finished_at": 1786458151,
-  "teams": {
-    "faction1": {
-      "team_id": "641bc080-6868-4cee-bb4c-044dd05f7d1c",
-      "nickname": "team_donk666",
-      "players": [
-        { "player_id": "e5e8e2a6-...", "nickname": "donk666", "skill_level": 10 }
-        // 4 more
-      ]
-    },
-    "faction2": { "team_id": "960d9e7a-...", "players": [ /* 5 */ ] }
-  },
-  "results": {
-    "winner": "faction1",                // a FACTION KEY, not a team_id
-    "score": { "faction1": 13, "faction2": 9 }
-  },
-  "faceit_url": "https://www.faceit.com/{lang}/cs2/room/1-98cf6a9c-..."
-}
-```
-
-**How it maps to `NormGame`:**
-
-| FaceIt field | Our field | Note |
-| --- | --- | --- |
-| `match_id` | `id` | What `/matches/{id}/stats` is keyed by |
-| `started_at` (else `finished_at`) | `created_at_ms` | **Seconds x 1000** |
-| which faction contains you, vs `results.winner` | `won` | `None` when there is no winner |
-| no winner | `drawn` | |
-| — | `speed` | Hardcoded `"cs2"` |
-| — | `rated` | Hardcoded `True` |
-| — | `moves` | Always `0`; chess-only field |
-
-`_normalize()` returns `None` (match skipped) when the status is not `finished`,
-or when the linked `player_id` appears in neither faction.
-
-**The winner is identified two different ways in two different endpoints.**
-Here it is a faction key (`"faction1"`). In the match-stats response below it is
-a `team_id` UUID. They are not interchangeable, and `_normalize` correctly
-compares faction keys.
-
-**Nothing here is filtered by competition type.** A `matchmaking` queue game and
-a `championship` game both count. Worth revisiting alongside the chess
-eligibility rules, since a private championship is arrangeable.
-
----
-
-## 4. Per-match stats — `GET /matches/{match_id}/stats`
-
-Called by `faceit.get_match_stats()`, parsed by `_extract_player_metrics()`.
-This is where every pool and tournament metric comes from.
-
-```
-https://open.faceit.com/data/v4/matches/1-98cf6a9c-.../stats
-```
-
-```jsonc
-{
-  "rounds": [                                  // one entry per map
+  "players": [
     {
-      "match_id": "1-98cf6a9c-...",
-      "match_round": "1",
-      "played": "1",
-      "best_of": "1",
-      "round_stats": {
-        "Map": "de_dust2",
-        "Score": "13 / 9",
-        "Rounds": "22",
-        "Winner": "641bc080-6868-4cee-bb4c-044dd05f7d1c",   // a TEAM ID here
-        "Region": "EU"
-      },
-      "teams": [
-        {
-          "team_id": "641bc080-...",
-          "players": [
-            {
-              "player_id": "e5e8e2a6-...",
-              "nickname": "donk666",
-              "player_stats": {
-                "Kills": "18",
-                "Deaths": "14",
-                "K/D Ratio": "1.29",
-                "Headshots %": "83",
-                "ADR": "94.2",
-                "MVPs": "4",
-                "Result": "1",
-                // ~40 more: entry, clutch, utility, flash, sniper, multikills
-              }
-            }
-            // 4 more players
-          ]
-        }
-        // the other team
-      ]
+      "SteamId": "76561198748110372",
+      "CommunityBanned": false,
+      "VACBanned": false,
+      "NumberOfVACBans": 0,
+      "DaysSinceLastBan": 0,
+      "NumberOfGameBans": 0,
+      "EconomyBan": "none"
     }
   ]
 }
 ```
 
-**The six fields the adapter maps:**
+A failed lookup returns `None`, which means **unknown** and never *clean* — the
+distinction matters, because treating a failed ban check as a pass is how a
+banned account gets to stake money.
 
-| FaceIt `player_stats` | Our metric | Used by |
-| --- | --- | --- |
-| `Kills` | `cs2_kills` | — |
-| `Deaths` | `cs2_deaths` | — |
-| `K/D Ratio` | `cs2_kd_ratio` | Pool, tournament, H2H stat duel |
-| `Headshots %` | `cs2_headshot_pct` | Pool, tournament, H2H stat duel |
-| `ADR` | `cs2_adr` | Pool, tournament, H2H stat duel |
-| `MVPs` | `cs2_mvps` | — |
+### `GetUserStatsForGame` — lifetime totals, usually unavailable
 
-A field that is absent is **omitted, never guessed**. Every value is a string
-and goes through `_to_float()`.
-
-**This is one HTTP request per match.** Polling twenty matches costs twenty-one
-requests, against Lichess's one. That is why `get_match_stats()` is TTL-cached
-in-process for an hour (finished-match stats never change) and why the API and
-the worker each keep their own cache.
-
-`_extract_player_metrics` walks `rounds -> teams -> players` and stops at the
-first entry whose `player_id` matches. On a best-of-three only the first map's
-stats are read.
-
----
-
-## 5. What is NOT in the response
-
-**No per-player score.** There is no `Score` field in `player_stats`, which is
-why ADR is the contribution metric. The adapter comment says this; the captured
-key list confirms it.
-
-**No Elo, and no Elo delta, anywhere in the match feed.** `faceit_elo` exists
-only on the player object, as a current value. So a match cannot tell you what
-either player was rated when they played it, and any Elo-based matchmaking has
-to read the profile snapshot taken at link time.
-
-**No `rated` flag.** Every CS2 match is treated as rated (`rated=True`,
-hardcoded). The chess distinction between rated and casual has no equivalent
-here, so the `rated_only` filter does nothing for CS2.
-
-**No anti-cheat or ban signal on a match.** `infractions` exists on the player
-object only.
-
-**No move or round timeline**, so nothing analogous to the chess
-minimum-move rule exists for CS2. The nearest usable signals are
-`round_stats.Rounds` (a 22-round match is real; a 3-round one is not) and
-`competition_type`.
-
----
-
-## 6. Reproducing this capture
-
-```bash
-export FACEIT_API_KEY=...        # same key the API uses
-AUTH="Authorization: Bearer $FACEIT_API_KEY"
-
-# 1. Player (and the player_id everything else needs)
-curl -s -H "$AUTH" \
-  'https://open.faceit.com/data/v4/players?nickname=YOUR_NICK&game=cs2' | jq
-
-PID=$(curl -s -H "$AUTH" \
-  'https://open.faceit.com/data/v4/players?nickname=YOUR_NICK&game=cs2' | jq -r .player_id)
-
-# 2. Lifetime stats
-curl -s -H "$AUTH" "https://open.faceit.com/data/v4/players/$PID/stats/cs2" | jq
-
-# 3. History, exactly as the adapter asks for it
-curl -s -H "$AUTH" \
-  "https://open.faceit.com/data/v4/players/$PID/history?game=cs2&limit=3" | jq
-
-# 4. Per-match stats for the newest match
-MID=$(curl -s -H "$AUTH" \
-  "https://open.faceit.com/data/v4/players/$PID/history?game=cs2&limit=1" \
-  | jq -r .items[0].match_id)
-curl -s -H "$AUTH" "https://open.faceit.com/data/v4/matches/$MID/stats" | jq
+```http
+GET /ISteamUserStats/GetUserStatsForGame/v2/?appid=730&key=<redacted>&steamid=…
+→ HTTP 400
 ```
 
-FaceIt rate-limits per key. `request_json()` fails soft, so a throttled poll
-degrades to an empty history rather than raising, and `get_player_history()`
-returns `[]` on any host error. A settlement that reads an empty history grades
-the entry as unverifiable and refunds it, which is the safe direction.
+**400 is the normal case, not an error.** It is what Steam returns when game
+details are not public, which is the default. When it does succeed it carries
+lifetime counters (`total_kills`, `total_deaths`, `total_time_played`, …)
+aggregated across casual, deathmatch and bot games.
+
+Because of that mixture it is treated as the weakest possible signal: it nudges
+a brand-new account's starting bar halfway toward the player and is ignored
+entirely once a real match exists. Handling the 400 quietly is required, not
+optional — a private profile must not fail a link.
+
+### `GetNextMatchSharingCode` — the chain
+
+```http
+GET /ICSGOPlayers_730/GetNextMatchSharingCode/v1/
+    ?key=<redacted>&steamid=…&steamidkey=<per-user auth code>&knowncode=CSGO-…
+```
+
+Valve stores a player's matches as a linked list. Given one code they own, this
+returns the next — which is what removes the paste step.
+
+```json
+{ "result": { "nextcode": "CSGO-ZmR9i-fDPS3-GqJEk-ZLEyU-QmztJ" } }
+```
+
+The status codes are the whole contract and are **not** interchangeable:
+
+| Status | Meaning | What the code does |
+| --- | --- | --- |
+| `200` | a newer match exists | resolve it, store it, advance the cursor |
+| `202` | caught up | **normal**, and the common case — no body worth reading |
+| `412` | `knowncode` is not this player's | stop and re-prompt; retrying can never work |
+| `403` | auth code rejected or regenerated | mark the chain broken, tell the player |
+| `429` / `5xx` | rate limited or down | back off; leave the cursor alone |
+
+Some responses answer `200` with `"nextcode": "n/a"` instead of `202`. Both mean
+caught up.
+
+Getting the permanent failures wrong matters beyond one user: Valve temporarily
+blocks an API key that keeps presenting bad auth codes, so one stale cursor
+retried in a loop takes settlement down for everybody.
+
+**`steamidkey` is a per-user secret.** It reads that account's match history. It
+goes in the query string because Valve accepts nothing else, which is why
+request-level URL logging has to stay off — see `logging.py`.
 
 ---
 
-## 7. See also
+## Game Coordinator — the scoreboard
 
-- `docs/game/cs2-demo.md` — what the CS2 demo can and cannot do today, per mode.
-- `docs/game/chess.md` — the same capture for Lichess.
+Reached through `gc-sidecar/` over loopback, authenticated with a shared secret:
+
+```http
+POST /resolve  { "shareCode": "CSGO-xLsRA-f9V8L-xvMCL-JuvMY-XZrKG" }
+```
+
+A share code carries only three ids (`match_id`, `outcome_id`, `token_id`). The
+GC turns those into the finished match:
+
+```json
+{
+  "matchId": "3836649446058229858",
+  "matchTime": 1786622320,
+  "scores": { "a": 13, "b": 3 },
+  "demoUrl": "http://replay129.valve.net/730/00383665256205700324…",
+  "players": [
+    { "steamid": "76561198728704465", "team": "a", "kills": 17, "deaths": 4,
+      "assists": 4, "headshots": 3, "mvps": 3, "score": 39 },
+    { "steamid": "76561198307691890", "team": "a", "kills": 15, "deaths": 6,
+      "assists": 3, "headshots": 7, "mvps": 4, "score": 32 },
+    { "steamid": "76561199095285812", "team": "a", "kills": 11, "deaths": 6,
+      "assists": 2, "headshots": 4, "mvps": 4, "score": 24 }
+  ]
+}
+```
+
+Ten entries, one per scoreboard line, **including the nine other players**. That
+is not incidental: Valve put those people in the lobby because it thinks they
+are your level, so it is a free, continuously updated read on "players around my
+rank" without asking any ranking API for anything. Bars are quoted from it.
+
+### Every field available per player
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `steamid` | string | SteamID64. The only identity here |
+| `team` | `"a"` / `"b"` | maps to `scores.a` / `scores.b` |
+| `kills` | int | |
+| `deaths` | int | |
+| `assists` | int | not currently wagered on |
+| `headshots` | int | a **count**, not a percentage |
+| `mvps` | int | round MVPs |
+| `score` | int | Valve's own scoreboard points |
+
+### What is stored
+
+| Column | From | Notes |
+| --- | --- | --- |
+| `share_code` | the submitted code | **globally unique** — one match cannot settle ten wagers |
+| `match_id` | `matchId` | |
+| `match_time` | `matchTime` | decides which contest windows it falls in |
+| `rounds_total` | `scores.a + scores.b` | the surrender check reads this |
+| `score_a`, `score_b` | `scores` | |
+| `players` | `players[]` | the whole array, verbatim |
+| `demo_url` | `demoUrl` | |
+| `demo_expired` | derived | demos expire after about a month; scoreboards do not |
+
+`map_name` is **null**: the GC's match record does not carry it, and it is only
+ever cosmetic here.
+
+### What is derived, and what cannot be
+
+```http
+cs2_kd_ratio     = kills / deaths          (deaths 0 → falls back to kills)
+cs2_headshot_pct = headshots / kills * 100 (kills 0 → 0.0, not a division error)
+cs2_kills        = kills
+```
+
+**There is no ADR.** Average damage per round needs per-round damage, which is
+in the demo file, not the scoreboard. Until demos are parsed, ADR does not
+exist — and a market nothing can grade would take money for a wager that could
+never settle, which is why CS2 offers a kills market instead.
+
+Assists, MVPs and Valve's `score` are all available and unused; they are the
+cheapest metrics to add if wanted.
+
+---
+
+## Which matches produce a share code at all
+
+Only **Premier, Competitive and Wingman**. Casual, Deathmatch and Arms Race
+generate none, so a code that resolves was necessarily a real matchmaking match
+— which is why no game-mode filter is needed anywhere.
+
+A completed match runs at least 16 rounds (9 for Wingman, which is 2v2). Below
+that it was surrendered or abandoned, and it is refused: not at intake, but in
+the adapter every engine reads matches through, so no ingest path can forget.
+
+---
+
+## See also
+
+- `docs/game/cs2-how-it-works.md` — how these pieces fit together end to end
+- `docs/game/cs2-steam.md` — the design decisions behind the Steam integration
