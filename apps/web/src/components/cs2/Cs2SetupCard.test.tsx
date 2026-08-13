@@ -88,13 +88,24 @@ describe('Cs2SetupCard', () => {
     });
   });
 
-  it('cannot be submitted before Steam is connected', () => {
-    // The codes are meaningless without a SteamID to attach them to, and a
-    // request that can only fail is worse than a disabled button.
+  it('does not ask for the codes before Steam is connected', () => {
+    // They are meaningless without a SteamID to attach them to. Two greyed-out
+    // boxes above a greyed-out button only ask the reader to work out which
+    // thing to do first.
     setup({ steamLinked: false });
     render(<Cs2SetupCard />);
-    expect(screen.getByRole('button', { name: /finish setup/i })).toBeDisabled();
-    expect(screen.getByLabelText(/authentication code/i)).toBeDisabled();
+    expect(screen.queryByLabelText(/authentication code/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/share code/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /finish setup/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('asks for the codes as soon as Steam is connected', () => {
+    setup({ steamLinked: true });
+    render(<Cs2SetupCard />);
+    expect(screen.getByLabelText(/authentication code/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /finish setup/i })).toBeInTheDocument();
   });
 
   it('offers Steam sign-in when that step is outstanding', () => {

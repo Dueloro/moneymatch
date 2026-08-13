@@ -251,80 +251,96 @@ export function Cs2SetupCard() {
           )}
         </Step>
 
-        <Step index={2} title="Create a match authentication code" done={false}>
-          <p className="mt-1 text-xs text-text-secondary">
-            Steam issues one per account.{' '}
-            <a
-              href={AUTH_CODE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-action underline"
-            >
-              Create yours
-            </a>
-            , then paste it below.
-          </p>
-        </Step>
+        {/* Steps two and three are meaningless without a SteamID to attach
+         * them to, and showing two disabled boxes above a disabled button just
+         * asks the reader to work out which thing to do first. They appear when
+         * they become doable. */}
+        {linked && (
+          <>
+            <Step index={2} title="Create a match authentication code" done={false}>
+              <p className="mt-1 text-xs text-text-secondary">
+                Steam issues one per account.{' '}
+                <a
+                  href={AUTH_CODE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-action underline"
+                >
+                  Create yours
+                </a>
+                , then paste it below.
+              </p>
+            </Step>
 
-        <Step index={3} title="Name one match you have played" done={false}>
-          <p className="mt-1 text-xs text-text-secondary">
-            In CS2: <span className="text-text">Watch</span> →{' '}
-            <span className="text-text">Your Matches</span> → copy any share code. It is
-            only a starting point, so any of your matches will do.
-          </p>
-        </Step>
+            <Step index={3} title="Name one match you have played" done={false}>
+              <p className="mt-1 text-xs text-text-secondary">
+                In CS2: <span className="text-text">Watch</span> →{' '}
+                <span className="text-text">Your Matches</span> → copy any share code.
+                It is only a starting point, so any of your matches will do.
+              </p>
+            </Step>
+          </>
+        )}
       </ol>
 
-      <form
-        className="mt-4 flex flex-col gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          connect.mutate({ authCode: authCode.trim(), knownCode: knownCode.trim() });
-        }}
-      >
-        <label htmlFor="cs2-auth-code" className="sr-only">
-          Steam match authentication code
-        </label>
-        <input
-          id="cs2-auth-code"
-          value={authCode}
-          onChange={(event) => setAuthCode(event.target.value)}
-          placeholder="Authentication code"
-          autoComplete="off"
-          spellCheck={false}
-          disabled={!linked}
-          className="w-full rounded-inset border border-hairline bg-panel px-3 py-2 font-mono text-sm text-text placeholder:text-text-tertiary disabled:opacity-50"
-        />
+      {!linked && (
+        <p className="mt-4 text-xs text-text-tertiary">
+          Two short codes come next. They take about a minute and are saved once, not
+          per match.
+        </p>
+      )}
 
-        <label htmlFor="cs2-known-code" className="sr-only">
-          A share code from one of your matches
-        </label>
-        <input
-          id="cs2-known-code"
-          value={knownCode}
-          onChange={(event) => setKnownCode(event.target.value)}
-          placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"
-          autoComplete="off"
-          spellCheck={false}
-          disabled={!linked}
-          className="w-full rounded-inset border border-hairline bg-panel px-3 py-2 font-mono text-sm text-text placeholder:text-text-tertiary disabled:opacity-50"
-        />
+      {linked && (
+        <form
+          className="mt-4 flex flex-col gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            connect.mutate({ authCode: authCode.trim(), knownCode: knownCode.trim() });
+          }}
+        >
+          <label htmlFor="cs2-auth-code" className="sr-only">
+            Steam match authentication code
+          </label>
+          <input
+            id="cs2-auth-code"
+            value={authCode}
+            onChange={(event) => setAuthCode(event.target.value)}
+            placeholder="Authentication code"
+            autoComplete="off"
+            spellCheck={false}
+            className="w-full rounded-inset border border-hairline bg-panel px-3 py-2 font-mono text-sm text-text placeholder:text-text-tertiary"
+          />
 
-        <div className="flex items-center gap-2">
-          <PillButton
-            type="submit"
-            disabled={
-              !linked ||
-              connect.isPending ||
-              authCode.trim().length < 8 ||
-              knownCode.trim().length < 10
-            }
-          >
-            {connect.isPending ? 'Checking…' : 'Finish setup'}
-          </PillButton>
-          <span className="text-xs text-text-tertiary">Saved once, not per match</span>
-        </div>
-      </form>
+          <label htmlFor="cs2-known-code" className="sr-only">
+            A share code from one of your matches
+          </label>
+          <input
+            id="cs2-known-code"
+            value={knownCode}
+            onChange={(event) => setKnownCode(event.target.value)}
+            placeholder="CSGO-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"
+            autoComplete="off"
+            spellCheck={false}
+            className="w-full rounded-inset border border-hairline bg-panel px-3 py-2 font-mono text-sm text-text placeholder:text-text-tertiary"
+          />
+
+          <div className="flex items-center gap-2">
+            <PillButton
+              type="submit"
+              disabled={
+                connect.isPending ||
+                authCode.trim().length < 8 ||
+                knownCode.trim().length < 10
+              }
+            >
+              {connect.isPending ? 'Checking…' : 'Finish setup'}
+            </PillButton>
+            <span className="text-xs text-text-tertiary">
+              Saved once, not per match
+            </span>
+          </div>
+        </form>
+      )}
 
       {connect.isError && (
         <p
