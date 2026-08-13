@@ -33,7 +33,7 @@ from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
-from . import demo_mode, markets
+from . import demo_mode, markets, test_opponents
 
 log = structlog.get_logger(__name__)
 
@@ -85,6 +85,22 @@ async def build_pool_snapshot(
     starts_ms, ends_ms = _ms(pool.window_starts_at), _ms(pool.window_ends_at)
     members: dict[str, Any] = {}
     for entry in entries:
+        # Practice opponents never play, so polling their host id returns
+        # nothing and they read as "waiting" forever. That is not cosmetic: a
+        # pool only settles early once *every* member is decided, so a single
+        # bot in the room kept every pool waiting for its window to close --
+        # turning "play a match and get paid" into "play a match and come back
+        # tomorrow". They are graded deterministically at settlement, so the
+        # live view reports the same answer settlement will.
+        if test_opponents.is_practice_opponent(entry.host_account_id):
+            cleared = test_opponents.clears_its_bar(entry.host_account_id)
+            members[str(entry.user_id)] = {
+                "status": "cleared" if cleared else "missed",
+                "cleared": cleared,
+                "practice_opponent": True,
+            }
+            continue
+
         rated_only = await demo_mode.rated_only_for(session, entry.user_id, pool.game)
         games = await _window_games(
             pool.game, entry.host_account_id, starts_ms, ends_ms, rated_only

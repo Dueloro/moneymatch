@@ -151,3 +151,42 @@ def test_a_kd_score_lands_on_a_real_increment():
     """K/D moves in 0.05 steps, so 1.265 is not a score anyone could post."""
     value = telemetry_fetch._clearing_value("cs2_kd_ratio", 1.10)
     assert round(value / 0.05) == pytest.approx(value / 0.05, abs=1e-6)
+
+
+# --------------------------------------------------------------------------- #
+# The live view has to agree with settlement, or nothing settles early.
+# --------------------------------------------------------------------------- #
+
+
+def test_the_live_view_calls_practice_opponents_decided():
+    """A pool settles early only when every member is decided.
+
+    Practice opponents never play, so polling their host id returned nothing and
+    they read as 'waiting' forever — which meant a room containing even one bot
+    could never settle early and always waited for its window to close. For a
+    player that is the difference between getting paid when they quit the game
+    and getting paid tomorrow.
+    """
+    from moneymatch_api.services.live_activity_service import pool_all_decided
+
+    snapshot = {
+        "members": {
+            "you": {"status": "missed"},
+            "ada": {"status": "cleared", "practice_opponent": True},
+            "bo": {"status": "missed", "practice_opponent": True},
+        }
+    }
+    assert pool_all_decided(snapshot) is True
+
+
+def test_a_real_player_who_has_not_played_still_blocks_early_settlement():
+    """The guard that must survive: don't settle a pool someone can still win."""
+    from moneymatch_api.services.live_activity_service import pool_all_decided
+
+    snapshot = {
+        "members": {
+            "you": {"status": "waiting"},
+            "ada": {"status": "cleared", "practice_opponent": True},
+        }
+    }
+    assert pool_all_decided(snapshot) is False
