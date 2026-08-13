@@ -44,6 +44,7 @@ vi.mock('../../hooks/useCs2', () => ({
   }),
 }));
 
+import { takeSteamReturn } from '../../lib/steamReturn';
 import { subscribeToasts } from '../../lib/toast';
 import { Cs2SetupCard } from './Cs2SetupCard';
 
@@ -289,5 +290,17 @@ describe('Cs2SetupCard · finishing setup', () => {
     expect(seen.some((s) => s.startsWith('success:') && /CS2 connected/i.test(s))).toBe(
       true,
     );
+  });
+});
+
+describe('Cs2SetupCard · leaving for Steam', () => {
+  it('remembers the page you left from', () => {
+    // Steam sign-in is a full-page redirect. Coming back somewhere else reads
+    // as having lost your place, mid-setup.
+    sessionStorage.clear();
+    setup({ steamLinked: false });
+    render(<Cs2SetupCard />);
+    screen.getByRole('link', { name: /sign in through steam/i }).click();
+    expect(takeSteamReturn()).toBe(window.location.pathname);
   });
 });

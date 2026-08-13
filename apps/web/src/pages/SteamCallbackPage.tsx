@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { api } from '../lib/api';
+import { takeSteamReturn } from '../lib/steamReturn';
 import { Card } from '../components/ui/Card';
 import { PillButton } from '../components/ui/PillButton';
 
@@ -21,6 +23,7 @@ import { PillButton } from '../components/ui/PillButton';
 export function SteamCallbackPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [steamId, setSteamId] = useState<string | null>(null);
   // Strict mode mounts effects twice in development, and this one links an
@@ -52,11 +55,22 @@ export function SteamCallbackPage() {
       }
       const body = data as { steam_id: string };
       setSteamId(body.steam_id);
-      // Straight back to where the account list lives, so the linked state is
-      // visible immediately rather than requiring a hunt.
-      setTimeout(() => navigate('/profile', { replace: true }), 1200);
+
+      // Drop the cached link list before leaving. It is only stale for a few
+      // seconds, but those are exactly the seconds you arrive in: without this
+      // the CS2 card renders from a copy fetched *before* the link and asks you
+      // to sign in to Steam again, with nowhere to enter the codes you came
+      // back to enter.
+      await queryClient.invalidateQueries({ queryKey: ['links'] });
+      await queryClient.invalidateQueries({ queryKey: ['cs2-chain'] });
+
+      // Back to the page you left, not a fixed one. Steam sign-in is a
+      // full-page redirect, so being returned somewhere else reads as having
+      // lost your place.
+      const returnTo = takeSteamReturn();
+      setTimeout(() => navigate(returnTo || '/profile', { replace: true }), 1200);
     })();
-  }, [params, navigate]);
+  }, [params, navigate, queryClient]);
 
   return (
     <div className="mx-auto mt-24 max-w-md px-4">

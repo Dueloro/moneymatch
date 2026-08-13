@@ -8,6 +8,7 @@ import {
 } from '../../hooks/useCs2';
 import { useLinks } from '../../hooks/useLinks';
 import { toast } from '../../lib/toast';
+import { rememberSteamReturn } from '../../lib/steamReturn';
 import { Card } from '../ui/Card';
 import { PillButton } from '../ui/PillButton';
 
@@ -244,6 +245,7 @@ export function Cs2SetupCard() {
             {loginUrl && (
               <a
                 href={loginUrl}
+                onClick={() => rememberSteamReturn(window.location.pathname)}
                 className="mt-2 inline-block rounded-pill bg-action px-4 py-2 text-sm font-semibold text-bg"
               >
                 Sign in through Steam
