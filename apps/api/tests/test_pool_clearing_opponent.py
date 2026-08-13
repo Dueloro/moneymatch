@@ -190,3 +190,56 @@ def test_a_real_player_who_has_not_played_still_blocks_early_settlement():
         }
     }
     assert pool_all_decided(snapshot) is False
+
+
+# --------------------------------------------------------------------------- #
+# The scaffolding must not refuse itself.
+# --------------------------------------------------------------------------- #
+
+
+def test_a_clearer_is_picked_before_the_rest():
+    """A room of nothing but missers can only end one way.
+
+    The split is the rule that decides the money, and it is undemonstrable
+    unless somebody in the room clears.
+    """
+    from moneymatch_api.services.test_opponents import _HANDLES, CLEARING_HANDLES
+
+    ordered = sorted(_HANDLES, key=lambda h: h not in CLEARING_HANDLES)
+    assert ordered[0] in CLEARING_HANDLES
+
+
+def test_there_are_spare_opponents_to_draw_on():
+    """A pool needs three; a fixed three is a single point of failure."""
+    from moneymatch_api.services.test_opponents import _HANDLES
+
+    assert len(_HANDLES) > 3
+
+
+def test_practice_opponents_are_given_caps_they_cannot_hit():
+    """The bug this exists for.
+
+    The two opponents built to miss lose their entry in every room, so the
+    default daily *loss* cap eventually refused them. The matcher then found
+    nobody to pair the demo with and fell back to a room of one — no pot to
+    split, and nothing on screen explaining why.
+    """
+    from moneymatch_api.models.wallet import DEFAULT_DAILY_LOSS_CAP_CENTS
+    from moneymatch_api.services.test_opponents import _BOT_CAP_CENTS
+
+    assert _BOT_CAP_CENTS > DEFAULT_DAILY_LOSS_CAP_CENTS * 100
+
+
+def test_the_cap_is_lifted_as_data_not_as_an_exemption():
+    """Nothing in the money path should grow a branch for fake users.
+
+    A `limits_service` exemption keyed on "is this a bot" is one refactor away
+    from applying to somebody real.
+    """
+    import inspect
+
+    from moneymatch_api.services import limits_service
+
+    source = inspect.getsource(limits_service)
+    assert "test_opponent" not in source
+    assert "zz_testbot" not in source
