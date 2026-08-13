@@ -21,6 +21,7 @@ from typing import Any
 
 import structlog
 
+from ..constants import cs2_min_rounds
 from ..db.session import get_sessionmaker
 from ..schemas.profile import ProfileSnapshot
 from ..services import cs2_matches
@@ -140,6 +141,22 @@ class CS2SteamAdapter(GameAdapter):
         for row in rows:
             line = row.line_for(account_id)
             if line is None:
+                continue
+            # A surrendered or abandoned game is not a result. The paste path
+            # rejects one with an explanation, but that check only guards the
+            # door it is nailed to: a code arriving through the share-code chain
+            # never passes it, and neither would any ingest path added later.
+            #
+            # Here it is structural. Everything that can grade a CS2 wager --
+            # pools, tournaments, head-to-head, the live view -- reads matches
+            # through this method, so a short match is simply never a match any
+            # of them can see.
+            if row.rounds_total < cs2_min_rounds(len(row.players or [])):
+                log.info(
+                    "cs2.match_too_short_to_grade",
+                    share_code=row.share_code,
+                    rounds=row.rounds_total,
+                )
                 continue
             out.append(
                 NormGame(

@@ -35,7 +35,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..constants import CS2_STEAM_METRICS, GAME_CS2_STEAM
+from ..constants import CS2_STEAM_METRICS, GAME_CS2_STEAM, cs2_min_rounds
 from ..models.cs2 import Cs2Match
 from ..models.skill import MetricModel
 from . import cs2_matches
@@ -252,6 +252,11 @@ async def _samples(
     for row in rows:
         ids = row.steam_ids()
         if steam_id not in ids:
+            continue
+        # Same floor the adapter applies. A three-round abandon is not evidence
+        # about anyone, and letting one in would drag a player's bar down for
+        # the next month -- which is also the cheapest way to tank one.
+        if row.rounds_total < cs2_min_rounds(len(row.players or [])):
             continue
         for player in row.players or []:
             value = cs2_matches.metrics_from_line(player).get(metric)
