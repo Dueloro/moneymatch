@@ -44,6 +44,7 @@ vi.mock('../../hooks/useCs2', () => ({
   }),
 }));
 
+import { subscribeToasts } from '../../lib/toast';
 import { Cs2SetupCard } from './Cs2SetupCard';
 
 function setup(
@@ -82,10 +83,13 @@ describe('Cs2SetupCard', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: /finish setup/i }));
 
-    expect(connect).toHaveBeenCalledWith({
-      authCode: 'ABCD-EFGHI',
-      knownCode: 'CSGO-UxSfp-RRcZ4-hp5uP-9ntcq-oXc3K',
-    });
+    expect(connect).toHaveBeenCalledWith(
+      {
+        authCode: 'ABCD-EFGHI',
+        knownCode: 'CSGO-UxSfp-RRcZ4-hp5uP-9ntcq-oXc3K',
+      },
+      expect.anything(),
+    );
   });
 
   it('does not ask for the codes before Steam is connected', () => {
@@ -186,7 +190,7 @@ describe('Cs2SetupCard · the connected Steam account', () => {
   it('offers a way to reconnect a different Steam account', () => {
     setup();
     render(<Cs2SetupCard />);
-    expect(screen.getByRole('link', { name: /reconnect steam/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^reconnect$/i })).toBeInTheDocument();
   });
 });
 
@@ -231,5 +235,59 @@ describe('Cs2SetupCard · connection status', () => {
     setup();
     render(<Cs2SetupCard />);
     expect(screen.getByTestId('cs2-status')).toBeDisabled();
+  });
+});
+
+describe('Cs2SetupCard · Steam is a fact, not a step', () => {
+  it('drops Steam out of the numbered list once it is done', () => {
+    // Rendering a finished task at the same weight as the outstanding ones is
+    // what made this read as "three things at once".
+    setup({ steamLinked: true });
+    render(<Cs2SetupCard />);
+    expect(screen.getByTestId('cs2-steam-connected')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('listitem', { name: /sign in through steam/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('still names the account it is connected to', () => {
+    setup({ steamLinked: true });
+    render(<Cs2SetupCard />);
+    expect(screen.getByTestId('cs2-steam-connected')).toHaveTextContent(STEAM_ID);
+  });
+
+  it('asks for Steam first, and nothing else, when it is missing', () => {
+    setup({ steamLinked: false });
+    render(<Cs2SetupCard />);
+    expect(screen.queryByTestId('cs2-steam-connected')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /sign in through steam/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/authentication code/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Cs2SetupCard · finishing setup', () => {
+  it('confirms with a toast when the codes are accepted', async () => {
+    // The card collapses on success, so without this the only feedback is
+    // something disappearing — which reads as the form having been lost.
+    const seen: string[] = [];
+    const stop = subscribeToasts((m) => seen.push(`${m.kind}:${m.text}`));
+
+    setup({ steamLinked: true });
+    // After setup(), which resets the mocks.
+    connect.mockImplementation((_vars, opts) => opts?.onSuccess?.());
+    render(<Cs2SetupCard />);
+    await userEvent.type(screen.getByLabelText(/authentication code/i), 'ABCD-EFGHI');
+    await userEvent.type(
+      screen.getByLabelText(/share code/i),
+      'CSGO-UxSfp-RRcZ4-hp5uP-9ntcq-oXc3K',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /finish setup/i }));
+
+    stop();
+    expect(seen.some((s) => s.startsWith('success:') && /CS2 connected/i.test(s))).toBe(
+      true,
+    );
   });
 });

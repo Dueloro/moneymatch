@@ -5,7 +5,10 @@ import { subscribeToasts, type ToastMessage } from '../../lib/toast';
 const DURATION_MS = 4000;
 
 const DOT: Record<ToastMessage['kind'], string> = {
-  success: 'bg-action',
+  // Green, so a success toast agrees with the green status controls it is
+  // usually confirming. `action` is the brand accent and reads as "a thing to
+  // click", not "that worked".
+  success: 'bg-green',
   error: 'bg-red',
   info: 'bg-live',
 };

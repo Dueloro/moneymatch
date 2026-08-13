@@ -7,6 +7,7 @@ import {
   useSyncChain,
 } from '../../hooks/useCs2';
 import { useLinks } from '../../hooks/useLinks';
+import { toast } from '../../lib/toast';
 import { Card } from '../ui/Card';
 import { PillButton } from '../ui/PillButton';
 
@@ -189,7 +190,9 @@ export function Cs2SetupCard() {
         <div>
           <h3 className="text-sm font-semibold text-text">Set up CS2</h3>
           <p className="mt-2 text-xs text-text-secondary">
-            Three things, once. After this your matches are collected automatically.
+            {linked
+              ? 'Two codes left. Saved once, and your matches are collected from then on.'
+              : 'Three things, once. After this your matches are collected automatically.'}
           </p>
         </div>
         {/* Red until collection actually works. Until then a wager can be
@@ -212,52 +215,48 @@ export function Cs2SetupCard() {
         </p>
       )}
 
-      <ol className="mt-4 flex flex-col gap-4">
-        <Step index={1} title="Sign in through Steam" done={linked}>
-          {!linked && loginUrl && (
-            <a
-              href={loginUrl}
-              className="mt-2 inline-block rounded-pill bg-action px-4 py-2 text-sm font-semibold text-bg"
-            >
-              Sign in through Steam
+      {/* Once Steam is done it stops being a step and becomes a fact: a
+       * finished task rendered at the same weight as the outstanding ones is
+       * what made this read as "three things at once" rather than "one thing,
+       * then the next". */}
+      {linked && (
+        <div
+          className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-inset border border-hairline bg-panel px-3 py-2"
+          data-testid="cs2-steam-connected"
+        >
+          <span className="text-xs font-semibold text-green">Steam connected</span>
+          <span className="text-xs text-text">{profile?.display_name ?? steamId}</span>
+          <span className="text-xs text-text-tertiary">{steamId}</span>
+          {loginUrl && (
+            <a href={loginUrl} className="ml-auto text-xs text-text-tertiary underline">
+              Reconnect
             </a>
           )}
-          {linked && (
-            <>
-              <p className="text-xs text-text">{profile?.display_name ?? steamId}</p>
-              <p className="text-xs text-text-tertiary">
-                SteamID {steamId}
-                {profile?.rank_label ? ` · ${profile.rank_label}` : ''}
-              </p>
-              {(profile?.total_games || profile?.extra?.total_kills) && (
-                <p className="mt-0.5 text-xs text-text-tertiary">
-                  {profile?.total_games ? `${profile.total_games} matches` : null}
-                  {profile?.extra?.total_kills
-                    ? `${profile?.total_games ? ' · ' : ''}${Number(
-                        profile.extra.total_kills,
-                      ).toLocaleString()} kills`
-                    : null}
-                </p>
-              )}
-              {loginUrl && (
-                <a
-                  href={loginUrl}
-                  className="mt-1 inline-block text-xs text-text-tertiary underline"
-                >
-                  Reconnect Steam
-                </a>
-              )}
-            </>
-          )}
-        </Step>
+        </div>
+      )}
 
-        {/* Steps two and three are meaningless without a SteamID to attach
-         * them to, and showing two disabled boxes above a disabled button just
-         * asks the reader to work out which thing to do first. They appear when
-         * they become doable. */}
+      <ol className="mt-4 flex flex-col gap-4">
+        {!linked && (
+          <Step index={1} title="Sign in through Steam" done={false}>
+            <p className="mt-1 text-xs text-text-secondary">
+              Your SteamID is what ties a match to you.
+            </p>
+            {loginUrl && (
+              <a
+                href={loginUrl}
+                className="mt-2 inline-block rounded-pill bg-action px-4 py-2 text-sm font-semibold text-bg"
+              >
+                Sign in through Steam
+              </a>
+            )}
+          </Step>
+        )}
+
+        {/* Numbered from one again: with Steam out of the list, "step 2" would
+         * be counting something the reader can no longer see. */}
         {linked && (
           <>
-            <Step index={2} title="Create a match authentication code" done={false}>
+            <Step index={1} title="Create a match authentication code" done={false}>
               <p className="mt-1 text-xs text-text-secondary">
                 Steam issues one per account.{' '}
                 <a
@@ -272,7 +271,7 @@ export function Cs2SetupCard() {
               </p>
             </Step>
 
-            <Step index={3} title="Name one match you have played" done={false}>
+            <Step index={2} title="Name one match you have played" done={false}>
               <p className="mt-1 text-xs text-text-secondary">
                 In CS2: <span className="text-text">Watch</span> →{' '}
                 <span className="text-text">Your Matches</span> → copy any share code.
@@ -295,7 +294,19 @@ export function Cs2SetupCard() {
           className="mt-4 flex flex-col gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            connect.mutate({ authCode: authCode.trim(), knownCode: knownCode.trim() });
+            connect.mutate(
+              { authCode: authCode.trim(), knownCode: knownCode.trim() },
+              {
+                onSuccess: () => {
+                  // Leaving edit mode is what collapses the card: the status
+                  // query has been invalidated, so it comes back connected.
+                  setEditing(false);
+                  setAuthCode('');
+                  setKnownCode('');
+                  toast.success('CS2 connected — your matches settle automatically');
+                },
+              },
+            );
           }}
         >
           <label htmlFor="cs2-auth-code" className="sr-only">
