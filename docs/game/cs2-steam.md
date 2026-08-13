@@ -408,15 +408,30 @@ refund ledger entries — then redeploy.
 
 | Setting | Default | What happens if unchanged |
 | --- | --- | --- |
-| `STEAM_OPENID_REALM` | `http://localhost:5173` | Steam returns users to localhost; sign-in silently cannot complete |
-| `STEAM_OPENID_RETURN_URL` | `http://localhost:5173/auth/steam/callback` | same |
-| `WEB_ORIGIN` | `http://localhost:5173` | CORS refuses the Vercel domain; every browser request fails |
+| `WEB_ORIGIN` | `http://localhost:5173` | **the API refuses to boot with `ENV=prod`** |
 | `GC_SIDECAR_URL` | `http://127.0.0.1:8787` | wired from the private service; unset means no CS2 wager settles |
-| `VALVE_CHAIN_ENABLED` | `false` | collection is off, and the paste box has been removed from the UI, so **turn this on** |
 | `STEAM_API_KEY` | unset | ban checks and the chain both stop; linking degrades rather than failing |
 
-The realm and return URL are the dangerous pair: nothing errors, Steam simply
-returns the user to a host that is not the deployment.
+Two of these used to fail silently and no longer can.
+
+**The Steam OpenID realm and return URL are gone as separate settings to get
+wrong.** They now default to `WEB_ORIGIN` and `WEB_ORIGIN/auth/steam/callback`,
+because they were never independent facts — the callback is a page in the web
+app. A deployment states its address once, for CORS, and Steam follows. They can
+still be set explicitly, for the case where the callback is served from a
+different host.
+
+**And production will not start pointing at a laptop.** With `ENV=prod`, a
+`WEB_ORIGIN` (or explicit Steam URL) containing `localhost` or `127.0.0.1`
+raises at startup. A refused boot is a failed deploy: loud, and cheap to fix.
+Booting happily and returning every user to localhost is neither — nothing
+errors, and the only symptom is that nobody can link an account.
+
+**`VALVE_CHAIN_ENABLED` now defaults to on.** It was off while it was new and
+pasting was the real ingest path. It is now the only one, and a flag that must
+be switched on for the feature to work at all is not a feature flag — it is a
+way to ship a deployment that quietly collects nothing. Still switchable, which
+is worth keeping to pause collection during a sidecar outage.
 
 ## What is off in production, and stays off
 
@@ -505,11 +520,10 @@ so a one-account *demo* works, not as a production design.
 
 ## Before merging
 
-- [ ] `STEAM_OPENID_REALM` and `STEAM_OPENID_RETURN_URL` set to the Vercel domain
-- [ ] `WEB_ORIGIN` set to the Vercel domain
+- [ ] `WEB_ORIGIN` set to the Vercel domain — the Steam OpenID realm and return
+      URL follow it, and `ENV=prod` refuses to boot without it
 - [ ] `GC_SHARED_SECRET` and `STEAM_API_KEY` in the `moneymatch-shared` group
 - [ ] `GC_REFRESH_TOKEN` set on `moneymatch-gc`, from an account that owns CS2 and that nobody plays on
-- [ ] `VALVE_CHAIN_ENABLED=true` — the paste box is gone, so collection is the only ingest path
 - [ ] `DEMO_LOGIN_ENABLED`, `DEMO_SIMULATE_ENABLED` and `E2E_AUTH_ENABLED` left unset
 - [ ] No `cs2.faceit` contest in flight, or `0022` refuses and the deploy fails
 - [ ] `VITE_API_BASE_URL` on Vercel pointing at the Render API

@@ -52,8 +52,8 @@ def login_url(return_url: str | None = None, realm: str | None = None) -> str:
     params = {
         "openid.ns": _NS,
         "openid.mode": "checkid_setup",
-        "openid.return_to": return_url or settings.steam_openid_return_url,
-        "openid.realm": realm or settings.steam_openid_realm,
+        "openid.return_to": return_url or settings.resolved_steam_openid_return_url,
+        "openid.realm": realm or settings.resolved_steam_openid_realm,
         # We are not naming a user; Steam picks whoever is signed in.
         "openid.identity": _IDENTIFIER_SELECT,
         "openid.claimed_id": _IDENTIFIER_SELECT,

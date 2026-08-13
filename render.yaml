@@ -64,6 +64,12 @@ services:
       # the standalone `type: worker` service shown below.
       - key: RUN_WORKER_IN_PROCESS
         value: "true"
+      # The one address that has to be right. The Steam OpenID realm and return
+      # URL follow it, and the API refuses to boot with ENV=prod if it still
+      # points at localhost — a failed deploy being much louder than Steam
+      # quietly returning every user to a laptop.
+      - key: WEB_ORIGIN
+        sync: false
       - key: RELEASE
         value: "" # Render injects the deploy commit SHA via $RENDER_GIT_COMMIT at runtime
       # The sidecar's internal address. Render exposes a private service on its

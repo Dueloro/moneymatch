@@ -66,7 +66,15 @@ async def test_minted_token_verifies_and_authenticates():
 
 async def test_route_refuses_in_prod_even_if_enabled():
     # Guard is defense-in-depth: even a stray prod mount must not mint tokens.
-    app = _app_with(_settings(env="prod", e2e_auth_enabled=True))
+    # A production Settings needs a real web origin, because one pointing at
+    # localhost now refuses to build at all — see test_production_config.
+    app = _app_with(
+        _settings(
+            env="prod",
+            e2e_auth_enabled=True,
+            web_origin="https://play.example.com",
+        )
+    )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.post("/api/v1/dev/e2e/token", json={"auth_id": "seed_x"})
