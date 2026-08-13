@@ -65,6 +65,53 @@ function Step({
   );
 }
 
+/**
+ * Connected or not, at a glance and in one colour.
+ *
+ * The old control said "Check now", which describes an action nobody needs to
+ * take and answers the wrong question. What a player actually wants to know
+ * before staking money is whether their matches will be collected at all, so
+ * that is what the control reports; checking now is what it *does* when there
+ * is something worth checking.
+ */
+function StatusButton({
+  ok,
+  label,
+  onClick,
+  disabled,
+  testId,
+}: {
+  ok: boolean;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  testId?: string;
+}) {
+  const tone = ok
+    ? 'border-green/40 bg-green/10 text-green'
+    : 'border-red/40 bg-red/10 text-red';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || !onClick}
+      data-testid={testId}
+      data-status={ok ? 'connected' : 'not-connected'}
+      // Not a button when there is nothing to do: a dead control that still
+      // looks pressable is how people conclude the page is broken.
+      className={`inline-flex items-center gap-2 rounded-pill border px-3 py-1.5 text-sm font-semibold ${tone} ${
+        onClick && !disabled ? 'hover:opacity-80' : 'cursor-default'
+      } disabled:opacity-60`}
+    >
+      <span
+        aria-hidden
+        className={`h-2 w-2 rounded-full ${ok ? 'bg-green' : 'bg-red'}`}
+      />
+      {label}
+    </button>
+  );
+}
+
 export function Cs2SetupCard() {
   const { data: status } = useChainStatus();
   const { data: loginUrl } = useSteamLoginUrl();
@@ -103,13 +150,13 @@ export function Cs2SetupCard() {
           Your matches are picked up on their own. Nothing to paste.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <PillButton
-            type="button"
+          <StatusButton
+            ok
+            label={sync.isPending ? 'Checking…' : 'Connected'}
             onClick={() => sync.mutate()}
             disabled={sync.isPending}
-          >
-            {sync.isPending ? 'Checking…' : 'Check now'}
-          </PillButton>
+            testId="cs2-status"
+          />
           {sync.isSuccess && (
             <span className="text-xs text-text-secondary" data-testid="cs2-sync-result">
               {sync.data.collected === 0
@@ -138,10 +185,22 @@ export function Cs2SetupCard() {
 
   return (
     <Card className="p-5" data-testid="cs2-setup-card">
-      <h3 className="text-sm font-semibold text-text">Set up CS2</h3>
-      <p className="mt-2 text-xs text-text-secondary">
-        Three things, once. After this your matches are collected automatically.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text">Set up CS2</h3>
+          <p className="mt-2 text-xs text-text-secondary">
+            Three things, once. After this your matches are collected automatically.
+          </p>
+        </div>
+        {/* Red until collection actually works. Until then a wager can be
+         * joined and played with nothing to settle it, which is the one state
+         * worth shouting about. */}
+        <StatusButton
+          ok={false}
+          label={broken ? 'Disconnected' : 'Not connected'}
+          testId="cs2-status"
+        />
+      </div>
 
       {broken && (
         <p

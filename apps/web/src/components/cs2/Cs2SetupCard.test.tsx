@@ -178,3 +178,47 @@ describe('Cs2SetupCard · the connected Steam account', () => {
     expect(screen.getByRole('link', { name: /reconnect steam/i })).toBeInTheDocument();
   });
 });
+
+describe('Cs2SetupCard · connection status', () => {
+  it('reads green once Steam and both codes are in', () => {
+    setup({ chain: { connected: true, state: 'active' } });
+    render(<Cs2SetupCard />);
+    const status = screen.getByTestId('cs2-status');
+    expect(status).toHaveAttribute('data-status', 'connected');
+    expect(status).toHaveTextContent(/connected/i);
+  });
+
+  it('reads red until setup is finished', () => {
+    // The state worth shouting about: a wager can be joined and played with
+    // nothing in place to settle it.
+    setup();
+    render(<Cs2SetupCard />);
+    const status = screen.getByTestId('cs2-status');
+    expect(status).toHaveAttribute('data-status', 'not-connected');
+    expect(status).toHaveTextContent(/not connected/i);
+  });
+
+  it('reads red when collection has stopped, and says so differently', () => {
+    setup({
+      chain: { connected: true, state: 'broken', last_error: 'Steam rejected it.' },
+    });
+    render(<Cs2SetupCard />);
+    const status = screen.getByTestId('cs2-status');
+    expect(status).toHaveAttribute('data-status', 'not-connected');
+    expect(status).toHaveTextContent(/disconnected/i);
+  });
+
+  it('still checks for matches when the green control is pressed', async () => {
+    setup({ chain: { connected: true, state: 'active' } });
+    render(<Cs2SetupCard />);
+    await userEvent.click(screen.getByTestId('cs2-status'));
+    expect(sync).toHaveBeenCalled();
+  });
+
+  it('is not pressable when there is nothing to check', () => {
+    // A dead control that still looks pressable reads as a broken page.
+    setup();
+    render(<Cs2SetupCard />);
+    expect(screen.getByTestId('cs2-status')).toBeDisabled();
+  });
+});
