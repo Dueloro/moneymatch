@@ -30,8 +30,14 @@ const http = require('http');
 const SteamUser = require('steam-user');
 const GlobalOffensive = require('globaloffensive');
 
-const PORT = Number(process.env.GC_PORT || 8787);
-const HOST = '127.0.0.1';
+// Render (and most platforms) inject the port to listen on.
+const PORT = Number(process.env.PORT || process.env.GC_PORT || 8787);
+
+// Loopback by default, because on a laptop nothing else should be able to reach
+// this. A deployed instance has to accept connections from the API container,
+// so the bind address is configurable — and the shared secret is mandatory
+// either way, which is what makes widening it survivable.
+const HOST = process.env.GC_BIND_HOST || '127.0.0.1';
 const SHARED_SECRET = process.env.GC_SHARED_SECRET || '';
 
 // Fail closed. Authentication used to be skipped entirely when the secret was

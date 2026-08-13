@@ -340,3 +340,176 @@ stacking with friends is a legitimate way to move your own average.
 same Valve matchmaking lobby. Each plays their own next match and the two results
 are compared. Do not write copy implying the platform matched them together — it
 cannot.
+
+---
+
+# Going to production
+
+Written **2026-08-13** while auditing this branch for a merge into `main`
+(Vercel for the web app, Render for the API, Supabase for auth). Everything
+below was checked against the code and the deploy config rather than
+remembered.
+
+## What actually gets deployed
+
+`render.yaml` declares three things now:
+
+| Service | Type | Why |
+| --- | --- | --- |
+| `moneymatch-postgres` | database | schema, reconciled on every boot |
+| `moneymatch-api` | web | the API, and the settlement worker in-process |
+| `moneymatch-gc` | **private** service | share code → scoreboard |
+
+The sidecar was the gap this audit found: it was not deployed at all. Without
+it, `POST /cs2/sharecode` and every automatic collection fail at the transport,
+so **no CS2 wager can settle** — while the rest of the product looks completely
+healthy. That is the worst shape a failure can take, because nothing alerts and
+the first symptom is a player asking where their money is.
+
+It is a **private** service deliberately: it can read match data for arbitrary
+Steam players and must never be routable from the internet. Two consequences:
+
+- It binds `0.0.0.0` inside the container (`GC_BIND_HOST`), because loopback is
+  unreachable from the API container. Private networking is what makes that
+  safe, and the shared secret is the second lock, not the first.
+- `GC_SHARED_SECRET` comes from the **shared env group** on both services. Two
+  independently-set copies drift, and the failure is a 401 on every settlement.
+
+`GC_SIDECAR_URL` is wired from the private service's `hostport`, which Render
+hands over as a bare `host:port`. The client fills in a missing scheme, because
+httpx rejects a URL without one.
+
+## The worker
+
+`RUN_WORKER_IN_PROCESS=true` runs settlement inside the API container. Nothing
+settles without it, and the same switch drives share-code collection, so one
+setting governs both.
+
+Run exactly one. Concurrency is *safe* — a match is claimed before it is worked,
+and a test proves exactly-once — but every extra instance doubles how often you
+poll Valve, and that endpoint throttles a key for abuse.
+
+## Migrations
+
+Applied by `docker-entrypoint.sh` before the app starts, so a deploy that
+forgets them is not a failure mode. Verified for this branch: **all 22
+migrations apply to an empty schema and land on `0022`**, and `alembic check`
+reports no drift afterwards. That check runs in CI, so a model/migration
+mismatch fails the build rather than the deploy.
+
+One migration can refuse to run. `0022_retire_cs2_faceit` aborts if any
+`cs2.faceit` contest is still in flight, and `set -e` turns that into a failed
+deploy rather than a started container. That is deliberate: the alternative is
+deleting the scaffolding under an open contest and stranding its entries in
+escrow. If it fires, cancel those contests through the engine — which writes the
+refund ledger entries — then redeploy.
+
+## Configuration that breaks production if left at its default
+
+| Setting | Default | What happens if unchanged |
+| --- | --- | --- |
+| `STEAM_OPENID_REALM` | `http://localhost:5173` | Steam returns users to localhost; sign-in silently cannot complete |
+| `STEAM_OPENID_RETURN_URL` | `http://localhost:5173/auth/steam/callback` | same |
+| `WEB_ORIGIN` | `http://localhost:5173` | CORS refuses the Vercel domain; every browser request fails |
+| `GC_SIDECAR_URL` | `http://127.0.0.1:8787` | wired from the private service; unset means no CS2 wager settles |
+| `VALVE_CHAIN_ENABLED` | `false` | collection is off, and the paste box has been removed from the UI, so **turn this on** |
+| `STEAM_API_KEY` | unset | ban checks and the chain both stop; linking degrades rather than failing |
+
+The realm and return URL are the dangerous pair: nothing errors, Steam simply
+returns the user to a host that is not the deployment.
+
+## What is off in production, and stays off
+
+Verified by building the app with a production environment and reading the
+resulting route table:
+
+- **`/api/v1/demo/*` is not mounted.** `DEMO_LOGIN_ENABLED` defaults to false.
+  With it on, anyone who finds the endpoint is signed in as the shared demo
+  account, so it must never be set next to anything real.
+- **`/api/v1/dev/e2e/token` is not mounted.** Double-gated on
+  `E2E_AUTH_ENABLED` *and* `env != prod`, with the handler re-checking both. It
+  mints arbitrary auth tokens, so one gate would not be enough.
+- **Injected results are impossible.** `DEMO_SIMULATE_ENABLED` defaults to
+  false, and with it off the adapter wrapper is never constructed.
+- **Practice opponents cannot appear.** `test_opponents.is_enabled()` keys off
+  *who is playing* — the shared demo account — not an environment flag. A real
+  signup never sees a fabricated opponent in any environment. Removing demo
+  login removes them with it, and `purge()` deletes every row.
+
+`/api/v1/wallet/demo-deposit` **is** mounted in production. That is consistent
+today because of the next section, and it is the first thing that has to change
+when it stops being true.
+
+## The honest state of "production"
+
+**Every wallet is created with `currency="DEMO"`, including a real signup's.**
+There is no real-money path in this codebase: no payment processor, no payouts,
+no KYC gate on withdrawal. "Production" today means *the real code paths running
+against real Steam accounts with play money*, which is what a public demo needs
+and is not the same thing as taking deposits.
+
+What that buys: everything a real user does is the real path. Steam OpenID
+verification, the Game Coordinator, the chain, grading, escrow, rake, the ledger
+and settlement are identical. Only the currency is fake.
+
+What has to happen before it is not: a payment processor and real deposits,
+withdrawal KYC, removing `demo-deposit`/`demo-withdrawal`, deleting
+`test_opponents.py` and its three call sites, and a licensing position on
+skill-based wagering per state — the geo-fence is enforced, but the list it
+enforces is a placeholder.
+
+## Demo account versus a real signup
+
+| | Demo account | Real signup |
+| --- | --- | --- |
+| Sign-in | `POST /demo/login`, no password | Supabase (Google, or email + password) |
+| Opponents | practice bots fill the room | other real players only |
+| Room formation | immediate | needs 3–4 real entrants in the same bucket |
+| CS2 identity | real Steam OpenID | identical |
+| Match data | real Game Coordinator | identical |
+| Settlement, escrow, rake | identical | identical |
+| Currency | DEMO | DEMO (see above) |
+
+The gap that matters is **room formation**. A pool needs three to four entrants
+in the same game/metric/difficulty/entry bucket. The demo hides that with bots;
+production does not. Until there is concurrent traffic, real users will queue
+without matching — a liquidity problem rather than a bug, and the reason the
+practice-opponent scaffolding exists at all.
+
+## Per-user CS2 setup in production
+
+Each player does this once, and it cannot be done for them:
+
+1. **Link Steam.** OpenID, verified by round-trip.
+2. **Create a match authentication code.** Issued per Steam account, so **every
+   player needs their own** — there is no bulk or delegated form. Stored, never
+   returned by the API, never logged.
+3. **Paste one share code** as a starting cursor.
+
+After that their matches arrive on their own. The sidecar's Steam account is
+**not** any of theirs: it needs its own account that owns CS2, which nobody
+plays on. Sharing an account with a player means each side evicts the other from
+the Game Coordinator; the supervisor's wait-for-you-to-finish behaviour exists
+so a one-account *demo* works, not as a production design.
+
+## Failure modes, and what a player sees
+
+| What breaks | Player sees | Recovers by |
+| --- | --- | --- |
+| Sidecar down | matches stop being collected | the supervisor restarting it; the cursor is untouched, so nothing is skipped |
+| Sidecar not deployed | the same, permanently | deploying it — nothing else surfaces this |
+| Valve rate limits | nothing; collection pauses | backing off automatically |
+| A player's auth code revoked | the chain reads "Disconnected", with the reason | reconnecting in the UI |
+| Steam Web API down | linking degrades; bans read "unknown" | itself — unknown is never treated as clean |
+| No qualifying match in the window | a full refund, zero rake | — you cannot lose by not playing |
+
+## Before merging
+
+- [ ] `STEAM_OPENID_REALM` and `STEAM_OPENID_RETURN_URL` set to the Vercel domain
+- [ ] `WEB_ORIGIN` set to the Vercel domain
+- [ ] `GC_SHARED_SECRET` and `STEAM_API_KEY` in the `moneymatch-shared` group
+- [ ] `GC_REFRESH_TOKEN` set on `moneymatch-gc`, from an account that owns CS2 and that nobody plays on
+- [ ] `VALVE_CHAIN_ENABLED=true` — the paste box is gone, so collection is the only ingest path
+- [ ] `DEMO_LOGIN_ENABLED`, `DEMO_SIMULATE_ENABLED` and `E2E_AUTH_ENABLED` left unset
+- [ ] No `cs2.faceit` contest in flight, or `0022` refuses and the deploy fails
+- [ ] `VITE_API_BASE_URL` on Vercel pointing at the Render API

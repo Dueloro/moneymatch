@@ -66,6 +66,13 @@ services:
         value: "true"
       - key: RELEASE
         value: "" # Render injects the deploy commit SHA via $RENDER_GIT_COMMIT at runtime
+      # The sidecar's internal address. Render exposes a private service on its
+      # own hostname; only services in this account can reach it.
+      - key: GC_SIDECAR_URL
+        fromService:
+          name: moneymatch-gc
+          type: pserv
+          property: hostport
       - fromGroup: moneymatch-shared
 
   # Optional standalone worker — only for paid tiers that want the loop isolated
@@ -87,3 +94,35 @@ services:
   #         name: moneymatch-postgres
   #         property: connectionString
   #     - fromGroup: moneymatch-shared
+
+  # ---------------------------------------------------------------------------
+  # Game Coordinator sidecar.
+  #
+  # A *private* service: no public URL, reachable only from the API. It can read
+  # match data for arbitrary Steam players, so it must never face the internet —
+  # the mandatory shared secret is a second lock, not the first one.
+  #
+  # Without this deployed, share codes cannot be resolved and no CS2 wager can
+  # settle. Everything else in the product is unaffected, which is exactly why
+  # its absence is easy to miss until someone's wager does not pay out.
+  # ---------------------------------------------------------------------------
+  - type: pserv
+    name: moneymatch-gc
+    runtime: docker
+    dockerfilePath: gc-sidecar/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      # Its own Steam account, which owns CS2 and which nobody plays on.
+      # Sharing an account with a player means each side evicts the other.
+      # Only the sidecar signs in, so the token lives only here.
+      - key: GC_REFRESH_TOKEN
+        sync: false
+      # GC_SHARED_SECRET comes from the shared group, so the API sends exactly
+      # what this checks. Two independent copies drift, and the failure is a
+      # 401 on every settlement.
+      - fromGroup: moneymatch-shared
+      # Stay connected. The idle-logout mode exists for sharing an account with
+      # a human, which production should never do.
+      - key: GC_IDLE_LOGOUT_SECONDS
+        value: "0"

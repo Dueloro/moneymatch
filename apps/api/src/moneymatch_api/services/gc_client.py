@@ -59,7 +59,15 @@ class GcHealth:
 
 
 def _base_url() -> str:
-    return get_settings().gc_sidecar_url.rstrip("/")
+    base = get_settings().gc_sidecar_url.strip().rstrip("/")
+    # Platforms hand out an internal address as bare "host:port" (Render's
+    # `hostport`), which httpx rejects for having no scheme. Defaulting to http
+    # is right for a private network: TLS between two containers on the same
+    # private network buys nothing, and this address is not routable from
+    # outside it.
+    if base and "://" not in base:
+        base = f"http://{base}"
+    return base
 
 
 def _headers() -> dict[str, str]:
