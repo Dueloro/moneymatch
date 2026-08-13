@@ -152,6 +152,22 @@ async def steam_callback(
     elif link is None:
         link = await linking_service.bind(session, user, GAME_CS2_STEAM, steam_id)
 
+    # A chain belongs to the Steam account it was set up for. Its authentication
+    # code is issued per account and its cursor points into that account's match
+    # list, so carrying either across to a different SteamID would keep
+    # collecting the *previous* account's matches and settle this user's wagers
+    # from them. Dropping it also stops us holding a credential for an account
+    # this user no longer has linked.
+    chain = await cs2_chain.get_chain(session, user.id)
+    if chain is not None and chain.steam_id != steam_id:
+        await session.delete(chain)
+        log.info(
+            "cs2.chain_dropped_on_relink",
+            user_id=str(user.id),
+            was=chain.steam_id,
+            now=steam_id,
+        )
+
     # A player who has just signed in has no results here, and a pool quotes
     # its bar from your results. Without a prior the answer to "join a wager"
     # is "play a match first", which is a poor thing to say to someone who has
