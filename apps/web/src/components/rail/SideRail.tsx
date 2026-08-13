@@ -7,6 +7,7 @@ import { useWallet } from '../../hooks/useWallet';
 import { formatCurrency } from '../../lib/format';
 import { gameMeta } from '../../lib/games';
 import { LiveLine } from '../activity/LiveLine';
+import { AnimatedBalance } from '../ui/AnimatedBalance';
 import { Card } from '../ui/Card';
 import { ClearBar } from '../ui/ClearBar';
 import { GameBadge } from '../ui/GameBadge';
@@ -239,7 +240,7 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
         <Card className="p-4">
           <p className="label-money">Balance</p>
           <p className="mt-1 text-3xl font-semibold text-green">
-            {formatCurrency(available)}
+            <AnimatedBalance cents={available} testId="rail-balance" />
           </p>
           {inPlayCents > 0 && (
             <p className="mt-1 text-xs text-text-secondary">
