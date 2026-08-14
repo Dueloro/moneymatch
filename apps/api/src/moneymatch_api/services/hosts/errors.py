@@ -36,6 +36,15 @@ class HostNotFound(HostError):
     """The requested resource (player/game) does not exist on the host (404)."""
 
 
+class HostRateLimited(HostUnavailable):
+    """The host rejected the call with 429 (rate limit).
+
+    A transient, budget-shaped failure. It subclasses `HostUnavailable` so the
+    grading watchdog extends the settlement window instead of consuming it, but
+    it is deliberately not retried in-call (an immediate retry only spends more
+    of the same budget)."""
+
+
 class HostNotConfigured(HostError):
     """The host integration has no API key configured — a deploy/config gap, not
     a transient outage or a missing player. Raised (never swallowed to ``None``)

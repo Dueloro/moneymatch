@@ -5,8 +5,8 @@ Storing it means settlement never depends on the GC being reachable, and the
 unique constraint on `share_code` is what stops one good match settling many
 wagers. That check cannot be raced anywhere but the database.
 
-Revision ID: 0020_cs2_matches
-Revises: 0019_simulated_matches
+Revision ID: 0022_cs2_matches
+Revises: 0021_simulated_matches
 Create Date: 2026-08-11
 """
 
@@ -18,8 +18,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0020_cs2_matches"
-down_revision: str | None = "0019_simulated_matches"
+revision: str = "0022_cs2_matches"
+down_revision: str | None = "0021_simulated_matches"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # PUBG — direct to the official PUBG (gamelocker) API. Without it, PUBG
     # lookups fail soft (link "can't right now") rather than crash.
     pubg_api_key: str | None = None
+    # PUBG's public limit is ~10 req/min. A process-local token bucket in the PUBG
+    # host client throttles to this (keep headroom under 10). Caveat: API and
+    # worker are separate processes, each with its own bucket — PUBG traffic is
+    # worker-dominated, so a conservative per-process budget stays under the cap.
+    pubg_rate_limit_per_min: int = 9
 
     # Steam Web API (steamcommunity.com/dev/apikey). Used for ban checks at
     # link time and the lifetime-K/D prior. Without it those degrade to a
@@ -90,6 +95,15 @@ class Settings(BaseSettings):
 
     # Warn when a host-API call exceeds this (ops signal — 09-phase-6 · d.4).
     slow_host_ms: int = Field(default=2_000)
+
+    # Transactional email (Resend). With no key the email seam is a no-op — in-app
+    # + push notifications still deliver. Synthetic username addresses
+    # (@users.moneymatch.app) have no inbox and are never emailed; only real
+    # addresses (e.g. Google sign-in) receive mail.
+    resend_api_key: str | None = None
+    # RFC 5322 From header for outbound mail; the domain must be verified in
+    # Resend (SPF/DKIM) or delivery is rejected.
+    email_from: str = Field(default="Money Match <noreply@moneymatch.app>")
 
     # Payments/KYC readiness (10-phase-7 §1). These are the *only* switches for
     # real rails, and they are guarded in code: turning either on with no live

@@ -21,6 +21,10 @@ export default defineConfig({
       VITE_API_BASE_URL: 'http://localhost:8000',
       VITE_SUPABASE_URL: 'http://localhost:54321',
       VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+      // Blank out optional keys so unit tests run in a keyless environment,
+      // matching the intent of tests that assert these integrations are no-ops.
+      VITE_POSTHOG_KEY: '',
+      VITE_SENTRY_DSN: '',
     },
   },
 });

@@ -6,8 +6,8 @@ one. Inert unless `DEMO_SIMULATE_ENABLED` is set; see
 `models/demo_simulation.py` for why it has to be a table rather than a fake in
 one process.
 
-Revision ID: 0019_simulated_matches
-Revises: 0018_risk_flag_pair_cap
+Revision ID: 0021_simulated_matches
+Revises: 0020_seed_pubg_flag
 Create Date: 2026-08-11
 """
 
@@ -19,8 +19,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0019_simulated_matches"
-down_revision: str | None = "0018_risk_flag_pair_cap"
+revision: str = "0021_simulated_matches"
+down_revision: str | None = "0020_seed_pubg_flag"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -9,8 +9,8 @@ One row per user. A second cursor for the same account would race the first and
 double-ingest every match, so the constraint lives in the database rather than
 in a check some future caller can forget.
 
-Revision ID: 0021_cs2_share_chain
-Revises: 0020_cs2_matches
+Revision ID: 0023_cs2_share_chain
+Revises: 0022_cs2_matches
 Create Date: 2026-08-12
 """
 
@@ -22,8 +22,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0021_cs2_share_chain"
-down_revision: str | None = "0020_cs2_matches"
+revision: str = "0023_cs2_share_chain"
+down_revision: str | None = "0022_cs2_matches"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -59,6 +59,10 @@ class GameAdapter(abc.ABC):
     # challenge). False ⇒ players coordinate on the host and we settle on the
     # shared match found in their histories.
     brokered: bool = False
+    # True ⇒ linking must NOT bootstrap this game's metric models inline (its host
+    # is too rate-limited for a synchronous history fan-out). The settlement worker
+    # bootstraps deferred accounts out-of-band. Default False (bootstrap at link).
+    defer_bootstrap: bool = False
 
     @abc.abstractmethod
     async def link_account(self, method: str, identifier: str) -> ProfileSnapshot:

@@ -18,11 +18,12 @@ so a missing key degrades to "can't link right now" rather than a crash.
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 from ...config import get_settings
 from ._client import request_json
-from .errors import HostError, HostNotConfigured, HostNotFound
+from .errors import HostError, HostNotConfigured, HostNotFound, HostUnavailable
 
 HOST = "pubg"
 PUBG_BASE = "https://api.pubg.com/shards"
@@ -31,6 +32,49 @@ PUBG_BASE = "https://api.pubg.com/shards"
 # enough to cover a settlement poll / metric-model bootstrap fan-out.
 _MATCH_TTL_SECONDS = 3600.0
 _match_cache: dict[str, tuple[float, dict]] = {}
+
+
+class _TokenBucket:
+    """Async token bucket: `capacity` tokens, refilled continuously at
+    `capacity/60` per second. `acquire()` blocks until a token is free. The lock
+    is held across the wait so waiters are served in order."""
+
+    def __init__(self, rate_per_min: int) -> None:
+        self._capacity = float(max(1, rate_per_min))
+        self._tokens = self._capacity
+        self._refill_per_sec = self._capacity / 60.0
+        self._updated = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        async with self._lock:
+            while True:
+                now = time.monotonic()
+                self._tokens = min(
+                    self._capacity,
+                    self._tokens + (now - self._updated) * self._refill_per_sec,
+                )
+                self._updated = now
+                if self._tokens >= 1.0:
+                    self._tokens -= 1.0
+                    return
+                await asyncio.sleep((1.0 - self._tokens) / self._refill_per_sec)
+
+
+_bucket: _TokenBucket | None = None
+
+
+def _rate_limiter() -> _TokenBucket:
+    global _bucket
+    if _bucket is None:
+        _bucket = _TokenBucket(get_settings().pubg_rate_limit_per_min)
+    return _bucket
+
+
+def reset_rate_limiter() -> None:
+    """Drop the process bucket (tests / config reload)."""
+    global _bucket
+    _bucket = None
 
 
 def _api_key() -> str | None:
@@ -63,6 +107,7 @@ async def get_player_by_name(name: str, shard: str = "steam") -> dict | None:
     the adapter's "player not found" means exactly that."""
     if not _api_key():
         raise HostNotConfigured(HOST, "PUBG_API_KEY is not configured")
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,
@@ -84,6 +129,7 @@ async def get_player_by_id(account_id: str, shard: str = "steam") -> dict | None
     """Re-fetch a player resource by its stable ``account.…`` id."""
     if not _api_key():
         return None
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,
@@ -91,10 +137,12 @@ async def get_player_by_id(account_id: str, shard: str = "steam") -> dict | None
             f"{PUBG_BASE}/{shard}/players/{account_id}",
             headers=_headers(),
         )
-    except HostNotFound:
-        return None
+    except HostUnavailable:
+        # Outage / rate-limit (429): propagate so settlement grading extends the
+        # window instead of reading it as "no such player / no qualifying game".
+        raise
     except HostError:
-        return None
+        return None  # 404 / other 4xx → "no such player / unreadable"
     try:
         return (response.json() or {}).get("data")
     except ValueError:
@@ -108,6 +156,7 @@ async def get_lifetime(account_id: str, shard: str = "steam") -> dict | None:
     """
     if not _api_key():
         return None
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,
@@ -117,6 +166,9 @@ async def get_lifetime(account_id: str, shard: str = "steam") -> dict | None:
             timeout_s=10.0,
         )
     except HostError:
+        # Deliberately fail-soft on ALL host errors (incl. outages): lifetime is a
+        # soft profile / bracketing signal, never settlement. A momentary gap must
+        # not fail linking; the profile just computes from what modes returned.
         return None
     try:
         attrs = ((response.json() or {}).get("data") or {}).get("attributes") or {}
@@ -135,6 +187,7 @@ async def get_match(match_id: str, shard: str = "steam") -> dict | None:
         return cached[1]
     if not _api_key():
         return None
+    await _rate_limiter().acquire()
     try:
         response = await request_json(
             HOST,
@@ -144,8 +197,12 @@ async def get_match(match_id: str, shard: str = "steam") -> dict | None:
             timeout_s=10.0,
         )
         data = response.json()
+    except HostUnavailable:
+        # An unreadable match might be the qualifying one — propagate so grading
+        # extends the window rather than silently grading a later match.
+        raise
     except (HostError, ValueError):
-        return None
+        return None  # 404 (expired match) / other 4xx / bad JSON → skip this match
     _match_cache[match_id] = (time.monotonic(), data)
     return data
 

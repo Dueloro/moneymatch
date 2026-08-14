@@ -157,6 +157,20 @@ GAME_HISTORY_FLOOR: dict[str, int] = {
     GAME_PUBG_STEAM: 20,  # matches
 }
 
+# PUBG per-poll match fan-out cap. Bootstrap needs ≥ METRIC_PROVISIONAL_MIN_N
+# graded samples to lift a stat duel out of "provisional"; 15 clears 10 even
+# after custom/event matches are filtered out. Settlement stays cheap via the
+# poll's newest-first early-exit + the finished-match cache.
+PUBG_MATCH_FANOUT = 15
+
+# Official PUBG modes eligible to settle money. Everything else — custom games,
+# arcade, war/zombie, event, training — is excluded so only standard
+# battle-royale play grades a duel.
+PUBG_OFFICIAL_GAME_MODES: frozenset[str] = frozenset(
+    {"solo", "solo-fpp", "duo", "duo-fpp", "squad", "squad-fpp"}
+)
+PUBG_OFFICIAL_MATCH_TYPES: frozenset[str] = frozenset({"official", "competitive"})
+
 
 # --------------------------------------------------------------------------- #
 # Head-to-head play config (06-phase-3). All timing/entry knobs live here, not

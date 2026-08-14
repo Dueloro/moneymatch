@@ -122,7 +122,7 @@ Anyone can craft a URL that looks like a Steam callback naming any SteamID.
 Reading the SteamID out of `claimed_id` without that round trip would let anyone
 sign in as anyone.
 
-### Storage — `models/cs2.py`, migration `0020_cs2_matches`
+### Storage — `models/cs2.py`, migration `0022_cs2_matches`
 
 One row per resolved match, keyed by share code.
 
@@ -392,12 +392,12 @@ poll Valve, and that endpoint throttles a key for abuse.
 ## Migrations
 
 Applied by `docker-entrypoint.sh` before the app starts, so a deploy that
-forgets them is not a failure mode. Verified for this branch: **all 22
-migrations apply to an empty schema and land on `0022`**, and `alembic check`
+forgets them is not a failure mode. Verified for this branch: **all 24
+migrations apply to an empty schema and land on `0024`**, and `alembic check`
 reports no drift afterwards. That check runs in CI, so a model/migration
 mismatch fails the build rather than the deploy.
 
-One migration can refuse to run. `0022_retire_cs2_faceit` aborts if any
+One migration can refuse to run. `0024_retire_cs2_faceit` aborts if any
 `cs2.faceit` contest is still in flight, and `set -e` turns that into a failed
 deploy rather than a started container. That is deliberate: the alternative is
 deleting the scaffolding under an open contest and stranding its entries in
@@ -619,7 +619,7 @@ was involved.
 
 ## Re-verified for this merge
 
-- All 22 migrations apply to an empty schema and land on `0022`; `alembic check`
+- All 24 migrations apply to an empty schema and land on `0024`; `alembic check`
   reports no drift.
 - A production-configured app mounts neither `/api/v1/demo/*` nor the e2e token
   minter.
@@ -638,7 +638,7 @@ was involved.
 - [ ] `GC_SHARED_SECRET` and `STEAM_API_KEY` in the `moneymatch-shared` group
 - [ ] `GC_REFRESH_TOKEN` set on `moneymatch-gc`, from an account that owns CS2 and that nobody plays on
 - [ ] `DEMO_LOGIN_ENABLED`, `DEMO_SIMULATE_ENABLED` and `E2E_AUTH_ENABLED` left unset
-- [ ] No `cs2.faceit` contest in flight, or `0022` refuses and the deploy fails
+- [ ] No `cs2.faceit` contest in flight, or `0024` refuses and the deploy fails
 - [ ] `VITE_API_BASE_URL` on Vercel pointing at the Render API, **and the same
       origin present in `vercel.json`'s CSP `connect-src`** — a mismatch blocks
       every request in the browser with nothing wrong on the server

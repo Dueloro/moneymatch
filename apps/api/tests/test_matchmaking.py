@@ -298,6 +298,34 @@ async def test_provisional_metric_cannot_queue_a_stat_duel(session):
     assert exc.value.code == "metric_provisional"
 
 
+async def _pubg_player(session, name, *, n):
+    user = await create_user(session, username=name)
+    await create_linked_account(session, user, "pubg.steam")
+    await create_metric_model(
+        session, user, "pubg.steam", "pubg_kills", mu=4.5, sigma=2.0, n=n
+    )
+    return user
+
+
+async def test_pubg_stat_duel_accepted_once_n_at_floor(session):
+    # Issue 1 regression: with the fan-out raised, a PUBG account can reach n≥10,
+    # so its kills duel must queue rather than being blocked as provisional.
+    ready = await _pubg_player(session, "pubg_ready", n=12)
+    r = await matchmaking.enqueue(
+        session, ready, game="pubg.steam", market_key="kills", entry_cents=1000
+    )
+    assert r.status == "searching"
+
+
+async def test_pubg_stat_duel_blocked_while_below_floor(session):
+    rookie = await _pubg_player(session, "pubg_rookie", n=5)
+    with pytest.raises(MatchmakingError) as exc:
+        await matchmaking.enqueue(
+            session, rookie, game="pubg.steam", market_key="kills", entry_cents=1000
+        )
+    assert exc.value.code == "metric_provisional"
+
+
 async def test_same_two_accounts_cannot_repair_within_24h(session):
     a = await cs2_player(session, "a")
     b = await cs2_player(session, "b")

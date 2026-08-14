@@ -38,6 +38,9 @@ os.environ["DEMO_LOGIN_ENABLED"] = "1"
 # the global limiter out of its way. The limiter itself is proven in
 # test_security_middleware.py against a purpose-built low-limit app.
 os.environ["RATE_LIMIT_WRITES_PER_MINUTE"] = "100000"
+# The PUBG host client throttles to ~9 req/min in prod; keep it out of the way of
+# respx-mocked tests (the token bucket itself is proven in test_pubg_rate_limit.py).
+os.environ["PUBG_RATE_LIMIT_PER_MIN"] = "100000"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402

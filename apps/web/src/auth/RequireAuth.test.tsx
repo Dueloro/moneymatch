@@ -37,11 +37,17 @@ describe('RequireAuth', () => {
     mockUseAuth.mockReturnValue({
       session: null,
       loading: false,
-      signInWithUsername: vi.fn(),
-      signUpWithUsername: vi.fn(),
+      isDemo: false,
+      isPasswordRecovery: false,
+      signUpWithEmail: vi.fn(),
+      signInWithEmail: vi.fn(),
+      sendLoginCode: vi.fn(),
+      verifyLoginCode: vi.fn(),
+      sendPasswordReset: vi.fn(),
+      setNewPassword: vi.fn(),
+      signInWithGoogle: vi.fn(),
       verifyCurrentPassword: vi.fn(),
       changePassword: vi.fn(),
-      isDemo: false,
       signOut: vi.fn(),
     });
     renderWithProviders(tree(), { route: '/play' });
@@ -53,11 +59,17 @@ describe('RequireAuth', () => {
     mockUseAuth.mockReturnValue({
       session: { user: { id: 'u1' } } as never,
       loading: false,
-      signInWithUsername: vi.fn(),
-      signUpWithUsername: vi.fn(),
+      isDemo: false,
+      isPasswordRecovery: false,
+      signUpWithEmail: vi.fn(),
+      signInWithEmail: vi.fn(),
+      sendLoginCode: vi.fn(),
+      verifyLoginCode: vi.fn(),
+      sendPasswordReset: vi.fn(),
+      setNewPassword: vi.fn(),
+      signInWithGoogle: vi.fn(),
       verifyCurrentPassword: vi.fn(),
       changePassword: vi.fn(),
-      isDemo: false,
       signOut: vi.fn(),
     });
     mockUseMe.mockReturnValue({

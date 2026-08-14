@@ -1,0 +1,16 @@
+<div style="background:#f3f4f6;padding:24px 0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden">
+    <tr><td style="background:#0B0B0C;padding:20px 28px">
+      <img src="https://moneymatch-beta.vercel.app/email/logo.png" width="28" height="28" alt="Money Match" style="vertical-align:middle;border-radius:8px">
+      <span style="color:#ffffff;font-weight:600;font-size:15px;vertical-align:middle;margin-left:10px">Money Match</span>
+    </td></tr>
+    <tr><td style="padding:28px;color:#111827">
+      <h1 style="margin:0 0 8px;font-size:20px">Verify your email</h1>
+      <p style="margin:0 0 20px;font-size:16px;line-height:1.5;color:#374151">You're almost in. Confirm this address to finish creating your Money Match account and start playing.</p>
+      <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#C6F440;color:#0B0B0C;padding:12px 22px;border-radius:9999px;text-decoration:none;font-weight:700;font-size:15px">Verify my email</a>
+      <p style="margin:20px 0 0;font-size:12px;color:#6b7280">Button not working? Paste this link:<br>{{ .ConfirmationURL }}</p>
+      <p style="margin:16px 0 0;font-size:12px;color:#6b7280">Didn't create an account? You can ignore this email.</p>
+    </td></tr>
+    <tr><td style="background:#0B0B0C;padding:16px 28px;font-size:12px;color:#9ca3af">Money Match · peer-to-peer skill wagering<br>Need help? Contact Dueloro Support.</td></tr>
+  </table>
+</div>

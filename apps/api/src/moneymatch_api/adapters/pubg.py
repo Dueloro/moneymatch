@@ -11,20 +11,27 @@ PUBG is a fully registered, playable game: it's in `REGISTERED_GAMES`, this
 adapter is in the registry, and its metrics drive pools / tournaments / stat
 duels (constants: `GAME_RATE_METRICS`, `POOL_METRICS`, `TOURNAMENT_METRICS`,
 `GAME_HISTORY_FLOOR`, `METRIC_BAR_INCREMENT`).
+
+Only *official* modes settle (`_is_official`): custom / arcade / war / event /
+training are skipped. `NormGame.speed` carries the settling match's `gameMode`
+(the audit trail for which mode graded). Team-mode `winPlace == 1` still credits
+one player, and a stat duel can compare a squad game against a solo game — both
+are accepted residuals of the "official modes, no custom" policy.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 
+from ..constants import (
+    PUBG_MATCH_FANOUT,
+    PUBG_OFFICIAL_GAME_MODES,
+    PUBG_OFFICIAL_MATCH_TYPES,
+)
 from ..schemas.profile import ProfileSnapshot
 from ..services.hosts import pubg
 from ..services.hosts.errors import HostNotConfigured
 from .base import GameAdapter, GameFilters, NormGame, TelemetrySample
-
-# Cap match fan-out per history poll: the PUBG public rate limit is ~10 req/min,
-# and one poll already spends a player lookup plus one request per match.
-_MATCH_LIMIT = 8
 
 # Lifetime totals we sum across game modes for the profile's soft skill signals.
 _LIFETIME_FIELDS = ("roundsPlayed", "wins", "kills", "losses", "damageDealt")
@@ -47,6 +54,9 @@ def _created_ms(iso: str | None) -> int:
 
 class PubgAdapter(GameAdapter):
     id = "pubg.steam"
+    # PUBG's ~10 req/min budget makes a link-time history bootstrap too expensive
+    # to run inline; the settlement worker bootstraps the metric models instead.
+    defer_bootstrap = True
 
     @property
     def _shard(self) -> str:
@@ -58,7 +68,10 @@ class PubgAdapter(GameAdapter):
             raise HostNotConfigured("pubg", "PUBG_API_KEY is not configured")
         player = await pubg.get_player_by_name(identifier.strip(), self._shard)
         if player is None:
-            raise ValueError(f"PUBG player '{identifier}' not found")
+            raise ValueError(
+                f"PUBG player '{identifier}' not found — names are case-sensitive; "
+                "check the exact spelling and platform."
+            )
         account_id = player.get("id") or ""
         name = (player.get("attributes") or {}).get("name") or identifier
         profile = await self._profile_from(account_id, name)
@@ -93,13 +106,16 @@ class PubgAdapter(GameAdapter):
         ]
 
         out: list[NormGame] = []
-        for match_id in match_ids[:_MATCH_LIMIT]:
+        for match_id in match_ids[:PUBG_MATCH_FANOUT]:
             match = await pubg.get_match(match_id, self._shard)
             if not match:
                 continue
             norm = self._normalize(match, account_id)
-            if norm is None or norm.created_at_ms < since_ms:
-                continue
+            if norm is None:
+                continue  # unreadable or a non-official mode — skip, keep scanning
+            if norm.created_at_ms < since_ms:
+                # The match list is newest-first, so everything past here is older.
+                break
             out.append(norm)
         out.sort(key=lambda x: x.created_at_ms)  # oldest first
         return out
@@ -114,6 +130,8 @@ class PubgAdapter(GameAdapter):
         """Turn a raw match document into a NormGame for ``account_id``."""
         data = match.get("data") or {}
         attrs = data.get("attributes") or {}
+        if not self._is_official(attrs):
+            return None  # custom / arcade / war / event / training don't settle
         stats = self._participant_stats(match, account_id)
         if stats is None:
             return None
@@ -137,6 +155,20 @@ class PubgAdapter(GameAdapter):
         )
 
     @staticmethod
+    def _is_official(attrs: dict) -> bool:
+        """Only standard battle-royale play settles: an allowlisted gameMode, an
+        official/competitive matchType, and not a custom lobby. Team-mode win
+        attribution and cross-mode stat comparison are accepted residuals."""
+        if attrs.get("isCustomMatch"):
+            return False
+        game_mode = str(attrs.get("gameMode") or "")
+        match_type = str(attrs.get("matchType") or "")
+        return (
+            game_mode in PUBG_OFFICIAL_GAME_MODES
+            and match_type in PUBG_OFFICIAL_MATCH_TYPES
+        )
+
+    @staticmethod
     def _participant_stats(match: dict, account_id: str) -> dict | None:
         for inc in match.get("included") or []:
             if inc.get("type") != "participant":
@@ -157,6 +189,8 @@ class PubgAdapter(GameAdapter):
         wins = int(agg["wins"])
         losses = int(agg["losses"])
         win_rate = (wins / rounds) if rounds else 0.5
+        # PUBG's conventional K/D: kills per non-winning round (losses = rounds −
+        # wins), NOT kills/deaths. A soft profile/bracketing signal only.
         kd = (agg["kills"] / losses) if losses else agg["kills"]
 
         return ProfileSnapshot(

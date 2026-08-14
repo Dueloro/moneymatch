@@ -19,7 +19,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.notification import Notification
-from . import push_service
+from . import email_service, push_service
 
 log = structlog.get_logger(__name__)
 
@@ -63,6 +63,26 @@ _PUSH_COPY: dict[str, tuple[str, str, str]] = {
     "friend_request": ("Friend request", "You have a new friend request.", "/social"),
 }
 
+# A deliberately small subset of kinds also gets a transactional email — the
+# high-value, non-time-critical nudges worth reaching an inbox for. (subject,
+# body); the deep link reuses the matching `_PUSH_COPY` path. Anything absent
+# here stays in-app + push only, so email never becomes a firehose. Only real
+# addresses receive it — see `email_service` (username accounts are skipped).
+_EMAIL_COPY: dict[str, tuple[str, str]] = {
+    "match_found": (
+        "Your match is ready",
+        "Your opponent is ready — confirm to play your match.",
+    ),
+    "settled": (
+        "Your contest settled",
+        "Your result is in. Open Money Match to see how it went.",
+    ),
+    "challenge_received": (
+        "You've been challenged",
+        "Someone challenged you to a match on Money Match.",
+    ),
+}
+
 
 async def emit(
     session: AsyncSession,
@@ -94,6 +114,17 @@ async def emit(
             )
         except Exception as exc:  # noqa: BLE001 — push must never break the caller
             log.warning("push.emit_failed", kind=kind, error=str(exc))
+
+    email_copy = _EMAIL_COPY.get(kind)
+    if email_copy is not None:
+        try:
+            subject, body = email_copy
+            link_path = copy[2] if copy is not None else None
+            await email_service.send_to_user(
+                session, user_id, subject=subject, body=body, link_path=link_path
+            )
+        except Exception as exc:  # noqa: BLE001 — email must never break the caller
+            log.warning("email.emit_failed", kind=kind, error=str(exc))
     return row
 
 

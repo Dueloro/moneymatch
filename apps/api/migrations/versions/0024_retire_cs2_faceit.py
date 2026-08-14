@@ -25,8 +25,8 @@ Any non-terminal cs2.faceit contest has entries in escrow and has to be
 cancelled through the engine's own refund path, which writes the ledger entries
 this cannot. Verified none remained before this shipped.
 
-Revision ID: 0022_retire_cs2_faceit
-Revises: 0021_cs2_share_chain
+Revision ID: 0024_retire_cs2_faceit
+Revises: 0023_cs2_share_chain
 Create Date: 2026-08-12
 """
 
@@ -37,8 +37,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0022_retire_cs2_faceit"
-down_revision: str | None = "0021_cs2_share_chain"
+revision: str = "0024_retire_cs2_faceit"
+down_revision: str | None = "0023_cs2_share_chain"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
