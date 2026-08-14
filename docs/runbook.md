@@ -111,7 +111,7 @@ Symptom: settlement latency climbing; worker logs `HostUnavailable`.
   consumes it) and cancels + refunds at the hard ceiling — no money is stranded.
 - To stop *new* contests on the affected game while the host is down, flip its
   per-game kill switch: `PUT /api/v1/admin/flags/game:<game_id>` → `enabled:false`
-  (e.g. `game:cs2.faceit`). Takes effect on the next request, no deploy.
+  (e.g. `game:cs2.steam`). Takes effect on the next request, no deploy.
 - Re-enable when the host recovers. Backfill settles automatically as results
   become available.
 
@@ -184,7 +184,7 @@ with no deploy. They take effect on the next request/cycle.
 | --- | --- |
 | `settlement_paused` | Worker idles; no settlements commit (fail-closed). |
 | `queue_paused` | Matchmaking off; worker drains waiting tickets to cancels. |
-| `game:<game_id>` | Per-game enable (e.g. `game:cs2.faceit`). False ⇒ no new contests on that game. |
+| `game:<game_id>` | Per-game enable (e.g. `game:cs2.steam`). False ⇒ no new contests on that game. |
 
 Real payment/KYC rails have **no** admin flag: `payments_live` / `kyc_live` are
 config + code guarded (a flip alone is inert), so they can never be enabled by

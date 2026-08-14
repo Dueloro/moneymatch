@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useInboxUnread } from '../../hooks/useChat';
 import { useMe } from '../../hooks/useMe';
 import { useWallet } from '../../hooks/useWallet';
-import { formatCurrency } from '../../lib/format';
+import { AnimatedBalance } from './AnimatedBalance';
 import { Badge } from './Badge';
 import { Logo } from './brand';
 import { NavIcon } from './icons';
@@ -85,7 +85,10 @@ export function SidebarNav() {
         >
           <span className="label-money block">Balance</span>
           <span className="mt-0.5 block text-lg font-semibold text-green">
-            {formatCurrency(wallet?.available_cents ?? 0)}
+            <AnimatedBalance
+              cents={wallet?.available_cents ?? 0}
+              testId="sidebar-balance"
+            />
           </span>
         </NavLink>
         <NavLink

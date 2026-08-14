@@ -6,6 +6,7 @@ import { ActivityCard } from '../components/activity/ActivityCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PillButton } from '../components/ui/PillButton';
+import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
@@ -61,6 +62,13 @@ export function ActivityPage() {
       <SectionHeader level="page" hint="Every contest you have played, newest first.">
         Activity
       </SectionHeader>
+
+      {/* This is where you land after playing, so it is where setup belongs:
+       * the card collapses to a one-line confirmation once connected, and
+       * disappears from your way entirely. */}
+      <div className="mb-6">
+        <Cs2SetupCard />
+      </div>
 
       {isError ? (
         <ErrorState

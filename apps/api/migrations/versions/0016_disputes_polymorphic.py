@@ -21,7 +21,9 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     # New polymorphic ref columns (nullable while we backfill).
     op.add_column("disputes", sa.Column("ref_type", sa.String(16), nullable=True))
-    op.add_column("disputes", sa.Column("ref_id", sa.dialects.postgresql.UUID(), nullable=True))
+    op.add_column(
+        "disputes", sa.Column("ref_id", sa.dialects.postgresql.UUID(), nullable=True)
+    )
 
     # Every existing dispute pointed at a match.
     op.execute("UPDATE disputes SET ref_type = 'match', ref_id = match_id")

@@ -44,9 +44,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("reason", sa.Text(), nullable=False),
-        sa.Column(
-            "status", sa.String(16), server_default="open", nullable=False
-        ),
+        sa.Column("status", sa.String(16), server_default="open", nullable=False),
         sa.Column("admin_note", sa.Text(), nullable=True),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(

@@ -19,11 +19,11 @@ def test_get_unknown_game_raises():
 
 def test_enabled_ids_filters_by_flag():
     flags = {game_flag_key(g): True for g in REGISTERED_GAMES}
-    flags[game_flag_key("cs2.faceit")] = False
+    flags[game_flag_key("cs2.steam")] = False
     enabled = registry.enabled_ids(flags)
-    assert "cs2.faceit" not in enabled
+    assert "cs2.steam" not in enabled
     assert "chess.lichess" in enabled
-    assert registry.is_enabled("cs2.faceit", flags) is False
+    assert registry.is_enabled("cs2.steam", flags) is False
 
 
 def test_absent_flag_defaults_enabled():

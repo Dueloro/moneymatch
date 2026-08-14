@@ -13,13 +13,40 @@ vi.mock('../hooks/useActivity', async () => {
   return { ...actual, useActivity: vi.fn() };
 });
 
+// Activity now carries the CS2 share-code card, which reads the viewer's links
+// and the match service. Neither is what this file is about, so both are
+// stubbed to their quiet state.
+vi.mock('../hooks/useLinks', () => ({
+  useLinks: () => ({ data: { games: [] } }),
+}));
+vi.mock('../hooks/useCs2', () => ({
+  useSteamLoginUrl: () => ({ data: 'https://steamcommunity.com/openid/login' }),
+  useGcHealth: () => ({ data: { ready: true, queue_depth: 0 } }),
+  useSubmitShareCode: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+  }),
+  // Automatic collection sits alongside the paste box. Reported as not
+  // connected, so these tests exercise the page's own content rather than the
+  // setup form.
+  useChainStatus: () => ({ data: { connected: false } }),
+  useConnectChain: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useSyncChain: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    isSuccess: false,
+  }),
+}));
+
 import { useActivity, type ActivityItem } from '../hooks/useActivity';
 
 function item(overrides: Partial<ActivityItem>): ActivityItem {
   return {
     type: 'match',
     id: 'm1',
-    game: 'cs2.faceit',
+    game: 'cs2.steam',
     market: 'kd_ratio',
     market_label: 'K/D ratio',
     kind: 'stat_race',

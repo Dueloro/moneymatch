@@ -190,10 +190,42 @@ body {
   animation: rise 0.28s ease-out;
 }
 
+/* The change in a balance after a wager settles: drifts up and fades out.
+ * Carries its own horizontal centring, because a transform utility class would
+ * be overridden by the animation the moment it started. */
+@keyframes money-delta {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -6px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+}
+.animate-money-delta {
+  animation: money-delta 2.2s ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
   .animate-rise {
     animation: none;
+  }
+  /* Still shown, just not moving: the amount you won or lost is information,
+   * not decoration, so it must not be animated away to nothing. */
+  .animate-money-delta {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -10px);
   }
   *,
   *::before,

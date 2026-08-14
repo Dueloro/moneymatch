@@ -17,6 +17,7 @@ Window-boundary matches are excluded (strict `[starts, ends]` containment).
 
 from __future__ import annotations
 
+import math
 import uuid
 from typing import Any
 
@@ -25,7 +26,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
-from ..constants import lower_is_better, metric_floor, requires_win
+from ..constants import (
+    METRIC_BAR_INCREMENT,
+    lower_is_better,
+    metric_floor,
+    requires_win,
+)
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
@@ -78,17 +84,45 @@ def _evidence(
     }
 
 
+def _clearing_value(metric: str, bar: float) -> float:
+    """A believable score for the opponent built to clear `bar`.
+
+    Snapped up to the metric's own increment, because the number goes on the
+    results card next to yours. Kills come in whole units, and an opponent
+    credited with 18.4 kills reads as a bug in the thing holding your money.
+    Rounding up rather than to nearest also keeps it strictly past the bar, so
+    the score shown always agrees with the grade awarded.
+    """
+    increment = METRIC_BAR_INCREMENT.get(metric, 0.01)
+    return round(math.ceil(bar * 1.15 / increment) * increment, 2)
+
+
 async def grade_pool(
     session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
 ) -> dict[uuid.UUID, PoolGrade]:
     """Grade every entry's first qualifying in-window match against `room_bar`."""
     grades: dict[uuid.UUID, PoolGrade] = {}
     for entry in entries:
-        # Practice opponents never play, so they miss the bar and forfeit their
-        # entry. Without this they would grade as unverifiable and be refunded,
-        # which would make a test pool pay nothing to anyone.
-        if test_opponents.graded_as_failed(entry.host_account_id):
-            grades[entry.user_id] = PoolGrade(cleared=False)
+        # Practice opponents never play, so they are graded rather than looked
+        # up. Most miss and forfeit their entry: without that they would grade
+        # as unverifiable and be refunded, and a test pool would pay nobody.
+        #
+        # One is built to clear (`CLEARING_HANDLES`), because a pool where only
+        # you can win never exercises the rule that decides the money — clearers
+        # *split* the pot. With a clearing opponent in the room, clearing your
+        # bar splits it and missing yours hands it over, which is the real
+        # behaviour a single real player otherwise cannot reach.
+        if test_opponents.is_practice_opponent(entry.host_account_id):
+            cleared = test_opponents.clears_its_bar(entry.host_account_id)
+            grades[entry.user_id] = PoolGrade(
+                cleared=cleared,
+                telemetry={
+                    pool.metric: _clearing_value(pool.metric, float(pool.room_bar))
+                    if cleared
+                    else None,
+                    "practice_opponent": True,
+                },
+            )
             continue
         games = await _window_games(
             pool.game,

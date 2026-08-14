@@ -9,7 +9,7 @@ function match(overrides: Partial<ActivityItem> = {}): ActivityItem {
   return {
     type: 'match',
     id: 'm1',
-    game: 'cs2.faceit',
+    game: 'cs2.steam',
     market: 'kd_ratio',
     market_label: 'K/D ratio',
     kind: 'stat_race',
@@ -23,7 +23,7 @@ function match(overrides: Partial<ActivityItem> = {}): ActivityItem {
     live: null,
     detail: {
       kind: 'match',
-      game: 'cs2.faceit',
+      game: 'cs2.steam',
       opponent: 's1mple_fan',
       entry_cents: 1000,
       prize_cents: 1800,
@@ -43,7 +43,7 @@ describe('ActivityCard', () => {
   it('names the host game on the row', () => {
     renderWithProviders(<ActivityCard item={match()} />);
     // The CS2 match carries a game badge so the row is not game-ambiguous.
-    expect(screen.getByText('Counter Strike')).toBeInTheDocument();
+    expect(screen.getByText('CS2')).toBeInTheDocument();
   });
 
   it('expands to show per-match stats and a contest action', () => {

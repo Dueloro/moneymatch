@@ -4,6 +4,8 @@
 from ..db.base import Base
 from .admin_audit import AdminAudit
 from .chat import Conversation, ConversationMember, Message
+from .cs2 import Cs2Match, Cs2ShareChain
+from .demo_simulation import SimulatedMatch
 from .dispute import Dispute
 from .feature_flag import FeatureFlag
 from .linked_account import LinkedAccount
@@ -48,4 +50,7 @@ __all__ = [
     "RiskFlag",
     "Friendship",
     "Challenge",
+    "SimulatedMatch",
+    "Cs2Match",
+    "Cs2ShareChain",
 ]

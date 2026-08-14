@@ -73,6 +73,11 @@ function HandleRow({ link }: { link: GameLink }) {
     );
   };
 
+  // CS2 is not swappable by handle: its identity is a SteamID64 that only
+  // Steam can vouch for, and connecting it lives in the CS2 setup card rather
+  // than being duplicated here.
+  if (link.game === 'cs2.steam') return null;
+
   return (
     <form onSubmit={submit} className="py-3">
       <div className="flex items-center gap-3">
@@ -103,3 +108,11 @@ function HandleRow({ link }: { link: GameLink }) {
     </form>
   );
 }
+
+/**
+ * The CS2 row: sign in through Steam, rather than type a name.
+ *
+ * Steam OpenID is a full-page redirect. You leave the app, approve on
+ * steamcommunity.com, and come back to `/auth/steam/callback`, which verifies
+ * the reply with Steam before anything is linked.
+ */

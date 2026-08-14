@@ -67,7 +67,7 @@ function messageOf(error: unknown, fallback: string): string {
   return typeof msg === 'string' && msg ? msg : fallback;
 }
 
-const CS2 = 'cs2.faceit';
+const CS2 = 'cs2.steam';
 
 export function useTournamentMarkets(game: string = CS2) {
   const { session } = useAuth();

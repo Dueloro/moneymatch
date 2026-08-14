@@ -9,7 +9,7 @@ from moneymatch_api.services import game_stats_service
 
 from .factories import create_linked_account, create_user, cs2_profile
 
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 _BASE = datetime(2026, 7, 1, tzinfo=UTC)
 
 

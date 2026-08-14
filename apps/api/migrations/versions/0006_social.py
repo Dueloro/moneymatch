@@ -189,7 +189,10 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
-            ["match_id"], ["matches.id"], name="fk_challenges_match", ondelete="RESTRICT"
+            ["match_id"],
+            ["matches.id"],
+            name="fk_challenges_match",
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["rematch_of"],

@@ -38,10 +38,15 @@ from ..constants import METRIC_BAR_INCREMENT
 from ..models.linked_account import LinkedAccount
 from ..models.skill import MetricModel
 from ..models.user import User
+from ..models.wallet import Limit
 from . import demo_mode, linking_service, skill_prior
 from .user_service import provision_new_user
 
 log = structlog.get_logger(__name__)
+
+#: Daily caps for a practice opponent: high enough that the scaffolding never
+#: refuses itself, and irrelevant either way since none of this is real money.
+_BOT_CAP_CENTS = 100_000_000
 
 # Every fake row is findable by this one prefix. `purge()` relies on it.
 TEST_AUTH_PREFIX = "zz_testbot_"
@@ -101,6 +106,23 @@ async def _opponent(
         session.add(user)
         await session.flush()
         await provision_new_user(session, user)  # wallet + signup grant
+
+    # Responsible-gambling caps exist to protect a person from themselves. A
+    # fabricated opponent has nobody to protect, and the default daily *loss*
+    # cap quietly broke the demo: the two opponents built to miss lose their
+    # entry every single room, so after a few pools they were refused for
+    # exceeding it. The matcher then found nobody to pair the demo with and
+    # fell back to a room of one, with no pot to split and nothing on screen
+    # explaining why.
+    #
+    # Raised as data rather than as an exemption inside `limits_service`, so
+    # nothing in the money path grows a branch that could ever apply to a real
+    # account.
+    limits = await session.scalar(select(Limit).where(Limit.user_id == user.id))
+    if limits is not None:
+        limits.daily_loss_cap_cents = max(limits.daily_loss_cap_cents, _BOT_CAP_CENTS)
+        limits.daily_entry_cap_cents = max(limits.daily_entry_cap_cents, _BOT_CAP_CENTS)
+        await session.flush()
 
     linked = await session.scalar(
         select(LinkedAccount).where(
@@ -194,7 +216,13 @@ async def _prepare(
     your_link = await linking_service.get_link(session, user.id, game)
     rating = skill_prior.host_rating(your_link) if your_link else None
     opponents: list[User] = []
-    for handle in _HANDLES[:count]:
+    # Clearers first. A room of nothing but opponents built to miss can only end
+    # one way, and the split — the rule that actually decides the money — never
+    # gets demonstrated.
+    ordered = sorted(_HANDLES, key=lambda h: h not in CLEARING_HANDLES)
+    for handle in ordered:
+        if len(opponents) >= count:
+            break
         opponent = await _opponent(
             session,
             handle,
@@ -315,6 +343,36 @@ async def fill_queue(
                 "testbot.queue_join_failed", handle=opponent.username, error=str(exc)
             )
     return 0
+
+
+#: The practice opponents that beat their bar instead of missing it.
+#:
+#: Every dummy missing meant a pool only ever had one possible outcome: you
+#: clear and take the whole prize, or you miss and everything is refunded. The
+#: rule that actually governs a pool -- clearers *split* the pot -- was never
+#: reachable with one real player, so the demo could not show the thing the
+#: product does.
+#:
+#: One clearer is enough to show both halves. Clear your bar and you split with
+#: it; miss, and it takes the pot off you. Keyed by handle so it is the same
+#: opponent every time: a demo whose outcome moves around is not a demo.
+CLEARING_HANDLES = frozenset({"testbot_ada"})
+
+
+def is_practice_opponent(host_account_id: str) -> bool:
+    """True for any practice opponent, whatever it is graded as.
+
+    Keyed off the host id rather than a user lookup, so settlement needs no
+    extra query.
+    """
+    return host_account_id.startswith(TEST_AUTH_PREFIX)
+
+
+def clears_its_bar(host_account_id: str) -> bool:
+    """True for the practice opponent built to clear (see `CLEARING_HANDLES`)."""
+    if not is_practice_opponent(host_account_id):
+        return False
+    return host_account_id[len(TEST_AUTH_PREFIX) :] in CLEARING_HANDLES
 
 
 def graded_as_failed(host_account_id: str) -> bool:

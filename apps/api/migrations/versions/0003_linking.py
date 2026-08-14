@@ -87,9 +87,7 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         ),
     )
-    op.create_index(
-        "ix_linked_accounts_user_id", "linked_accounts", ["user_id"]
-    )
+    op.create_index("ix_linked_accounts_user_id", "linked_accounts", ["user_id"])
 
     op.create_table(
         "metric_models",

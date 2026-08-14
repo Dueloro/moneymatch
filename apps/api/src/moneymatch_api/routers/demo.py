@@ -28,7 +28,9 @@ from ..constants import (
     DEMO_JWT_SECRET,
     DEMO_RESIDENCE_STATE,
     DEMO_USERNAME,
-    GAME_CS2_FACEIT,
+    GAME_CHESS_LICHESS,
+    GAME_CS2_STEAM,
+    GAME_DOTA2_OPENDOTA,
     GAME_PUBG_STEAM,
     POOL_METRICS,
     REGISTERED_GAMES,
@@ -37,7 +39,7 @@ from ..constants import (
     game_display_name,
 )
 from ..db.session import get_session
-from ..dependencies import CurrentUser
+from ..dependencies import AdminUser, CurrentUser
 from ..errors import APIError
 from ..models.chat import Conversation, ConversationMember, Message
 from ..models.linked_account import LinkedAccount
@@ -53,10 +55,12 @@ from ..services import (
     admin_contests_service,
     challenge_service,
     chat_service,
+    demo_simulation,
     linking_service,
     matchmaking,
     money_math,
     pool_engine,
+    telemetry_fetch,
     tournament_engine,
     wallet_service,
 )
@@ -78,7 +82,6 @@ _TOKEN_TTL = timedelta(hours=12)
 _DEMO_METRIC_FIXTURE: dict[str, tuple[float, float]] = {
     "chess_accuracy": (85.0, 6.0),
     "cs2_kd_ratio": (1.15, 0.22),
-    "cs2_adr": (78.0, 12.0),
     "cs2_headshot_pct": (47.0, 8.0),
     "dota2_kda_ratio": (3.2, 0.8),
     "dota2_gpm": (520.0, 90.0),
@@ -90,6 +93,16 @@ _DEMO_METRIC_FIXTURE: dict[str, tuple[float, float]] = {
 # Sample count stamped on a seeded model — comfortably clear of every baseline
 # floor, so the demo never reads as provisional.
 _DEMO_METRIC_N = 25
+
+
+#: The demo's play set. CS2 is the Steam game, which is now the only one:
+#: FACEIT was retired on 2026-08-12.
+_DEMO_ACTIVE_GAMES = [
+    GAME_CS2_STEAM,
+    GAME_PUBG_STEAM,
+    GAME_DOTA2_OPENDOTA,
+    GAME_CHESS_LICHESS,
+]
 
 
 async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
@@ -108,6 +121,11 @@ async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
         )
     }
     for game in REGISTERED_GAMES:
+        # A Steam identity cannot be faked. `cs2.steam` is keyed by a SteamID64
+        # that only Steam can vouch for, so a placeholder link there would be a
+        # lie that also blocks the real sign-in from ever binding.
+        if game == GAME_CS2_STEAM:
+            continue
         if game not in linked:
             session.add(
                 LinkedAccount(
@@ -150,6 +168,9 @@ async def _ensure_demo_fixture(session: AsyncSession, user: User) -> None:
                 existing.mu = mu
                 existing.sigma = sigma
                 existing.n = _DEMO_METRIC_N
+    # The play set drives the game tabs, so a reset must not put the demo back
+    # on the FACEIT game it can no longer settle.
+    user.active_games = list(_DEMO_ACTIVE_GAMES)
     await session.flush()
 
 
@@ -184,7 +205,7 @@ class _SampleMatch:
 # real games (a couple of wins, a couple of losses, one nail-biter).
 _SAMPLE_MATCHES: tuple[_SampleMatch, ...] = (
     _SampleMatch(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         market="kd_ratio",
         metric="cs2_kd_ratio",
         opponent="s1mple_fan",
@@ -213,7 +234,7 @@ _SAMPLE_MATCHES: tuple[_SampleMatch, ...] = (
         days_ago=0.3,
     ),
     _SampleMatch(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         market="kd_ratio",
         metric="cs2_kd_ratio",
         opponent="Rojo",
@@ -242,7 +263,7 @@ _SAMPLE_MATCHES: tuple[_SampleMatch, ...] = (
         days_ago=1.1,
     ),
     _SampleMatch(
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         market="kd_ratio",
         metric="cs2_kd_ratio",
         opponent="kvem_",
@@ -552,7 +573,7 @@ _DAY = 60 * 24
 _DEMO_THREADS: tuple[_DemoThread, ...] = (
     _DemoThread(
         friend="s1mple_fan",
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         online=True,
         lines=(
             _ChatLine(False, 2 * _DAY + 40, "gg earlier, that dust2 half was rough"),
@@ -564,7 +585,7 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
                 None,
                 {
                     "invite_kind": "pool",
-                    "game": GAME_CS2_FACEIT,
+                    "game": GAME_CS2_STEAM,
                     "entry_cents": 1000,
                     "metric": "cs2_kd_ratio",
                     "difficulty": "medium",
@@ -612,7 +633,7 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
     ),
     _DemoThread(
         friend="kvem_",
-        game=GAME_CS2_FACEIT,
+        game=GAME_CS2_STEAM,
         online=False,
         lines=(
             _ChatLine(False, 4 * _DAY, "that inferno one came down to the last round"),
@@ -623,9 +644,9 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
                 None,
                 {
                     "invite_kind": "pool",
-                    "game": GAME_CS2_FACEIT,
+                    "game": GAME_CS2_STEAM,
                     "entry_cents": 2500,
-                    "metric": "cs2_adr",
+                    "metric": "cs2_kills",
                     "difficulty": "hard",
                     "status": "declined",
                 },
@@ -761,13 +782,13 @@ async def _ensure_demo_social(session: AsyncSession, demo: User) -> None:
     # One live head-to-head challenge from a friend: a *real* `challenges` row, so
     # the invite card in chat (and the Inbox pill) actually forms a match on
     # accept. Posted last so it's the newest thing in the Inbox.
-    challenger = await _demo_opponent(session, _DEMO_THREADS[0].friend, GAME_CS2_FACEIT)
+    challenger = await _demo_opponent(session, _DEMO_THREADS[0].friend, GAME_CS2_STEAM)
     try:
         await challenge_service.create_direct(
             session,
             challenger,
             challengee_id=demo.id,
-            game=GAME_CS2_FACEIT,
+            game=GAME_CS2_STEAM,
             market_key="kd_ratio",
             entry_cents=1000,
         )
@@ -952,3 +973,198 @@ async def demo_reset(
     await _reset_demo_state(session, user)
     await session.commit()
     return DemoResetResponse()
+
+
+# --------------------------------------------------------------------------- #
+# Demo escape hatch (IMPLEMENTATION_PROMPT phase 0).
+#
+# A live demo of a wager product has to show a contest settling, and settlement
+# reads real match history from a game host. For CS2 that is a 40-minute FaceIt
+# match with ten people in it, and for a tournament it is a 48-hour window.
+# Neither is schedulable around an audience.
+#
+# Both endpoints below are admin-only *and* behind `DEMO_SIMULATE_ENABLED`, and
+# both shout in the logs and in their own response body, because an injected
+# result is deliberately indistinguishable everywhere else.
+# --------------------------------------------------------------------------- #
+
+
+class SimulateResultRequest(BaseModel):
+    game: str = GAME_CS2_STEAM
+    user_id: uuid.UUID | None = None  # defaults to the demo user
+    metrics: dict[str, float] = {}
+    rounds: int = 0
+    moves: int = 0
+    won: bool | None = True
+    drawn: bool = False
+    played_at: datetime | None = None
+
+
+class SimulateResultResponse(BaseModel):
+    simulated: bool = True
+    warning: str = (
+        "This is an injected result, not a real match. It is indistinguishable "
+        "from a real one downstream by design."
+    )
+    id: uuid.UUID
+    game: str
+    host_account_id: str
+    user_id: uuid.UUID
+    created_at_ms: int
+    metrics: dict[str, float]
+
+
+class ForceSettleRequest(BaseModel):
+    contest_id: uuid.UUID
+
+
+class ForceSettleResponse(BaseModel):
+    simulated: bool = True
+    warning: str = "Settlement was forced by an admin, not by the contest window."
+    kind: str
+    contest_id: uuid.UUID
+    state: str
+    detail: dict | None = None
+
+
+def _assert_simulation_enabled(settings: Settings) -> None:
+    if not settings.demo_simulate_enabled:
+        raise APIError("not_found", "Not found.", status_code=404)
+
+
+async def _demo_or_named_user(session: AsyncSession, user_id: uuid.UUID | None) -> User:
+    if user_id is not None:
+        target = await session.get(User, user_id)
+        if target is None:
+            raise APIError("not_found", "No such user.", status_code=404)
+        return target
+    target = await session.scalar(select(User).where(User.auth_id == DEMO_AUTH_ID))
+    if target is None:
+        raise APIError(
+            "not_found", "The demo user does not exist yet.", status_code=404
+        )
+    return target
+
+
+@router.post("/simulate_result", response_model=SimulateResultResponse)
+async def simulate_result(
+    body: SimulateResultRequest,
+    admin: AdminUser,
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_session),
+) -> SimulateResultResponse:
+    """Inject a finished match so a wager can settle without playing one.
+
+    The row is written against the target's **linked host account**, and the
+    adapter merges it into `poll_eligible_games` alongside real history. So the
+    settlement worker, the pool engine and the payout path all read it through
+    the same call they use for a real match, and none of them has a branch for
+    it. That is the point: a demo that proves the real path works.
+    """
+    _assert_simulation_enabled(settings)
+
+    target = await _demo_or_named_user(session, body.user_id)
+    link = await linking_service.get_link(session, target.id, body.game)
+    if link is None:
+        raise APIError(
+            "not_linked",
+            f"{target.username or target.id} has no {body.game} account linked.",
+            status_code=409,
+        )
+
+    row = await demo_simulation.record(
+        session,
+        user_id=target.id,
+        game=body.game,
+        host_account_id=link.host_account_id,
+        metrics=body.metrics,
+        won=body.won,
+        drawn=body.drawn,
+        rounds=body.rounds,
+        moves=body.moves,
+        played_at=body.played_at,
+        created_by=f"admin:{admin.username or admin.id}",
+    )
+    await session.commit()
+
+    return SimulateResultResponse(
+        id=row.id,
+        game=row.game,
+        host_account_id=row.host_account_id,
+        user_id=target.id,
+        created_at_ms=int(row.created_at_ms),
+        metrics=row.metrics,
+    )
+
+
+@router.post("/force_settle", response_model=ForceSettleResponse)
+async def force_settle(
+    body: ForceSettleRequest,
+    admin: AdminUser,
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_session),
+) -> ForceSettleResponse:
+    """Settle one pool or tournament now, instead of at its window close.
+
+    Runs the worker's own grade-then-settle sequence for a single contest. It
+    does not shortcut grading: the contest is graded from whatever match history
+    the adapters return, so a forced settlement still reflects real (or injected)
+    results rather than a fabricated outcome.
+    """
+    _assert_simulation_enabled(settings)
+
+    pool = await session.get(SoloPool, body.contest_id)
+    if pool is not None:
+        entries = list(
+            await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool.id))
+        )
+        grades = await telemetry_fetch.grade_pool(session, pool, entries)
+        settled = await pool_engine.settle_pool(session, pool, grades)
+        await session.commit()
+        log.warning(
+            "demo.force_settled",
+            simulated=True,
+            kind="pool",
+            contest_id=str(pool.id),
+            state=settled.state,
+            by=str(admin.id),
+        )
+        return ForceSettleResponse(
+            kind="pool",
+            contest_id=pool.id,
+            state=settled.state,
+            detail={str(uid): {"cleared": g.cleared} for uid, g in grades.items()},
+        )
+
+    tournament = await session.get(Tournament, body.contest_id)
+    if tournament is not None:
+        # Distinct names from the pool branch above: the two grade maps and the
+        # two contest types are different shapes, and reusing one name for both
+        # is how a settle path ends up passing the wrong one.
+        field = list(
+            await session.scalars(
+                select(TournamentEntry).where(
+                    TournamentEntry.tournament_id == tournament.id
+                )
+            )
+        )
+        standings = await telemetry_fetch.grade_tournament(session, tournament, field)
+        finished = await tournament_engine.settle_tournament(
+            session, tournament, standings
+        )
+        await session.commit()
+        log.warning(
+            "demo.force_settled",
+            simulated=True,
+            kind="tournament",
+            contest_id=str(tournament.id),
+            state=finished.state,
+            by=str(admin.id),
+        )
+        return ForceSettleResponse(
+            kind="tournament",
+            contest_id=tournament.id,
+            state=finished.state,
+        )
+
+    raise APIError("not_found", "No pool or tournament with that id.", status_code=404)

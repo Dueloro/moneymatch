@@ -18,10 +18,17 @@
 #
 # Set the sync:false secrets in the dashboard (or an env group named
 # `moneymatch-shared`): DATABASE_URL is wired from the managed DB below;
-# SUPABASE_*, FACEIT_API_KEY, PUBG_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are
-# per-environment. Without FACEIT_API_KEY / PUBG_API_KEY, that game's account
+# SUPABASE_*, STEAM_API_KEY, PUBG_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are
+# per-environment. Without STEAM_API_KEY / PUBG_API_KEY, that game's account
 # linking returns a `host_not_configured` error (503) — set both so CS2 and PUBG
 # are linkable in the deployed environment, not just locally.
+#
+# CS2 additionally needs the Game Coordinator sidecar to turn a share code into
+# a scoreboard: GC_SIDECAR_URL and GC_SHARED_SECRET. Without them share codes
+# resolve to a 503 and no CS2 wager can settle — the rest of the app is
+# unaffected. VALVE_CHAIN_ENABLED turns on automatic collection; leave it off
+# until the sidecar is reachable, or players connect a chain that cannot
+# deliver.
 
 databases:
   - name: moneymatch-postgres
@@ -57,8 +64,21 @@ services:
       # the standalone `type: worker` service shown below.
       - key: RUN_WORKER_IN_PROCESS
         value: "true"
+      # The one address that has to be right. The Steam OpenID realm and return
+      # URL follow it, and the API refuses to boot with ENV=prod if it still
+      # points at localhost — a failed deploy being much louder than Steam
+      # quietly returning every user to a laptop.
+      - key: WEB_ORIGIN
+        sync: false
       - key: RELEASE
         value: "" # Render injects the deploy commit SHA via $RENDER_GIT_COMMIT at runtime
+      # The sidecar's internal address. Render exposes a private service on its
+      # own hostname; only services in this account can reach it.
+      - key: GC_SIDECAR_URL
+        fromService:
+          name: moneymatch-gc
+          type: pserv
+          property: hostport
       - fromGroup: moneymatch-shared
 
   # Optional standalone worker — only for paid tiers that want the loop isolated
@@ -80,3 +100,35 @@ services:
   #         name: moneymatch-postgres
   #         property: connectionString
   #     - fromGroup: moneymatch-shared
+
+  # ---------------------------------------------------------------------------
+  # Game Coordinator sidecar.
+  #
+  # A *private* service: no public URL, reachable only from the API. It can read
+  # match data for arbitrary Steam players, so it must never face the internet —
+  # the mandatory shared secret is a second lock, not the first one.
+  #
+  # Without this deployed, share codes cannot be resolved and no CS2 wager can
+  # settle. Everything else in the product is unaffected, which is exactly why
+  # its absence is easy to miss until someone's wager does not pay out.
+  # ---------------------------------------------------------------------------
+  - type: pserv
+    name: moneymatch-gc
+    runtime: docker
+    dockerfilePath: gc-sidecar/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      # Its own Steam account, which owns CS2 and which nobody plays on.
+      # Sharing an account with a player means each side evicts the other.
+      # Only the sidecar signs in, so the token lives only here.
+      - key: GC_REFRESH_TOKEN
+        sync: false
+      # GC_SHARED_SECRET comes from the shared group, so the API sends exactly
+      # what this checks. Two independent copies drift, and the failure is a
+      # 401 on every settlement.
+      - fromGroup: moneymatch-shared
+      # Stay connected. The idle-logout mode exists for sharing an account with
+      # a human, which production should never do.
+      - key: GC_IDLE_LOGOUT_SECONDS
+        value: "0"

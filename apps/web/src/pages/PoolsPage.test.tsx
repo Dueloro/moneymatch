@@ -18,8 +18,8 @@ vi.mock('../hooks/useMe', () => ({
 }));
 vi.mock('../hooks/useGameSelection', () => ({
   useGameSelection: () => ({
-    games: [{ game: 'cs2.faceit', display_name: 'Counter Strike 2', status: 'LINKED' }],
-    selected: 'cs2.faceit',
+    games: [{ game: 'cs2.steam', display_name: 'Counter Strike 2', status: 'LINKED' }],
+    selected: 'cs2.steam',
     select: vi.fn(),
   }),
 }));
@@ -69,7 +69,7 @@ describe('PoolsPage', () => {
     vi.clearAllMocks();
     vi.mocked(usePoolMarkets).mockReturnValue({
       data: {
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
         metrics: [KD_METRIC],
@@ -111,7 +111,7 @@ describe('PoolsPage', () => {
     // The confirm button carries the selected amount (default middle preset $10).
     fireEvent.click(wc.getByRole('button', { name: 'Confirm · $10.00' }));
     expect(enterMutate).toHaveBeenCalledWith({
-      game: 'cs2.faceit',
+      game: 'cs2.steam',
       metric: 'cs2_kd_ratio',
       difficulty: 'medium',
       entry_preset_cents: 1000,
@@ -122,7 +122,7 @@ describe('PoolsPage', () => {
     fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
     fireEvent.click(wc.getByRole('button', { name: 'Confirm · $25.00' }));
     expect(enterMutate).toHaveBeenLastCalledWith({
-      game: 'cs2.faceit',
+      game: 'cs2.steam',
       metric: 'cs2_kd_ratio',
       difficulty: 'medium',
       entry_preset_cents: 2500,
@@ -134,7 +134,7 @@ describe('PoolsPage', () => {
       status: 'formed',
       pool: {
         id: 'p1',
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         metric: 'cs2_kd_ratio',
         metric_label: 'K/D ratio',
         difficulty: 'medium',

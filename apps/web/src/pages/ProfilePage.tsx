@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '../auth/useAuth';
+import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
 import { PillButton } from '../components/ui/PillButton';
@@ -44,6 +45,17 @@ export function ProfilePage() {
           ready to play for real.
         </p>
         <LinkGames />
+      </Section>
+
+      {/* Right under the place you connect Steam, because that is the next
+       * thing you do: CS2 has no per-match stats API, so a match only becomes
+       * a settled wager once its share code is pasted. Also on Activity, which
+       * is where you land after playing. */}
+      <Section title="Counter-Strike 2">
+        <p className="mb-3 text-sm text-text-secondary">
+          Connect Steam and your matches settle your wagers automatically.
+        </p>
+        <Cs2SetupCard />
       </Section>
 
       {isDemo && (

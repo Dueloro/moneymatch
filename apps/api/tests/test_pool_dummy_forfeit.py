@@ -24,7 +24,7 @@ def test_a_dummy_entry_is_recognised_by_its_host_id():
 
 
 def test_a_real_host_id_is_never_auto_failed():
-    for host in ("lifeunicorn", "faceit_player1", "pubg_someone", ""):
+    for host in ("lifeunicorn", "76561198748110372", "pubg_someone", ""):
         assert test_opponents.graded_as_failed(host) is False, host
 
 

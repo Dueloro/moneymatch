@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from moneymatch_api.constants import (
     GAME_CHESS_LICHESS,
-    GAME_CS2_FACEIT,
+    GAME_CS2_STEAM,
     GAME_DOTA2_OPENDOTA,
 )
 from moneymatch_api.services import markets
@@ -17,9 +17,9 @@ from moneymatch_api.services.markets import (
 
 def test_each_game_offers_its_designed_markets():
     assert {m.key for m in markets.for_game(GAME_CHESS_LICHESS)} == {"win_h2h"}
-    assert {m.key for m in markets.for_game(GAME_CS2_FACEIT)} == {
+    assert {m.key for m in markets.for_game(GAME_CS2_STEAM)} == {
         "kd_ratio",
-        "adr",
+        "kills",
         "headshot_pct",
         "win_next",
     }
@@ -39,14 +39,14 @@ def test_chess_is_brokered_and_needs_speed():
 
 
 def test_win_next_is_coordinated_not_brokered():
-    m = markets.get(GAME_CS2_FACEIT, "win_next")
+    m = markets.get(GAME_CS2_STEAM, "win_next")
     assert m is not None and m.kind == KIND_WIN_NEXT
     assert m.brokered is False
     assert m.metric is None
 
 
 def test_stat_races_carry_a_metric_models_key():
-    m = markets.get(GAME_CS2_FACEIT, "kd_ratio")
+    m = markets.get(GAME_CS2_STEAM, "kd_ratio")
     assert m is not None and m.kind == KIND_STAT_RACE
     assert m.metric == "cs2_kd_ratio"
     assert markets.get(GAME_DOTA2_OPENDOTA, "gpm").metric == "dota2_gpm"
@@ -54,7 +54,7 @@ def test_stat_races_carry_a_metric_models_key():
 
 def test_multiplier_is_derived_18x_at_default_rake():
     # 2·(1 − 0.10) = ×1.80 → 18000 bps (02-design-system §4). Derived, not set.
-    m = markets.get(GAME_CS2_FACEIT, "kd_ratio")
+    m = markets.get(GAME_CS2_STEAM, "kd_ratio")
     assert m.multiplier_bps == 18_000
 
 

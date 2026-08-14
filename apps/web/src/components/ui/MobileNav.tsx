@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useInboxUnread } from '../../hooks/useChat';
 import { useMe } from '../../hooks/useMe';
 import { useWallet } from '../../hooks/useWallet';
-import { formatCurrency } from '../../lib/format';
+import { AnimatedBalance } from './AnimatedBalance';
 import { Badge, BadgeDot } from './Badge';
 import { Logo } from './brand';
 import { BellIcon, NavIcon } from './icons';
@@ -28,7 +28,10 @@ export function MobileTopBar() {
           to="/wallet"
           className="rounded-pill bg-panel px-3 py-1.5 text-xs font-semibold text-green"
         >
-          {formatCurrency(wallet?.available_cents ?? 0)}
+          <AnimatedBalance
+            cents={wallet?.available_cents ?? 0}
+            testId="mobile-balance"
+          />
         </NavLink>
         <NavLink
           to="/social?tab=inbox"

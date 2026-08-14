@@ -9,6 +9,7 @@ import { InvitePage } from './pages/InvitePage';
 import { PlayPage } from './pages/PlayPage';
 import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SteamCallbackPage } from './pages/SteamCallbackPage';
 import { SignInPage } from './pages/SignInPage';
 import { SocialPage } from './pages/SocialPage';
 import { TournamentPage } from './pages/TournamentPage';
@@ -27,6 +28,8 @@ export function App() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path="/signin" element={<SignInPage />} />
+      {/* Steam returns here after a full-page redirect. Outside RequireAuth is
+       * wrong (we need the session to bind the link), so it sits inside. */}
       <Route path="/i/:token" element={<InvitePage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
@@ -38,6 +41,7 @@ export function App() {
           <Route path="wallet" element={<WalletPage />} />
           <Route path="inbox" element={<Navigate to="/social?tab=inbox" replace />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="auth/steam/callback" element={<SteamCallbackPage />} />
         </Route>
         {/* Admin tree: separate, dense layout (not the consumer design system). */}
         <Route element={<RequireAdmin />}>

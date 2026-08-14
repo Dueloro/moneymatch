@@ -14,8 +14,8 @@ vi.mock('../hooks/useWallet', () => ({
 }));
 vi.mock('../hooks/useGameSelection', () => ({
   useGameSelection: () => ({
-    games: [{ game: 'cs2.faceit', display_name: 'Counter Strike 2', status: 'LINKED' }],
-    selected: 'cs2.faceit',
+    games: [{ game: 'cs2.steam', display_name: 'Counter Strike 2', status: 'LINKED' }],
+    selected: 'cs2.steam',
     select: vi.fn(),
   }),
 }));
@@ -42,7 +42,7 @@ function mockStatus(s: unknown) {
 }
 
 const MARKETS = {
-  game: 'cs2.faceit',
+  game: 'cs2.steam',
   linked: true,
   entry_presets_cents: [500, 1000, 2500],
   prize_split: [50, 30, 20],
@@ -50,7 +50,7 @@ const MARKETS = {
   score_matches: 3,
   metrics: [{ metric: 'cs2_kd_ratio', label: 'K/D ratio', provisional: false }],
 };
-const ADR_METRIC = { metric: 'cs2_adr', label: 'ADR', provisional: false };
+const ADR_METRIC = { metric: 'cs2_kills', label: 'ADR', provisional: false };
 
 describe('TournamentPage', () => {
   beforeEach(() => {
@@ -84,7 +84,7 @@ describe('TournamentPage', () => {
       within(card as HTMLElement).getByRole('button', { name: 'Join tournament' }),
     );
     expect(enterMutate).toHaveBeenCalledWith({
-      game: 'cs2.faceit',
+      game: 'cs2.steam',
       metric: 'cs2_kd_ratio',
       entry_preset_cents: 1000,
     });
@@ -95,7 +95,7 @@ describe('TournamentPage', () => {
       status: 'formed',
       tournament: {
         id: 't1',
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         metric: 'cs2_kd_ratio',
         metric_label: 'K/D ratio',
         entry_cents: 1000,
@@ -147,7 +147,7 @@ describe('TournamentPage', () => {
     // Two open metrics so the Metric chip row appears (hidden for a single one).
     vi.mocked(useTournamentMarkets).mockReturnValue({
       data: {
-        game: 'cs2.faceit',
+        game: 'cs2.steam',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
         prize_split: [50, 30, 20],
@@ -155,7 +155,7 @@ describe('TournamentPage', () => {
         score_matches: 3,
         metrics: [
           { metric: 'cs2_kd_ratio', label: 'K/D ratio', provisional: false },
-          { metric: 'cs2_adr', label: 'ADR', provisional: false },
+          { metric: 'cs2_kills', label: 'ADR', provisional: false },
         ],
       },
     } as unknown as ReturnType<typeof useTournamentMarkets>);

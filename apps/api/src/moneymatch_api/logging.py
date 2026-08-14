@@ -18,6 +18,18 @@ def configure_logging(settings: Settings) -> None:
         level=logging.INFO,
     )
 
+    # httpx logs every request at INFO *with the full URL*, query string and
+    # all. Steam takes its API key and a player's match-history auth code as
+    # query parameters, because it accepts nothing else, so leaving this on
+    # writes both into stdout — and from there into Sentry and whatever
+    # aggregates logs in production.
+    #
+    # Our own `host.request` event records method, host, status and latency
+    # without the query, which is the part worth keeping. Warnings and errors
+    # from httpx still come through.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     shared_processors: list[structlog.typing.Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,

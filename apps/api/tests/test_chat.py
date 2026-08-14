@@ -20,7 +20,7 @@ from .conftest import auth_headers, new_sessionmaker
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-GAME = "cs2.faceit"
+GAME = "cs2.steam"
 
 
 async def _onboard(client, auth_id: str, name: str) -> str:
@@ -40,7 +40,7 @@ async def _onboard(client, auth_id: str, name: str) -> str:
                 LinkedAccount(
                     user_id=user.id,
                     game=GAME,
-                    host_account_id=f"faceit_{name}",
+                    host_account_id=f"steam_{name}",
                     host_username=name,
                     profile_snapshot={"username": name, "game": GAME},
                 )

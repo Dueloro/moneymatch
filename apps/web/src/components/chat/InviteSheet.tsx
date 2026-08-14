@@ -50,7 +50,7 @@ export function InviteSheet({
   const send = useSendMessage();
   const copy = COPY[kind];
 
-  const gameIds = games.length > 0 ? games.map((g) => g.game) : ['cs2.faceit'];
+  const gameIds = games.length > 0 ? games.map((g) => g.game) : ['cs2.steam'];
   const [game, setGame] = useState(gameIds[0]);
   const [entryCents, setEntryCents] = useState<number | null>(ENTRY_PRESETS[1]);
   const [difficulty, setDifficulty] = useState<string>('medium');

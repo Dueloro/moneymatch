@@ -19,7 +19,7 @@ default to "not supported".
 
 | Member | Required? | Purpose |
 | --- | --- | --- |
-| `id: str` | yes | Game id, e.g. `chess.lichess`, `cs2.faceit` |
+| `id: str` | yes | Game id, e.g. `chess.lichess`, `cs2.steam` |
 | `brokered: bool` | yes | `True` if the platform can create the match itself (e.g. a Lichess challenge); `False` if players coordinate on the host and we settle on the shared match found in their histories |
 | `link_account(method, identifier) -> ProfileSnapshot` | yes | Verify a host account exists; return its skill profile |
 | `fetch_profile(account_id) -> ProfileSnapshot` | yes | Re-fetch a linked account's profile (refresh / rating badge) |
@@ -41,7 +41,7 @@ default to "not supported".
 ## Steps
 
 1. **Study a live adapter.** `chess_lichess.py` is the brokered reference (open
-   challenge + winner verification, no API key). `cs2_faceit.py` is the
+   challenge + winner verification, no API key). `cs2_steam.py` is the
    non-brokered, telemetry-bearing reference. Capture real host responses the way
    [`game/chess.md`](./game/chess.md) does before parsing.
 2. **Write `adapters/<game>.py`** implementing `GameAdapter`. Set `id` and

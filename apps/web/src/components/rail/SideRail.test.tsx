@@ -29,7 +29,7 @@ const FORMED = {
   status: 'formed',
   pool: {
     id: 'p1',
-    game: 'cs2.faceit',
+    game: 'cs2.steam',
     metric: 'cs2_kd_ratio',
     metric_label: 'K/D ratio',
     difficulty: 'medium',
@@ -78,7 +78,7 @@ describe('SideRail', () => {
     expect(card).toHaveTextContent('Room bar 1.75');
     expect(card).toHaveTextContent('4 players · pot $40.00');
     // The room names its game (the CS2 short label).
-    expect(card).toHaveTextContent('Counter Strike');
+    expect(card).toHaveTextContent('CS2');
     expect(screen.getByTestId('rail-room-play-cue')).toHaveTextContent(
       /you can now play your .* game/i,
     );

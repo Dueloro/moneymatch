@@ -28,7 +28,7 @@ async def _any_link(session, user):
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 KD = "kd_ratio"
 ENTRY = 1_000
 

@@ -7,7 +7,7 @@ Game ids are the canonical `<game>.<host>` identifiers used everywhere
 from __future__ import annotations
 
 GAME_CHESS_LICHESS = "chess.lichess"
-GAME_CS2_FACEIT = "cs2.faceit"
+GAME_CS2_STEAM = "cs2.steam"
 GAME_DOTA2_OPENDOTA = "dota2.opendota"
 GAME_PUBG_STEAM = "pubg.steam"
 
@@ -16,7 +16,7 @@ GAME_PUBG_STEAM = "pubg.steam"
 # here once its adapter and metrics exist.
 REGISTERED_GAMES: tuple[str, ...] = (
     GAME_CHESS_LICHESS,
-    GAME_CS2_FACEIT,
+    GAME_CS2_STEAM,
     GAME_DOTA2_OPENDOTA,
     GAME_PUBG_STEAM,
 )
@@ -31,8 +31,8 @@ CATALOG_GAMES: tuple[str, ...] = REGISTERED_GAMES + COMING_SOON_GAMES
 
 # Human labels for the Profile "Games" rows (design PDF p.12).
 GAME_DISPLAY_NAMES: dict[str, str] = {
+    GAME_CS2_STEAM: "Counter-Strike 2 (Steam)",
     GAME_CHESS_LICHESS: "Chess — Lichess",
-    GAME_CS2_FACEIT: "CS2 — FACEIT",
     GAME_DOTA2_OPENDOTA: "Dota 2 — OpenDota",
     GAME_PUBG_STEAM: "PUBG: Battlegrounds",
 }
@@ -93,9 +93,42 @@ def game_flag_key(game_id: str) -> str:
 # these on link). Chess models `chess_moves`, read straight off each game record
 # Lichess already returns. `chess_accuracy` is retained only because demo
 # fixtures seed it; it has no live source and is no longer offered for pools.
+# --------------------------------------------------------------------------- #
+# CS2 over Steam.
+#
+# Everything below comes from the Game Coordinator scoreboard, which a share
+# code resolves to. Deliberately absent: `cs2_adr`. ADR needs a parsed demo,
+# and a market that cannot be graded is worse than three that can.
+#
+# All three are rates where a bigger number is better, so a harder tier asks
+# for more. The opposite of chess `moves`.
+# --------------------------------------------------------------------------- #
+CS2_STEAM_METRICS: tuple[str, ...] = (
+    "cs2_kd_ratio",
+    "cs2_headshot_pct",
+    "cs2_kills",
+)
+
+# A real Premier/Competitive match runs at least 16 rounds; 13-3 is the
+# shortest legitimate scoreline. Wingman is first to 9. Below the floor the
+# match was surrendered or abandoned, and grading it would let a three-round
+# forfeit stand in for a real result.
+CS2_MIN_ROUNDS_STANDARD = 16
+CS2_MIN_ROUNDS_WINGMAN = 9
+#: Wingman is 2v2, so the roster size is how the mode is told apart.
+CS2_WINGMAN_MAX_PLAYERS = 4
+
+
+def cs2_min_rounds(player_count: int) -> int:
+    """The round floor for the mode implied by the roster size."""
+    if player_count and player_count <= CS2_WINGMAN_MAX_PLAYERS:
+        return CS2_MIN_ROUNDS_WINGMAN
+    return CS2_MIN_ROUNDS_STANDARD
+
+
 GAME_RATE_METRICS: dict[str, tuple[str, ...]] = {
+    GAME_CS2_STEAM: CS2_STEAM_METRICS,
     GAME_CHESS_LICHESS: ("chess_moves",),
-    GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
     GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
     GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
@@ -116,8 +149,10 @@ STAT_BASELINE_MIN_N = 1
 # Per-game finished-history floor. An account below it gets H2H `win` markets
 # only (no stat duels), regardless of any single metric's n.
 GAME_HISTORY_FLOOR: dict[str, int] = {
+    # A Steam user starts with no history in our system; the prior comes from
+    # their Steam lifetime stats instead, so nothing is gated on match count.
+    GAME_CS2_STEAM: 0,
     GAME_CHESS_LICHESS: 20,  # rated games
-    GAME_CS2_FACEIT: 25,  # matches
     GAME_DOTA2_OPENDOTA: 25,  # matches
     GAME_PUBG_STEAM: 20,  # matches
 }
@@ -222,8 +257,8 @@ TOURNAMENT_GAMES: tuple[str, ...] = REGISTERED_GAMES
 
 # Metrics offered for pools/tournaments per game (rate-based allowlist only).
 POOL_METRICS: dict[str, tuple[str, ...]] = {
+    GAME_CS2_STEAM: CS2_STEAM_METRICS,
     GAME_CHESS_LICHESS: ("chess_moves",),
-    GAME_CS2_FACEIT: ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"),
     GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
     GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
@@ -232,6 +267,7 @@ POOL_METRICS: dict[str, tuple[str, ...]] = {
 # `services/aggregate_metrics.py`); every other game still scores its rate
 # metrics as a first-N mean.
 TOURNAMENT_METRICS: dict[str, tuple[str, ...]] = {
+    GAME_CS2_STEAM: CS2_STEAM_METRICS,
     **POOL_METRICS,
     GAME_CHESS_LICHESS: ("chess_win_streak", "chess_wins", "chess_fastest_win"),
 }
@@ -325,6 +361,7 @@ METRIC_BAR_INCREMENT: dict[str, float] = {
     "cs2_kd_ratio": 0.05,
     "cs2_adr": 1.0,
     "cs2_headshot_pct": 1.0,
+    "cs2_kills": 1.0,
     "dota2_kda_ratio": 0.1,
     "dota2_gpm": 10.0,
     "pubg_kills": 1.0,
@@ -382,6 +419,7 @@ METRIC_LABELS: dict[str, str] = {
     "cs2_kd_ratio": "K/D ratio",
     "cs2_adr": "ADR",
     "cs2_headshot_pct": "Headshot %",
+    "cs2_kills": "Kills",
     "dota2_kda_ratio": "KDA ratio",
     "dota2_gpm": "GPM",
     "pubg_kills": "Kills",

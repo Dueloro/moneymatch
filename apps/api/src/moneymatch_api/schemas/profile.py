@@ -56,3 +56,6 @@ class ProfileSnapshot(BaseModel):
     rank_label: str | None = None  # e.g. "Level 10", "Divine"
     kd: float | None = None  # average kill/death ratio (FPS)
     avatar_url: str | None = None
+    #: Title-specific extras a generic field cannot hold (CS2 lifetime kills,
+    #: hours played). Display only: nothing settles on these.
+    extra: dict[str, float] = {}

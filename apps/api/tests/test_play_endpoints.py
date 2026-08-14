@@ -18,7 +18,7 @@ from .factories import create_linked_account, create_metric_model, cs2_profile
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.faceit"
+CS2 = "cs2.steam"
 
 
 async def setup_player(client, auth_id, name, *, mu=1.0, n=15, host=None):
@@ -33,7 +33,7 @@ async def setup_player(client, auth_id, name, *, mu=1.0, n=15, host=None):
         await create_linked_account(
             s, user, CS2, host_account_id=host, profile=cs2_profile(name)
         )
-        for metric in ("cs2_kd_ratio", "cs2_adr", "cs2_headshot_pct"):
+        for metric in ("cs2_kd_ratio", "cs2_kills", "cs2_headshot_pct"):
             await create_metric_model(s, user, CS2, metric, mu=mu, sigma=0.3, n=n)
         await s.commit()
 
@@ -55,7 +55,7 @@ async def test_markets_lists_cs2_with_derived_multiplier(client):
     assert body["linked"] is True
     assert body["entry_presets_cents"] == [500, 1000, 2500]
     keys = {m["key"] for m in body["markets"]}
-    assert keys == {"kd_ratio", "adr", "headshot_pct", "win_next"}
+    assert keys == {"kd_ratio", "kills", "headshot_pct", "win_next"}
     kd = next(m for m in body["markets"] if m["key"] == "kd_ratio")
     assert kd["multiplier_bps"] == 18000  # derived ×1.80, never an odds line
     assert kd["provisional"] is False  # seeded n=15

@@ -358,6 +358,32 @@ async def _drain_queue_if_paused(
 # --------------------------------------------------------------------------- #
 
 
+async def _sync_share_chains(
+    sm: async_sessionmaker[AsyncSession], report: CycleReport
+) -> None:
+    """Collect any CS2 matches played since the last cycle.
+
+    This is what makes automatic collection automatic: without it the cursor
+    only advances when somebody calls the endpoint by hand, which is the paste
+    step wearing a different hat.
+
+    Never fatal to a cycle. Valve being slow must not stop pools and matches
+    from settling out of history that is already stored.
+    """
+    from ..services import cs2_chain
+
+    if not cs2_chain.is_enabled():
+        return
+    try:
+        async with sm() as session:
+            collected = await cs2_chain.sync_all(session)
+            await session.commit()
+        if collected:
+            log.info("worker.chains_synced", collected=collected)
+    except Exception as exc:  # noqa: BLE001 - collection is never worth a cycle
+        log.warning("worker.chain_sync_failed", error=str(exc))
+
+
 async def _process_due_pools(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
@@ -638,6 +664,11 @@ async def run_cycle(
         if await _flag(session, FLAG_SETTLEMENT_PAUSED):
             report.paused = True
             return report
+
+    # Before anything settles. A match played minutes before a pool's window
+    # closes has to be *in* the database by the time that pool is graded, or it
+    # grades as unverifiable and refunds a wager the player actually won.
+    await _sync_share_chains(sm, report)
 
     try:
         await _process_due_matches(sm, now, report)
