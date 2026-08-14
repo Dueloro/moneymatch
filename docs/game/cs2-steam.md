@@ -518,6 +518,119 @@ so a one-account *demo* works, not as a production design.
 | Steam Web API down | linking degrades; bans read "unknown" | itself — unknown is never treated as clean |
 | No qualifying match in the window | a full refund, zero rake | — you cannot lose by not playing |
 
+---
+
+# The hosted stack, specifically
+
+A second pass on **2026-08-14**, over the parts the first audit did not touch:
+Vercel's routing and headers, Supabase, and what a real signup actually
+experiences on day one.
+
+## Vercel
+
+**The Steam callback is a client-side route.** `/auth/steam/callback` exists
+only in the React router, so a full-page redirect from Steam lands on a path
+the CDN has never heard of. `vercel.json` rewrites `/(.*)` to `/index.html`,
+which is what makes it resolve — verified present. Remove that rewrite and
+Steam sign-in returns every user to a 404, after Steam has already approved
+them.
+
+**The Content-Security-Policy names the API by hostname.** `connect-src`
+hardcodes `https://moneymatch.onrender.com` and the Supabase project origin. If
+the API is deployed to a different Render URL than that, the browser blocks
+every request and the app looks completely dead while the API is perfectly
+healthy — no CORS error on the server, because the request is never sent. Keep
+`vercel.json`, `VITE_API_BASE_URL` and the actual Render URL in agreement.
+
+The CSP does not need an entry for Steam. Sign-in is a top-level navigation,
+not a fetch, so `connect-src` never sees it.
+
+## Supabase
+
+**Auth.** The API accepts a Supabase JWT and verifies it by HS256 secret or
+asymmetric JWKS. With no `SUPABASE_JWT_SECRET`, the JWKS URL is derived from
+`SUPABASE_URL`, which is what newer projects with signing keys need. Settings
+refuse to build when neither is available, so a misconfigured auth setup is a
+failed boot rather than a service that rejects every request.
+
+**A real account is created on its first authed call**, not by a webhook or a
+seeding step: `get_or_create_user` inserts the row, provisions a wallet, posts
+the signup grant, and handles two races (a duplicate `auth_id` returns the
+winner; a `friend_code` collision retries). Nothing needs configuring in
+Supabase for this beyond auth itself.
+
+**The database.** `render.yaml` declares its own Postgres. If `main` points
+`DATABASE_URL` at Supabase's instead, the declared one is unused and the
+migrations run against Supabase — which is fine, and worth being deliberate
+about, because two databases exist and only one is being migrated.
+
+## What a real signup goes through that the demo never does
+
+The demo account is created with a state and an age attestation already set.
+A real user is not, and **cannot stake until both exist**: `assert_can_enter`
+raises on a null residence state, before any escrow.
+
+That is wired up — `RequireAuth` sends anyone with `needs_onboarding` back to
+`/signin`, which collects username, state and the 18+ attestation, and `PATCH
+/me` records them. The consequence worth knowing is ordering: a real user
+cannot join a pool until they have finished onboarding, so any test of the
+production path has to start there rather than at the CS2 card.
+
+**The geo-fence blocks nothing by default.** `excluded_states` reads a
+`geo_config` feature flag; with no flag row it returns an empty set, so on a
+fresh database every state is allowed. For play money that is a non-issue. It
+is the first thing to seed before real money, and the code comment claiming it
+fails closed is wrong — it fails open.
+
+## Where the money in a demo pool comes from
+
+Worth stating because it is the opposite of what most demo scaffolding does:
+**practice opponents hold real wallets and their entries genuinely fund the
+pot.** From a settled four-handed room:
+
+```text
+demo           escrow_hold      -2500   escrow +2500
+demo           escrow_release       0   escrow -2500
+testbot_ada    escrow_hold      -2500   escrow +2500
+testbot_ada    escrow_release       0   escrow -2500
+testbot_ada    payout           +9000
+testbot_bo     escrow_hold      -2500   escrow +2500
+testbot_bo     escrow_release       0   escrow -2500
+testbot_cy     escrow_hold      -2500   escrow +2500
+testbot_cy     escrow_release       0   escrow -2500
+
+sum of every amount: -1000   <- the rake, and nothing else
+```
+
+Four entries of $25 were held and deducted; the clearer was paid $90, which is
+the pot less 10% rake. The sum of the ledger is exactly the rake, so money is
+conserved and none is minted. The only fabricated thing about an opponent is
+its *result*, never its balance.
+
+That is already the production behaviour: in a room of real players, the
+payout comes out of the losing entries the same way. Deleting
+`test_opponents.py` changes no money code — the bots simply stop existing and
+real losers fund the pot instead.
+
+It is also why a genuine bug surfaced: the opponents built to miss lost their
+entry every room, accumulated real daily losses, and were eventually refused by
+the daily loss cap. Fabricated balances would have hidden that until real money
+was involved.
+
+## Re-verified for this merge
+
+- All 22 migrations apply to an empty schema and land on `0022`; `alembic check`
+  reports no drift.
+- A production-configured app mounts neither `/api/v1/demo/*` nor the e2e token
+  minter.
+- `ENV=prod` refuses to boot with a localhost origin, so the Steam OpenID realm
+  and return URL cannot silently point at a laptop.
+- `healthCheckPath: /api/v1/health` matches a real route, so a healthy deploy is
+  not marked unhealthy.
+- The full API suite passes: 1,028 tests.
+
+---
+
 ## Before merging
 
 - [ ] `WEB_ORIGIN` set to the Vercel domain — the Steam OpenID realm and return
@@ -526,4 +639,8 @@ so a one-account *demo* works, not as a production design.
 - [ ] `GC_REFRESH_TOKEN` set on `moneymatch-gc`, from an account that owns CS2 and that nobody plays on
 - [ ] `DEMO_LOGIN_ENABLED`, `DEMO_SIMULATE_ENABLED` and `E2E_AUTH_ENABLED` left unset
 - [ ] No `cs2.faceit` contest in flight, or `0022` refuses and the deploy fails
-- [ ] `VITE_API_BASE_URL` on Vercel pointing at the Render API
+- [ ] `VITE_API_BASE_URL` on Vercel pointing at the Render API, **and the same
+      origin present in `vercel.json`'s CSP `connect-src`** — a mismatch blocks
+      every request in the browser with nothing wrong on the server
+- [ ] Seed `geo_config` if any state should be excluded; it blocks nothing by
+      default
