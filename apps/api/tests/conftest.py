@@ -7,6 +7,7 @@ Tests run against a real Postgres (the models use citext/jsonb), pointed at
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections.abc import AsyncIterator
@@ -47,6 +48,7 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from moneymatch_api.config import get_settings  # noqa: E402
+from moneymatch_api.constants import GEO_REQUIRED_EXCLUDED_STATES  # noqa: E402
 from moneymatch_api.db.append_only import (  # noqa: E402
     ALL_APPEND_ONLY_TABLES,
     install_statements,
@@ -131,6 +133,24 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
                 ),
                 {"k": key, "e": enabled},
             )
+        # Seed the geo-fence exactly as migration 0001 does.
+        #
+        # The test schema is built with `Base.metadata.create_all`, which carries
+        # no migration seed data, and `DEFAULT_FLAGS` has no `geo_config` entry —
+        # so until this line the entire suite ran with **no geo-fence at all**.
+        # That is precisely why the fail-open bug in `geo_service` survived: with
+        # the flag absent it returned an empty set, an empty set excludes nobody,
+        # and every contest-entry test sailed through a fence that was not there.
+        #
+        # Tests that need a different list override it (see `test_geo_service`);
+        # the default test user is in MA, which is not excluded.
+        await session.execute(
+            text(
+                "INSERT INTO feature_flags (key, enabled, payload) "
+                "VALUES ('geo_config', true, cast(:p as jsonb))"
+            ),
+            {"p": json.dumps({"excluded_states": sorted(GEO_REQUIRED_EXCLUDED_STATES)})},
+        )
         await session.commit()
     yield
 

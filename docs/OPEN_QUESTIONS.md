@@ -130,6 +130,72 @@ number. The golden file makes that separable.
 
 ---
 
+## Significant findings
+
+### Q9. The entire test suite has been running with **no geo-fence at all**
+
+Found while fixing 1.1: turning the fence on broke **~90 tests** across pools, tournaments,
+matchmaking and endpoints. The cause is not the fix — it is that the fence was never exercised.
+
+Three things compound:
+
+1. `tests/conftest.py` builds the schema with `Base.metadata.create_all`, **not** by running
+   migrations. So migration 0001's seed data — including the 14-state `geo_config` row — never
+   existed in the test database.
+2. The `_clean` fixture then deletes all feature flags and reseeds from
+   `feature_flags.DEFAULT_FLAGS`, which **contains no `geo_config` entry at all**.
+3. Under the old fail-open code, an absent flag returned an empty set, and an empty set excludes
+   nobody — so every contest-entry test sailed straight through a fence that was not there.
+
+**No test would have caught a regression that disabled the geo-fence entirely.** That is why the
+fail-open bug survived to production. Fixed by seeding `geo_config` in `_clean` exactly as
+migration 0001 does; the default test user is in MA, which is not excluded, so no assertion had
+to change. Suite went 1052 → 1123 passing.
+
+**Wider implication worth a decision:** because tests use `create_all` rather than migrations,
+**no migration seed data is covered by any test**, and `create_all` can drift from the migration
+chain without failing anything. `alembic check` catches model-vs-migration drift but not
+seed-data drift. Candidate follow-up (out of scope here): build the test schema by running
+migrations, or add a test that asserts `create_all` + seeds == migrated schema.
+
+---
+
+## Needs a product/legal decision
+
+### Q7. The prod geo-fence floor makes the list one-way editable
+
+Brief 1.1 asks for a startup assertion that refuses to boot in `ENV=prod` if the excluded-state
+list "is empty or does not contain all 14 seeded states". Implemented as specified
+(`geo_service.assert_configured_for_production`, floor in
+`constants.GEO_REQUIRED_EXCLUDED_STATES`).
+
+**The tension:** the whole reason the list lives in a feature flag rather than a code constant is
+that it "changes without a deploy". The floor makes that true in one direction only — an admin
+can *widen* the fence live, but narrowing it below the seeded 14 now requires a code change and a
+deploy.
+
+That is almost certainly the right default for a fence that only ever loosens under legal advice.
+But it is a product decision, not an engineering one, and it should be a deliberate answer to:
+*if a state's legal position changes in our favour, are we content that re-opening it takes a
+deploy?* Flagging rather than deciding, per the brief's rule on legal judgements.
+
+### Q8. `residence_state` is self-attested and never verified
+
+Out of scope for this pass (the brief forbids wiring geolocation vendors), but worth stating
+plainly because the geo-fence work above could otherwise read as stronger than it is: the fence
+gates on `users.residence_state`, which the user types during onboarding. There is no IP check,
+no device geolocation and no address verification anywhere in the codebase. **A blocked resident
+can currently pass the fence by selecting a different state.**
+
+The fence is therefore a compliance *posture*, not a control. Before real money, that gap needs
+either a geolocation vendor or an explicit written acceptance of the risk.
+
+---
+
 ## Deferred / out of scope for this pass
 
-_(populated as encountered)_
+- **Module coverage measurement (Phase 0.1).** Deferred: an instrumented full run costs another
+  ~11 minutes and the test database is shared, so it cannot run alongside the verification runs
+  this pass needs. Will capture in one pass alongside a later full-suite run.
+- **Web suite baseline.** Not run — no Phase 0–2 item touches web code. Will run before the
+  first web-facing change (Phase 1.2 card copy).
