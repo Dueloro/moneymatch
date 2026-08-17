@@ -203,6 +203,36 @@ async def test_production_boot_refuses_an_empty_fence(session):
         await geo_service.assert_configured_for_production(session)
 
 
+async def test_floor_check_can_be_disabled_but_defaults_to_strict(session):
+    """Q7 is deferred, so the strictness is configurable — strict by default."""
+    from moneymatch_api.config import Settings
+
+    # The default must be the safe one.
+    assert Settings.model_fields["geo_enforce_seeded_floor"].default is True
+
+    await _set_geo(session, ["FL"])  # far below the seeded floor
+    # Default (strict) refuses.
+    with pytest.raises(geo_service.GeoFenceMisconfigured):
+        await geo_service.assert_configured_for_production(session)
+    # Explicitly relaxed, it boots.
+    await geo_service.assert_configured_for_production(session, enforce_floor=False)
+
+
+async def test_relaxing_the_floor_does_not_permit_an_absent_fence(session):
+    """The deferred question is the floor, not whether a fence must exist.
+
+    Turning the floor check off must not reopen the hole that was live in
+    production.
+    """
+    await _clear_geo(session)
+    with pytest.raises(geo_service.GeoFenceMisconfigured):
+        await geo_service.assert_configured_for_production(session, enforce_floor=False)
+
+    await _set_geo(session, [])
+    with pytest.raises(geo_service.GeoFenceMisconfigured):
+        await geo_service.assert_configured_for_production(session, enforce_floor=False)
+
+
 async def test_the_required_floor_matches_what_migration_0001_seeds(session):
     """The constant and the migration must not drift apart."""
     from moneymatch_api.constants import GEO_REQUIRED_EXCLUDED_STATES

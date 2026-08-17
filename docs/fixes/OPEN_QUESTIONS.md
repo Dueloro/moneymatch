@@ -162,7 +162,18 @@ migrations, or add a test that asserts `create_all` + seeds == migrated schema.
 
 ## Needs a product/legal decision
 
-### Q7. The prod geo-fence floor makes the list one-way editable
+### Q7. The prod geo-fence floor makes the list one-way editable — **DEFERRED**
+
+> **Status: DEFERRED, not decided** (per `REPLY_TO_AGENT.md` §2). To be revisited once the
+> state-by-state legal opinion exists. No further geo work in this pass.
+>
+> **Resolution applied in the meantime:** the strictness is no longer hard-coded. It sits behind
+> `Settings.geo_enforce_seeded_floor`, **defaulting to `True`** (strict). The deferred decision can
+> therefore be made later by configuration rather than by a code change.
+>
+> Note the split, which is deliberate: relaxing that setting does **not** permit an absent, empty,
+> malformed or unreadable fence. That check is unconditional and is not the part being deferred —
+> it was the live hole in production. Only the *seeded-floor* requirement is configurable.
 
 Brief 1.1 asks for a startup assertion that refuses to boot in `ENV=prod` if the excluded-state
 list "is empty or does not contain all 14 seeded states". Implemented as specified
