@@ -719,7 +719,8 @@ Recorded because they mislead anyone reading the source.
 ## 16. Test and verification status
 
 - **API:** 93 test files, 657 test functions (parametrisation expands this — project docs
-  report 1,028 collected). **The suite was not re-run while writing this document.**
+  report 1,028 collected — **this was wrong; the measured figure is 1052**, recorded in
+  `OPEN_QUESTIONS.md`). **The suite was not re-run while writing this document.**
 - **Web:** 30 vitest files, 4 Playwright e2e specs.
 - **CI:** `alembic check` runs in CI, so a model/migration mismatch fails the build.
 - **Verified by direct probing this week:** all 24 migrations applied and at head; a

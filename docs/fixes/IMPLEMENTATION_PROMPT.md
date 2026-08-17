@@ -108,7 +108,8 @@ You cannot know whether you broke something if you don't know what worked when y
 
 **0.1 Establish the baseline.**
 
-- Run the full API suite (93 test files, ~657 test functions, ~1,028 collected with
+- Run the full API suite (93 test files, ~657 test functions, **1052 collected** — the
+  "~1,028" originally written here was wrong, measured 2026-08-17 — with
   parametrisation) and the web suite (30 vitest files, 4 Playwright specs). Record exact pass/
   fail/skip counts and total runtime in `OPEN_QUESTIONS.md`. `IMPLEMENTATION_STATUS.md` §16
   admits the suite was not re-run when that document was written — so **assume nothing about it
