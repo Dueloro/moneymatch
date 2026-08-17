@@ -9,9 +9,21 @@ wins** — the research was written without reading the source.
 
 ---
 
+## Resolved
+
+| # | Question | Resolution |
+| --- | --- | --- |
+| Q1 | `analysis.py` missing | **Supplied.** Committed at `docs/research/analysis.py` on its own. Treated as hypotheses to verify, not results to trust — it simulates synthetic models and was written without reading the source. |
+| Q2 | "Full suite per change" vs a 12-minute suite | **Revised.** Per change: affected modules + golden harness + money invariants. Per commit: full suite. Per phase: full suite + `alembic check` + reviewed golden diff. |
+| Q7 | Geo floor one-way editable | **DEFERRED** (see below) — but no longer hard-coded; it is now a setting with a fail-closed default. |
+| Q9 | Suite ran with no geo-fence | **Fixed at the cause.** Test schema is now built by running migrations. Promoted to `AUDIT_FINDINGS.md` **P0-1**. |
+| — | scipy vs hand-rolled numerics | **Decided: adopt scipy** as a runtime dependency, pinned `>=1.14,<2`, with a Φ reconciliation test, determinism tests, and the version recorded in the golden metadata. |
+
+---
+
 ## Blocking / needs a human decision
 
-### Q1. `analysis.py` does not exist in the repo
+### Q1. `analysis.py` does not exist in the repo — **RESOLVED, supplied**
 
 Both `IMPLEMENTATION_PROMPT.md` ("reproducible via the `analysis.py` script delivered with it")
 and `MONEYMATCH_RESEARCH.md` §2 ("All figures below are reproducible with the delivered
