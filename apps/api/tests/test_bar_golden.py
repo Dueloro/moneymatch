@@ -134,8 +134,25 @@ def _snapshot_case(
     }
 
 
+def _numerics_meta() -> dict:
+    """Library versions that can move a quoted number.
+
+    scipy quantiles feed bar placement from Phase 2.3 onward. A patch release
+    that shifts a quantile in the sixth decimal place can move a *rounded* bar,
+    which is a real change to what a player is quoted. Recording the version
+    here means such a diff can be **attributed** rather than guessed at
+    (REPLY_TO_AGENT.md §3).
+    """
+    import scipy
+
+    return {"scipy": scipy.__version__}
+
+
 def build_snapshot() -> dict:
-    return {label: _snapshot_case(label, *rest) for label, *rest in CORPUS}
+    return {
+        "meta": _numerics_meta(),
+        "cases": {label: _snapshot_case(label, *rest) for label, *rest in CORPUS},
+    }
 
 
 def test_bar_golden_snapshot():
@@ -150,14 +167,41 @@ def test_bar_golden_snapshot():
     assert GOLDEN_PATH.exists(), (
         f"missing golden file {GOLDEN_PATH}; regenerate with UPDATE_BAR_GOLDEN=1"
     )
-    expected = json.loads(GOLDEN_PATH.read_text())
+    stored = json.loads(GOLDEN_PATH.read_text())
+    expected_cases = stored["cases"]
+    current_cases = current["cases"]
 
-    assert set(current) == set(expected), "corpus membership changed"
-    for label in sorted(expected):
-        assert current[label] == expected[label], (
+    assert set(current_cases) == set(expected_cases), "corpus membership changed"
+    for label in sorted(expected_cases):
+        assert current_cases[label] == expected_cases[label], (
             f"bar maths moved for {label!r}. If deliberate, regenerate the golden "
             "file and explain the diff in the commit message."
+            + (
+                "\n\nNOTE: the numerics library version ALSO changed "
+                f"({stored['meta']} -> {current['meta']}), so this diff may be "
+                "the upgrade rather than your change. Separate them before "
+                "attributing it."
+                if stored["meta"] != current["meta"]
+                else ""
+            )
         )
+
+
+def test_numerics_version_is_recorded_and_unchanged():
+    """A library upgrade must be a deliberate, reviewed event.
+
+    This is intentionally a *separate* failure from a bar diff: an upgrade that
+    moves no bar should still be noticed and re-blessed, and an upgrade that
+    does move a bar should not be mistaken for a maths change.
+    """
+    if os.environ.get("UPDATE_BAR_GOLDEN"):
+        pytest.skip("regenerating")
+    stored = json.loads(GOLDEN_PATH.read_text())["meta"]
+    assert stored == _numerics_meta(), (
+        f"numerics library changed: golden={stored}, current={_numerics_meta()}. "
+        "Re-run the golden harness, review whether any bar moved, and re-bless "
+        "the file in a commit that says so."
+    )
 
 
 @pytest.mark.parametrize(

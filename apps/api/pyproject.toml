@@ -19,6 +19,18 @@ dependencies = [
     "sentry-sdk[fastapi]>=2.16",
     "posthog>=7.26.0",
     "pywebpush>=2.0.0",
+    # Specialist numerics for bar-setting: Student-t predictive quantiles,
+    # beta-binomial and negative-binomial models, and Wilson intervals on the
+    # calibration curve.
+    #
+    # A real runtime dependency, not a dev one: it sits in the code path that
+    # decides where money goes. Hand-rolling five special functions there is a
+    # worse risk than the deployment size (REPLY_TO_AGENT.md §3).
+    #
+    # **Pinned to a minor range on purpose.** A quantile that moves in the sixth
+    # decimal place can move a rounded bar, so the version is recorded in the
+    # golden-snapshot metadata and an upgrade must be reviewed as a maths change.
+    "scipy>=1.14,<2",
 ]
 
 [project.optional-dependencies]
