@@ -7,8 +7,10 @@ Tests run against a real Postgres (the models use citext/jsonb), pointed at
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import pathlib
 import time
 from collections.abc import AsyncIterator
 
@@ -48,15 +50,8 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from moneymatch_api.config import get_settings  # noqa: E402
-from moneymatch_api.constants import GEO_REQUIRED_EXCLUDED_STATES  # noqa: E402
-from moneymatch_api.db.append_only import (  # noqa: E402
-    ALL_APPEND_ONLY_TABLES,
-    install_statements,
-)
 from moneymatch_api.db.session import get_engine, get_sessionmaker  # noqa: E402
 from moneymatch_api.main import create_app  # noqa: E402
-from moneymatch_api.models import Base  # noqa: E402
-from moneymatch_api.services.feature_flags import DEFAULT_FLAGS  # noqa: E402
 
 
 def make_token(
@@ -75,6 +70,39 @@ def make_token(
     return jwt.encode(payload, secret, algorithm=algorithm)
 
 
+#: Feature-flag rows exactly as the migration chain seeds them, captured once
+#: after `_schema` migrates and replayed by `_clean` before each test.
+_SEEDED_FLAGS: list[tuple[str, bool, str]] = []
+
+#: Repo path to `alembic.ini` (tests/ -> apps/api/).
+_ALEMBIC_INI = pathlib.Path(__file__).resolve().parents[1] / "alembic.ini"
+
+
+def _alembic_upgrade_head() -> None:
+    """Run the migration chain against the test database.
+
+    Synchronous, so it is called via `asyncio.to_thread` — alembic's env.py
+    drives its own event loop and cannot be nested inside the running one.
+    It reads `DATABASE_URL`, which this module points at the test database
+    before any app module is imported.
+
+    **Built without handing alembic the ini file**, deliberately. `migrations/
+    env.py` calls `fileConfig(config.config_file_name)` when one is set, and
+    `fileConfig` defaults to `disable_existing_loggers=True` — so running
+    migrations in-process silently switches off every logger configured before
+    it, including `httpx` and `httpcore`. That broke `test_secret_logging.py`,
+    which asserts those loggers can still report trouble. Passing no ini leaves
+    `config_file_name` as None, env.py skips the logging setup, and only
+    `script_location` is needed because env.py sets the database URL itself.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_ALEMBIC_INI.parent / "migrations"))
+    command.upgrade(cfg, "head")
+
+
 @pytest_asyncio.fixture(scope="session")
 async def _schema(request) -> AsyncIterator[None]:
     # Nothing selected touches Postgres (e.g. `pytest -m nodb`), so do not
@@ -85,14 +113,36 @@ async def _schema(request) -> AsyncIterator[None]:
         return
 
     engine = get_engine()
+    # Build the test schema by running the **migration chain**, not `create_all`.
+    #
+    # `create_all` carries no migration seed data, no raw-SQL triggers and no
+    # guarantee of agreeing with the chain. That gap is what let the geo-fence
+    # bug reach production: the fence reads its state list from a row seeded by
+    # migration 0001, that row never existed in tests, and the fence therefore
+    # read "unconfigured" in every test that has ever run. See
+    # AUDIT_FINDINGS.md P0-1.
+    #
+    # Running migrations costs ~3 seconds once per session against a ~11.5
+    # minute suite, and it continuously proves the thing every deploy relies on:
+    # that the chain applies cleanly to an empty database.
     async with engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext"))
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-        # `create_all` doesn't carry raw-SQL triggers; install the append-only
-        # guard so tests exercise the same immutability as the migrated schema.
-        for statement in install_statements(ALL_APPEND_ONLY_TABLES):
-            await conn.execute(text(statement))
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+    await asyncio.to_thread(_alembic_upgrade_head)
+
+    # Capture the seeded state so `_clean` can restore exactly what the
+    # migrations produced, rather than holding its own opinion about what
+    # should exist — an opinion is the thing that drifts.
+    global _SEEDED_FLAGS
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as session:
+        rows = await session.execute(
+            text("SELECT key, enabled, payload FROM feature_flags")
+        )
+        _SEEDED_FLAGS = [
+            (r.key, r.enabled, json.dumps(r.payload or {})) for r in rows
+        ]
+
     yield
     await engine.dispose()
 
@@ -124,33 +174,26 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
                 "solo_pools, tournaments, users RESTART IDENTITY CASCADE"
             )
         )
+        # Restore feature flags to exactly what the migration chain seeded.
+        #
+        # Deliberately not rebuilt from `DEFAULT_FLAGS`: that is a code-side
+        # opinion about what flags exist, and it disagreed with the migrations in
+        # four places — it was missing `geo_config` (with its 14-state payload),
+        # `worker_heartbeat` and `game:cs2.faceit`, and it invented
+        # `game:cs2.steam`, which no migration seeds (AUDIT_FINDINGS.md P1-1).
+        # Replaying the captured rows means the fixture can no longer drift.
+        #
+        # Tests needing a different geo list override it (see `test_geo_service`);
+        # the default test user is in MA, which is not excluded.
         await session.execute(text("DELETE FROM feature_flags"))
-        for key, enabled in DEFAULT_FLAGS.items():
+        for key, enabled, payload in _SEEDED_FLAGS:
             await session.execute(
                 text(
                     "INSERT INTO feature_flags (key, enabled, payload) "
-                    "VALUES (:k, :e, '{}'::jsonb)"
+                    "VALUES (:k, :e, cast(:p as jsonb))"
                 ),
-                {"k": key, "e": enabled},
+                {"k": key, "e": enabled, "p": payload},
             )
-        # Seed the geo-fence exactly as migration 0001 does.
-        #
-        # The test schema is built with `Base.metadata.create_all`, which carries
-        # no migration seed data, and `DEFAULT_FLAGS` has no `geo_config` entry —
-        # so until this line the entire suite ran with **no geo-fence at all**.
-        # That is precisely why the fail-open bug in `geo_service` survived: with
-        # the flag absent it returned an empty set, an empty set excludes nobody,
-        # and every contest-entry test sailed through a fence that was not there.
-        #
-        # Tests that need a different list override it (see `test_geo_service`);
-        # the default test user is in MA, which is not excluded.
-        await session.execute(
-            text(
-                "INSERT INTO feature_flags (key, enabled, payload) "
-                "VALUES ('geo_config', true, cast(:p as jsonb))"
-            ),
-            {"p": json.dumps({"excluded_states": sorted(GEO_REQUIRED_EXCLUDED_STATES)})},
-        )
         await session.commit()
     yield
 
