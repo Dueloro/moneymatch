@@ -92,8 +92,41 @@ Recorded before any source change, against commit `ede7ce6`.
 
 - **Migrations:** 24 files, head `0024_retire_cs2_faceit`. `alembic check` → *"No new upgrade
   operations detected."* ✅
-- **API suite:** _pending — filled in when the baseline run completes._
-- **Web suite:** _pending._
+- **API suite: 1052 passed, 0 failed, 0 skipped, 4 warnings, in 662.71s (11m02s).** Green.
+  - Note: `IMPLEMENTATION_STATUS.md` §16 and the brief both say ~1,028 collected. The actual
+    figure is **1052**. Corrected in the status doc.
+  - The 4 warnings are pre-existing and harmless: one short HMAC key in `test_auth.py`, and
+    three tests in `test_sandbagging.py` marked `@pytest.mark.asyncio` that are not async
+    functions. The latter is worth tidying but changes no behaviour.
+  - The three Phase 0 test files I added were written *after* collection began, so they were
+    not counted — this is a clean pre-change baseline.
+- **Web suite:** not yet run (deferred to the first web-touching change; no Phase 0–2 item
+  changes web code).
+
+**Post-Phase-0 count: 1052 + 37 = 1089 passing.**
+
+---
+
+## Findings from the Phase 0 harness itself
+
+### Q6. Bar rounding moves the true clear rate by up to 15% relative — confirmed from code
+
+The golden snapshot records `p_target` (the difficulty's design clear rate) alongside `p_quoted`
+(the probability of clearing the bar **as actually rounded and quoted**). They diverge:
+
+| CS2 K/D (μ=1.00, σ=0.25, increment 0.05) | p_target | p_quoted | Error |
+| --- | --- | --- | --- |
+| Easy | 35.01% | 34.46% | −0.55pp |
+| Medium | 19.99% | 21.19% | +1.20pp |
+| **Hard** | **9.99%** | **11.51%** | **+1.51pp (15% relative)** |
+
+This independently confirms `MONEYMATCH_RESEARCH.md` §2.5 (bar-increment coarseness) **from the
+codebase rather than from its simulation** — the research's `analysis.py` was not needed. It also
+means the K/D increment change in Phase 2.5 (0.05 → 0.01) is justified on measured grounds.
+
+Worth noting for Phase 2.3: part of what the research attributes to the plug-in normal is
+actually *rounding*, and the two need to be separated before either fix is credited with a
+number. The golden file makes that separable.
 
 ---
 

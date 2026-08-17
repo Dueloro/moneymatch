@@ -1,0 +1,617 @@
+{
+  "chess_moves_1000": {
+    "difficulties": {
+      "easy": {
+        "bar": 21.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.35928,
+        "p_target": 0.350119,
+        "room_bar": 21.0
+      },
+      "hard": {
+        "bar": 14.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.094547,
+        "p_target": 0.099921,
+        "room_bar": 14.0
+      },
+      "medium": {
+        "bar": 17.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.195728,
+        "p_target": 0.199894,
+        "room_bar": 17.0
+      }
+    },
+    "game": "chess.lichess",
+    "metric": "chess_moves",
+    "mu": 26.8,
+    "n": 20,
+    "n_eff": 17.319271,
+    "shape": {
+      "floor": 2.0,
+      "increment": 1.0,
+      "lower_is_better": true,
+      "positive": true
+    },
+    "sigma": 11.94,
+    "sigma_effective": 11.94
+  },
+  "chess_moves_2000": {
+    "difficulties": {
+      "easy": {
+        "bar": 31.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.346665,
+        "p_target": 0.350119,
+        "room_bar": 31.0
+      },
+      "hard": {
+        "bar": 23.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.090079,
+        "p_target": 0.099921,
+        "room_bar": 23.0
+      },
+      "medium": {
+        "bar": 27.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.202665,
+        "p_target": 0.199894,
+        "room_bar": 27.0
+      }
+    },
+    "game": "chess.lichess",
+    "metric": "chess_moves",
+    "mu": 36.9,
+    "n": 60,
+    "n_eff": 27.977285,
+    "shape": {
+      "floor": 2.0,
+      "increment": 1.0,
+      "lower_is_better": true,
+      "positive": true
+    },
+    "sigma": 11.94,
+    "sigma_effective": 11.94
+  },
+  "chess_moves_tight": {
+    "difficulties": {
+      "easy": {
+        "bar": 25.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.375797,
+        "p_target": 0.350119,
+        "room_bar": 25.0
+      },
+      "hard": {
+        "bar": 23.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.082323,
+        "p_target": 0.099921,
+        "room_bar": 23.0
+      },
+      "medium": {
+        "bar": 24.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.199923,
+        "p_target": 0.199894,
+        "room_bar": 24.0
+      }
+    },
+    "game": "chess.lichess",
+    "metric": "chess_moves",
+    "mu": 25.7,
+    "n": 9,
+    "n_eff": 8.722544,
+    "shape": {
+      "floor": 2.0,
+      "increment": 1.0,
+      "lower_is_better": true,
+      "positive": true
+    },
+    "sigma": 2.0,
+    "sigma_effective": 2.0
+  },
+  "cs2_headshot_established": {
+    "difficulties": {
+      "easy": {
+        "bar": 49.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.338461,
+        "p_target": 0.350119,
+        "room_bar": 49.0
+      },
+      "hard": {
+        "bar": 60.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.10565,
+        "p_target": 0.099921,
+        "room_bar": 60.0
+      },
+      "medium": {
+        "bar": 55.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.191819,
+        "p_target": 0.199894,
+        "room_bar": 55.0
+      }
+    },
+    "game": "cs2.steam",
+    "metric": "cs2_headshot_pct",
+    "mu": 43.5,
+    "n": 50,
+    "n_eff": 27.116031,
+    "shape": {
+      "floor": 0.0,
+      "increment": 1.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 13.2,
+    "sigma_effective": 13.2
+  },
+  "cs2_headshot_seeded": {
+    "difficulties": {
+      "easy": {
+        "bar": 47.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.348885,
+        "p_target": 0.350119,
+        "room_bar": 47.0
+      },
+      "hard": {
+        "bar": 58.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.095946,
+        "p_target": 0.099921,
+        "room_bar": 58.0
+      },
+      "medium": {
+        "bar": 52.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.21041,
+        "p_target": 0.199894,
+        "room_bar": 52.0
+      }
+    },
+    "game": "cs2.steam",
+    "metric": "cs2_headshot_pct",
+    "mu": 42.34,
+    "n": 3,
+    "n_eff": 2.990433,
+    "shape": {
+      "floor": 0.0,
+      "increment": 1.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 12.0,
+    "sigma_effective": 12.0
+  },
+  "cs2_kd_established": {
+    "difficulties": {
+      "easy": {
+        "bar": 1.3,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.349342,
+        "p_target": 0.350119,
+        "room_bar": 1.3
+      },
+      "hard": {
+        "bar": 1.6,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.087734,
+        "p_target": 0.099921,
+        "room_bar": 1.6
+      },
+      "medium": {
+        "bar": 1.45,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.191886,
+        "p_target": 0.199894,
+        "room_bar": 1.45
+      }
+    },
+    "game": "cs2.steam",
+    "metric": "cs2_kd_ratio",
+    "mu": 1.18,
+    "n": 40,
+    "n_eff": 25.469517,
+    "shape": {
+      "floor": 0.0,
+      "increment": 0.05,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 0.31,
+    "sigma_effective": 0.31
+  },
+  "cs2_kd_private_prior": {
+    "difficulties": {
+      "easy": {
+        "bar": 1.1,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.344578,
+        "p_target": 0.350119,
+        "room_bar": 1.1
+      },
+      "hard": {
+        "bar": 1.3,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.11507,
+        "p_target": 0.099921,
+        "room_bar": 1.3
+      },
+      "medium": {
+        "bar": 1.2,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.211855,
+        "p_target": 0.199894,
+        "room_bar": 1.2
+      }
+    },
+    "game": "cs2.steam",
+    "metric": "cs2_kd_ratio",
+    "mu": 1.0,
+    "n": 3,
+    "n_eff": 2.990433,
+    "shape": {
+      "floor": 0.0,
+      "increment": 0.05,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 0.25,
+    "sigma_effective": 0.25
+  },
+  "cs2_kd_public_lifetime": {
+    "difficulties": {
+      "easy": {
+        "bar": 0.7,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.353458,
+        "p_target": 0.350119,
+        "room_bar": 0.7
+      },
+      "hard": {
+        "bar": 0.95,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.084411,
+        "p_target": 0.099921,
+        "room_bar": 0.95
+      },
+      "medium": {
+        "bar": 0.8,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.218874,
+        "p_target": 0.199894,
+        "room_bar": 0.8
+      }
+    },
+    "game": "cs2.steam",
+    "metric": "cs2_kd_ratio",
+    "mu": 0.606,
+    "n": 3,
+    "n_eff": 2.990433,
+    "shape": {
+      "floor": 0.0,
+      "increment": 0.05,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 0.25,
+    "sigma_effective": 0.25
+  },
+  "cs2_kills_established": {
+    "difficulties": {
+      "easy": {
+        "bar": 19.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.358065,
+        "p_target": 0.350119,
+        "room_bar": 19.0
+      },
+      "hard": {
+        "bar": 24.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.101557,
+        "p_target": 0.099921,
+        "room_bar": 24.0
+      },
+      "medium": {
+        "bar": 22.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.181651,
+        "p_target": 0.199894,
+        "room_bar": 22.0
+      }
+    },
+    "game": "cs2.steam",
+    "metric": "cs2_kills",
+    "mu": 17.0,
+    "n": 50,
+    "n_eff": 27.116031,
+    "shape": {
+      "floor": 0.0,
+      "increment": 1.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 5.5,
+    "sigma_effective": 5.5
+  },
+  "cs2_kills_seeded": {
+    "difficulties": {
+      "easy": {
+        "bar": 13.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.364421,
+        "p_target": 0.350119,
+        "room_bar": 13.0
+      },
+      "hard": {
+        "bar": 19.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.089044,
+        "p_target": 0.099921,
+        "room_bar": 19.0
+      },
+      "medium": {
+        "bar": 16.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.19859,
+        "p_target": 0.199894,
+        "room_bar": 16.0
+      }
+    },
+    "game": "cs2.steam",
+    "metric": "cs2_kills",
+    "mu": 10.92,
+    "n": 3,
+    "n_eff": 2.990433,
+    "shape": {
+      "floor": 0.0,
+      "increment": 1.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 6.0,
+    "sigma_effective": 6.0
+  },
+  "dota2_gpm": {
+    "difficulties": {
+      "easy": {
+        "bar": 550.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.369441,
+        "p_target": 0.350119,
+        "room_bar": 550.0
+      },
+      "hard": {
+        "bar": 640.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.091211,
+        "p_target": 0.099921,
+        "room_bar": 640.0
+      },
+      "medium": {
+        "bar": 600.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.187031,
+        "p_target": 0.199894,
+        "room_bar": 600.0
+      }
+    },
+    "game": "dota2.opendota",
+    "metric": "dota2_gpm",
+    "mu": 520.0,
+    "n": 30,
+    "n_eff": 22.450907,
+    "shape": {
+      "floor": 0.0,
+      "increment": 10.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 90.0,
+    "sigma_effective": 90.0
+  },
+  "dota2_kda": {
+    "difficulties": {
+      "easy": {
+        "bar": 3.5,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.35383,
+        "p_target": 0.350119,
+        "room_bar": 3.5
+      },
+      "hard": {
+        "bar": 4.2,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.10565,
+        "p_target": 0.099921,
+        "room_bar": 4.2
+      },
+      "medium": {
+        "bar": 3.9,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.190787,
+        "p_target": 0.199894,
+        "room_bar": 3.9
+      }
+    },
+    "game": "dota2.opendota",
+    "metric": "dota2_kda_ratio",
+    "mu": 3.2,
+    "n": 30,
+    "n_eff": 22.450907,
+    "shape": {
+      "floor": 0.0,
+      "increment": 0.1,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 0.8,
+    "sigma_effective": 0.8
+  },
+  "pubg_damage": {
+    "difficulties": {
+      "easy": {
+        "bar": 430.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.338461,
+        "p_target": 0.350119,
+        "room_bar": 430.0
+      },
+      "hard": {
+        "bar": 530.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.10565,
+        "p_target": 0.099921,
+        "room_bar": 530.0
+      },
+      "medium": {
+        "bar": 480.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.202328,
+        "p_target": 0.199894,
+        "room_bar": 480.0
+      }
+    },
+    "game": "pubg.steam",
+    "metric": "pubg_damage",
+    "mu": 380.0,
+    "n": 25,
+    "n_eff": 20.193052,
+    "shape": {
+      "floor": 0.0,
+      "increment": 10.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 120.0,
+    "sigma_effective": 120.0
+  },
+  "pubg_headshot": {
+    "difficulties": {
+      "easy": {
+        "bar": 25.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.35383,
+        "p_target": 0.350119,
+        "room_bar": 25.0
+      },
+      "hard": {
+        "bar": 32.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.10565,
+        "p_target": 0.099921,
+        "room_bar": 32.0
+      },
+      "medium": {
+        "bar": 29.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.190787,
+        "p_target": 0.199894,
+        "room_bar": 29.0
+      }
+    },
+    "game": "pubg.steam",
+    "metric": "pubg_headshot_pct",
+    "mu": 22.0,
+    "n": 25,
+    "n_eff": 20.193052,
+    "shape": {
+      "floor": 0.0,
+      "increment": 1.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 8.0,
+    "sigma_effective": 8.0
+  },
+  "pubg_kills": {
+    "difficulties": {
+      "easy": {
+        "bar": 5.0,
+        "k": 0.385,
+        "multiplier_bps": 25706,
+        "p_quoted": 0.401294,
+        "p_target": 0.350119,
+        "room_bar": 5.0
+      },
+      "hard": {
+        "bar": 7.0,
+        "k": 1.282,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.10565,
+        "p_target": 0.099921,
+        "room_bar": 7.0
+      },
+      "medium": {
+        "bar": 6.0,
+        "k": 0.842,
+        "multiplier_bps": 36000,
+        "p_quoted": 0.226627,
+        "p_target": 0.199894,
+        "room_bar": 6.0
+      }
+    },
+    "game": "pubg.steam",
+    "metric": "pubg_kills",
+    "mu": 4.5,
+    "n": 25,
+    "n_eff": 20.193052,
+    "shape": {
+      "floor": 0.0,
+      "increment": 1.0,
+      "lower_is_better": false,
+      "positive": false
+    },
+    "sigma": 2.0,
+    "sigma_effective": 2.0
+  }
+}
