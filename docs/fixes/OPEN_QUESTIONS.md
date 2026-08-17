@@ -112,8 +112,9 @@ Recorded before any source change, against commit `ede7ce6`.
     functions. The latter is worth tidying but changes no behaviour.
   - The three Phase 0 test files I added were written *after* collection began, so they were
     not counted — this is a clean pre-change baseline.
-- **Web suite:** not yet run (deferred to the first web-touching change; no Phase 0–2 item
-  changes web code).
+- **Web suite: 30 files, 138 tests, all passing, 18.46s** (captured 2026-08-17 before Phase 1.2
+  touches card copy, per `NEXT_STEPS.md`). Pre-existing noise: React Router v7 future-flag
+  warnings in `AdminFlagsPage.test.tsx`. Not errors; left alone.
 
 **Post-Phase-0 count: 1052 + 37 = 1089 passing.**
 

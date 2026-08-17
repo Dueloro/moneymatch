@@ -13,16 +13,22 @@ from moneymatch_api.services.sandbagging_service import SandbaggingBlockedError
 
 from .factories import create_linked_account, create_user, cs2_profile
 
-pytestmark = pytest.mark.asyncio
+# No module-level `pytest.mark.asyncio`: `asyncio_mode = "auto"` in pyproject
+# already collects every async test here, so the marker was redundant — and
+# applying it to the three pure z-test functions below made pytest warn on each
+# one. Warnings in a money-relevant control are where a real warning goes to
+# hide (AUDIT_FINDINGS.md P2-1).
 
 CS2 = "cs2.steam"
 KD = "cs2_kd_ratio"
 
 
+@pytest.mark.nodb
 def test_sandbag_z_none_without_enough_history():
     assert sandbagging_service.sandbag_z([1.0] * 8) is None
 
 
+@pytest.mark.nodb
 def test_sandbag_z_flags_a_tanked_recent_window():
     # Older baseline steady ~1.5; recent 10 tanked to ~0.6 → strongly negative z.
     baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
@@ -31,6 +37,7 @@ def test_sandbag_z_flags_a_tanked_recent_window():
     assert z is not None and z < -1.5
 
 
+@pytest.mark.nodb
 def test_sandbag_z_steady_form_not_flagged():
     values = [1.5, 1.4, 1.6, 1.5, 1.55, 1.45] * 4
     z = sandbagging_service.sandbag_z(values, recent_n=10)
