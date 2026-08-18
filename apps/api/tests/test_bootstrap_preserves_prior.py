@@ -60,7 +60,10 @@ class _FakeAdapter:
 async def _seeded_user(session, monkeypatch, username: str):
     user = await create_user(session, username=username)
     await create_linked_account(
-        session, user, GAME_CS2_STEAM, host_account_id=STEAM_ID,
+        session,
+        user,
+        GAME_CS2_STEAM,
+        host_account_id=STEAM_ID,
         profile=cs2_profile("seeded"),
     )
 
@@ -160,7 +163,10 @@ async def test_first_bootstrap_with_no_history_still_creates_a_model(
     """
     user = await create_user(session, username="brand_new")
     await create_linked_account(
-        session, user, GAME_CS2_STEAM, host_account_id="76561198000000099",
+        session,
+        user,
+        GAME_CS2_STEAM,
+        host_account_id="76561198000000099",
         profile=cs2_profile("new"),
     )
     monkeypatch.setattr(registry, "get", lambda _g: _FakeAdapter([]))

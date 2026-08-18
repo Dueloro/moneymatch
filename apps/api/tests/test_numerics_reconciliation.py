@@ -37,14 +37,34 @@ PHI_TOLERANCE = 1e-12
     "z",
     [
         # The body of the distribution, where ordinary bars sit.
-        -3.0, -2.0, -1.282, -0.842, -0.385, 0.0,
-        0.385, 0.842, 1.282, 2.0, 3.0,
+        -3.0,
+        -2.0,
+        -1.282,
+        -0.842,
+        -0.385,
+        0.0,
+        0.385,
+        0.842,
+        1.282,
+        2.0,
+        3.0,
         # The tails, where a hard bar sits and where naive implementations rot.
-        -6.0, -5.0, -4.0, 4.0, 5.0, 6.0,
+        -6.0,
+        -5.0,
+        -4.0,
+        4.0,
+        5.0,
+        6.0,
         # Extremes, to prove neither implementation blows up.
-        -37.0, -10.0, 10.0, 37.0,
+        -37.0,
+        -10.0,
+        10.0,
+        37.0,
         # Awkward magnitudes.
-        1e-8, -1e-8, 0.5000001, -0.4999999,
+        1e-8,
+        -1e-8,
+        0.5000001,
+        -0.4999999,
     ],
 )
 def test_hand_rolled_phi_agrees_with_scipy(z: float):

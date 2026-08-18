@@ -139,9 +139,7 @@ async def _schema(request) -> AsyncIterator[None]:
         rows = await session.execute(
             text("SELECT key, enabled, payload FROM feature_flags")
         )
-        _SEEDED_FLAGS = [
-            (r.key, r.enabled, json.dumps(r.payload or {})) for r in rows
-        ]
+        _SEEDED_FLAGS = [(r.key, r.enabled, json.dumps(r.payload or {})) for r in rows]
 
     yield
     await engine.dispose()

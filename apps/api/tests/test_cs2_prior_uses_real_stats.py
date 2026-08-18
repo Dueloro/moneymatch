@@ -138,13 +138,14 @@ async def test_seeded_bars_track_real_form(session, monkeypatch):
 
     user, _values = await _seed(session, monkeypatch, "real_bars", REAL)
     await create_linked_account(
-        session, user, GAME_CS2_STEAM, host_account_id=STEAM_ID,
+        session,
+        user,
+        GAME_CS2_STEAM,
+        host_account_id=STEAM_ID,
         profile=cs2_profile("real"),
     )
 
-    kills = await pool_engine.preview_bars(
-        session, user, GAME_CS2_STEAM, "cs2_kills"
-    )
+    kills = await pool_engine.preview_bars(session, user, GAME_CS2_STEAM, "cs2_kills")
     easy = next(c["bar"] for c in kills["cards"] if c["difficulty"] == "easy")
     # Old heuristic quoted 13 kills to an 8.19-kill player. Must now be lower.
     assert easy < 13, f"easy kills bar {easy} is still above the old inflated 13"

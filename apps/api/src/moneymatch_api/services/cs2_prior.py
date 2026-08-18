@@ -140,9 +140,7 @@ async def seed(
         # expose a real headshot rate and kills-per-match. Take what is there.
         values, sources = _from_lifetime(stats)
         values["cs2_kd_ratio"] = _DEFAULTS["cs2_kd_ratio"]
-        sources["cs2_kd_ratio"] = (
-            "default" if kd is None else "default_implausible_kd"
-        )
+        sources["cs2_kd_ratio"] = "default" if kd is None else "default_implausible_kd"
     else:
         values = dict(_DEFAULTS)
         sources = dict.fromkeys(values, "default")

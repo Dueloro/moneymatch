@@ -65,9 +65,7 @@ def test_split_pot_pays_every_winner_equally(pot: int, rake_bps: int, n: int):
 
 @given(pot=pots, rake_bps=rakes, weights=weight_vectors)
 @settings(max_examples=400)
-def test_split_weighted_always_reconciles(
-    pot: int, rake_bps: int, weights: list[int]
-):
+def test_split_weighted_always_reconciles(pot: int, rake_bps: int, weights: list[int]):
     split = money_math.split_weighted(pot, tuple(weights), rake_bps)
     _assert_split_is_sound(split, pot)
 

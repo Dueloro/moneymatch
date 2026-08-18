@@ -231,8 +231,11 @@ async def health() -> GcHealth:
         return GcHealth(
             ready=False,
             queue_depth=0,
-            detail={"error": str(exc), "error_type": type(exc).__name__,
-                    "url": _base_url()},
+            detail={
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+                "url": _base_url(),
+            },
             status="unreachable",
         )
 

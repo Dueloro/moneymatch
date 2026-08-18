@@ -66,8 +66,20 @@ async def test_flag_change_takes_effect_without_deploy(session):
 
 #: The 14 "Any Chance" states seeded by migration 0001.
 SEEDED_EXCLUDED = [
-    "AZ", "AR", "CT", "DE", "FL", "IN", "LA",
-    "MD", "MN", "MT", "SC", "SD", "TN", "WY",
+    "AZ",
+    "AR",
+    "CT",
+    "DE",
+    "FL",
+    "IN",
+    "LA",
+    "MD",
+    "MN",
+    "MT",
+    "SC",
+    "SD",
+    "TN",
+    "WY",
 ]
 
 

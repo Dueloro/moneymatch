@@ -77,8 +77,20 @@ FLAG_GEO_CONFIG = "geo_config"
 # deploy — see OPEN_QUESTIONS.md Q7.
 GEO_REQUIRED_EXCLUDED_STATES: frozenset[str] = frozenset(
     {
-        "AZ", "AR", "CT", "DE", "FL", "IN", "LA",
-        "MD", "MN", "MT", "SC", "SD", "TN", "WY",
+        "AZ",
+        "AR",
+        "CT",
+        "DE",
+        "FL",
+        "IN",
+        "LA",
+        "MD",
+        "MN",
+        "MT",
+        "SC",
+        "SD",
+        "TN",
+        "WY",
     }
 )
 
