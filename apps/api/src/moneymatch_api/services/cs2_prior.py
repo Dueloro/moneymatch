@@ -51,12 +51,23 @@ PRIOR_N = 3
 _PLAUSIBLE_KD = (0.4, 2.5)
 
 
+#: A lifetime headshot rate outside this range is not a competitive signal.
+#: Below ~10% or above ~80% is a bot-farm, a deathmatch grind or a broken stat.
+_PLAUSIBLE_HS_PCT = (10.0, 80.0)
+
+#: Likewise for kills per match. CS2 matches with a sub-1 or 60+ average are not
+#: matchmaking games.
+_PLAUSIBLE_KILLS_PER_MATCH = (1.0, 60.0)
+
+
 def _derived(kd: float) -> dict[str, tuple[float, float]]:
     """Scale the defaults by how a player's lifetime K/D compares to average.
 
-    Only K/D is measured, so the other two are moved with it rather than
-    invented independently: someone who kills more tends to post more kills per
-    match, while headshot rate barely tracks it at all.
+    The **fallback** path, used only for metrics Steam did not give us a direct
+    measurement for. See `_from_lifetime`, which prefers the real numbers.
+
+    Someone who kills more tends to post more kills per match, while headshot
+    rate barely tracks K/D at all — hence the very different multipliers.
     """
     ratio = kd / _DEFAULTS["cs2_kd_ratio"][0]
     return {
@@ -73,6 +84,43 @@ def _derived(kd: float) -> dict[str, tuple[float, float]]:
     }
 
 
+def _from_lifetime(stats) -> tuple[dict[str, tuple[float, float]], dict[str, str]]:
+    """Seed each metric from Steam's own totals where they exist.
+
+    `GetUserStatsForGame` returns `total_kills_headshot` and
+    `total_matches_played` in the **same response** as the K/D inputs. Scaling a
+    generic default by the K/D ratio while that data sat unread quoted a real
+    test account bars of 47% headshots and 13 kills when its actual form was
+    36.6% and 8.19 — a player who never clears, loses four contests and leaves.
+
+    Each metric is taken from measurement when the measurement is usable, and
+    falls back to the K/D-derived heuristic otherwise, so a partially-populated
+    profile improves the metrics it can and does not corrupt the rest. The
+    returned `sources` map records which is which, so the log line says what the
+    number actually came from.
+    """
+    kd = stats.kd_ratio
+    values = dict(_derived(kd)) if kd is not None else dict(_DEFAULTS)
+    sources = dict.fromkeys(values, "steam_derived" if kd is not None else "default")
+    if kd is not None:
+        sources["cs2_kd_ratio"] = "steam_lifetime"
+
+    hs = stats.headshot_pct
+    if hs is not None and _PLAUSIBLE_HS_PCT[0] <= hs <= _PLAUSIBLE_HS_PCT[1]:
+        values["cs2_headshot_pct"] = (hs, _DEFAULTS["cs2_headshot_pct"][1])
+        sources["cs2_headshot_pct"] = "steam_lifetime"
+
+    kpm = stats.kills_per_match
+    if (
+        kpm is not None
+        and _PLAUSIBLE_KILLS_PER_MATCH[0] <= kpm <= _PLAUSIBLE_KILLS_PER_MATCH[1]
+    ):
+        values["cs2_kills"] = (kpm, _DEFAULTS["cs2_kills"][1])
+        sources["cs2_kills"] = "steam_lifetime"
+
+    return values, sources
+
+
 async def seed(
     session: AsyncSession, user_id: uuid.UUID, steam_id: str
 ) -> dict[str, tuple[float, float]]:
@@ -83,13 +131,29 @@ async def seed(
     """
     stats = await steam.get_cs2_lifetime_stats(steam_id)
     kd = stats.kd_ratio if stats else None
+    kd_usable = kd is not None and _PLAUSIBLE_KD[0] <= kd <= _PLAUSIBLE_KD[1]
 
-    if kd is not None and _PLAUSIBLE_KD[0] <= kd <= _PLAUSIBLE_KD[1]:
-        values = _derived(kd)
-        source = "steam_lifetime"
+    if stats is not None and kd_usable:
+        values, sources = _from_lifetime(stats)
+    elif stats is not None:
+        # K/D is unusable (missing or implausible) but the profile may still
+        # expose a real headshot rate and kills-per-match. Take what is there.
+        values, sources = _from_lifetime(stats)
+        values["cs2_kd_ratio"] = _DEFAULTS["cs2_kd_ratio"]
+        sources["cs2_kd_ratio"] = (
+            "default" if kd is None else "default_implausible_kd"
+        )
     else:
         values = dict(_DEFAULTS)
-        source = "default" if kd is None else "default_implausible_kd"
+        sources = dict.fromkeys(values, "default")
+
+    # One headline source for the log line, so a glance still says whether this
+    # player was measured or guessed.
+    source = (
+        "steam_lifetime"
+        if any(s == "steam_lifetime" for s in sources.values())
+        else "default"
+    )
 
     existing = {
         m.metric: m
@@ -134,6 +198,7 @@ async def seed(
         user_id=str(user_id),
         steam_id=steam_id,
         source=source,
+        sources=sources,
         lifetime_kd=round(kd, 3) if kd is not None else None,
         values={k: round(v[0], 2) for k, v in values.items()},
     )

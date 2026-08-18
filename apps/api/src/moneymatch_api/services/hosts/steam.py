@@ -72,12 +72,27 @@ class LifetimeStats:
     total_time_played: int
     total_matches_won: int
     total_matches_played: int
+    total_kills_headshot: int = 0
 
     @property
     def kd_ratio(self) -> float | None:
         if self.total_deaths <= 0:
             return None
         return self.total_kills / self.total_deaths
+
+    @property
+    def headshot_pct(self) -> float | None:
+        """Lifetime headshots as a percentage of kills, or None if unusable."""
+        if self.total_kills <= 0 or self.total_kills_headshot <= 0:
+            return None
+        return 100.0 * self.total_kills_headshot / self.total_kills
+
+    @property
+    def kills_per_match(self) -> float | None:
+        """Lifetime kills per match, or None if unusable."""
+        if self.total_matches_played <= 0 or self.total_kills <= 0:
+            return None
+        return self.total_kills / self.total_matches_played
 
 
 async def _get(path: str, params: dict[str, str]) -> dict | None:
@@ -145,6 +160,10 @@ async def get_cs2_lifetime_stats(steam_id: str) -> LifetimeStats | None:
         total_time_played=by_name.get("total_time_played", 0),
         total_matches_won=by_name.get("total_matches_won", 0),
         total_matches_played=by_name.get("total_matches_played", 0),
+        # Arrives in the same response and was previously discarded, so the
+        # prior invented a headshot rate for a player whose real one was sitting
+        # right here (see `cs2_prior._derived`).
+        total_kills_headshot=by_name.get("total_kills_headshot", 0),
     )
 
 
