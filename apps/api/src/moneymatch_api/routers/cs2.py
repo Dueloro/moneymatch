@@ -116,6 +116,14 @@ class ShareCodeResponse(BaseModel):
 class GcHealthResponse(BaseModel):
     ready: bool
     queue_depth: int
+    #: `attached` | `up_but_unattached` | `unreachable` | `circuit_open`.
+    #: `ready` alone cannot distinguish "no sidecar deployed" from "deployed but
+    #: not talking to Valve", and those need different fixes by different people.
+    status: str = "unreachable"
+    #: Whatever the sidecar (or the transport error) actually said. Previously
+    #: discarded here, which is what made three days of `ready:false`
+    #: undiagnosable from outside.
+    detail: dict = {}
 
 
 @router.get("/steam/login-url", response_model=LoginUrlResponse)
@@ -325,4 +333,9 @@ async def sync_chain(
 async def gc_health() -> GcHealthResponse:
     """Whether the Game Coordinator sidecar is up, for the status page."""
     health = await gc_client.health()
-    return GcHealthResponse(ready=health.ready, queue_depth=health.queue_depth)
+    return GcHealthResponse(
+        ready=health.ready,
+        queue_depth=health.queue_depth,
+        status=health.status,
+        detail=health.detail,
+    )
