@@ -41,7 +41,7 @@ async def test_every_declared_game_flag_has_a_seeded_row(session):
     declared_games = {k for k in DEFAULT_FLAGS if k.startswith("game:")}
     missing = declared_games - seeded
     assert not missing, (
-        f"declared in DEFAULT_FLAGS but never seeded by a migration: {sorted(missing)}. "
+        f"declared in DEFAULT_FLAGS but never seeded: {sorted(missing)}. "
         "Add a migration seeding each, following 0020/0025."
     )
 

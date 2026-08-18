@@ -222,7 +222,13 @@ POST /api/v1/demo/force_settle      settle now           (admin + flag)
 
 ## What is not built
 
-**The GC sidecar itself.** The implementation prompt said `gc-sidecar/server.js`
+> **Corrected 2026-08-17.** This section said the GC sidecar "is not in the
+> repo". It is — `gc-sidecar/` contains `server.js`, `supervise.js`,
+> `get-token.js`, a `Dockerfile` and a README, all tracked in git, and
+> `render.yaml` deploys it as the private service `moneymatch-gc`. The text
+> below is kept for history; treat the sidecar as **built**.
+
+**~~The GC sidecar itself.~~** The implementation prompt said `gc-sidecar/server.js`
 was supplied; it is not in the repo. It needs writing, and it needs a
 `GC_REFRESH_TOKEN` from a Steam account that has played CS2 (`npx steam-session`
 once — not a password and Guard code, which expire in ~30 seconds and will not
@@ -231,6 +237,11 @@ survive a restart).
 **Until the sidecar exists, `/cs2/sharecode` rejects with "could not reach the
 CS2 match service".** Everything behind it — codec, checks, storage, adapter,
 settlement, UI — is built and tested.
+
+*What is actually outstanding on the sidecar is operational, not missing code:
+it needs a valid `GC_REFRESH_TOKEN` on an account that owns CS2 and that nobody
+plays on. As of 2026-08-17 the deployed instance reports `up_but_unattached`,
+which is now distinguishable from `unreachable` — see `/api/v1/cs2/health`.*
 
 **FACEIT removal.** `cs2.steam` was registered *alongside* `cs2.faceit` rather
 than replacing it. The prompt says remove FACEIT first, but that is ~25 API

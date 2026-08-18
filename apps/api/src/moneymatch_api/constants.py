@@ -379,7 +379,10 @@ METRIC_BAR_INCREMENT: dict[str, float] = {
     "chess_accuracy": 1.0,
     "chess_moves": 1.0,
     "cs2_kd_ratio": 0.05,
-    "cs2_adr": 1.0,
+    # `cs2_adr` was removed here when migration 0024 retired the FACEIT adapter.
+    # ADR needs a parsed demo file, which the Game Coordinator scoreboard does
+    # not carry, so there is no market to quote an increment for. An increment
+    # for a market that cannot be graded is a trap for whoever adds the next one.
     "cs2_headshot_pct": 1.0,
     "cs2_kills": 1.0,
     "dota2_kda_ratio": 0.1,
