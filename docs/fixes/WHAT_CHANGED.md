@@ -167,7 +167,128 @@ Two safeguards came with it:
 
 ---
 
-## 7. What we still don't know
+## 7. The bug that made your pool cards vanish
+
+This is the one you hit yourself, so it's worth reading.
+
+**What was wrong.** When you link a Steam account, Money Match doesn't know anything about you
+yet, so it makes a starting estimate of your ability. That estimate is what lets it quote you a
+bar on day one instead of saying "come back after ten games".
+
+But pressing **Refresh** next to your CS2 account ran a different routine — one that rebuilds your
+ability from *matches we've collected and stored*. A freshly-linked account has none. So it
+confidently overwrote your starting estimate with "no data", and "no data" means "we can't quote
+you a bar", which is why the page went from three tiers of pool cards to *"No pools on this game
+yet."*
+
+**What a player experienced.** Link Steam → see pools → press Refresh → pools disappear, with no
+explanation and no way to get them back except re-linking.
+
+**A second victim nobody had reported.** The same overwrite fires for an *established* player if
+Steam's servers happen to be down during a refresh. Fifty games of real history, replaced with
+zeros, because an API call came back empty.
+
+**What we changed.** An empty result is now treated as *no news*, not as *bad news*. Nothing
+overwrites your record unless there is actually something to overwrite it with. Creating a record
+for a genuinely brand-new account still works — the rule is "don't destroy", not "don't create".
+
+**How we know it's fixed.** Five tests, including one that reproduces your exact sequence (link →
+refresh → assert the pool cards are still offered) and one that simulates the host outage against
+fifty games of history.
+
+---
+
+## 8. The bars that were too hard for the player they were quoted to
+
+**What was wrong.** When your Steam profile *does* expose your stats, Steam hands back several
+numbers at once: kills, deaths, matches played, and headshots. The code read the kills and deaths,
+worked out your kill/death ratio — and then **invented** your headshot rate and your kills-per-match
+by scaling a generic average, while your real values sat unread in the very same response.
+
+**What a player experienced.** For the real test account we measured: actual headshot rate 36.6%,
+actual 8.19 kills per match. The bars quoted: **47% headshots and 13 kills**. Targets meaningfully
+above what that player does, presented as achievable. They'd miss, lose four entries, and leave —
+and nothing would look broken.
+
+**What we changed.** Each stat is now taken from the measurement when Steam actually provides it,
+and only falls back to the generic estimate for the ones it doesn't. A partly-filled profile now
+improves the parts it can rather than being all-or-nothing.
+
+There's a guard on it: a lifetime headshot rate below 10% or above 80%, or a kills-per-match figure
+outside 1–60, is treated as a broken or bot-farmed counter and ignored in favour of the safe
+default. Real data is better than a guess, but not *any* number claiming to be real data.
+
+**How we know it's fixed.** Nine tests, including one asserting the old inflated numbers (42.3%,
+10.9) can't come back, and one checking the private-profile fallback still behaves.
+
+---
+
+## 9. "Is the sidecar broken?" — a question the system couldn't answer
+
+**What was wrong.** CS2 results reach us through a small helper program (a "sidecar") that talks to
+Valve. The health check reported `ready: false`. That single answer covered two completely
+different situations:
+
+- the helper is running but hasn't connected to Valve yet, **or**
+- there is no helper at all.
+
+The information that would have told them apart was collected and then **thrown away** before it
+reached the response.
+
+**Why it mattered.** Those two need different people to do different things — one needs a fresh
+login token, the other needs a deployment. Your deployed sidecar sat in that state for three days
+and nobody could say which it was without shell access to the server.
+
+**What we changed.** The health check now reports one of four distinct states: **attached**,
+**up but not connected**, **unreachable**, or **we've stopped calling it** (after repeated
+failures). Each carries the underlying detail through to the response, including the address it
+actually tried — so a misconfigured URL is now self-evident.
+
+That fourth state matters more than it looks: it's the difference between "the sidecar is broken"
+and "we backed off and stopped asking", and blaming the sidecar for our own back-off sends someone
+to debug the wrong machine.
+
+**How we know it's fixed.** Six tests, including one that asserts all four states are genuinely
+distinguishable from each other.
+
+---
+
+## 10. Comments that told the truth
+
+Three places where the documentation contradicted the code it described. This is a category worth
+naming, because it's *worse* than an ordinary bug: it misleads the person who goes to check.
+
+- The file that decides difficulty tiers **stated the wrong numbers in its own description** — it
+  claimed the tiers were roughly 31%/16%/4%, while the code has used 35%/20%/10% for some time.
+  Rather than correct the copy, we deleted it: the description now points at the single place the
+  values live. A test fails if anyone ever writes a second copy again.
+- A settings table still listed **ADR**, a CS2 stat that was retired months ago and which the
+  system physically cannot measure. Removed, with a test that every listed stat is a real, tradeable
+  market. That test immediately found a second entry — a chess stat with no data source — which
+  turned out to be *deliberately* retained. It's now explicitly exempted **with its reason written
+  down**, rather than sitting there indistinguishable from a mistake.
+- A file describing how starting estimates blend with your real record read as though it applied to
+  every game. It applies to **chess and nothing else** — for CS2, PUBG and Dota that machinery
+  currently does nothing at all. It now says so.
+
+We also fixed a note claiming the CS2 sidecar "is not in the repo". It is, and has been.
+
+---
+
+## 11. Two smaller things
+
+**Migrations were switching off the logs.** A standard Python behaviour means that running database
+setup steps inside a live program silently disables every log channel configured before it. Harmless
+where migrations run on their own; not harmless anywhere else — and the symptom is *logs simply
+stopping*, which is close to impossible to notice. Fixed at the source.
+
+**Warnings cleared in the anti-cheat tests.** Three tests in the sandbagging detector were emitting
+warnings on every run. They worked fine, but warnings in a money-relevant control are exactly where
+a real warning goes to hide.
+
+---
+
+## 12. What we still don't know
 
 Honest list. Full detail in `OPEN_QUESTIONS.md` and `AUDIT_FINDINGS.md`.
 
@@ -185,7 +306,7 @@ Honest list. Full detail in `OPEN_QUESTIONS.md` and `AUDIT_FINDINGS.md`.
 
 ---
 
-## 8. What has to happen before real money
+## 13. What has to happen before real money
 
 1. The two mispricing exploits above (mode split, headshot floor).
 2. Version-stamping the maths, so a contest priced under old rules settles under old rules.

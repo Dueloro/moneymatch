@@ -173,6 +173,31 @@ migrations, or add a test that asserts `create_all` + seeds == migrated schema.
 
 ---
 
+### Q10. Phase 1.2 conflicts with its own place in the running order
+
+`NEXT_STEPS.md` puts **1.2 at position 1** and **2.0 (model versioning) at position 2**, saying of
+2.0: *"Prerequisite for everything below; nothing that moves a quoted number ships before it."*
+
+But the surviving half of 1.2 — making `clear_prob` answer `P(X ≥ bar)` to match inclusive
+grading — **does move quoted numbers.** On a discrete metric the two differ by the probability
+mass sitting exactly at the bar, which is the whole point of the fix. So 1.2 as specified cannot
+ship before 2.0 without breaking 2.0's own rule.
+
+**What I did:** shipped the four items in 1.2–1.6 that do *not* move a quoted number (1.3, 1.4,
+1.5, 1.6) and **held 1.2 back to sit immediately after 2.0**, alongside the ratio-distribution
+work, so its golden diff can be reviewed under model versioning as intended.
+
+**What I did not do:** guess. If the intent was that 1.2 is small enough to precede versioning,
+say so and I will move it forward — but the numbers it changes are live-market numbers, which is
+exactly the category 2.0 exists to protect.
+
+Worth noting the fix is currently *latent* rather than urgent: `clear_prob` uses a continuous
+normal, and on a continuous distribution `P(X > bar)` and `P(X ≥ bar)` are equal. The discrepancy
+only becomes real once discrete distributions arrive in 2.4 — so 1.2 and 2.4 are arguably the same
+change and might be better done together.
+
+---
+
 ## Needs a product/legal decision
 
 ### Q7. The prod geo-fence floor makes the list one-way editable — **DEFERRED**
