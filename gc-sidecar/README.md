@@ -52,7 +52,7 @@ normal for a few seconds after start, and after any Steam hiccup.
 
 ## The account it logs in as
 
-It must have **played CS2**. A brand-new account is *limited* and may never
+It must have **played CS2**. A brand-new account is _limited_ and may never
 attach to the GC. If yours is new, spend the $5 to unlock it before relying on
 this.
 
@@ -62,7 +62,7 @@ time. Run this on the account you play on and the two sessions evict each
 other: you get `LoggedInElsewhere` and the sidecar exits.
 
 For anything ongoing, a second Steam account that owns CS2 is the answer. It
-resolves *anyone's* share code, so it never needs to have played the match.
+resolves _anyone's_ share code, so it never needs to have played the match.
 
 ### Sharing one account, for testing
 
@@ -92,11 +92,11 @@ reconnecting on every request is wasted work.
 
 ## Endpoints
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| POST | `/resolve` | `{ shareCode }` -> scoreboard. 404 if Valve does not know it, 503 while reconnecting |
-| POST | `/recent` | `{ steamId }` -> last few matches. Opportunistic; Valve has restricted this and failure is normal |
-| GET | `/health` | `{ ready, queueDepth }`. No secret required, so a status page can poll it |
+| Method | Path       | Notes                                                                                             |
+| ------ | ---------- | ------------------------------------------------------------------------------------------------- |
+| POST   | `/resolve` | `{ shareCode }` -> scoreboard. 404 if Valve does not know it, 503 while reconnecting              |
+| POST   | `/recent`  | `{ steamId }` -> last few matches. Opportunistic; Valve has restricted this and failure is normal |
+| GET    | `/health`  | `{ ready, queueDepth }`. No secret required, so a status page can poll it                         |
 
 `expired: true` with `demoUrl: null` is expected on matches older than about a
 month. **It does not block settlement** — the scoreboard is still there. Only

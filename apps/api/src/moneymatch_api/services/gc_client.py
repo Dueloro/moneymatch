@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 import structlog
@@ -51,11 +51,36 @@ class GcError(Exception):
         self.retryable = retryable
 
 
+#: What the sidecar is actually doing. These are **not** interchangeable and the
+#: distinction is the whole point of this type.
+#:
+#: `ready: false` used to mean either "the process is up but has not attached to
+#: the Game Coordinator" or "there is no process at all" — the same shape for
+#: both, with the `detail` that would have told them apart discarded by the
+#: router. That ambiguity is why a deployed sidecar sat unattached for three
+#: days without anyone being able to say which failure it was.
+#:
+#: - `attached`          — up and talking to the GC. Share codes resolve.
+#: - `up_but_unattached` — process answers, GC session not established. Usually
+#:                         a bad or missing refresh token, or a Steam hiccup.
+#:                         Recovers on its own or needs a new token.
+#: - `unreachable`       — nothing answered. Not deployed, wrong address,
+#:                         network path broken. Needs a deploy or config fix.
+#: - `circuit_open`      — we stopped calling after repeated failures. Says
+#:                         nothing about the sidecar; says something about us.
+GcStatus = Literal["attached", "up_but_unattached", "unreachable", "circuit_open"]
+
+
 @dataclass(frozen=True)
 class GcHealth:
     ready: bool
     queue_depth: int
     detail: dict[str, Any]
+    status: GcStatus = "unreachable"
+
+    @property
+    def is_healthy(self) -> bool:
+        return self.status == "attached"
 
 
 def _base_url() -> str:
@@ -179,18 +204,49 @@ async def recent(steam_id: str) -> list[dict[str, Any]]:
 
 
 async def health() -> GcHealth:
-    """Whether the sidecar is up and connected. Never raises."""
+    """What the sidecar is doing, as a discriminated status. Never raises.
+
+    Every branch returns a **different** `status`, because "not deployed" and
+    "deployed but not attached" need different people to do different things,
+    and previously both surfaced as `ready: false` with the distinguishing
+    detail thrown away.
+    """
+    if _breaker_is_open():
+        # We are not calling, so we genuinely do not know what the sidecar is
+        # doing. Saying "unreachable" here would blame the sidecar for our own
+        # back-off.
+        return GcHealth(
+            ready=False,
+            queue_depth=0,
+            detail={"error": "circuit breaker open", "failures": _failures},
+            status="circuit_open",
+        )
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(f"{_base_url()}/health", headers=_headers())
         data = response.json()
     except (httpx.HTTPError, ValueError) as exc:
-        log.info("gc.health_unavailable", error=str(exc))
-        return GcHealth(ready=False, queue_depth=0, detail={"error": str(exc)})
+        log.info("gc.health_unavailable", error=str(exc), url=_base_url())
+        return GcHealth(
+            ready=False,
+            queue_depth=0,
+            detail={
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+                "url": _base_url(),
+            },
+            status="unreachable",
+        )
+
+    ready = bool(data.get("ready"))
+    if not ready:
+        log.warning("gc.up_but_unattached", detail=data)
     return GcHealth(
-        ready=bool(data.get("ready")),
+        ready=ready,
         queue_depth=int(data.get("queueDepth") or 0),
         detail=data,
+        status="attached" if ready else "up_but_unattached",
     )
 
 

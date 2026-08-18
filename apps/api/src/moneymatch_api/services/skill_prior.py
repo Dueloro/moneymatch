@@ -7,6 +7,14 @@ had a measured spread of 18.1 moves around a mean of 25.7, and the hard bar came
 out at **minus six moves**: not merely hard, but impossible, and no chess game
 has ever ended in a negative number of moves.
 
+> **Scope, stated plainly: this applies to `chess_moves` and nothing else.**
+> `_PRIORS` is empty and `prior_for()` returns a value only for `chess_moves`,
+> so for every CS2, PUBG and Dota metric `shrink()` receives `prior=None` and
+> returns `(μ, σ)` untouched — a no-op. `host_rating()` compounds it by reading
+> `formats`/`primary_speed`, a chess-shaped snapshot structure, so it returns
+> `None` for CS2 regardless. The mechanism below is general; the *data* to drive
+> it exists for one metric. Fitting a CS2 prior on CS Rating is Phase 2.8.
+
 Two fixes live here, and the third is in `fairness.py`.
 
 1. **A prior from rating.** How long a chess game runs depends on how good the

@@ -16,7 +16,19 @@ from moneymatch_api.models import Base  # registers all tables on the metadata
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # `disable_existing_loggers=False` is load-bearing, not tidiness.
+    #
+    # `fileConfig` defaults to True, which switches off every logger configured
+    # *before* it runs. Alembic is normally a standalone process where that is
+    # harmless, but anything that migrates in-process — a management command, a
+    # data backfill, a test fixture — silently loses `httpx`, `httpcore` and any
+    # other already-configured logger for the rest of that process.
+    #
+    # The symptom is the absence of log lines, which is the hardest kind of
+    # failure to notice: nothing errors, output just stops. Caught by
+    # `test_secret_logging.py` when the test suite began running migrations
+    # (AUDIT_FINDINGS.md P2-2).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 

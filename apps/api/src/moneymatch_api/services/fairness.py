@@ -6,9 +6,15 @@ no odds. Because it's a deterministic function of stored inputs, `room_bar` and
 each `personal_bar` re-derive byte-for-byte from the saved snapshots (the audit
 replay), and it unit-tests without a DB.
 
-- **Personal bar** (pools): `round_to_increment(μ + k·σ)`, `k = {easy: 0.5,
-  medium: 1.0, hard: 1.75}`. Implied clear rate `1 − Φ(k)` (≈31/16/4%) is a
+- **Personal bar** (pools): `round_to_increment(μ + k·σ)`, with `k` taken from
+  `constants.POOL_DIFFICULTY_K` — **the single source of truth; this docstring
+  deliberately does not restate the values.** Implied clear rate `1 − Φ(k)` is a
   *disclosed difficulty*, not an odds line.
+
+  (This paragraph used to inline a stale copy of those values, so anyone reading
+  the file to understand the difficulty tiers got the wrong numbers.
+  `test_docs_do_not_drift.py` now fails if any copy is reintroduced here — the
+  fix is not to keep two copies in sync, it is to refuse to have two.)
 - **Room bar**: `round_to_increment(mean(personal_bars))`.
 - **Room composition**: a room forms only if every member's implied clear
   probability vs. the room bar, `p_i = 1 − Φ((room_bar − μi)/σi)`, sits in

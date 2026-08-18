@@ -62,6 +62,38 @@ FLAG_QUEUE_PAUSED = "queue_paused"
 FLAG_SETTLEMENT_PAUSED = "settlement_paused"
 FLAG_GEO_CONFIG = "geo_config"
 
+# The 14 excluded ("Any Chance") states seeded by migration 0001. The live list
+# lives in the `geo_config` flag so it is admin-editable without a deploy; this
+# is the **boot-time floor** for a production deploy, checked once at startup.
+#
+# The point is that a fresh or half-restored database cannot quietly come up
+# with a smaller fence than the one the product was designed around. A deploy
+# that would do so fails loudly, which is cheap; booting with a hole in the
+# geo-fence is not.
+#
+# Note the tension this creates, deliberately: an admin can still *add* states
+# without a deploy, but cannot drop below this floor in prod without a code
+# change. If a state's legal position changes, that is a code change plus a
+# deploy — see OPEN_QUESTIONS.md Q7.
+GEO_REQUIRED_EXCLUDED_STATES: frozenset[str] = frozenset(
+    {
+        "AZ",
+        "AR",
+        "CT",
+        "DE",
+        "FL",
+        "IN",
+        "LA",
+        "MD",
+        "MN",
+        "MT",
+        "SC",
+        "SD",
+        "TN",
+        "WY",
+    }
+)
+
 # The settlement worker writes its liveness here each cycle (payload `{"ts": iso}`);
 # /health and the admin reconciliation view redden when it goes stale (09-phase-6 ·
 # deliverable 4 · worker heartbeat).
@@ -359,7 +391,10 @@ METRIC_BAR_INCREMENT: dict[str, float] = {
     "chess_accuracy": 1.0,
     "chess_moves": 1.0,
     "cs2_kd_ratio": 0.05,
-    "cs2_adr": 1.0,
+    # `cs2_adr` was removed here when migration 0024 retired the FACEIT adapter.
+    # ADR needs a parsed demo file, which the Game Coordinator scoreboard does
+    # not carry, so there is no market to quote an increment for. An increment
+    # for a market that cannot be graded is a trap for whoever adds the next one.
     "cs2_headshot_pct": 1.0,
     "cs2_kills": 1.0,
     "dota2_kda_ratio": 0.1,

@@ -113,6 +113,21 @@ class Settings(BaseSettings):
     payments_live: bool = Field(default=False)
     kyc_live: bool = Field(default=False)
 
+    # Geo-fence boot strictness. With ENV=prod the API refuses to boot unless the
+    # `geo_config` flag lists at least the states in
+    # `constants.GEO_REQUIRED_EXCLUDED_STATES`.
+    #
+    # Behind a setting rather than hard-coded because whether the list may ever
+    # be narrowed is a product/legal decision that has not been made yet
+    # (OPEN_QUESTIONS.md Q7 — DEFERRED pending the state-by-state opinion).
+    # Hard-coding it would settle that question by accident, in code.
+    #
+    # **The default is the strict one.** Turning this off still does not permit
+    # an absent or unreadable fence — that check is unconditional and is not the
+    # part being deferred. This only governs whether the deploy must carry the
+    # full seeded floor.
+    geo_enforce_seeded_floor: bool = Field(default=True)
+
     # Per-request body size cap in bytes (hardening — 10-phase-7 §2 · input caps).
     max_request_bytes: int = Field(default=64 * 1024)
 

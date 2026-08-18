@@ -71,6 +71,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("api.startup")
     settings: Settings = app.state.settings
 
+    if settings.env == "prod":
+        # The geo-fence is the one gate that decides whether a stake may be
+        # taken at all, and it lives in a database row rather than in code. A
+        # fresh, half-restored or hand-edited database can therefore come up
+        # with no fence and nothing anywhere errors. Check it once, at boot, and
+        # refuse the deploy rather than serve with a hole in it.
+        from .db.session import get_sessionmaker
+        from .services import geo_service
+
+        async with get_sessionmaker()() as session:
+            await geo_service.assert_configured_for_production(session)
+
     worker_task: asyncio.Task[None] | None = None
     if settings.run_worker_in_process:
         # Run the settlement loop as a background task in this process (no separate
