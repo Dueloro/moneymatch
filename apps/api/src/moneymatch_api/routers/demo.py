@@ -426,6 +426,23 @@ async def _ensure_demo_history(session: AsyncSession, demo: User) -> None:
     }
     now = datetime.now(UTC)
     for i, spec in enumerate(_SAMPLE_MATCHES):
+        # Sample history needs an identity to hang itself on, and the demo user
+        # does not hold one for every game. `_ensure_demo_fixture` deliberately
+        # refuses to create a `cs2.steam` link: a SteamID64 is vouched for by
+        # Steam alone, and a placeholder would occupy the slot the player's real
+        # account has to bind into.
+        #
+        # Skipping rather than deleting the CS2 specs is what makes this
+        # self-correcting — the moment a real Steam account is linked, that
+        # game's samples seed on the next history rebuild.
+        #
+        # Without this the lookup below raised `KeyError: 'cs2.steam'` and every
+        # demo sign-in 500'd. It only surfaced on a database with no sample
+        # history: production still had rows from the FACEIT era, when a
+        # placeholder CS2 link *was* allowed, so the guard above short-circuited
+        # and hid it until the database was rebuilt from empty.
+        if spec.game not in demo_links:
+            continue
         opp = await _demo_opponent(session, spec.opponent, spec.game)
         opp_link = await session.scalar(
             select(LinkedAccount.id).where(
