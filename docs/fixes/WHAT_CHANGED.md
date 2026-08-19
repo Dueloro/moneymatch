@@ -288,7 +288,49 @@ a real warning goes to hide.
 
 ---
 
-## 12. What we still don't know
+## 12. The demo sign-in button, broken by an empty database
+
+**What was wrong.** Clicking *"Skip sign-up · enter the demo"* returned a 500 and you could not
+get in at all.
+
+Two pieces of setup contradicted each other. When the app builds the guest demo account it
+connects it to each game with a made-up username — except **CS2, which it deliberately refuses**,
+and rightly so: a CS2 identity is a Steam ID, only Steam can vouch for one, and a fake one would
+sit in the slot your *real* Steam account has to bind into.
+
+A second step then gives the guest some pretend match history to fill the screen — including three
+pretend **CS2** matches. It looked up the guest's CS2 connection, found the nothing the first step
+had deliberately left there, and crashed.
+
+**Why it only appeared now.** That history step begins by asking *"does this guest already have
+their pretend history?"* and skips everything if so. The old production database still had those
+rows from months earlier — from when CS2 ran through FACEIT, where a made-up username *was*
+allowed. So it always skipped, and never reached the broken line. Rebuilding the database from
+empty removed the cover.
+
+**The migration did not break this.** The bug was always there; old data was hiding it.
+
+**What we changed.** One rule: if the guest has no connection for a game, don't try to fabricate
+history for it. The request succeeds and the CS2 samples are simply absent — which is correct,
+because once a real Steam account is linked the demo gets *real* CS2 history from the share-code
+chain rather than invented samples.
+
+**How we know it's fixed.** Eight new tests, including one that performs the exact failing request
+against a freshly-migrated database, and one asserting the demo is never given a fabricated Steam
+link — because that is the tempting wrong fix.
+
+**The part worth remembering.** No test anywhere called the demo sign-in endpoint. The single test
+that went near this code monkeypatched *both* setup steps to do nothing before running. So the
+broken path was not merely untested — it was switched off in the only place that touched it.
+
+That is the second bug in this pass that only appears on a fresh database and that the suite could
+not have caught. The geo-fence was the first. The tests are good at checking the app once it is
+running, and blind to what happens when it starts from nothing — which is exactly the state every
+new deployment is in.
+
+---
+
+## 13. What we still don't know
 
 Honest list. Full detail in `OPEN_QUESTIONS.md` and `AUDIT_FINDINGS.md`.
 
@@ -306,7 +348,7 @@ Honest list. Full detail in `OPEN_QUESTIONS.md` and `AUDIT_FINDINGS.md`.
 
 ---
 
-## 13. What has to happen before real money
+## 14. What has to happen before real money
 
 1. The two mispricing exploits above (mode split, headshot floor).
 2. Version-stamping the maths, so a contest priced under old rules settles under old rules.
