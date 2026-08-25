@@ -5,6 +5,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { useAuth } from './auth/useAuth';
 import { AppShell } from './components/AppShell';
 import { ActivityPage } from './pages/ActivityPage';
+import { DemoSignInPage } from './pages/DemoSignInPage';
 import { InvitePage } from './pages/InvitePage';
 import { PlayPage } from './pages/PlayPage';
 import { PoolsPage } from './pages/PoolsPage';
@@ -28,6 +29,8 @@ export function App() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path="/signin" element={<SignInPage />} />
+      {/* Hidden demo entry — not linked from the main sign-in form. */}
+      <Route path="/demosignin" element={<DemoSignInPage />} />
       {/* Steam returns here after a full-page redirect. Outside RequireAuth is
        * wrong (we need the session to bind the link), so it sits inside. */}
       <Route path="/i/:token" element={<InvitePage />} />
@@ -75,5 +78,5 @@ function RootRedirect() {
       </div>
     );
   }
-  return <Navigate to={session ? '/pools' : '/signin'} replace />;
+  return <Navigate to={session ? '/play' : '/signin'} replace />;
 }

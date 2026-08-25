@@ -13,6 +13,11 @@ vi.mock('../hooks/useActivity', async () => {
   return { ...actual, useActivity: vi.fn() };
 });
 
+// ActivityPage checks active_games to conditionally show the CS2 setup card.
+vi.mock('../hooks/useMe', () => ({
+  useMe: () => ({ data: { user: { active_games: [] } } }),
+}));
+
 // Activity now carries the CS2 share-code card, which reads the viewer's links
 // and the match service. Neither is what this file is about, so both are
 // stubbed to their quiet state.

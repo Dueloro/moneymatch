@@ -42,7 +42,7 @@ describe('SignInPage', () => {
     >);
   });
 
-  it('renders email + password with Google and demo options', () => {
+  it('renders email + password with Google options', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
     expect(
       screen.getByRole('button', { name: /continue with google/i }),
@@ -50,7 +50,6 @@ describe('SignInPage', () => {
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /enter the demo/i })).toBeInTheDocument();
   });
 
   it('signs in with email + password', async () => {

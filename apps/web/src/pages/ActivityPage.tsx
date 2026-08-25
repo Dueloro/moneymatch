@@ -12,6 +12,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
 import { toast } from '../lib/toast';
 import { useActivity, type ActivityItem } from '../hooks/useActivity';
+import { useMe } from '../hooks/useMe';
 
 /** A newly-settled contest → a one-line toast summarizing the outcome. */
 function toastFor(item: ActivityItem): string {
@@ -31,7 +32,9 @@ function toastFor(item: ActivityItem): string {
 
 export function ActivityPage() {
   const { data, isLoading, isError, refetch } = useActivity();
+  const me = useMe();
   const items = useMemo(() => data?.items ?? [], [data]);
+  const showCs2 = (me.data?.user.active_games ?? []).includes('cs2.steam');
 
   // Settlement toast: track which resolved matches we've already shown, seeding
   // from the first load so we only pop for transitions that happen live.
@@ -63,12 +66,12 @@ export function ActivityPage() {
         Activity
       </SectionHeader>
 
-      {/* This is where you land after playing, so it is where setup belongs:
-       * the card collapses to a one-line confirmation once connected, and
-       * disappears from your way entirely. */}
-      <div className="mb-6">
-        <Cs2SetupCard />
-      </div>
+      {/* CS2 share-code setup: only visible for players who have CS2 active. */}
+      {showCs2 && (
+        <div className="mb-6">
+          <Cs2SetupCard />
+        </div>
+      )}
 
       {isError ? (
         <ErrorState
@@ -81,10 +84,10 @@ export function ActivityPage() {
       ) : items.length === 0 ? (
         <EmptyState
           title="No contests yet"
-          subline="Join a pool and your results land here automatically."
+          subline="Play a match and your results land here automatically."
           action={
-            <Link to="/pools">
-              <PillButton>Browse solo pools</PillButton>
+            <Link to="/play">
+              <PillButton>Start playing</PillButton>
             </Link>
           }
         />

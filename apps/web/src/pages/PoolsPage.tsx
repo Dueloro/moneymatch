@@ -240,6 +240,7 @@ export function PoolsPage() {
                         entryOptions={presets}
                         payoutFor={(entry) => estPrize(entry, c.est_multiplier_bps)}
                         payoutLabel="Est. win"
+                        feeNote="10% platform fee on winnings"
                         capacity={POOL_CAPACITY}
                         filled={isDemo ? filledSpots(key, POOL_CAPACITY) : undefined}
                         buttonLabel="Join pool"

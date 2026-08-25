@@ -44,7 +44,18 @@ export function LinkGames({ onlyActive = false }: { onlyActive?: boolean }) {
     return <SkeletonList rows={3} />;
   }
   if (links.isError || !links.data) {
-    return <p className="text-sm text-red">Couldn't load your games.</p>;
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-sm text-red">Couldn't load your games.</p>
+        <button
+          type="button"
+          className="text-sm text-text-secondary underline hover:text-text"
+          onClick={() => void links.refetch()}
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   // An empty play set means "not chosen yet" — the switcher falls back to every
@@ -97,6 +108,7 @@ function GameRow({
   onLinked: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const create = useCreateLink();
   const refresh = useRefreshLink();
   const [username, setUsername] = useState('');
@@ -107,15 +119,23 @@ function GameRow({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
     create.mutate(
       { game: link.game, username: username.trim() },
       {
         onSuccess: () => {
           setEditing(false);
+          setConfirming(false);
           setUsername('');
           onLinked();
         },
-        onError: (err: Error) => setError(err.message),
+        onError: (err: Error) => {
+          setError(err.message);
+          setConfirming(false);
+        },
       },
     );
   };
@@ -211,34 +231,75 @@ function GameRow({
 
       {!soon && link.status === 'UNLINKED' && editing && (
         <form className="mt-3 flex flex-col gap-2" onSubmit={submit}>
-          <div className="flex items-center gap-2">
-            <TextInput
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              aria-label={`Your ${meta.name} username`}
-              placeholder={
-                link.game === 'dota2.opendota' ? 'Steam name or ID' : 'Your username'
-              }
-            />
-            <PillButton
-              type="submit"
-              variant="primary"
-              disabled={!username.trim() || create.isPending}
-            >
-              {create.isPending ? 'Verifying…' : 'Verify'}
-            </PillButton>
-            <PillButton
-              type="button"
-              variant="text"
-              onClick={() => {
-                setEditing(false);
-                setError(null);
-              }}
-            >
-              Cancel
-            </PillButton>
-          </div>
+          {!confirming ? (
+            <>
+              <div className="flex items-center gap-2">
+                <TextInput
+                  autoFocus
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  aria-label={`Your ${meta.name} username`}
+                  placeholder={
+                    link.game === 'chess.lichess'
+                      ? 'Your Lichess username'
+                      : link.game === 'dota2.opendota'
+                        ? 'Steam name or ID'
+                        : 'Your username'
+                  }
+                />
+                <PillButton
+                  type="submit"
+                  variant="primary"
+                  disabled={!username.trim() || create.isPending}
+                >
+                  Verify
+                </PillButton>
+                <PillButton
+                  type="button"
+                  variant="text"
+                  onClick={() => {
+                    setEditing(false);
+                    setError(null);
+                  }}
+                >
+                  Cancel
+                </PillButton>
+              </div>
+              {link.game === 'chess.lichess' && (
+                <p className="text-xs text-text-secondary">
+                  Find yours at{' '}
+                  <a
+                    href="https://lichess.org"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline hover:text-text"
+                  >
+                    lichess.org
+                  </a>
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-text-secondary">
+                This permanently links{' '}
+                <span className="font-medium text-text">{username}</span> to your
+                account. Contact support if you ever need to change it.
+              </p>
+              <div className="flex items-center gap-2">
+                <PillButton type="submit" variant="primary" disabled={create.isPending}>
+                  {create.isPending ? 'Linking…' : 'Link account'}
+                </PillButton>
+                <PillButton
+                  type="button"
+                  variant="text"
+                  onClick={() => setConfirming(false)}
+                >
+                  Back
+                </PillButton>
+              </div>
+            </>
+          )}
           {error && <p className="text-xs text-red">{error}</p>}
         </form>
       )}
