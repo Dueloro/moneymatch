@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 
 import { useEventStream } from '../hooks/useEventStream';
+import { SettlementCelebration } from './SettlementCelebration';
 import { useMe } from '../hooks/useMe';
 import { isExcludedState, stateName } from '../lib/usStates';
 import { SideRail } from './rail/SideRail';
@@ -39,6 +40,9 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg text-text md:h-screen md:flex-row md:overflow-hidden">
+      {/* Above everything, on every route: a contest can settle while you are
+       * anywhere in the app, and the result is the one moment worth seeing. */}
+      <SettlementCelebration />
       <MobileTopBar />
       <SidebarNav />
       <main className="flex min-w-0 flex-1 flex-col pb-24 md:min-h-0 md:pb-0">
