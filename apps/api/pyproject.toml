@@ -42,6 +42,9 @@ dev = [
     "ruff>=0.6.9",
     "mypy>=1.11",
     "pip-audit>=2.7",
+    # pip-audit pulls pip in transitively (via pip-api). Floor it past
+    # PYSEC-2026-1721 (fixed in 26.2) so the audit doesn't flag its own tree.
+    "pip>=26.2",
     # Property-based testing for the money invariants. The example-based tests
     # only cover the cases somebody thought of; `sum(payouts) + rake == pot`
     # has to hold for every pot, rake rate and winner count there is.
