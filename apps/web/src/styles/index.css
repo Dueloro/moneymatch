@@ -215,10 +215,417 @@ body {
   animation: money-delta 2.2s ease-out forwards;
 }
 
+/* ── Settlement takeover ──────────────────────────────────────────────────
+ *
+ * Settlement is the moment the product does its job, so it gets the screen for
+ * ~1.9s and then gives it straight back.
+ *
+ * Everything below animates `transform` and `opacity` only. Both are owned by
+ * the compositor, so none of this triggers layout or paint — which is the whole
+ * game here, because a settlement invalidates half the query cache and React is
+ * re-rendering the page underneath at exactly the moment this plays. A blur
+ * filter or an animated gradient stop would repaint every frame and drop the
+ * illusion instantly, so softness is baked into static gradients and only
+ * scale and opacity move.
+ */
+
+/* The darkened backdrop. Colour comes from an inline gradient per outcome. */
+@keyframes mm-veil {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  74% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.mm-veil {
+  animation: mm-veil 1.9s ease-out forwards;
+  will-change: opacity;
+}
+
+/* The central flash the burst erupts from. */
+@keyframes mm-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  6% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  22% {
+    opacity: 0.35;
+    transform: scale(1.6);
+  }
+  50% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+.mm-flash {
+  animation: mm-flash 1.9s cubic-bezier(0.12, 0.8, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* A shockwave ring leaving the flash. */
+@keyframes mm-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.15);
+  }
+  10% {
+    opacity: 0.85;
+  }
+  55% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+.mm-ring {
+  animation: mm-ring 1.9s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Coins, bills and confetti thrown out of the centre, then falling. Each piece
+ * carries its own vector, spin and delay as custom properties, so one keyframe
+ * serves the whole burst. */
+@keyframes mm-burst {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.3);
+  }
+  6% {
+    opacity: 1;
+    transform: translate3d(calc(var(--tx) * 0.35), calc(var(--ty) * 0.35), 0)
+      rotate(calc(var(--rot) * 0.3)) scale(1);
+  }
+  38% {
+    opacity: 1;
+    transform: translate3d(var(--tx), var(--ty), 0) rotate(var(--rot)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(var(--tx) * 1.05), calc(var(--ty) + var(--fall)), 0)
+      rotate(calc(var(--rot) * 1.7)) scale(0.9);
+  }
+}
+.mm-burst {
+  animation: mm-burst var(--dur) cubic-bezier(0.08, 0.7, 0.25, 1) var(--delay) forwards;
+  will-change: transform, opacity;
+}
+
+/* A coin reads as a coin because it spins edge-on, not because of detail. */
+@keyframes mm-spin {
+  to {
+    transform: rotateY(720deg);
+  }
+}
+.mm-spin {
+  animation: mm-spin var(--dur) linear var(--delay) forwards;
+  will-change: transform;
+}
+
+/* The headline: overshoots, settles, holds, leaves. */
+@keyframes mm-title {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.72);
+  }
+  10% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1.12);
+  }
+  18% {
+    transform: translate3d(0, 0, 0) scale(0.97);
+  }
+  26% {
+    transform: translate3d(0, 0, 0) scale(1.02);
+  }
+  34% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(1.03);
+  }
+}
+.mm-title {
+  animation: mm-title 1.9s cubic-bezier(0.2, 1.1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* The loss headline settles downward with the debris instead of rising. */
+@keyframes mm-title-down {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0) scale(1.08);
+  }
+  12% {
+    opacity: 1;
+    transform: translate3d(0, 3px, 0) scale(0.99);
+  }
+  22% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.98);
+  }
+}
+.mm-title-down {
+  animation: mm-title-down 1.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* The amount arrives a beat after the headline. */
+@keyframes mm-amount {
+  0%,
+  12% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.9);
+  }
+  24% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1.04);
+  }
+  30% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  76% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0);
+  }
+}
+.mm-amount {
+  animation: mm-amount 1.9s cubic-bezier(0.2, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* A light beam sweeping left to right, once. */
+@keyframes mm-beam {
+  0%,
+  14% {
+    opacity: 0;
+    transform: translate3d(-140%, 0, 0) skewX(-14deg);
+  }
+  24% {
+    opacity: 1;
+  }
+  56% {
+    opacity: 0;
+    transform: translate3d(240%, 0, 0) skewX(-14deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(240%, 0, 0) skewX(-14deg);
+  }
+}
+.mm-beam {
+  animation: mm-beam 1.9s ease-out forwards;
+  will-change: transform, opacity;
+}
+
+/* Sparkles around the amount. */
+@keyframes mm-spark {
+  0%,
+  18% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  60% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.mm-spark {
+  animation: mm-spark 1.9s ease-out var(--delay) forwards;
+  will-change: transform, opacity;
+}
+
+/* The wager token: a tense shake, then it is gone. */
+@keyframes mm-shake {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.86);
+  }
+  6% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  8% {
+    transform: translate3d(-3px, 0, 0) rotate(-2deg);
+  }
+  10% {
+    transform: translate3d(3px, 0, 0) rotate(2deg);
+  }
+  12% {
+    transform: translate3d(-3px, 0, 0) rotate(-2deg);
+  }
+  14% {
+    transform: translate3d(3px, 0, 0) rotate(2deg);
+  }
+  16% {
+    transform: translate3d(-2px, 0, 0) rotate(-1deg);
+  }
+  18% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.04);
+  }
+  22% {
+    opacity: 1;
+    transform: scale(0.94);
+  }
+  26% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+.mm-shake {
+  animation: mm-shake 1.9s ease-in-out forwards;
+  will-change: transform, opacity;
+}
+
+/* Debris from the shattered token: outward, then down, fading. */
+@keyframes mm-shard {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  24% {
+    opacity: 1;
+    transform: translate3d(calc(var(--tx) * 0.4), calc(var(--ty) * 0.4), 0)
+      rotate(calc(var(--rot) * 0.4));
+  }
+  52% {
+    opacity: 1;
+    transform: translate3d(var(--tx), var(--ty), 0) rotate(var(--rot));
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--tx), calc(var(--ty) + var(--fall)), 0)
+      rotate(calc(var(--rot) * 1.6));
+  }
+}
+.mm-shard {
+  animation: mm-shard 1.9s cubic-bezier(0.15, 0.6, 0.3, 1) var(--delay) forwards;
+  will-change: transform, opacity;
+}
+
+/* Smoke left behind: rises, spreads, thins out. */
+@keyframes mm-smoke {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.5);
+  }
+  34% {
+    opacity: 0.5;
+    transform: translate3d(var(--tx), -14px, 0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(var(--tx) * 1.4), -46px, 0) scale(1.7);
+  }
+}
+.mm-smoke {
+  animation: mm-smoke 1.9s ease-out var(--delay) forwards;
+  will-change: transform, opacity;
+}
+
+/* A hairline crack across the veil, gone almost as soon as it appears. */
+@keyframes mm-crack {
+  0%,
+  18% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  24% {
+    opacity: 0.8;
+    transform: scaleX(1);
+  }
+  44% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+.mm-crack {
+  animation: mm-crack 1.9s ease-out forwards;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
   .animate-rise {
     animation: none;
+  }
+  /* Whether you won is information, not decoration, so the card stays put and
+   * stays visible; only the motion goes. It is still dismissed on the timer by
+   * JS, so it does not linger forever. Confetti is pure decoration and is the
+   * one part removed outright. */
+  /* Whether you won is information, not decoration. The headline and the
+   * amount stay, still and visible; everything that exists purely as spectacle
+   * is removed outright. JS still dismisses on the timer. */
+  .mm-veil,
+  .mm-title,
+  .mm-title-down,
+  .mm-amount {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .mm-flash,
+  .mm-ring,
+  .mm-burst,
+  .mm-spin,
+  .mm-beam,
+  .mm-spark,
+  .mm-shake,
+  .mm-shard,
+  .mm-smoke,
+  .mm-crack {
+    display: none;
   }
   /* Still shown, just not moving: the amount you won or lost is information,
    * not decoration, so it must not be animated away to nothing. */

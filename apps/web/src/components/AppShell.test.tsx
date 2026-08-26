@@ -12,6 +12,9 @@ vi.mock('./ui/Ticker', () => ({ Ticker: () => null }));
 vi.mock('./rail/SideRail', () => ({ SideRail: () => null }));
 // The SSE listener needs the auth + query context the shell test doesn't provide.
 vi.mock('../hooks/useEventStream', () => ({ useEventStream: () => {} }));
+// Same for the settlement result overlay, which reads Activity. Its own
+// behaviour is covered in SettlementCelebration.test.tsx.
+vi.mock('./SettlementCelebration', () => ({ SettlementCelebration: () => null }));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({ data: { available_cents: 100_800, escrow_cents: 0 } }),
 }));

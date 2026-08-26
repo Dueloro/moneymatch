@@ -89,6 +89,12 @@ export function useActivity() {
     queryKey: ['activity'],
     enabled: !!session,
     refetchInterval: 10000,
+    // Overrides the global `false`. You leave this app to play — the tab you
+    // return to is the one holding a result you have not seen, and the interval
+    // is paused while backgrounded, so without this the settlement sequence
+    // waits on the next tick behind stale data. Cheaper than the poll it is
+    // already doing, and it makes Activity itself correct on arrival.
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<{ items: ActivityItem[] }> => {
       const { data, error } = await api.GET('/api/v1/activity');
       if (error) throw new Error('Failed to load activity');
