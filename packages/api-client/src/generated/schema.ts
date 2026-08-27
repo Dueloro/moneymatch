@@ -2400,6 +2400,18 @@ export interface components {
             ready: boolean;
             /** Queue Depth */
             queue_depth: number;
+            /**
+             * Status
+             * @default unreachable
+             */
+            status: string;
+            /**
+             * Detail
+             * @default {}
+             */
+            detail: {
+                [key: string]: unknown;
+            };
         };
         /**
          * GettingStarted
