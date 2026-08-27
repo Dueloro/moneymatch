@@ -112,6 +112,14 @@ host-specific escapes the adapter.
    suites are the spec — a new game must not break them.
 8. **Regenerate the client.** `make gen-api` so the web app sees the new game
    id/metadata. No hand-written types.
+9. **Web game config.** Add the game to `apps/web/src/lib/games.tsx`: presentation
+   in `gameMeta` (name/short/accent/icon) and, if it should appear in the
+   post-sign-up selection overlay, a row in the `ONBOARDING` availability table
+   (`badge`, `preselected`, and per-context `demo`/`production` `{selectable,
+   color}`). That table is the single source for the overlay, app-wide gating, and
+   the Profile add/remove editor — demo vs. production availability is a one-line
+   change here. A game absent from `ONBOARDING` still plays for users who have it
+   in `active_games`, but can't be picked from the overlay.
 
 ## What you do NOT touch
 

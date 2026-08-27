@@ -40,6 +40,14 @@ for the authoritative definition always read the SQLAlchemy models in
 
 - **`users`** — one per Supabase auth id. Also holds `kyc_status`
   (`none|pending|verified|failed`, default `none`) and the friend code.
+  - **`active_games`** (JSONB list) — the player's "play set", the **single
+    source of truth** for which games render anywhere in the app (tabs, cards,
+    pickers). Distinct from linking: a game is selected first, then linked.
+    Empty is treated as **Chess-only** (fail-closed) by the client, and migration
+    `0026` backfilled existing users to their linked games (else Chess).
+  - **`dismissed_checklists`** (JSONB list) — games whose Play-tab onboarding
+    checklist the player dismissed. Kept a subset of `active_games`: removing a
+    game drops its dismissal, so re-adding shows the checklist again.
 - **`linked_accounts`** — a user's bound host accounts. Uniqueness is a **partial**
   index on `status <> 'unbound'`, so a **soft-unbind** (`status='unbound'`) frees
   the slot for a rebind while keeping the row for FK history.
