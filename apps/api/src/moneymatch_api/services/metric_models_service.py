@@ -33,6 +33,24 @@ from . import demo_mode
 _BOOTSTRAP_MATCH_LIMIT = 50
 
 
+async def get_metric_model(
+    session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
+) -> MetricModel | None:
+    """The user's model for one game+metric, or None if they have none yet.
+
+    The single reader for this row: matchmaking and pool formation both quote a
+    bar off it, so it lived as an identical private ``_metric_model`` in each.
+    One copy here keeps the two entry paths reading the model the same way.
+    """
+    return await session.scalar(
+        select(MetricModel).where(
+            MetricModel.user_id == user_id,
+            MetricModel.game == game,
+            MetricModel.metric == metric,
+        )
+    )
+
+
 def compute_ewma(
     values: list[float], half_life: int = METRIC_EWMA_HALF_LIFE
 ) -> tuple[float, float, int]:

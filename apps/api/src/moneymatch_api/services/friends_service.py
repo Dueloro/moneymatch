@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     MAX_FRIENDS,
     MAX_PENDING_OUTBOUND,
@@ -33,20 +34,16 @@ class FriendError(APIError):
     """A friendship-transition failure (RFC-7807 via APIError)."""
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 def is_online(last_seen_at: datetime | None, *, now: datetime | None = None) -> bool:
     if last_seen_at is None:
         return False
-    now = now or _now()
+    now = now or clock.now()
     return (now - last_seen_at).total_seconds() <= PRESENCE_WINDOW_SECONDS
 
 
 async def heartbeat(session: AsyncSession, user: User) -> None:
     """Bump the presence heartbeat (called from polled social surfaces)."""
-    user.last_seen_at = _now()
+    user.last_seen_at = clock.now()
     await session.flush()
 
 
@@ -199,7 +196,7 @@ async def accept(
             "not_addressee", "Only the recipient can accept.", status_code=403
         )
     friendship.state = "accepted"
-    friendship.accepted_at = _now()
+    friendship.accepted_at = clock.now()
     await session.flush()
     await notifications_service.emit(
         session,
@@ -283,7 +280,7 @@ class FriendsView:
 async def list_friends(session: AsyncSession, user: User) -> FriendsView:
     """Accepted friends (with presence) plus incoming/outgoing pending requests.
     Blocked relationships are hidden."""
-    now = _now()
+    now = clock.now()
     rows = list(
         await session.scalars(
             select(Friendship).where(

@@ -8,13 +8,13 @@ settles (00-README §3; 06-phase-3 exit criteria).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import ENTRY_PRESETS_CENTS, METRIC_PROVISIONAL_MIN_N
 from ..db.session import get_session
 from ..dependencies import CurrentUser
@@ -50,11 +50,6 @@ from ..services.match_lifecycle import cancel_pending, confirm, players
 router = APIRouter(prefix="/play", tags=["play"])
 
 _CHESS_SPEEDS = ["bullet", "blitz", "rapid", "classical"]
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
-
 
 # --------------------------------------------------------------------------- #
 # View builders.
@@ -145,7 +140,7 @@ async def _status_view(
             status="matched", match=await _match_view(session, result.match, user)
         )
     if result.status == "searching" and result.ticket is not None:
-        waited = int((_now() - result.ticket.created_at).total_seconds())
+        waited = int((clock.now() - result.ticket.created_at).total_seconds())
         return QueueStatusResponse(
             status="searching",
             waited_seconds=waited,
@@ -178,7 +173,7 @@ async def get_markets(
             LinkedAccount.status != "unbound",
         )
     )
-    now = _now()
+    now = clock.now()
     depth_rows = await session.execute(
         select(QueueTicket.market, func.count())
         .where(
@@ -410,7 +405,7 @@ async def get_waiting(
 ) -> WaitingResponse:
     tickets = await matchmaking.list_waiting(session, user, game=game)
     names = await _usernames(session, [t.user_id for t in tickets])
-    now = _now()
+    now = clock.now()
     rows = []
     for t in tickets:
         market = get_market(t.game, t.market)

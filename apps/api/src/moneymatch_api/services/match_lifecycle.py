@@ -20,13 +20,14 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..adapters import registry
 from ..constants import MATCH_SETTLE_WINDOW_SECONDS
 from ..errors import APIError
@@ -84,10 +85,6 @@ class SettlementResult:
     raw_payload_id: uuid.UUID | None = None
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 async def players(session: AsyncSession, match_id: uuid.UUID) -> list[MatchPlayer]:
     """Both seats of a match (locked-order-stable by created_at)."""
     rows = await session.scalars(
@@ -138,7 +135,7 @@ async def confirm(session: AsyncSession, match: Match, user: User) -> Match:
         ref_id=match.id,
         memo=f"{match.market} entry",
     )
-    seat.confirmed_at = _now()
+    seat.confirmed_at = clock.now()
     await session.flush()
 
     if all(s.confirmed_at is not None for s in seats):
@@ -151,7 +148,7 @@ async def _activate(
 ) -> None:
     """Both confirmed → go ACTIVE. Brokers chess; stamps a server-owned `matched_at`."""
     match_states.assert_transition(match.state, ACTIVE)
-    now = _now()
+    now = clock.now()
 
     if match.brokered:
         adapter = registry.get(match.game)
@@ -224,7 +221,7 @@ async def cancel_pending(session: AsyncSession, match: Match, *, reason: str) ->
             )
     match.state = CANCELED
     match.outcome_detail = {"reason": reason}
-    match.resolved_at = _now()
+    match.resolved_at = clock.now()
     await session.flush()
     await _assert_reconciled(session, match)
     log.info("match.canceled", match_id=str(match.id), reason=reason)
@@ -317,7 +314,7 @@ async def settle(
     match.outcome_detail = result.outcome_detail
     match.engine_version = result.engine_version
     match.raw_payload_id = result.raw_payload_id
-    match.resolved_at = _now()
+    match.resolved_at = clock.now()
     await session.flush()
 
     for seat in seats:

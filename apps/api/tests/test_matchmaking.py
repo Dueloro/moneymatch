@@ -15,7 +15,7 @@ import pytest_asyncio
 from sqlalchemy import func, select
 
 from moneymatch_api.models.play import Match, QueueTicket
-from moneymatch_api.services import matchmaking
+from moneymatch_api.services import matchmaking, metric_models_service
 from moneymatch_api.services.matchmaking import MatchmakingError
 
 from .conftest import new_sessionmaker
@@ -350,7 +350,7 @@ async def test_baseline_is_frozen_against_later_model_refresh(session):
     assert r.status == "searching"
 
     # A's model is refreshed to a wildly different mu after queueing.
-    model = await matchmaking._metric_model(session, a.id, CS2, KD)
+    model = await metric_models_service.get_metric_model(session, a.id, CS2, KD)
     model.mu = 5.0
     await session.flush()
 

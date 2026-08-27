@@ -11,6 +11,7 @@ from moneymatch_api.constants import POOL_DIFFICULTY_K
 from moneymatch_api.models.pools import SoloEntry, SoloPool
 from moneymatch_api.services import (
     fairness,
+    metric_models_service,
     pool_engine,
     reconciliation_service,
     wallet_service,
@@ -222,7 +223,7 @@ async def test_baseline_frozen_against_model_refresh(session):
     frozen = fairness.personal_bar(1.50, 0.30, POOL_DIFFICULTY_K["medium"], 0.05)
     await enq(session, u1)  # freezes the bar at μ=1.50
     # Refresh the model to something wild after queueing.
-    model = await pool_engine._metric_model(session, u1.id, CS2, KD)
+    model = await metric_models_service.get_metric_model(session, u1.id, CS2, KD)
     model.mu = 5.0
     await session.flush()
     ticket = await pool_engine.get_waiting_ticket(session, u1.id)

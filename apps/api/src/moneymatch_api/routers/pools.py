@@ -8,13 +8,13 @@ No endpoint accepts a bar, room bar, or payout — the server owns every number.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     POOL_GAMES,
@@ -43,10 +43,6 @@ from ..services import live_activity_service, money_math, pool_engine, test_oppo
 from ..services.pool_engine import PoolEnqueueResult
 
 router = APIRouter(prefix="/pools", tags=["pools"])
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
@@ -119,7 +115,7 @@ async def _status_view(
             status="formed", pool=await _pool_view(session, result.pool, user)
         )
     if result.status == "searching" and result.ticket is not None:
-        waited = int((_now() - result.ticket.created_at).total_seconds())
+        waited = int((clock.now() - result.ticket.created_at).total_seconds())
         return PoolStatusResponse(
             status="searching",
             difficulty=result.ticket.difficulty,

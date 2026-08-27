@@ -22,12 +22,13 @@ from __future__ import annotations
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import structlog
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     CHALLENGE_TTL_SECONDS,
     ENTRY_PRESETS_CENTS,
@@ -58,10 +59,6 @@ log = structlog.get_logger(__name__)
 
 class ChallengeError(APIError):
     """A challenge-flow failure (RFC-7807 via APIError)."""
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 # --------------------------------------------------------------------------- #
@@ -99,7 +96,7 @@ async def pair_over_cap(
 ) -> bool:
     """Whether the pair is at/over its rake-bearing cap (⇒ the next contest is a
     friendly). Checks both the daily and the weekly window."""
-    now = now or _now()
+    now = now or clock.now()
     day = await _pair_rake_count(session, a, b, now - timedelta(days=1))
     if day >= PAIR_RAKE_CONTESTS_PER_DAY:
         return True
@@ -337,7 +334,7 @@ async def _create(
         friendly=friendly,
         state="sent",
         rematch_of=rematch_of,
-        expires_at=_now() + timedelta(seconds=CHALLENGE_TTL_SECONDS),
+        expires_at=clock.now() + timedelta(seconds=CHALLENGE_TTL_SECONDS),
     )
     session.add(challenge)
     await session.flush()
@@ -371,7 +368,7 @@ async def _accept(
 ) -> Match:
     """Shared accept: verify the challengee is ready, form the PENDING match,
     resolve the challenge, notify the challenger."""
-    now = _now()
+    now = clock.now()
     _assert_live(challenge, now)
     if challengee.id == challenge.challenger_id:
         raise ChallengeError(
@@ -492,9 +489,9 @@ async def decline(
         raise ChallengeError(
             "challenge_not_found", "No such challenge.", status_code=404
         )
-    _assert_live(challenge, _now())
+    _assert_live(challenge, clock.now())
     challenge.state = "declined"
-    challenge.resolved_at = _now()
+    challenge.resolved_at = clock.now()
     await session.flush()
     await notifications_service.emit(
         session,
@@ -537,7 +534,7 @@ async def preview_token(session: AsyncSession, token: str) -> ChallengePreview:
     """Public invite-link preview (market, entry, challenger name) — no auth."""
     challenge = await _load_token(session, token)
     challenger = await session.get(User, challenge.challenger_id)
-    valid = challenge.state == "sent" and challenge.expires_at > _now()
+    valid = challenge.state == "sent" and challenge.expires_at > clock.now()
     return ChallengePreview(
         challenge=challenge,
         challenger_username=challenger.username if challenger else None,
@@ -562,7 +559,7 @@ async def get_for_user(
 
 async def expire_due(session: AsyncSession, *, now: datetime | None = None) -> int:
     """Worker: expire past-TTL open challenges and notify the challenger."""
-    now = now or _now()
+    now = now or clock.now()
     due = list(
         await session.scalars(
             select(Challenge)

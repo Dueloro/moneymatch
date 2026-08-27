@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import structlog
 from sqlalchemy import and_, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
@@ -37,7 +38,6 @@ from ..constants import (
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer, QueueTicket
-from ..models.skill import MetricModel
 from ..models.user import User
 from ..schemas.play import Forecast
 from ..schemas.profile import ProfileSnapshot
@@ -45,6 +45,7 @@ from . import (
     analytics,
     geo_service,
     linking_service,
+    metric_models_service,
     money_math,
     notifications_service,
     pairing,
@@ -75,10 +76,6 @@ class EnqueueResult:
     status: str  # "matched" | "searching"
     match: Match | None = None
     ticket: QueueTicket | None = None
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 def _age_seconds(ticket: QueueTicket, now: datetime) -> float:
@@ -130,18 +127,6 @@ async def _require_link(
     return link
 
 
-async def _metric_model(
-    session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
-) -> MetricModel | None:
-    return await session.scalar(
-        select(MetricModel).where(
-            MetricModel.user_id == user_id,
-            MetricModel.game == game,
-            MetricModel.metric == metric,
-        )
-    )
-
-
 async def _assert_eligible(
     session: AsyncSession,
     user: User,
@@ -162,7 +147,9 @@ async def _assert_eligible(
             "game_disabled", "This game is currently disabled.", status_code=409
         )
     if market.kind == KIND_STAT_RACE and market.metric is not None:
-        model = await _metric_model(session, user.id, game, market.metric)
+        model = await metric_models_service.get_metric_model(
+            session, user.id, game, market.metric
+        )
         n = model.n if model else 0
         if n < METRIC_PROVISIONAL_MIN_N:
             raise MatchmakingError(
@@ -206,7 +193,9 @@ async def _build_baseline(
     else:
         baseline["rating"] = snapshot.get("rating")  # faceit elo / mmr (may be None)
     if market.kind == KIND_STAT_RACE and market.metric is not None:
-        model = await _metric_model(session, user.id, market.game, market.metric)
+        model = await metric_models_service.get_metric_model(
+            session, user.id, market.game, market.metric
+        )
         baseline["metric"] = market.metric
         baseline["mu"] = float(model.mu) if model else 0.0
         baseline["sigma"] = float(model.sigma) if model else 0.0
@@ -572,7 +561,7 @@ async def create_challenge_match(
     rather than the forecast matcher (fairness is by consent here, 08-phase-5).
     The challenger takes seat 0 (white, for chess).
     """
-    now = _now()
+    now = clock.now()
     challenger_baseline = await _build_baseline(
         session, challenger, market, challenger_link, speed
     )
@@ -665,7 +654,7 @@ async def enqueue(
     speed: str | None = None,
 ) -> EnqueueResult:
     """Join the queue for a market, pairing immediately if a fair opponent waits."""
-    now = _now()
+    now = clock.now()
     if entry_cents not in ENTRY_PRESETS_CENTS:
         raise MatchmakingError(
             "invalid_entry",
@@ -719,7 +708,7 @@ async def poll_status(session: AsyncSession, user: User) -> EnqueueResult:
     Re-running the pairing pass here converges the two-both-waiting race (each
     side's own enqueue may have missed the other under READ COMMITTED).
     """
-    now = _now()
+    now = clock.now()
     existing = await _current_match_for_user(session, user.id)
     if existing is not None:
         return EnqueueResult(status="matched", match=existing)
@@ -746,7 +735,7 @@ async def take_waiting(
     Runs the identical pairing checks — a crafted request cannot bypass the
     forecast window or `can_pair`.
     """
-    now = _now()
+    now = clock.now()
     flags = await _flags(session)
     if flags.get(FLAG_QUEUE_PAUSED, False):
         raise MatchmakingError(
@@ -808,7 +797,7 @@ async def list_waiting(
     session: AsyncSession, user: User, *, game: str | None = None
 ) -> list[QueueTicket]:
     """Open waiting tickets of **other** users (the design's "Waiting to play" list)."""
-    now = _now()
+    now = clock.now()
     conds = [
         QueueTicket.state == "waiting",
         QueueTicket.user_id != user.id,
@@ -829,7 +818,7 @@ async def list_waiting(
 
 async def expire_tickets(session: AsyncSession, *, now: datetime | None = None) -> int:
     """Worker: mark waiting tickets past their TTL as expired. Returns the count."""
-    now = now or _now()
+    now = now or clock.now()
     tickets = list(
         await session.scalars(
             select(QueueTicket)
