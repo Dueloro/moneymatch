@@ -8,6 +8,7 @@ import { ErrorState } from '../components/ui/ErrorState';
 import { PillButton } from '../components/ui/PillButton';
 import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
 import { toast } from '../lib/toast';
@@ -31,6 +32,7 @@ function toastFor(item: ActivityItem): string {
 }
 
 export function ActivityPage() {
+  usePageTitle('Activity');
   const { data, isLoading, isError, refetch } = useActivity();
   const me = useMe();
   const items = useMemo(() => data?.items ?? [], [data]);

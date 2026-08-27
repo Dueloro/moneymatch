@@ -13,6 +13,7 @@ import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
@@ -30,6 +31,7 @@ import {
 
 /** The Tournament section: browse joinable skill fields as cards. */
 export function TournamentPage() {
+  usePageTitle('Tournament');
   const { isDemo } = useAuth();
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;

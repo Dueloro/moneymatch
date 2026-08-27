@@ -191,6 +191,7 @@ export function WagerCard({
           // the amount is on the button, and the commitment is the whole point.
           <div className="flex flex-col gap-2">
             <PillButton
+              className="mm-glow"
               fullWidth
               size="lg"
               disabled={joining}
@@ -213,6 +214,7 @@ export function WagerCard({
           </div>
         ) : (
           <PillButton
+            className="mm-glow"
             fullWidth
             size="lg"
             disabled={disabled || joining}

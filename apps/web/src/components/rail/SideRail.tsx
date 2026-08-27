@@ -237,7 +237,7 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
   return (
     <div className="flex flex-col gap-6">
       {showBalance && (
-        <Card className="p-4">
+        <Card className="mm-grid-surface p-4">
           <p className="label-money">Balance</p>
           <p className="mt-1 text-3xl font-semibold text-green">
             <AnimatedBalance cents={available} testId="rail-balance" />

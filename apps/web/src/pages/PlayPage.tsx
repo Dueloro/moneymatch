@@ -13,6 +13,7 @@ import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { dashless, formatCurrency } from '../lib/format';
@@ -46,6 +47,7 @@ function defaultSpeed(market: MarketRow): string | undefined {
 const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
 export function PlayPage() {
+  usePageTitle('Head to head');
   const { games, selected: game, select: setGame } = useGameSelection();
   // Coming-soon games have no markets endpoint, so don't fetch for them.
   const playableGame = game && !isComingSoon(game) ? game : undefined;

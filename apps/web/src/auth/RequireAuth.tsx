@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
+import { Loader } from '../components/ui/Loader';
 import { useMe } from '../hooks/useMe';
 import { useAuth } from './useAuth';
 
@@ -22,20 +23,12 @@ export function RequireAuth() {
     }
   }, [session, me.isError, signOut]);
 
-  if (loading) return <FullScreenLoader />;
+  if (loading) return <Loader />;
   if (!session) return <Navigate to="/signin" replace state={{ from: location }} />;
-  if (me.isError) return <FullScreenLoader />;
-  if (me.isLoading) return <FullScreenLoader />;
+  if (me.isError) return <Loader />;
+  if (me.isLoading) return <Loader />;
   if (me.data?.needs_onboarding && location.pathname !== '/signin') {
     return <Navigate to="/signin" replace />;
   }
   return <Outlet />;
-}
-
-function FullScreenLoader() {
-  return (
-    <div className="flex h-full items-center justify-center bg-bg text-text-secondary">
-      Loading…
-    </div>
-  );
 }

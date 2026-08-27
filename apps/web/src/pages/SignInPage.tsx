@@ -6,6 +6,7 @@ import { useAuth } from '../auth/useAuth';
 import { LinkGames } from '../components/LinkGames';
 import { TriangleMark } from '../components/ui/brand';
 import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
+import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
 import { useMe } from '../hooks/useMe';
@@ -23,14 +24,14 @@ export function SignInPage() {
   const [postStep, setPostStep] = useState<'idle' | 'link'>('idle');
 
   if (loading || (session && me.isLoading && !me.isError)) {
-    return <Centered>Loading…</Centered>;
+    return <Loader />;
   }
 
   // Stale browser session (e.g. HS256 token while API expects JWKS) — drop it
   // and show the sign-in form instead of spinning forever.
   if (session && me.isError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+      <div className="mm-grid-surface flex min-h-screen items-center justify-center bg-bg px-4">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center gap-4">
             <TriangleMark className="h-11 w-11" />
@@ -43,7 +44,7 @@ export function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+    <div className="mm-grid-surface flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-2">
           <TriangleMark className="h-11 w-11" />
@@ -106,12 +107,12 @@ function StaleSessionStep() {
   }
 
   return (
-    <div className="text-center">
-      <h1 className="text-xl font-semibold">Session expired</h1>
-      <p className="mt-2 text-sm text-text-secondary">
-        Your saved sign-in is no longer valid. Sign in again or enter the demo.
-      </p>
-      <div className="mt-8 flex flex-col gap-3">
+    <div>
+      <AuthHeading
+        title="Session expired"
+        subtitle="Your saved sign-in is no longer valid. Sign in again or enter the demo."
+      />
+      <div className="mt-6 flex flex-col gap-3">
         <PillButton
           type="button"
           fullWidth
@@ -149,15 +150,13 @@ function friendlyAuthError(err: unknown, mode: 'signin' | 'signup'): string {
   );
 }
 
-type AuthView = 'credentials' | 'check-email' | 'enter-code' | 'reset-request';
+type AuthView = 'credentials' | 'check-email' | 'reset-request';
 
 function AuthStep() {
   const [view, setView] = useState<AuthView>('credentials');
   const [email, setEmail] = useState('');
 
   if (view === 'check-email') return <CheckEmailNotice email={email} />;
-  if (view === 'enter-code')
-    return <EnterCodeForm email={email} onBack={() => setView('credentials')} />;
   if (view === 'reset-request')
     return <ResetRequestForm email={email} onBack={() => setView('credentials')} />;
 
@@ -166,7 +165,6 @@ function AuthStep() {
       email={email}
       setEmail={setEmail}
       onNeedsVerification={() => setView('check-email')}
-      onUseCode={() => setView('enter-code')}
       onForgot={() => setView('reset-request')}
     />
   );
@@ -176,13 +174,11 @@ function CredentialsForm({
   email,
   setEmail,
   onNeedsVerification,
-  onUseCode,
   onForgot,
 }: {
   email: string;
   setEmail: (v: string) => void;
   onNeedsVerification: () => void;
-  onUseCode: () => void;
   onForgot: () => void;
 }) {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
@@ -234,114 +230,95 @@ function CredentialsForm({
 
   return (
     <div>
-      <h1 className="text-center text-xl font-semibold">
-        {mode === 'signin' ? 'Sign in' : 'Create your account'}
-      </h1>
-      <p className="mt-2 text-center text-sm text-text-secondary">
-        Skill-based contests, verified by the game.
-      </p>
+      <AuthHeading
+        title={mode === 'signin' ? 'Sign in' : 'Create your account'}
+        subtitle="Skill-based contests on your favourite games"
+      />
 
-      <div className="mt-8 flex flex-col gap-3">
-        <PillButton
-          type="button"
-          variant="outline"
-          fullWidth
-          disabled={busy}
-          onClick={() => void google()}
-        >
-          <GoogleMark className="h-4 w-4" />
-          Continue with Google
-        </PillButton>
-
-        <div className="flex items-center gap-3 py-1 text-xs text-text-tertiary">
-          <span className="h-px flex-1 bg-hairline" />
-          or
-          <span className="h-px flex-1 bg-hairline" />
-        </div>
-
-        <form className="flex flex-col gap-3" onSubmit={submit}>
+      <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
+        <Field label="Email">
           <TextInput
             type="email"
             required
             autoComplete="email"
-            aria-label="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value.trim())}
-            placeholder="you@example.com"
+            placeholder="Enter your email"
           />
-          <div>
-            <TextInput
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-              aria-label="Password"
-              aria-invalid={pwTooShort ? true : undefined}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={
-                mode === 'signup' ? 'Password, at least 6 characters' : 'Password'
-              }
-            />
-            {pwTooShort && (
-              <p className="mt-1 text-xs text-red">
-                Password must be at least 6 characters.
-              </p>
+        </Field>
+
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor="signin-password"
+              className="text-xs font-medium text-text-secondary"
+            >
+              Password
+            </label>
+            {mode === 'signin' && (
+              <button
+                type="button"
+                className="text-xs text-text-tertiary hover:text-text-secondary"
+                onClick={onForgot}
+              >
+                Forgot password?
+              </button>
             )}
           </div>
-          <PillButton type="submit" variant="primary" fullWidth disabled={!canSubmit}>
-            {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
-          </PillButton>
-          {error && <p className="text-center text-sm text-red">{error}</p>}
-        </form>
-
-        <div className="flex items-center justify-between text-xs text-text-tertiary">
-          <button
-            type="button"
-            className="hover:text-text-secondary"
-            onClick={onUseCode}
-          >
-            Email me a code instead
-          </button>
-          {mode === 'signin' && (
-            <button
-              type="button"
-              className="hover:text-text-secondary"
-              onClick={onForgot}
-            >
-              Forgot password?
-            </button>
+          <TextInput
+            id="signin-password"
+            type="password"
+            required
+            minLength={6}
+            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+            aria-invalid={pwTooShort ? true : undefined}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+          />
+          {pwTooShort && (
+            <span className="text-xs text-red">
+              Password must be at least 6 characters.
+            </span>
           )}
         </div>
 
+        <PillButton type="submit" variant="primary" fullWidth disabled={!canSubmit}>
+          {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+        </PillButton>
+        {error && <p className="text-sm text-red">{error}</p>}
+      </form>
+
+      <Divider />
+
+      <PillButton
+        type="button"
+        variant="outline"
+        fullWidth
+        disabled={busy}
+        onClick={() => void google()}
+      >
+        <GoogleMark className="h-4 w-4" />
+        Continue with Google
+      </PillButton>
+
+      <p className="mt-6 text-center text-sm text-text-secondary">
+        {mode === 'signin'
+          ? 'Need to create an account? '
+          : 'Already have an account? '}
         <button
           type="button"
-          className="text-center text-sm text-text-secondary hover:text-text"
+          className="font-medium text-text hover:underline"
           onClick={() => {
             setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
             setError(null);
           }}
         >
-          {mode === 'signin'
-            ? 'New here? Create an account'
-            : 'Have an account? Sign in'}
+          {mode === 'signin' ? 'Sign up' : 'Sign in'}
         </button>
-      </div>
+      </p>
 
-      <div className="mt-6 border-t border-hairline pt-4 text-center text-xs text-text-tertiary">
-        By continuing you agree to our{' '}
-        <a href="/terms" className="underline hover:text-text-secondary">
-          Terms
-        </a>{' '}
-        ·{' '}
-        <a href="/privacy" className="underline hover:text-text-secondary">
-          Privacy
-        </a>{' '}
-        ·{' '}
-        <a href="/responsible-gaming" className="underline hover:text-text-secondary">
-          Responsible Gaming
-        </a>
-      </div>
+      <LegalFooter />
     </div>
   );
 }
@@ -351,9 +328,9 @@ function CheckEmailNotice({ email }: { email: string }) {
   const [resent, setResent] = useState(false);
 
   return (
-    <div className="text-center">
-      <h1 className="text-xl font-semibold">Check your email</h1>
-      <p className="mt-2 text-sm text-text-secondary">
+    <div>
+      <AuthHeading title="Check your email" />
+      <p className="mt-3 text-sm text-text-secondary">
         We sent a verification link to <span className="text-text">{email}</span>. Click
         it to finish creating your account.
       </p>
@@ -379,105 +356,6 @@ function CheckEmailNotice({ email }: { email: string }) {
       {resent && (
         <p className="mt-2 text-sm text-green">Sent — check your inbox again.</p>
       )}
-    </div>
-  );
-}
-function EnterCodeForm({
-  email: initial,
-  onBack,
-}: {
-  email: string;
-  onBack: () => void;
-}) {
-  const { sendLoginCode, verifyLoginCode } = useAuth();
-  const [email, setEmail] = useState(initial);
-  const [sent, setSent] = useState(false);
-  const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!email.includes('@')) {
-      setError('Enter a valid email address.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await sendLoginCode(email);
-      setSent(true);
-    } catch (err) {
-      setError((err as Error)?.message || 'Could not send a code. Try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function verify(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setBusy(true);
-    try {
-      await verifyLoginCode(email, code.trim());
-    } catch {
-      setError("That code didn't work or expired — send a new one.");
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div>
-      <h1 className="text-center text-xl font-semibold">
-        {sent ? 'Enter your code' : 'Email me a code'}
-      </h1>
-      <p className="mt-2 text-center text-sm text-text-secondary">
-        {sent
-          ? `We sent a 6-digit code to ${email}.`
-          : 'We’ll email you a one-time login code.'}
-      </p>
-
-      {!sent ? (
-        <form className="mt-8 flex flex-col gap-3" onSubmit={send}>
-          <TextInput
-            type="email"
-            required
-            autoComplete="email"
-            aria-label="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value.trim())}
-            placeholder="you@example.com"
-          />
-          <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
-            {busy ? 'Sending…' : 'Send code'}
-          </PillButton>
-          {error && <p className="text-center text-sm text-red">{error}</p>}
-        </form>
-      ) : (
-        <form className="mt-8 flex flex-col gap-3" onSubmit={verify}>
-          <TextInput
-            required
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            aria-label="Login code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="123456"
-          />
-          <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
-            {busy ? 'Verifying…' : 'Verify'}
-          </PillButton>
-          {error && <p className="text-center text-sm text-red">{error}</p>}
-        </form>
-      )}
-
-      <button
-        type="button"
-        className="mt-6 w-full text-center text-sm text-text-secondary hover:text-text"
-        onClick={onBack}
-      >
-        ← Back to sign in
-      </button>
     </div>
   );
 }
@@ -514,51 +392,40 @@ function ResetRequestForm({
 
   if (sent) {
     return (
-      <div className="text-center">
-        <h1 className="text-xl font-semibold">Check your email</h1>
-        <p className="mt-2 text-sm text-text-secondary">
+      <div>
+        <AuthHeading title="Check your email" />
+        <p className="mt-3 text-sm text-text-secondary">
           If <span className="text-text">{email}</span> has an account, a reset link is
           on its way.
         </p>
-        <button
-          type="button"
-          className="mt-6 w-full text-center text-sm text-text-secondary hover:text-text"
-          onClick={onBack}
-        >
-          ← Back to sign in
-        </button>
+        <BackToSignIn onBack={onBack} />
       </div>
     );
   }
 
   return (
     <div>
-      <h1 className="text-center text-xl font-semibold">Reset your password</h1>
-      <p className="mt-2 text-center text-sm text-text-secondary">
-        We'll email you a link to set a new one.
-      </p>
-      <form className="mt-8 flex flex-col gap-3" onSubmit={submit}>
-        <TextInput
-          type="email"
-          required
-          autoComplete="email"
-          aria-label="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value.trim())}
-          placeholder="you@example.com"
-        />
+      <AuthHeading
+        title="Reset your password"
+        subtitle="We'll email you a link to set a new one."
+      />
+      <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
+        <Field label="Email">
+          <TextInput
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value.trim())}
+            placeholder="Enter your email"
+          />
+        </Field>
         <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
           {busy ? 'Sending…' : 'Send reset link'}
         </PillButton>
-        {error && <p className="text-center text-sm text-red">{error}</p>}
+        {error && <p className="text-sm text-red">{error}</p>}
       </form>
-      <button
-        type="button"
-        className="mt-6 w-full text-center text-sm text-text-secondary hover:text-text"
-        onClick={onBack}
-      >
-        ← Back to sign in
-      </button>
+      <BackToSignIn onBack={onBack} />
     </div>
   );
 }
@@ -588,22 +455,23 @@ function ResetPasswordStep() {
 
   return (
     <div>
-      <h1 className="text-center text-xl font-semibold">Set a new password</h1>
-      <form className="mt-8 flex flex-col gap-3" onSubmit={submit}>
-        <TextInput
-          type="password"
-          required
-          minLength={6}
-          autoComplete="new-password"
-          aria-label="New password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="At least 6 characters"
-        />
+      <AuthHeading title="Set a new password" />
+      <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
+        <Field label="New password">
+          <TextInput
+            type="password"
+            required
+            minLength={6}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 6 characters"
+          />
+        </Field>
         <PillButton type="submit" variant="primary" fullWidth disabled={busy}>
           {busy ? 'Saving…' : 'Update password'}
         </PillButton>
-        {error && <p className="text-center text-sm text-red">{error}</p>}
+        {error && <p className="text-sm text-red">{error}</p>}
       </form>
     </div>
   );
@@ -649,13 +517,13 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
 
   return (
     <div>
-      <h1 className="text-center text-xl font-semibold">Create your profile</h1>
-      <p className="mt-2 text-center text-sm text-text-secondary">
-        A couple of details and you're in.
-      </p>
+      <AuthHeading
+        title="Create your profile"
+        subtitle="A couple of details and you're in."
+      />
 
       <form
-        className="mt-8 flex flex-col gap-4"
+        className="mt-6 flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
           setError(null);
@@ -720,11 +588,11 @@ function LinkGameStep() {
   const navigate = useNavigate();
   return (
     <div>
-      <h1 className="text-center text-xl font-semibold">Link your games</h1>
-      <p className="mt-2 text-center text-sm text-text-secondary">
-        Connect an account to start playing, or do it later from your profile.
-      </p>
-      <div className="mt-8">
+      <AuthHeading
+        title="Link your games"
+        subtitle="Connect an account to start playing, or do it later from your profile."
+      />
+      <div className="mt-6">
         <LinkGames onlyActive />
       </div>
       <div className="mt-8">
@@ -733,6 +601,71 @@ function LinkGameStep() {
         </PillButton>
       </div>
     </div>
+  );
+}
+
+/** Left-aligned title + optional subtitle shared by every auth step, so the
+ * whole suite (sign-in, reset, onboarding) reads as one screen family. */
+function AuthHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="text-center">
+      <h1 className="text-2xl font-semibold">{title}</h1>
+      {subtitle && <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>}
+    </div>
+  );
+}
+
+/** "OR" rule separating the primary form from social sign-in. */
+function Divider() {
+  return (
+    <div className="my-5 flex items-center gap-3 text-xs text-text-tertiary">
+      <span className="h-px flex-1 bg-hairline" />
+      OR
+      <span className="h-px flex-1 bg-hairline" />
+    </div>
+  );
+}
+
+/** Left-aligned "← Back to sign in" used by the reset / code sub-forms. */
+function BackToSignIn({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      className="mt-6 text-sm text-text-secondary hover:text-text"
+      onClick={onBack}
+    >
+      ← Back to sign in
+    </button>
+  );
+}
+
+function LegalFooter() {
+  return (
+    <p className="mt-5 whitespace-nowrap text-center text-micro text-text-tertiary">
+      By continuing you agree to our{' '}
+      <LegalLink href="https://www.dueloro.com/terms">Terms</LegalLink>
+      {' · '}
+      <LegalLink href="https://www.dueloro.com/privacy">Privacy</LegalLink>
+      {' · '}
+      <LegalLink href="https://www.dueloro.com/responsible-gaming">
+        Responsible Gaming
+      </LegalLink>
+    </p>
+  );
+}
+
+/** A legal/marketing link that lives on the dueloro.com site, so it opens in a
+ * new tab rather than routing inside the app. */
+function LegalLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline hover:text-text-secondary"
+    >
+      {children}
+    </a>
   );
 }
 
@@ -758,13 +691,5 @@ function GoogleMark({ className }: { className?: string }) {
         d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
       />
     </svg>
-  );
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-bg text-text-secondary">
-      {children}
-    </div>
   );
 }

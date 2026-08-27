@@ -5,6 +5,7 @@ import { ExpandableCard } from '../components/ui/ExpandableCard';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency, formatRelativeTime } from '../lib/format';
 import {
@@ -43,6 +44,7 @@ function LedgerDot({ entry }: { entry: LedgerEntry }) {
 }
 
 export function WalletPage() {
+  usePageTitle('Wallet');
   const { data: wallet, isLoading, isError, refetch } = useWallet();
   const ledger = useWalletLedger();
   const deposit = useDemoDeposit();

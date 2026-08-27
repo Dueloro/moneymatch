@@ -75,33 +75,29 @@ describe('SignInPage', () => {
     expect(screen.getByLabelText(/step 1 of 3/i)).toBeInTheDocument();
   });
 
-  it('sends and verifies an email login code', async () => {
-    const sendLoginCode = vi.fn().mockResolvedValue(undefined);
-    const verifyLoginCode = vi.fn().mockResolvedValue(undefined);
-    mockUseAuth.mockReturnValue({
-      session: null,
-      loading: false,
-      isDemo: false,
-      isPasswordRecovery: false,
-      signUpWithEmail: vi.fn(),
-      signInWithEmail,
-      sendLoginCode,
-      verifyLoginCode,
-      sendPasswordReset: vi.fn(),
-      setNewPassword: vi.fn(),
-      signInWithGoogle,
-      verifyCurrentPassword: vi.fn(),
-      changePassword: vi.fn(),
-      signOut: vi.fn(),
-    });
+  it('has no email-code option (removed in favour of password / Google)', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
-    await userEvent.click(screen.getByRole('button', { name: /email me a code/i }));
-    await userEvent.type(screen.getByLabelText('Email'), 'kv@example.com');
-    await userEvent.click(screen.getByRole('button', { name: /send code/i }));
-    expect(sendLoginCode).toHaveBeenCalledWith('kv@example.com');
-    await userEvent.type(await screen.findByLabelText(/code/i), '123456');
-    await userEvent.click(screen.getByRole('button', { name: /verify/i }));
-    expect(verifyLoginCode).toHaveBeenCalledWith('kv@example.com', '123456');
+    expect(
+      screen.queryByRole('button', { name: /email me a code/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the reworded tagline', () => {
+    renderWithProviders(<SignInPage />, { route: '/signin' });
+    expect(
+      screen.getByText(/skill-based contests on your favourite games/i),
+    ).toBeInTheDocument();
+  });
+
+  it('links the legal footer to dueloro.com in a new tab', () => {
+    renderWithProviders(<SignInPage />, { route: '/signin' });
+    const terms = screen.getByRole('link', { name: 'Terms' });
+    expect(terms).toHaveAttribute('href', 'https://www.dueloro.com/terms');
+    expect(terms).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: 'Responsible Gaming' })).toHaveAttribute(
+      'href',
+      'https://www.dueloro.com/responsible-gaming',
+    );
   });
 
   it('shows check-your-email after a signup that needs verification', async () => {
@@ -124,7 +120,7 @@ describe('SignInPage', () => {
       signOut: vi.fn(),
     });
     renderWithProviders(<SignInPage />, { route: '/signin' });
-    await userEvent.click(screen.getByRole('button', { name: /create an account/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^sign up$/i }));
     await userEvent.type(screen.getByLabelText('Email'), 'new@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'longenough');
     await userEvent.click(screen.getByRole('button', { name: 'Create account' }));

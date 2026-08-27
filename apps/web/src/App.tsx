@@ -4,6 +4,7 @@ import { RequireAdmin } from './auth/RequireAdmin';
 import { RequireAuth } from './auth/RequireAuth';
 import { useAuth } from './auth/useAuth';
 import { AppShell } from './components/AppShell';
+import { Loader } from './components/ui/Loader';
 import { ActivityPage } from './pages/ActivityPage';
 import { DemoSignInPage } from './pages/DemoSignInPage';
 import { InvitePage } from './pages/InvitePage';
@@ -71,12 +72,6 @@ export function App() {
  */
 function RootRedirect() {
   const { session, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center bg-bg text-text-secondary">
-        Loading…
-      </div>
-    );
-  }
+  if (loading) return <Loader />;
   return <Navigate to={session ? '/play' : '/signin'} replace />;
 }

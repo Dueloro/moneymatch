@@ -4,13 +4,17 @@ import { useAuth } from '../auth/useAuth';
 import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
+import { ErrorState } from '../components/ui/ErrorState';
+import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useResetDemo } from '../hooks/useResetDemo';
 import { formatCurrency } from '../lib/format';
 
 export function ProfilePage() {
+  usePageTitle('Profile');
   const { signOut, isDemo } = useAuth();
   const me = useMe();
   const selfExclude = useSelfExclude();
@@ -20,6 +24,20 @@ export function ProfilePage() {
   const limits = me.data?.limits;
   const excluded = user?.status === 'self_excluded';
   const showCs2 = (user?.active_games ?? []).includes('cs2.steam');
+
+  if (me.isLoading) return <Loader />;
+  if (me.isError || !user) {
+    return (
+      <div className="max-w-read">
+        <SectionHeader level="page">Profile</SectionHeader>
+        <ErrorState
+          title="Couldn't load your profile"
+          subline="We couldn't reach your account just now."
+          onRetry={() => void me.refetch()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-read">
