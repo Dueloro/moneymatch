@@ -2722,6 +2722,8 @@ export interface components {
              */
             unread_notifications: number;
             getting_started?: components["schemas"]["GettingStarted"] | null;
+            /** Contested Games */
+            contested_games?: string[];
         };
         /**
          * MessageView
@@ -3512,6 +3514,11 @@ export interface components {
              * @description Catalog game ids the player has chosen to play
              */
             active_games?: string[] | null;
+            /**
+             * Dismissed Checklists
+             * @description Catalog game ids whose Play-tab checklist the player dismissed
+             */
+            dismissed_checklists?: string[] | null;
         };
         /** UserResponse */
         UserResponse: {
@@ -3541,6 +3548,8 @@ export interface components {
             member_since: string;
             /** Active Games */
             active_games: string[];
+            /** Dismissed Checklists */
+            dismissed_checklists: string[];
         };
         /** ValidationError */
         ValidationError: {
