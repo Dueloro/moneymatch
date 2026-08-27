@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { GettingStarted } from '../components/GettingStarted';
+import { GameChecklists } from '../components/GameChecklists';
 import { ModeSwitcher } from '../components/ModeSwitcher';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
@@ -149,7 +149,7 @@ export function PoolsPage() {
     <div>
       {header}
 
-      <GettingStarted />
+      <GameChecklists />
 
       {/* From xl up the rail's "Room formed" section owns this, so a formed room
        * stops pushing the grid down. Below xl there is no rail, so keep it here

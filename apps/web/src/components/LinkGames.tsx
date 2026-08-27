@@ -8,10 +8,29 @@ import {
   type GameLink,
   type ProfileSnapshot,
 } from '../hooks/useLinks';
-import { gameMeta, isComingSoon } from '../lib/games';
+import {
+  availabilityFor,
+  gameMeta,
+  gameOnboarding,
+  onboardingGames,
+  type OnboardingContext,
+} from '../lib/games';
 import { TextInput } from './ui/Field';
 import { SkeletonList } from './ui/Skeleton';
 import { PillButton } from './ui/PillButton';
+
+/** A row for a catalog game we have no link record for yet (unlinked default). */
+function unlinkedLink(id: string): GameLink {
+  return {
+    game: id,
+    display_name: gameMeta(id).name,
+    status: 'UNLINKED',
+    host_username: null,
+    linked_at: null,
+    profile: null,
+    win_streak: 0,
+  };
+}
 
 /** The single best skill descriptor for a snapshot: a rank label, else a
  * rating. Drives the per-game skill badge. */
@@ -25,17 +44,34 @@ function skillBadge(p: ProfileSnapshot): string | null {
 }
 
 /**
- * Games section (design PDF p.12): the full catalog, one row per game. A left
- * checkmark toggles the game in the player's play set (what shows in the
- * switcher) independent of linking; the right side carries the link flow
- * (row → username input → server verify → LINKED) or a "coming soon" note for
- * games without an adapter yet. Reused by Profile and the onboarding link step.
+ * Games section (design PDF p.12): the add/remove editor for the play set. One
+ * row per game, in the onboarding order. A left checkmark toggles the game in
+ * the player's play set (what gates the whole app) independent of linking; the
+ * right side carries the link flow (row → username input → server verify →
+ * LINKED). Reused by Profile and the onboarding link step.
  *
- * `onlyActive` narrows the list to the player's chosen games (used in
- * onboarding, where they've just picked); it falls back to the full catalog
- * when nothing is chosen yet.
+ * Availability is driven by the shared C2 config (`lib/games`) for the given
+ * `context`, so demo vs. production is one table, not logic duplicated here:
+ * - **Add** a game only if it's `selectable` in this context. In production
+ *   that's Chess only; CS2/PUBG/Dota render grayscale + disabled with their
+ *   badge until launch flips their `production` availability.
+ * - **Remove** any currently-active game (except Chess, which is required) — it
+ *   drops out of `active_games` and disappears from every play surface, but its
+ *   linked account and history are untouched (nothing is deleted).
+ *
+ * Fail-closed: an empty play set is treated as Chess-only (matching the switcher
+ * and the backfill), so editing never starts from an accidental "all games".
+ *
+ * `onlyActive` narrows the list to the player's chosen games (onboarding, right
+ * after they picked).
  */
-export function LinkGames({ onlyActive = false }: { onlyActive?: boolean }) {
+export function LinkGames({
+  onlyActive = false,
+  context = 'production',
+}: {
+  onlyActive?: boolean;
+  context?: OnboardingContext;
+}) {
   const links = useLinks();
   const me = useMe();
   const setActiveGames = useSetActiveGames();
@@ -58,37 +94,38 @@ export function LinkGames({ onlyActive = false }: { onlyActive?: boolean }) {
     );
   }
 
-  // An empty play set means "not chosen yet" — the switcher falls back to every
-  // playable game, so we show those as the effective selection here too. That
-  // keeps the checkmarks in sync with the bar and makes the first edit additive
-  // (checking a new game adds to the visible set rather than replacing it).
+  // Fail-closed: an empty set is Chess-only, never "every game". Mutations base
+  // off this real set (not a fallback-expanded one) so a single edit can never
+  // accidentally persist the whole catalog.
   const stored = me.data?.user.active_games ?? [];
-  const registeredIds = links.data.games
-    .filter((g) => !isComingSoon(g.game))
-    .map((g) => g.game);
-  const active = stored.length > 0 ? stored : registeredIds;
-  const activeSet = new Set(active);
+  const activeList = stored.length > 0 ? stored : ['chess.lichess'];
+  const activeSet = new Set(activeList);
+  const byGame = new Map(links.data.games.map((g) => [g.game, g]));
 
   const setSelected = (game: string, on: boolean) => {
-    const next = on ? [...active, game] : active.filter((g) => g !== game);
+    // Chess is required — never toggles off. Every other gate (locked/not-yet
+    // addable) is enforced by the row's disabled toggle, so this only runs for
+    // genuinely allowed edits.
+    if (gameOnboarding(game)?.preselected) return;
+    const next = on ? [...activeList, game] : activeList.filter((g) => g !== game);
     setActiveGames.mutate(next);
   };
 
-  const rows =
-    onlyActive && stored.length > 0
-      ? links.data.games.filter((g) => activeSet.has(g.game))
-      : links.data.games;
+  const configs = onlyActive
+    ? onboardingGames().filter((c) => activeSet.has(c.id))
+    : onboardingGames();
 
   return (
     <div className="divide-y divide-hairline border-y border-hairline">
-      {rows.map((g) => (
+      {configs.map((cfg) => (
         <GameRow
-          key={g.game}
-          link={g}
-          selected={activeSet.has(g.game)}
-          onToggleSelect={() => setSelected(g.game, !activeSet.has(g.game))}
+          key={cfg.id}
+          link={byGame.get(cfg.id) ?? unlinkedLink(cfg.id)}
+          context={context}
+          selected={activeSet.has(cfg.id)}
+          onToggleSelect={() => setSelected(cfg.id, !activeSet.has(cfg.id))}
           onLinked={() => {
-            if (!activeSet.has(g.game)) setSelected(g.game, true);
+            if (!activeSet.has(cfg.id)) setSelected(cfg.id, true);
           }}
         />
       ))}
@@ -98,11 +135,13 @@ export function LinkGames({ onlyActive = false }: { onlyActive?: boolean }) {
 
 function GameRow({
   link,
+  context,
   selected,
   onToggleSelect,
   onLinked,
 }: {
   link: GameLink;
+  context: OnboardingContext;
   selected: boolean;
   onToggleSelect: () => void;
   onLinked: () => void;
@@ -114,7 +153,30 @@ function GameRow({
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const meta = gameMeta(link.game, link.display_name);
-  const soon = link.status === 'COMING_SOON' || isComingSoon(link.game);
+
+  const cfg = gameOnboarding(link.game);
+  const avail = availabilityFor(link.game, context);
+  const preselected = cfg?.preselected ?? false;
+  const hasBinding = link.status === 'LINKED' || link.status === 'BLOCKED';
+  // "Locked" = can't be added yet in this context (e.g. CS2/PUBG/Dota in prod)
+  // AND has no real binding of its own. A game already in the play set, or one
+  // the player has actually linked, always renders normally (removable/visible)
+  // — the launch gate only hides games that are neither yours nor addable yet.
+  const locked =
+    !preselected &&
+    !selected &&
+    !hasBinding &&
+    (!avail.selectable || link.status === 'COMING_SOON');
+  const grayscale = locked || (!selected && !avail.color);
+  const toggleDisabled = preselected || locked;
+  const lockReason = cfg?.badge === 'SOON' ? 'Coming soon' : 'Available after launch';
+  const toggleLabel = preselected
+    ? `${meta.name} (always on)`
+    : locked
+      ? `${meta.name} (${lockReason.toLowerCase()})`
+      : selected
+        ? `Remove ${meta.name}`
+        : `Add ${meta.name}`;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,15 +203,18 @@ function GameRow({
   };
 
   return (
-    <div className="py-3">
+    <div className={`py-3 ${grayscale ? 'opacity-50 grayscale' : ''}`}>
       <div className="flex items-center gap-3">
         <button
           type="button"
           role="checkbox"
           aria-checked={selected}
-          aria-label={selected ? `Remove ${meta.name}` : `Add ${meta.name}`}
+          aria-disabled={toggleDisabled || undefined}
+          disabled={toggleDisabled}
+          aria-label={toggleLabel}
+          title={locked ? lockReason : undefined}
           onClick={onToggleSelect}
-          className="grid h-5 w-5 shrink-0 place-items-center rounded-full border text-bg transition"
+          className="grid h-5 w-5 shrink-0 place-items-center rounded-full border text-bg transition disabled:cursor-not-allowed"
           style={
             selected
               ? { backgroundColor: meta.accent, borderColor: meta.accent }
@@ -162,10 +227,17 @@ function GameRow({
         <div className="min-w-0 flex-1">
           {/* meta.name, not display_name: the server sends "CS2 — FACEIT" and
            * the copy rules ban the em dash. */}
-          <div className="text-sm font-medium text-text">{meta.name}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-text">{meta.name}</span>
+            {cfg?.badge && (
+              <span className="rounded-pill bg-panel px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-text-secondary">
+                {cfg.badge}
+              </span>
+            )}
+          </div>
           <div className="truncate text-xs text-text-secondary">
-            {soon
-              ? 'Linking coming soon'
+            {locked
+              ? lockReason
               : link.status === 'LINKED'
                 ? link.profile
                   ? `${link.host_username} · ${link.profile.total_games.toLocaleString('en-US')} games`
@@ -196,12 +268,7 @@ function GameRow({
         </div>
 
         <div className="shrink-0">
-          {soon && (
-            <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Soon
-            </span>
-          )}
-          {!soon && link.status === 'LINKED' && (
+          {!locked && link.status === 'LINKED' && (
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -216,12 +283,12 @@ function GameRow({
               </span>
             </div>
           )}
-          {!soon && link.status === 'BLOCKED' && (
+          {!locked && link.status === 'BLOCKED' && (
             <span className="text-xs font-semibold uppercase tracking-wide text-red">
               Blocked
             </span>
           )}
-          {!soon && link.status === 'UNLINKED' && !editing && (
+          {!locked && link.status === 'UNLINKED' && !editing && (
             <PillButton variant="outline" onClick={() => setEditing(true)}>
               Link
             </PillButton>
@@ -229,7 +296,7 @@ function GameRow({
         </div>
       </div>
 
-      {!soon && link.status === 'UNLINKED' && editing && (
+      {!locked && link.status === 'UNLINKED' && editing && (
         <form className="mt-3 flex flex-col gap-2" onSubmit={submit}>
           {!confirming ? (
             <>

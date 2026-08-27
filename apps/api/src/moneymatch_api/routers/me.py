@@ -12,6 +12,9 @@ from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
+from ..models.play import Match, MatchPlayer
+from ..models.pools import SoloEntry, SoloPool
+from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..models.wallet import LedgerEntry, Wallet
 from ..schemas.user import (
@@ -52,6 +55,30 @@ async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
     )
 
 
+async def _contested_games(session: AsyncSession, user: User) -> list[str]:
+    """Games the player has entered at least one contest for (pool / H2H /
+    tournament). Computed, not stored: three `user_id`-indexed lookups unioned
+    into a small distinct set — cheap enough for a checklist and avoids a
+    per-game counter that every escrow path would have to keep in sync."""
+    pools = (
+        select(SoloPool.game)
+        .join(SoloEntry, SoloEntry.pool_id == SoloPool.id)
+        .where(SoloEntry.user_id == user.id)
+    )
+    matches = (
+        select(Match.game)
+        .join(MatchPlayer, MatchPlayer.match_id == Match.id)
+        .where(MatchPlayer.user_id == user.id)
+    )
+    tournaments = (
+        select(Tournament.game)
+        .join(TournamentEntry, TournamentEntry.tournament_id == Tournament.id)
+        .where(TournamentEntry.user_id == user.id)
+    )
+    rows = await session.execute(pools.union(matches, tournaments))
+    return sorted({game for (game,) in rows})
+
+
 async def _me(session: AsyncSession, user: User) -> MeResponse:
     limit = await limits_service.get_or_create_limits(session, user.id)
     limits_service.promote_pending(limit)
@@ -62,6 +89,7 @@ async def _me(session: AsyncSession, user: User) -> MeResponse:
         limits=LimitsResponse.model_validate(limit),
         unread_notifications=unread,
         getting_started=await _getting_started(session, user),
+        contested_games=await _contested_games(session, user),
     )
 
 
@@ -115,6 +143,16 @@ async def update_me(
 
     if body.active_games is not None:
         user.active_games = body.active_games
+        # Keep dismissals a subset of the play set: a removed game forgets its
+        # dismissal, so re-adding it shows the checklist again (starting over).
+        active = set(body.active_games)
+        user.dismissed_checklists = [
+            g for g in user.dismissed_checklists if g in active
+        ]
+        await session.flush()
+
+    if body.dismissed_checklists is not None:
+        user.dismissed_checklists = body.dismissed_checklists
         await session.flush()
 
     return await _me(session, user)

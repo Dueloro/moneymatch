@@ -101,3 +101,10 @@ class User(Base, TimestampMixin):
     active_games: Mapped[list[str]] = mapped_column(
         JSONB, default=list, server_default="[]", nullable=False
     )
+    # Catalog game ids whose Play-tab onboarding checklist the player has
+    # dismissed. Kept as a subset of `active_games`: removing a game from the
+    # play set drops its dismissal, so re-adding the game shows the checklist
+    # again (removing + re-adding reads as "starting over").
+    dismissed_checklists: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )

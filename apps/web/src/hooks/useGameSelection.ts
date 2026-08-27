@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { isComingSoon } from '../lib/games';
 import { useLinks, type GameLink } from './useLinks';
 import { useMe } from './useMe';
 
@@ -9,6 +8,9 @@ import { useMe } from './useMe';
 // most recently used games shuffle to the front of the switcher.
 const ORDER_KEY = 'mm.games.order';
 const SELECTED_KEY = 'mm.games.selected';
+
+// Fail-closed fallback when a user has no play set yet (matches the backfill).
+const CHESS_FALLBACK = 'chess.lichess';
 
 function readList(key: string): string[] {
   try {
@@ -40,17 +42,16 @@ export function useGameSelection(): {
   const catalog = useMemo(() => data?.games ?? [], [data]);
   const activeGames = me.data?.user.active_games;
 
-  // The switcher shows the player's chosen "play set". Until they've picked any
-  // (empty set — legacy accounts, or a skipped onboarding), fall back to every
-  // playable game so the bar is never empty. Coming-soon games only appear when
-  // explicitly added to the set.
+  // The switcher shows the player's chosen "play set". If it's empty — a not-yet
+  // migrated legacy account, or a fresh sign-up that closed the picker before
+  // confirming — fall back to **Chess only**, not every game. Fail closed: this
+  // matches the CS2 card gating and the backfill default, so an unpicked account
+  // shows exactly one game everywhere instead of being silently un-gated, and it
+  // closes the deep-link-before-confirming gap without an unskippable overlay.
   const games = useMemo(() => {
     const active = activeGames ?? [];
-    if (active.length > 0) {
-      const chosen = new Set(active);
-      return catalog.filter((g) => chosen.has(g.game));
-    }
-    return catalog.filter((g) => !isComingSoon(g.game));
+    const chosen = new Set(active.length > 0 ? active : [CHESS_FALLBACK]);
+    return catalog.filter((g) => chosen.has(g.game));
   }, [catalog, activeGames]);
 
   const [order, setOrder] = useState<string[]>(() => readList(ORDER_KEY));

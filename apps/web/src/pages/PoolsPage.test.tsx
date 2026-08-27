@@ -12,9 +12,10 @@ vi.mock('../hooks/useWallet', () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
   }),
 }));
-// GettingStarted (rendered by PoolsPage) reads /me; null = checklist hidden.
+// GameChecklists (rendered by PoolsPage) reads /me; no `user` → no checklist cards.
 vi.mock('../hooks/useMe', () => ({
   useMe: () => ({ data: { getting_started: null } }),
+  useSetDismissedChecklists: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('../hooks/useGameSelection', () => ({
   useGameSelection: () => ({

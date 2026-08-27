@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
+import { GameSelectOverlay } from '../components/GameSelectOverlay';
 import { LinkGames } from '../components/LinkGames';
 import { TriangleMark } from '../components/ui/brand';
 import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
 import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
-import { useMe } from '../hooks/useMe';
+import { useMe, useSetActiveGames } from '../hooks/useMe';
 import { api } from '../lib/api';
 import { enterDemo as demoEnter } from '../lib/demoAuth';
 import { toast } from '../lib/toast';
@@ -21,7 +22,12 @@ const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 export function SignInPage() {
   const { session, loading, isPasswordRecovery } = useAuth();
   const me = useMe();
-  const [postStep, setPostStep] = useState<'idle' | 'link'>('idle');
+  // After auth the user creates a profile, then picks their games, then links an
+  // account. `select` is the game-selection overlay; a fresh account also lands
+  // there via its empty `active_games`, so closing the app mid-overlay re-prompts
+  // on the next sign-in rather than skipping the pick.
+  const [postStep, setPostStep] = useState<'idle' | 'select' | 'link'>('idle');
+  const activeGames = me.data?.user.active_games ?? [];
 
   if (loading || (session && me.isLoading && !me.isError)) {
     return <Loader />;
@@ -63,9 +69,14 @@ export function SignInPage() {
         ) : !session ? (
           <AuthStep />
         ) : me.data?.needs_onboarding ? (
-          <OnboardingStep onDone={() => setPostStep('link')} />
+          <OnboardingStep onDone={() => setPostStep('select')} />
         ) : postStep === 'link' ? (
           <LinkGameStep />
+        ) : postStep === 'select' || activeGames.length === 0 ? (
+          <GameSelectStep
+            initialSelected={activeGames}
+            onDone={() => setPostStep('link')}
+          />
         ) : (
           <PostAuthRedirect />
         )}
@@ -583,7 +594,27 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Onboarding step 3: link a game to start playing. */
+/** Post-profile step: pick your games (the play set that gates the whole app).
+ * Production context — only Chess is selectable until the other games launch. */
+function GameSelectStep({
+  initialSelected,
+  onDone,
+}: {
+  initialSelected: string[];
+  onDone: () => void;
+}) {
+  const setGames = useSetActiveGames();
+  return (
+    <GameSelectOverlay
+      context="production"
+      initialSelected={initialSelected}
+      busy={setGames.isPending}
+      onConfirm={(games) => setGames.mutate(games, { onSuccess: onDone })}
+    />
+  );
+}
+
+/** Onboarding step: link a game to start playing. */
 function LinkGameStep() {
   const navigate = useNavigate();
   return (
@@ -593,7 +624,7 @@ function LinkGameStep() {
         subtitle="Connect an account to start playing, or do it later from your profile."
       />
       <div className="mt-6">
-        <LinkGames onlyActive />
+        <LinkGames onlyActive context="production" />
       </div>
       <div className="mt-8">
         <PillButton variant="primary" fullWidth onClick={() => navigate('/play')}>
