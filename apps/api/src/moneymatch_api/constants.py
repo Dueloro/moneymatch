@@ -452,7 +452,8 @@ METRIC_LABELS: dict[str, str] = {
     "chess_wins": "Total wins",
     "chess_fastest_win": "Fastest win",
     "cs2_kd_ratio": "K/D ratio",
-    "cs2_adr": "ADR",
+    # `cs2_adr` intentionally absent — retired with the FACEIT adapter (migration
+    # 0024); ADR needs a parsed demo the Game Coordinator scoreboard lacks.
     "cs2_headshot_pct": "Headshot %",
     "cs2_kills": "Kills",
     "dota2_kda_ratio": "KDA ratio",
