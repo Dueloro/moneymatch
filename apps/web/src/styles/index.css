@@ -46,6 +46,13 @@
     0 16px 48px -24px rgb(0 0 0 / 0.85), 0 2px 8px -2px rgb(0 0 0 / 0.45);
 
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Motion: two durations and one easing, so interactive feedback stays in the
+   * sub-300ms band (emilkowal.ski/ui/you-dont-need-animations) instead of each
+   * call site picking its own. Frequent/interactive → fast; entrances → base. */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 html,
@@ -157,6 +164,33 @@ body {
 .is-selected {
   border-color: var(--line-strong) !important;
   background-color: var(--panel-raised);
+}
+
+/* --- Moderate "arena" gaming cues. Structural, not colourful: they never
+ * introduce a hue that competes with money (lime), live (cyan) or focus (blue).
+ * --- */
+
+/* A faint grid, the contest-surface texture. Sits under content on hero panels
+ * (sign-in, the play/pools side rail, the wallet header). Kept low-contrast so
+ * it reads as material, not as a chart. */
+.mm-grid-surface {
+  background-image:
+    linear-gradient(to right, rgba(51, 57, 69, 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(51, 57, 69, 0.22) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* A restrained halo for the single loudest CTA on a screen (Find match, Join
+ * pool). Paper-coloured so it never masquerades as money or a live state; only
+ * on hover, only for a pointer, and gone under reduced motion via the global
+ * transition kill-switch. */
+.mm-glow {
+  transition: box-shadow var(--dur-base) var(--ease-standard);
+}
+.mm-glow:hover:not(:disabled) {
+  box-shadow:
+    0 0 0 1px rgba(242, 245, 239, 0.12),
+    0 10px 30px -12px rgba(242, 245, 239, 0.28);
 }
 
 /* Marquee crawl for the live ticker. Content is duplicated, so -50% loops. */

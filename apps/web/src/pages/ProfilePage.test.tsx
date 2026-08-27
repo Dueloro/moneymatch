@@ -158,10 +158,14 @@ describe('ProfilePage', () => {
   it('runs the link flow for an unlinked game', () => {
     renderWithProviders(<ProfilePage />);
     fireEvent.click(screen.getByRole('button', { name: 'Link' }));
-    fireEvent.change(screen.getByPlaceholderText('Your username'), {
+    fireEvent.change(screen.getByPlaceholderText('Your Lichess username'), {
       target: { value: 'magnus' },
     });
+    // First click shows the permanent-link confirmation.
     fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    expect(screen.getByText(/permanently links/)).toBeInTheDocument();
+    // Second click confirms and triggers the mutation.
+    fireEvent.click(screen.getByRole('button', { name: 'Link account' }));
     expect(createMutate).toHaveBeenCalledWith(
       { game: 'chess.lichess', username: 'magnus' },
       expect.anything(),

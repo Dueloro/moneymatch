@@ -5,6 +5,7 @@ import { FriendsPanel } from '../components/FriendsPanel';
 import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { SubTabs } from '../components/ui/SubTabs';
 import { useInboxUnread } from '../hooks/useChat';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { InboxPage } from './InboxPage';
 
 type SocialTab = 'inbox' | 'leaderboard' | 'friends';
@@ -16,6 +17,7 @@ const TABS: SocialTab[] = ['inbox', 'leaderboard', 'friends'];
  * deep-links here via `?tab=inbox`; Friends' Message button adds
  * `&dm=<user_id>` to land in a specific thread. */
 export function SocialPage() {
+  usePageTitle('Social');
   const [params] = useSearchParams();
   const initial = params.get('tab');
   const [tab, setTab] = useState<SocialTab>(

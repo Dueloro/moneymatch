@@ -13,6 +13,7 @@ import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
 import { GameTabs } from '../components/ui/GameTabs';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
@@ -37,6 +38,7 @@ const POOL_CAPACITY = 4;
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'];
 
 export function PoolsPage() {
+  usePageTitle('Solo pools');
   const { isDemo } = useAuth();
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
@@ -240,6 +242,7 @@ export function PoolsPage() {
                         entryOptions={presets}
                         payoutFor={(entry) => estPrize(entry, c.est_multiplier_bps)}
                         payoutLabel="Est. win"
+                        feeNote="10% platform fee on winnings"
                         capacity={POOL_CAPACITY}
                         filled={isDemo ? filledSpots(key, POOL_CAPACITY) : undefined}
                         buttonLabel="Join pool"

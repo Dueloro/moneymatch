@@ -22,13 +22,14 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
@@ -61,6 +62,7 @@ from . import (
     limits_service,
     linking_service,
     matchmaking,
+    metric_models_service,
     money_math,
     notifications_service,
     pairing,
@@ -101,10 +103,6 @@ class PoolGrade:
     raw_payload_id: uuid.UUID | None = None
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 # --------------------------------------------------------------------------- #
 # Eligibility + baselines.
 # --------------------------------------------------------------------------- #
@@ -132,18 +130,6 @@ def _validate_bucket(game: str, metric: str, difficulty: str, entry_cents: int) 
             status_code=422,
             detail={"allowed": list(ENTRY_PRESETS_CENTS)},
         )
-
-
-async def _metric_model(
-    session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
-) -> MetricModel | None:
-    return await session.scalar(
-        select(MetricModel).where(
-            MetricModel.user_id == user_id,
-            MetricModel.game == game,
-            MetricModel.metric == metric,
-        )
-    )
 
 
 async def _require_link(
@@ -196,7 +182,7 @@ async def preview_bars(
 ) -> dict[str, Any]:
     """The three difficulty bars quoted from the viewer's own baseline + the
     disclosed clear rates. Provisional metrics return no bars (can't duel)."""
-    model = await _metric_model(session, user.id, game, metric)
+    model = await metric_models_service.get_metric_model(session, user.id, game, metric)
     n = model.n if model else 0
     provisional = n < STAT_BASELINE_MIN_N
     shape = _shape(metric)
@@ -241,7 +227,7 @@ async def _build_baseline(
     link: LinkedAccount,
 ) -> tuple[dict[str, Any], float]:
     """Freeze the metric model + host id, compute the personal bar for `difficulty`."""
-    model = await _metric_model(session, user.id, game, metric)
+    model = await metric_models_service.get_metric_model(session, user.id, game, metric)
     if model is None or model.n < STAT_BASELINE_MIN_N:
         raise PoolError(
             "no_stat_baseline",
@@ -552,7 +538,7 @@ async def enqueue(
     entry_cents: int,
 ) -> PoolEnqueueResult:
     """Enter a pool (enqueue). Gates run in order; escrow waits for formation."""
-    now = _now()
+    now = clock.now()
     _validate_bucket(game, metric, difficulty, entry_cents)
 
     flags = await get_boolean_flags(session)
@@ -620,7 +606,7 @@ async def enqueue(
 async def poll_status(session: AsyncSession, user: User) -> PoolEnqueueResult:
     """Where the viewer stands: in a formed room, still searching (retry a pass),
     or idle."""
-    now = _now()
+    now = clock.now()
     existing = await _current_pool_for_user(session, user.id)
     if existing is not None:
         return PoolEnqueueResult(status="formed", pool=existing)
@@ -769,7 +755,7 @@ async def settle_pool(
         pool.rake_cents = split.rake_cents
 
     pool.state = "SETTLED"
-    pool.resolved_at = _now()
+    pool.resolved_at = clock.now()
     await session.flush()
     await _assert_reconciled(session, pool)
     log.info(
@@ -804,7 +790,7 @@ async def cancel_pool(
     pool.rake_cents = 0
     pool.state = "CANCELED"
     pool.outcome_detail = {"reason": reason}
-    pool.resolved_at = _now()
+    pool.resolved_at = clock.now()
     await session.flush()
     await _assert_reconciled(session, pool)
     return pool

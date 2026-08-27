@@ -7,13 +7,13 @@ the window, final at settle). No endpoint accepts a score, rank, or payout.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     STAT_BASELINE_MIN_N,
@@ -48,10 +48,6 @@ from ..services import (
 from ..services.tournament_engine import TournamentEnqueueResult
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
@@ -155,7 +151,7 @@ async def _status_view(
             status="formed", tournament=await _view(session, result.tournament, user)
         )
     if result.status == "searching" and result.ticket is not None:
-        waited = int((_now() - result.ticket.created_at).total_seconds())
+        waited = int((clock.now() - result.ticket.created_at).total_seconds())
         return TournamentStatusResponse(
             status="searching", metric=result.ticket.market, waited_seconds=waited
         )

@@ -13,6 +13,7 @@ import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { dashless, formatCurrency } from '../lib/format';
@@ -46,6 +47,7 @@ function defaultSpeed(market: MarketRow): string | undefined {
 const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
 export function PlayPage() {
+  usePageTitle('Head to head');
   const { games, selected: game, select: setGame } = useGameSelection();
   // Coming-soon games have no markets endpoint, so don't fetch for them.
   const playableGame = game && !isComingSoon(game) ? game : undefined;
@@ -80,6 +82,7 @@ export function PlayPage() {
   const take = useTakeWaiting();
 
   const [marketFilter, setMarketFilter] = useState<string>(ALL);
+  const [speedByMarket, setSpeedByMarket] = useState<Record<string, string>>({});
 
   const selectGame = games.find((g) => g.game === game);
   const linked = markets?.linked ?? false;
@@ -192,20 +195,27 @@ export function PlayPage() {
               {hasResults ? (
                 <CardGrid count={filteredMarkets.length}>
                   {filteredMarkets.map((m) => {
-                    const speed = defaultSpeed(m);
+                    const speed = speedByMarket[m.key] ?? defaultSpeed(m);
                     const key = `${game}:${m.key}:${speed ?? ''}`;
                     return (
                       <WagerCard
                         key={key}
                         gameName={meta?.name ?? 'Game'}
-                        tag={speed ? speed.toUpperCase() : undefined}
+                        tag={speed?.toUpperCase()}
                         title={m.label}
                         subtitle={marketHeadline(m)}
+                        speedOptions={m.requires_speed ? m.speeds : undefined}
+                        selectedSpeed={speed}
+                        onSpeedChange={
+                          m.requires_speed
+                            ? (s) =>
+                                setSpeedByMarket((prev) => ({ ...prev, [m.key]: s }))
+                            : undefined
+                        }
                         entryOptions={presets}
                         payoutFor={(entry) => prizeForEntry(entry, m.multiplier_bps)}
                         payoutLabel="You win"
                         capacity={2}
-                        filled={1}
                         oneVsOne
                         buttonLabel="Find match"
                         joining={join.isPending}

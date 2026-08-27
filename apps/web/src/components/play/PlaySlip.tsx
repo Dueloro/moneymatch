@@ -263,6 +263,17 @@ function GoPlay({ match }: { match: MatchView }) {
       </div>
     );
   }
+  if (match.brokered) {
+    return (
+      <div className="mt-5 rounded-inset bg-bg p-3">
+        <p className="text-sm font-medium text-text">Game link unavailable</p>
+        <p className="mt-1 text-xs text-text-secondary">
+          Your entry is held safely — the link should arrive shortly. Contact support
+          with your match ID if this persists.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="mt-5 rounded-inset bg-bg p-3">
       <p className="text-sm font-medium text-text">Play your next match now</p>

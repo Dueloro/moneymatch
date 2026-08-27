@@ -20,12 +20,13 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import structlog
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from .. import clock
 from ..adapters import registry
 from ..constants import (
     FLAG_NIGHTLY_LAST_RUN,
@@ -93,10 +94,6 @@ class CycleReport:
     live_refreshed: int = 0
     expired_challenges: int = 0
     paused: bool = False
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def _flag(session: AsyncSession, key: str) -> bool:
@@ -369,6 +366,12 @@ async def _sync_share_chains(
 
     Never fatal to a cycle. Valve being slow must not stop pools and matches
     from settling out of history that is already stored.
+
+    **The one non-game-agnostic call in the worker, left as-is on purpose.**
+    Generalizing this into an adapter ``pre_cycle_hook()`` only pays off once a
+    second title needs a similar periodic intake loop; until then it would be a
+    speculative abstraction with no second caller. Documented as a deliberate
+    seam in docs/agent-handoff.md — revisit only when a new game needs it.
     """
     from ..services import cs2_chain
 
@@ -653,7 +656,7 @@ async def run_cycle(
 ) -> CycleReport:
     """One full worker pass. Returns a report (used by tests + ops logging)."""
     sm = sm or get_sessionmaker()
-    now = now or _now()
+    now = now or clock.now()
     report = CycleReport()
 
     # Liveness first — the worker is alive even when settlement is paused, so the
@@ -718,7 +721,7 @@ async def maybe_run_nightly(
     """Run the nightly pass if due, then stamp the last-run flag. Returns whether
     it ran. Lives in the loop (not `run_cycle`) so the money cycle stays untouched
     and its tests are unaffected."""
-    now = now or _now()
+    now = now or clock.now()
     if not await _nightly_due(sm, now):
         return False
     from .nightly import run_nightly
@@ -745,7 +748,7 @@ async def _bootstrap_pending_models(
 
     Lives in `run_forever` (not `run_cycle`) so the money cycle and its tests are
     untouched, same posture as `maybe_run_nightly`."""
-    now = now or _now()
+    now = now or clock.now()
     deferred = _deferred_bootstrap_games()
     if not deferred:
         return 0

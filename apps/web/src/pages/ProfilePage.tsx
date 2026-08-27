@@ -4,14 +4,17 @@ import { useAuth } from '../auth/useAuth';
 import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
+import { ErrorState } from '../components/ui/ErrorState';
+import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useResetDemo } from '../hooks/useResetDemo';
 import { formatCurrency } from '../lib/format';
-import { disablePush, enablePush, isPushSupported, isSubscribed } from '../lib/push';
 
 export function ProfilePage() {
+  usePageTitle('Profile');
   const { signOut, isDemo } = useAuth();
   const me = useMe();
   const selfExclude = useSelfExclude();
@@ -20,6 +23,21 @@ export function ProfilePage() {
   const user = me.data?.user;
   const limits = me.data?.limits;
   const excluded = user?.status === 'self_excluded';
+  const showCs2 = (user?.active_games ?? []).includes('cs2.steam');
+
+  if (me.isLoading) return <Loader />;
+  if (me.isError || !user) {
+    return (
+      <div className="max-w-read">
+        <SectionHeader level="page">Profile</SectionHeader>
+        <ErrorState
+          title="Couldn't load your profile"
+          subline="We couldn't reach your account just now."
+          onRetry={() => void me.refetch()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-read">
@@ -47,16 +65,14 @@ export function ProfilePage() {
         <LinkGames />
       </Section>
 
-      {/* Right under the place you connect Steam, because that is the next
-       * thing you do: CS2 has no per-match stats API, so a match only becomes
-       * a settled wager once its share code is pasted. Also on Activity, which
-       * is where you land after playing. */}
-      <Section title="Counter-Strike 2">
-        <p className="mb-3 text-sm text-text-secondary">
-          Connect Steam and your matches settle your wagers automatically.
-        </p>
-        <Cs2SetupCard />
-      </Section>
+      {showCs2 && (
+        <Section title="Counter-Strike 2">
+          <p className="mb-3 text-sm text-text-secondary">
+            Connect Steam and your matches settle your wagers automatically.
+          </p>
+          <Cs2SetupCard />
+        </Section>
+      )}
 
       {isDemo && (
         <Section title="Test with real accounts">
@@ -74,10 +90,6 @@ export function ProfilePage() {
         ) : (
           <p className="text-sm text-text-tertiary">Not set</p>
         )}
-      </Section>
-
-      <Section title="Notifications">
-        <PushToggle />
       </Section>
 
       {!isDemo && (
@@ -317,62 +329,6 @@ function ChangePassword() {
         </PillButton>
       </div>
     </form>
-  );
-}
-
-/** Enable/disable browser push notifications (match found, settled, disputes…). */
-function PushToggle() {
-  const supported = isPushSupported();
-  const [on, setOn] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (supported) void isSubscribed().then(setOn);
-  }, [supported]);
-
-  if (!supported) {
-    return (
-      <p className="text-sm text-text-secondary">
-        This browser doesn't support push notifications.
-      </p>
-    );
-  }
-
-  const toggle = async () => {
-    setError(null);
-    setBusy(true);
-    try {
-      if (on) {
-        await disablePush();
-        setOn(false);
-      } else {
-        const ok = await enablePush();
-        setOn(ok);
-        if (!ok) setError('Notifications are blocked or unavailable.');
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm text-text-secondary">
-        Get a push when your match is found, a contest settles, or a dispute updates.
-      </p>
-      <div className="flex items-center gap-3">
-        <PillButton
-          variant={on ? 'outline' : 'primary'}
-          onClick={() => void toggle()}
-          disabled={busy}
-        >
-          {busy ? 'Working…' : on ? 'Turn off notifications' : 'Enable notifications'}
-        </PillButton>
-        {on && <span className="text-sm text-live">On</span>}
-        {error && <span className="text-sm text-red">{error}</span>}
-      </div>
-    </div>
   );
 }
 

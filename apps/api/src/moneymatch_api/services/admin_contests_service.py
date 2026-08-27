@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..errors import APIError
 from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
@@ -69,10 +70,6 @@ class ContestDetail:
     ledger: list[dict[str, Any]] = field(default_factory=list)
     platform_ledger: list[dict[str, Any]] = field(default_factory=list)
     reconciliation: dict[str, Any] = field(default_factory=dict)
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 async def list_contests(
@@ -397,7 +394,7 @@ async def resettle_match(
         raise ContestActionError("contest_not_found", "No such match.", status_code=404)
     if is_terminal(match.state):
         return match.state  # nothing to do; idempotent
-    return await settlement_worker.resolve_match(session, match, now or _now())
+    return await settlement_worker.resolve_match(session, match, now or clock.now())
 
 
 async def void_match(

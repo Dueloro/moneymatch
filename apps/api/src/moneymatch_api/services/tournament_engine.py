@@ -20,13 +20,14 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
@@ -47,7 +48,6 @@ from ..constants import (
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
 from ..models.play import QueueTicket
-from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from . import (
@@ -57,6 +57,7 @@ from . import (
     limits_service,
     linking_service,
     matchmaking,
+    metric_models_service,
     money_math,
     notifications_service,
     pairing,
@@ -101,10 +102,6 @@ class TournamentGrade:
     raw_payload_id: uuid.UUID | None = None
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 def _mu(ticket: QueueTicket) -> float:
     return float(ticket.baseline_snapshot["mu"])
 
@@ -134,18 +131,6 @@ def _validate_bucket(game: str, metric: str, entry_cents: int) -> None:
             status_code=422,
             detail={"allowed": list(ENTRY_PRESETS_CENTS)},
         )
-
-
-async def _metric_model(
-    session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
-) -> MetricModel | None:
-    return await session.scalar(
-        select(MetricModel).where(
-            MetricModel.user_id == user_id,
-            MetricModel.game == game,
-            MetricModel.metric == metric,
-        )
-    )
 
 
 async def _require_link(
@@ -192,7 +177,7 @@ async def _build_baseline(
             "n": 1,
         }
 
-    model = await _metric_model(session, user.id, game, metric)
+    model = await metric_models_service.get_metric_model(session, user.id, game, metric)
     if model is None or model.n < STAT_BASELINE_MIN_N:
         raise TournamentError(
             "no_stat_baseline",
@@ -448,7 +433,7 @@ async def enqueue(
     entry_cents: int,
 ) -> TournamentEnqueueResult:
     """Enter a tournament (enqueue). Gates in order; escrow at field formation."""
-    now = _now()
+    now = clock.now()
     _validate_bucket(game, metric, entry_cents)
 
     flags = await get_boolean_flags(session)
@@ -488,7 +473,7 @@ async def enqueue(
 
 
 async def poll_status(session: AsyncSession, user: User) -> TournamentEnqueueResult:
-    now = _now()
+    now = clock.now()
     existing = await _current_tournament_for_user(session, user.id)
     if existing is not None:
         return TournamentEnqueueResult(status="formed", tournament=existing)
@@ -701,7 +686,7 @@ async def settle_tournament(
     tournament.prize_cents = sum(split.payouts_cents)
     tournament.rake_cents = split.rake_cents
     tournament.state = "SETTLED"
-    tournament.resolved_at = _now()
+    tournament.resolved_at = clock.now()
     await session.flush()
     await _assert_reconciled(session, tournament)
     log.info(
@@ -733,7 +718,7 @@ async def _cancel(
     tournament.rake_cents = 0
     tournament.state = "CANCELED"
     tournament.outcome_detail = {"reason": reason}
-    tournament.resolved_at = _now()
+    tournament.resolved_at = clock.now()
     await session.flush()
     await _assert_reconciled(session, tournament)
     return tournament

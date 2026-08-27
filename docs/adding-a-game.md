@@ -38,6 +38,52 @@ default to "not supported".
 - **`ProfileSnapshot`** — the normalized profile (`schemas/profile.py`) rendered on
   Profile and used for skill bracketing.
 
+### The data contract, field by field
+
+This is the exact surface shared code depends on (`adapters/base.py`). An adapter
+that fills these correctly needs no changes anywhere else; one that gets a field's
+_meaning_ wrong (e.g. `won=True` on a draw) corrupts grading silently. Get these
+right.
+
+**`NormGame`** — one finished game.
+
+| Field | Type | Contract |
+| --- | --- | --- |
+| `id` | `str` | Host's stable match id. Must be unique per game; settlement dedupes on it. |
+| `speed` | `str` | Time-control / mode bucket (e.g. `bullet`, `blitz`). Used for market filtering. |
+| `rated` | `bool` | Was it a ranked/rated game? Unrated games are filtered out where a market requires rated. |
+| `created_at_ms` | `int` | Finish time, epoch **milliseconds**. Drives the `since_ms` cursor and window checks. |
+| `moves` | `int` | Full moves played (chess). `0` when not applicable. |
+| `won` | `bool \| None` | `True`/`False` for the **linked user**; `None` if unknown or a draw. Never infer a win. |
+| `drawn` | `bool` | `True` if the game was drawn. `won` must be `None` when `drawn` is `True`. |
+| `metrics` | `dict[str, float]` | **Rate** stats only (K/D, ADR, HS%, KDA, GPM). Keys are the metric ids in `constants.py`. Never raw totals, never self-reported. |
+
+**`TelemetrySample`** — per-match telemetry for solo/pool grading.
+
+| Field | Type | Contract |
+| --- | --- | --- |
+| `game` | `str` | The game id this sample is for. |
+| `metrics` | `dict[str, float]` | Rate metrics only, keyed as in `constants.py`. This is what a pool bar is graded against. |
+
+**`GameFilters`** — passed into `poll_eligible_games` to scope the fetch.
+
+| Field | Type | Contract |
+| --- | --- | --- |
+| `speed` | `str \| None` | Single speed to restrict to, or `None` for any. |
+| `rated_only` | `bool` | Default `True` — only rated games count toward money contests. |
+| `speeds` | `set[str]` | Allowed speed set when more than one qualifies. |
+
+**Adapter flags** (`GameAdapter` class attributes):
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `brokered` | `False` | Platform can create the match itself (vs. settle on a shared host match). |
+| `defer_bootstrap` | `False` | `True` ⇒ do **not** bootstrap metric models inline at link (host too rate-limited); the worker bootstraps out-of-band. |
+
+Invariants to preserve: `metrics` are **rate-based only**; `won`/`drawn` are
+consistent (a draw is `won=None, drawn=True`); timestamps are epoch ms; nothing
+host-specific escapes the adapter.
+
 ## Steps
 
 1. **Study a live adapter.** `chess_lichess.py` is the brokered reference (open

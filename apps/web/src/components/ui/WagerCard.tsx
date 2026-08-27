@@ -36,6 +36,10 @@ export function WagerCard({
   capacity,
   filled,
   oneVsOne = false,
+  feeNote,
+  speedOptions,
+  selectedSpeed,
+  onSpeedChange,
   buttonLabel,
   onJoin,
   disabled = false,
@@ -73,6 +77,12 @@ export function WagerCard({
    * real roster to read, so no fabricated count is shown. */
   filled?: number;
   oneVsOne?: boolean;
+  /** Optional fee disclosure shown below the payout (e.g. "10% platform fee"). */
+  feeNote?: string;
+  /** Speed options for speed-gated markets (chess). Shows a picker if > 1. */
+  speedOptions?: string[];
+  selectedSpeed?: string;
+  onSpeedChange?: (speed: string) => void;
   buttonLabel: string;
   onJoin: (entryCents: number) => void;
   disabled?: boolean;
@@ -123,6 +133,29 @@ export function WagerCard({
         subtitle && <p className="mt-3 text-sm text-text-secondary">{subtitle}</p>
       )}
 
+      {speedOptions && speedOptions.length > 1 && selectedSpeed && onSpeedChange && (
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-xs text-text-secondary">Speed</span>
+          <div className="flex flex-wrap gap-1">
+            {speedOptions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => onSpeedChange(s)}
+                className={[
+                  'rounded-pill px-2 py-0.5 text-xs font-medium capitalize transition',
+                  selectedSpeed === s
+                    ? 'bg-action text-bg'
+                    : 'bg-panel-raised text-text-secondary hover:text-text',
+                ].join(' ')}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-5">
         <p className="label-money mb-2">Entry</p>
         <Segmented
@@ -143,6 +176,7 @@ export function WagerCard({
           <p className="text-lg font-semibold text-green">
             {formatCurrency(payoutFor(selected))}
           </p>
+          {feeNote && <p className="mt-0.5 text-xs text-text-secondary">{feeNote}</p>}
         </div>
         {(oneVsOne || filled != null) && (
           <p className="text-xs text-text-tertiary">
@@ -157,6 +191,7 @@ export function WagerCard({
           // the amount is on the button, and the commitment is the whole point.
           <div className="flex flex-col gap-2">
             <PillButton
+              className="mm-glow"
               fullWidth
               size="lg"
               disabled={joining}
@@ -179,6 +214,7 @@ export function WagerCard({
           </div>
         ) : (
           <PillButton
+            className="mm-glow"
             fullWidth
             size="lg"
             disabled={disabled || joining}

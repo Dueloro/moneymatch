@@ -113,13 +113,24 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
 }
 
 /** A labelled fact chip used in the pool/tournament expanded view. */
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="rounded-inset bg-panel-raised px-3 py-2">
       <div className="text-micro uppercase tracking-wide text-text-secondary">
         {label}
       </div>
-      <div className="text-sm font-medium text-text">{value}</div>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm font-medium text-text underline hover:text-text-secondary"
+        >
+          {value}
+        </a>
+      ) : (
+        <div className="text-sm font-medium text-text">{value}</div>
+      )}
     </div>
   );
 }
@@ -149,7 +160,15 @@ function DetailBody({ item }: { item: ActivityItem }) {
             <Fact label="Prize" value={formatCurrency(d.prize_cents)} />
           ) : null}
           {d.host_game_id && !d.host_game_id.startsWith('demo-') ? (
-            <Fact label="Match id" value={d.host_game_id} />
+            <Fact
+              label="Match id"
+              value={d.host_game_id}
+              href={
+                item.game.startsWith('chess.')
+                  ? `https://lichess.org/${d.host_game_id}`
+                  : undefined
+              }
+            />
           ) : null}
         </div>
       </div>

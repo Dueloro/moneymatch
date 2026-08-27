@@ -24,11 +24,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import case, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import LEADERBOARD_MIN_CONTESTS, LEADERBOARD_WINDOW_DAYS
 from ..models.user import User
 from ..models.wallet import LedgerEntry, Wallet
@@ -66,14 +67,10 @@ class Leaderboard:
     min_contests: int
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 async def compute(
     session: AsyncSession, viewer: User, *, now: datetime | None = None
 ) -> Leaderboard:
-    now = now or _now()
+    now = now or clock.now()
     since = now - timedelta(days=LEADERBOARD_WINDOW_DAYS)
 
     # Windowed contest ledger, one aggregate row per real user.
