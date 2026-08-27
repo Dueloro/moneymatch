@@ -5,10 +5,11 @@ import { renderWithProviders } from '../test/testUtils';
 import { PlayPage } from './PlayPage';
 
 vi.mock('../hooks/useLinks', () => ({ useLinks: vi.fn() }));
-// useGameSelection reads the play set from /me; empty → the switcher falls back
-// to every game, which is what these fixtures expect.
+// useGameSelection reads the play set from /me. Gating is fail-closed: an empty
+// set now falls back to Chess only, so these CS2 fixtures set an explicit play
+// set of ['cs2.steam'] — how a real CS2 player is configured after the backfill.
 vi.mock('../hooks/useMe', () => ({
-  useMe: () => ({ data: { user: { active_games: [] } } }),
+  useMe: () => ({ data: { user: { active_games: ['cs2.steam'] } } }),
 }));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({

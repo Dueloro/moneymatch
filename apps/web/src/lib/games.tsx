@@ -127,3 +127,102 @@ const COMING_SOON_GAMES = new Set<string>([]);
 export function isComingSoon(id: string): boolean {
   return COMING_SOON_GAMES.has(id);
 }
+
+// --------------------------------------------------------------------------- //
+// Game-select onboarding config — the ONE table driving the selection overlay,
+// app-wide gating, and Profile add-back, in both demo and production.
+//
+// Demo vs. prod is a *context*, not a fork in the UI: every surface reads this
+// table and its own context, so flipping a game from prod-locked to prod-live is
+// a one-line change here (move its `production` row from OFF to ON). Nothing else
+// changes. Availability has two axes: `selectable` (can it be toggled) and
+// `color` (full color vs. grayscale). Grayscale-but-selectable is deliberate —
+// Dota in demo keeps its "coming soon" look while still being clickable.
+// --------------------------------------------------------------------------- //
+
+export type OnboardingContext = 'demo' | 'production';
+
+export interface GameAvailability {
+  /** Clickable / toggleable in this context. */
+  selectable: boolean;
+  /** Rendered in full color (vs. grayscale). */
+  color: boolean;
+}
+
+export interface GameOnboardingConfig {
+  id: string;
+  /** Badge under the icon, or none. */
+  badge: 'BETA' | 'SOON' | null;
+  /** Pre-selected and required — cannot be deselected. Chess only. */
+  preselected: boolean;
+  demo: GameAvailability;
+  production: GameAvailability;
+}
+
+const ON: GameAvailability = { selectable: true, color: true };
+const GRAY_ON: GameAvailability = { selectable: true, color: false };
+const OFF: GameAvailability = { selectable: false, color: false };
+
+/** Display order in the overlay (Chess first — it is the launch game). */
+export const ONBOARDING_GAME_ORDER = [
+  'chess.lichess',
+  'cs2.steam',
+  'pubg.steam',
+  'dota2.opendota',
+] as const;
+
+const ONBOARDING: Record<string, GameOnboardingConfig> = {
+  'chess.lichess': {
+    id: 'chess.lichess',
+    badge: null,
+    preselected: true,
+    demo: ON,
+    production: ON,
+  },
+  'cs2.steam': {
+    id: 'cs2.steam',
+    badge: 'BETA',
+    preselected: false,
+    demo: ON,
+    production: OFF,
+  },
+  'pubg.steam': {
+    id: 'pubg.steam',
+    badge: 'BETA',
+    preselected: false,
+    demo: ON,
+    production: OFF,
+  },
+  'dota2.opendota': {
+    id: 'dota2.opendota',
+    badge: 'SOON',
+    preselected: false,
+    // Demo: clickable but keeps the muted SOON look (grayscale, selectable).
+    demo: GRAY_ON,
+    production: OFF,
+  },
+};
+
+/** The overlay's game configs, in display order. */
+export function onboardingGames(): GameOnboardingConfig[] {
+  return ONBOARDING_GAME_ORDER.map((id) => ONBOARDING[id]);
+}
+
+export function gameOnboarding(id: string): GameOnboardingConfig | undefined {
+  return ONBOARDING[id];
+}
+
+/** Availability of a game in a given context (unknown games are locked off). */
+export function availabilityFor(id: string, ctx: OnboardingContext): GameAvailability {
+  const cfg = ONBOARDING[id];
+  if (!cfg) return OFF;
+  return ctx === 'demo' ? cfg.demo : cfg.production;
+}
+
+/** Games that can be added/kept in a given context (drives Profile add-back). */
+export function selectableGames(ctx: OnboardingContext): string[] {
+  return ONBOARDING_GAME_ORDER.filter((id) => availabilityFor(id, ctx).selectable);
+}
+
+/** The brand lime used for the filled selection circle (design guidelines). */
+export const SELECT_FILL = '#c6f440';

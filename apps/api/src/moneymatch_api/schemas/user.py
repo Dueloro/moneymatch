@@ -26,6 +26,7 @@ class UserResponse(BaseModel):
     status: str
     member_since: datetime
     active_games: list[str]
+    dismissed_checklists: list[str]
 
 
 class LimitsResponse(BaseModel):
@@ -58,6 +59,8 @@ class MeResponse(BaseModel):
     limits: LimitsResponse | None = None
     unread_notifications: int = 0  # sidebar bell dot (08-phase-5)
     getting_started: GettingStarted | None = None
+    # Games the player has entered a contest for — per-game checklist progress.
+    contested_games: list[str] = Field(default_factory=list)
 
 
 class UpdateMeRequest(BaseModel):
@@ -78,10 +81,14 @@ class UpdateMeRequest(BaseModel):
     active_games: list[str] | None = Field(
         default=None, description="Catalog game ids the player has chosen to play"
     )
+    dismissed_checklists: list[str] | None = Field(
+        default=None,
+        description="Catalog game ids whose Play-tab checklist the player dismissed",
+    )
 
-    @field_validator("active_games")
+    @field_validator("active_games", "dismissed_checklists")
     @classmethod
-    def _validate_active_games(cls, v: list[str] | None) -> list[str] | None:
+    def _validate_catalog_games(cls, v: list[str] | None) -> list[str] | None:
         if v is None:
             return None
         seen: list[str] = []

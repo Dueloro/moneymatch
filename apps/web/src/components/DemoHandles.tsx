@@ -23,6 +23,11 @@ function skillBadge(link: GameLink): string | null {
  * the live adapter verifies it and the real profile + skill land. One row per
  * playable game: current handle → real-username input → Save. Rendered on Profile
  * only when `isDemo`. Not shown to real users, whose bindings are immutable.
+ *
+ * Intentionally NOT gated by `active_games`: this is a demo-only utility for
+ * binding real accounts across every game regardless of the play set (you may
+ * want to link before adding a game to your bar), so gating it would defeat its
+ * purpose.
  */
 export function DemoHandles() {
   const links = useLinks();

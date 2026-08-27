@@ -35,11 +35,15 @@ export interface Me {
     member_since: string;
     /** Catalog game ids the player has chosen to play (their "play set"). */
     active_games: string[];
+    /** Catalog game ids whose Play-tab onboarding checklist was dismissed. */
+    dismissed_checklists: string[];
   };
   needs_onboarding: boolean;
   limits: Limits | null;
   unread_notifications: number;
   getting_started: GettingStarted | null;
+  /** Games the player has entered a contest for (per-game checklist progress). */
+  contested_games: string[];
 }
 
 /** Fetches `/me` once the user is authenticated. Provisions the row server-side. */
@@ -83,6 +87,26 @@ export function useSetActiveGames() {
         body: { active_games: games },
       });
       if (error) throw new Error('Could not save your games');
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['me', session?.user.id] }),
+  });
+}
+
+/**
+ * Set the games whose Play-tab checklist is dismissed. Sends the full list (like
+ * `useSetActiveGames`); the server validates and dedupes. Server-side so a
+ * dismissal survives reload and follows the player across devices. Refreshes
+ * `/me` so the checklist section updates immediately.
+ */
+export function useSetDismissedChecklists() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: async (games: string[]): Promise<void> => {
+      const { error } = await api.PATCH('/api/v1/me', {
+        body: { dismissed_checklists: games },
+      });
+      if (error) throw new Error('Could not dismiss the checklist');
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['me', session?.user.id] }),
   });

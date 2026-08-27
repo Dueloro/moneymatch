@@ -76,6 +76,9 @@ describe('ProfilePage', () => {
           role: 'user',
           status: 'active',
           member_since: new Date().toISOString(),
+          // The play set gates the Games section; a user with these linked games
+          // has them active (as the backfill guarantees).
+          active_games: ['chess.lichess', 'cs2.steam', 'dota2.opendota'],
         },
         needs_onboarding: false,
         limits: {

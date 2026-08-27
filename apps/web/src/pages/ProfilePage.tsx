@@ -62,7 +62,7 @@ export function ProfilePage() {
           Check the games you play to add them to your bar. Link an account when you're
           ready to play for real.
         </p>
-        <LinkGames />
+        <LinkGames context={isDemo ? 'demo' : 'production'} />
       </Section>
 
       {showCs2 && (

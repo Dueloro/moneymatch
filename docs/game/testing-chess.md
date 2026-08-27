@@ -169,7 +169,7 @@ Work down this list.
 | "Link your chess account" | Not linked | Profile → Games → Link |
 | "No pools on this game yet" | No metric model | Profile → Chess row → **Refresh** |
 | Still empty after refresh | No rated games to model from | Play one rated game, then Refresh again |
-| Chess missing from the game switcher | Not in your play set | Profile → Games → tick the Chess checkbox |
+| A game missing from the switcher | Not in your play set (`active_games`) | Profile → Games → add it. Chess can't go missing — it's always in the play set (pre-selected, and the fail-closed fallback when the set is empty). |
 | Join does nothing, no room forms | Signed in as a real account | Sign out, use "Skip sign-up · enter the demo" |
 | Room forms but never settles | Worker not running | `make worker` |
 | Tournament card shows no standings | Window still open | Standings refresh on a cadence; the window is 48h |
