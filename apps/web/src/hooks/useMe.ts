@@ -93,22 +93,51 @@ export function useSetActiveGames() {
 }
 
 /**
- * Set the games whose Play-tab checklist is dismissed. Sends the full list (like
- * `useSetActiveGames`); the server validates and dedupes. Server-side so a
- * dismissal survives reload and follows the player across devices. Refreshes
- * `/me` so the checklist section updates immediately.
+ * Dismiss one game's Play-tab checklist. Server-side so the dismissal survives
+ * reload and follows the player across devices (never localStorage).
+ *
+ * Two things make the X actually work, not just fire a request:
+ *
+ * 1. **Optimistic** — the card hides the instant you click, before the network
+ *    round-trip. Without this the card lingers until a PATCH *and* a `/me`
+ *    refetch both return; on a slow link that lag reads as "the X does nothing".
+ * 2. **Race-safe** — the full list PATCHed to the server is computed from the
+ *    freshest cache each time, not a value closed over at render. Dismissing a
+ *    second card before the first settles no longer drops the first dismissal
+ *    (the old code sent `[game]` built from a stale `dismissed_checklists`).
+ *
+ * On error we roll back to the pre-click snapshot; on settle we invalidate so
+ * the server stays the source of truth.
  */
 export function useSetDismissedChecklists() {
   const qc = useQueryClient();
   const { session } = useAuth();
+  const key = ['me', session?.user.id];
+  const withGame = (me: Me | undefined, game: string): string[] =>
+    Array.from(new Set([...(me?.user.dismissed_checklists ?? []), game]));
   return useMutation({
-    mutationFn: async (games: string[]): Promise<void> => {
+    mutationFn: async (game: string): Promise<void> => {
+      const next = withGame(qc.getQueryData<Me>(key), game);
       const { error } = await api.PATCH('/api/v1/me', {
-        body: { dismissed_checklists: games },
+        body: { dismissed_checklists: next },
       });
       if (error) throw new Error('Could not dismiss the checklist');
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['me', session?.user.id] }),
+    onMutate: async (game: string) => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<Me>(key);
+      if (prev) {
+        qc.setQueryData<Me>(key, {
+          ...prev,
+          user: { ...prev.user, dismissed_checklists: withGame(prev, game) },
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _game, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
   });
 }
 

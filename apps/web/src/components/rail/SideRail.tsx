@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import { useActivity, type ActivityItem } from '../../hooks/useActivity';
+import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
 import { useLeaveTournament, useTournamentStatus } from '../../hooks/useTournaments';
 import { useWallet } from '../../hooks/useWallet';
@@ -217,7 +218,10 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
   const leavePool = useLeavePool();
   const leaveTournament = useLeaveTournament();
 
-  const available = wallet?.available_cents ?? 0;
+  // Undefined (not `?? 0`) while loading, so AnimatedBalance shows a placeholder
+  // rather than flashing $0 and firing a phantom gain on refresh. Held at its
+  // pre-settlement value while a win/loss overlay is up (see useDisplayBalance).
+  const available = useDisplayBalance();
   const inPlayCents = wallet?.escrow_cents ?? 0;
 
   const searchingPool = poolStatus?.status === 'searching';

@@ -16,6 +16,22 @@ describe('AnimatedBalance', () => {
     expect(screen.queryByTestId('bal-delta')).not.toBeInTheDocument();
   });
 
+  it('shows a placeholder while the balance is still loading', () => {
+    render(<AnimatedBalance cents={undefined} testId="bal" />);
+    expect(screen.getByTestId('bal')).toHaveTextContent('—');
+    expect(screen.queryByTestId('bal-delta')).not.toBeInTheDocument();
+  });
+
+  it('does not fire a gain when the balance first loads (loading → value)', () => {
+    // The bug: 0-while-loading → real value announced a phantom "+$X" gain on
+    // every login/refresh. Loading is not a settlement, so nothing animates and
+    // the real figure renders directly (no $0 flash, no count-up from zero).
+    const { rerender } = render(<AnimatedBalance cents={undefined} testId="bal" />);
+    act(() => rerender(<AnimatedBalance cents={101_000} testId="bal" />));
+    expect(screen.queryByTestId('bal-delta')).not.toBeInTheDocument();
+    expect(screen.getByTestId('bal')).toHaveTextContent('$1,010.00');
+  });
+
   it('shows what was won when the balance rises', () => {
     const { rerender } = render(<AnimatedBalance cents={10_000} testId="bal" />);
     act(() => rerender(<AnimatedBalance cents={14_500} testId="bal" />));

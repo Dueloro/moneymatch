@@ -1,5 +1,6 @@
 import { AnimatedBalance } from './ui/AnimatedBalance';
 import { formatCurrency } from '../lib/format';
+import { useDisplayBalance } from '../hooks/useDisplayBalance';
 import { useWallet } from '../hooks/useWallet';
 
 /**
@@ -11,7 +12,10 @@ import { useWallet } from '../hooks/useWallet';
  */
 export function BalanceHeader() {
   const { data: wallet } = useWallet();
-  const available = wallet?.available_cents ?? 0;
+  // Undefined (not `?? 0`) while loading, so AnimatedBalance shows a placeholder
+  // instead of flashing $0 and animating a phantom gain on every refresh. Held
+  // at its pre-settlement value while a win/loss overlay is up (see the hook).
+  const available = useDisplayBalance();
   const inPlay = wallet?.escrow_cents ?? 0;
 
   return (

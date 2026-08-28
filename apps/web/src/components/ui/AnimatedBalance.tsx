@@ -28,6 +28,36 @@ export function AnimatedBalance({
   className = '',
   testId,
 }: {
+  /**
+   * The available balance in cents, or `undefined` until the wallet has loaded.
+   * Undefined renders a quiet placeholder and is *not* treated as a value — so a
+   * normal login or refresh (0-while-loading → real balance) no longer flashes
+   * through $0 or fires a phantom "+$X". The animating inner only mounts once a
+   * real number exists, so it seeds on the true balance and stays silent until
+   * an *actual* change (a settlement, a deposit) moves it.
+   */
+  cents: number | undefined;
+  className?: string;
+  testId?: string;
+}) {
+  if (cents == null) {
+    return (
+      <span
+        className={`tabular-nums text-text-tertiary ${className}`}
+        data-testid={testId}
+      >
+        —
+      </span>
+    );
+  }
+  return <LoadedBalance cents={cents} className={className} testId={testId} />;
+}
+
+function LoadedBalance({
+  cents,
+  className = '',
+  testId,
+}: {
   cents: number;
   className?: string;
   testId?: string;

@@ -6,6 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ActivityItem } from '../hooks/useActivity';
 import { outcomeOf } from '../hooks/useSettlementCelebration';
 import { SettlementCelebration } from './SettlementCelebration';
+import { SettlementProvider } from './SettlementProvider';
+
+// The overlay now reads the shared settlement stream from context, so tests
+// mount it inside the provider (which runs the detection hook against the
+// mocked activity above).
+function Cel() {
+  return (
+    <SettlementProvider>
+      <SettlementCelebration />
+    </SettlementProvider>
+  );
+}
 
 /**
  * Settlement is the moment the product does its job, and it used to happen
@@ -67,7 +79,7 @@ describe('SettlementCelebration', () => {
         resolved_at: '2020-01-01T00:00:00Z',
       }),
     ]);
-    render(<SettlementCelebration />);
+    render(<Cel />);
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
 
@@ -84,9 +96,9 @@ describe('SettlementCelebration', () => {
         resolved_at: new Date(Date.now() - 90_000).toISOString(),
       }),
     ]);
-    render(<SettlementCelebration />);
+    render(<Cel />);
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
-    expect(screen.getByText('YOU WIN!')).toBeInTheDocument();
+    expect(screen.getByText('You won')).toBeInTheDocument();
   });
 
   it('does not replay that result on the next visit', () => {
@@ -94,39 +106,41 @@ describe('SettlementCelebration', () => {
     setActivity([
       item({ id: 'a', state: 'SETTLED', net_cents: 2_000, resolved_at: recent }),
     ]);
-    const first = render(<SettlementCelebration />);
+    const first = render(<Cel />);
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
     first.unmount();
 
-    render(<SettlementCelebration />);
+    render(<Cel />);
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
 
   it('ignores an unannounced result that is no longer recent', () => {
-    // Coming back tomorrow should be quiet, even on a fresh browser.
+    // Coming back tomorrow should be quiet, even on a fresh browser. Sit clearly
+    // past the one-hour window (not exactly on it) so the boundary `<=` compare
+    // can't flip on sub-millisecond timing.
     setActivity([
       item({
         id: 'a',
         state: 'SETTLED',
         net_cents: 2_000,
-        resolved_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        resolved_at: new Date(Date.now() - 61 * 60 * 1000).toISOString(),
       }),
     ]);
-    render(<SettlementCelebration />);
+    render(<Cel />);
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
 
   it('announces a win when a live contest settles in your favour', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 9_000 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
-    expect(screen.getByText('YOU WIN!')).toBeInTheDocument();
+    expect(screen.getByText('You won')).toBeInTheDocument();
     // The visible figure counts up from zero; the announced text carries the
     // final amount immediately, which is the number that must be right.
     expect(screen.getByRole('status')).toHaveTextContent(/You won \$90\.00/);
@@ -134,15 +148,19 @@ describe('SettlementCelebration', () => {
 
   it('announces a loss without dressing it up as anything else', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: -2_500 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
-    expect(screen.getByText('WAGER LOST')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/You lost \$25\.00/);
+    expect(screen.getByText('You lost…')).toBeInTheDocument();
+    // A loss is stated, but the amount lost is deliberately not disclosed —
+    // not visibly and not in the announcement.
+    expect(screen.getByRole('status')).toHaveTextContent(/You lost/);
+    expect(screen.getByRole('status')).not.toHaveTextContent('$25.00');
+    expect(screen.queryByTestId('settlement-amount')).not.toBeInTheDocument();
   });
 
   // Only a win and a loss are celebrated for now. A push and a refund still
@@ -150,24 +168,24 @@ describe('SettlementCelebration', () => {
   // shown as one — they simply have no overlay yet.
   it('shows no overlay for a refund, and never calls it a loss', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'CANCELED', net_cents: 0 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
-    expect(screen.queryByText('WAGER LOST')).not.toBeInTheDocument();
+    expect(screen.queryByText('You lost…')).not.toBeInTheDocument();
   });
 
   it('shows no overlay for a push', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 0 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
@@ -185,11 +203,11 @@ describe('SettlementCelebration', () => {
 
   it('marks the outcome on the element, not only in colour', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 9_000 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     expect(screen.getByTestId('settlement-celebration')).toHaveAttribute(
@@ -201,16 +219,16 @@ describe('SettlementCelebration', () => {
   it('announces the same contest only once, even across a remount', () => {
     // A refetch, a reconnect or a page revisit must not replay a result.
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const first = render(<SettlementCelebration />);
+    const first = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 9_000 })]);
-      first.rerender(<SettlementCelebration />);
+      first.rerender(<Cel />);
     });
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
     first.unmount();
 
-    render(<SettlementCelebration />);
+    render(<Cel />);
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
 
@@ -219,7 +237,7 @@ describe('SettlementCelebration', () => {
       item({ id: 'a', state: 'LOCKED' }),
       item({ id: 'b', state: 'LOCKED' }),
     ]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([
@@ -238,7 +256,7 @@ describe('SettlementCelebration', () => {
           resolved_at: '2026-08-25T11:00:00Z',
         }),
       ]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     // The one that resolved first is shown first, regardless of list order.
@@ -255,7 +273,7 @@ describe('SettlementCelebration', () => {
       item({ id: 'a', state: 'LOCKED' }),
       item({ id: 'b', state: 'LOCKED' }),
     ]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([
@@ -274,7 +292,7 @@ describe('SettlementCelebration', () => {
           resolved_at: '2026-08-25T12:00:00Z',
         }),
       ]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     await user.click(screen.getByRole('status'));
@@ -284,11 +302,11 @@ describe('SettlementCelebration', () => {
   it('dismisses itself on a timer', () => {
     vi.useFakeTimers();
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 9_000 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
 
@@ -300,11 +318,11 @@ describe('SettlementCelebration', () => {
 
   it('announces the result to screen readers, not only in colour', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 9_000 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     const status = screen.getByRole('status');
@@ -320,11 +338,11 @@ describe('SettlementCelebration', () => {
     // being non-blocking.
     vi.useFakeTimers();
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 9_000 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
 
@@ -341,30 +359,27 @@ describe('SettlementCelebration', () => {
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
 
-  it('keeps the win and the loss visually distinguishable, not just recoloured', () => {
-    // A win erupts, a loss collapses. If they ever converge on the same
-    // sequence with a different hue, this is what should fail.
+  it('keeps the win and the loss distinguishable by more than colour', () => {
+    // A win states the amount in lime; a loss is quieter and shows no amount.
+    // If they ever converge on the same treatment, this is what should fail.
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
-    const { rerender, unmount } = render(<SettlementCelebration />);
+    const { rerender, unmount } = render(<Cel />);
     act(() => {
       setActivity([item({ id: 'a', state: 'SETTLED', net_cents: 9_000 })]);
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
-    const winHtml = screen.getByTestId('settlement-celebration').innerHTML;
+    expect(screen.getByText('You won')).toBeInTheDocument();
+    expect(screen.getByTestId('settlement-amount')).toBeInTheDocument();
     unmount();
 
     setActivity([item({ id: 'b', state: 'LOCKED' })]);
-    const second = render(<SettlementCelebration />);
+    const second = render(<Cel />);
     act(() => {
       setActivity([item({ id: 'b', state: 'SETTLED', net_cents: -2_500 })]);
-      second.rerender(<SettlementCelebration />);
+      second.rerender(<Cel />);
     });
-    const lossHtml = screen.getByTestId('settlement-celebration').innerHTML;
-
-    expect(winHtml).toContain('mm-burst');
-    expect(winHtml).not.toContain('mm-shard');
-    expect(lossHtml).toContain('mm-shard');
-    expect(lossHtml).not.toContain('mm-burst');
+    expect(screen.getByText('You lost…')).toBeInTheDocument();
+    expect(screen.queryByTestId('settlement-amount')).not.toBeInTheDocument();
   });
 });
 
@@ -417,14 +432,14 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
 
   it('holds the result until you come back, instead of spending it on an empty room', () => {
     setActivity([item({ id: 'p-away' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     background();
 
     // The worker settles and SSE pushes the refetch through to the hidden tab.
     setActivity([settled()]);
     act(() => {
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
     expect(screen.queryByTestId('settlement-celebration')).toBeNull();
 
@@ -437,18 +452,18 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
 
   it('does not burn the contest while hidden, so a later visit still shows it', () => {
     setActivity([item({ id: 'p-away' })]);
-    const first = render(<SettlementCelebration />);
+    const first = render(<Cel />);
 
     background();
     setActivity([settled()]);
     act(() => {
-      first.rerender(<SettlementCelebration />);
+      first.rerender(<Cel />);
     });
     first.unmount();
 
     // A fresh tab, reading the same persisted announced set.
     hidden = false;
-    render(<SettlementCelebration />);
+    render(<Cel />);
     expect(screen.getByTestId('settlement-celebration')).toHaveAttribute(
       'data-outcome',
       'win',
@@ -464,11 +479,11 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
     // tab is on screen, so it is shown to.
     focused = false;
     setActivity([item({ id: 'p-away' })]);
-    const { rerender } = render(<SettlementCelebration />);
+    const { rerender } = render(<Cel />);
 
     setActivity([settled()]);
     act(() => {
-      rerender(<SettlementCelebration />);
+      rerender(<Cel />);
     });
 
     expect(screen.getByTestId('settlement-celebration')).toHaveAttribute(
@@ -487,7 +502,7 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
         resolved_at: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
       }),
     ]);
-    render(<SettlementCelebration />);
+    render(<Cel />);
     expect(screen.getByTestId('settlement-celebration')).toHaveAttribute(
       'data-outcome',
       'win',
@@ -504,7 +519,7 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
       }),
     );
     setActivity(many);
-    render(<SettlementCelebration />);
+    render(<Cel />);
 
     // All nine are recorded as announced; only the last few are performed.
     const stored = JSON.parse(

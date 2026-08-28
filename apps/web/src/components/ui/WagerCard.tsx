@@ -77,8 +77,13 @@ export function WagerCard({
    * real roster to read, so no fabricated count is shown. */
   filled?: number;
   oneVsOne?: boolean;
-  /** Optional fee disclosure shown below the payout (e.g. "10% platform fee"). */
-  feeNote?: string;
+  /**
+   * Optional pre-commit fee disclosure shown below the payout, computed from the
+   * selected entry so it shows real dollars (e.g. "$2.00 platform fee"). The
+   * rake must always be visible before commit on every joinable surface
+   * (design-guidelines §8).
+   */
+  feeNote?: (entryCents: number) => string;
   /** Speed options for speed-gated markets (chess). Shows a picker if > 1. */
   speedOptions?: string[];
   selectedSpeed?: string;
@@ -176,7 +181,9 @@ export function WagerCard({
           <p className="text-lg font-semibold text-green">
             {formatCurrency(payoutFor(selected))}
           </p>
-          {feeNote && <p className="mt-0.5 text-xs text-text-secondary">{feeNote}</p>}
+          {feeNote && (
+            <p className="mt-0.5 text-xs text-text-secondary">{feeNote(selected)}</p>
+          )}
         </div>
         {(oneVsOne || filled != null) && (
           <p className="text-xs text-text-tertiary">

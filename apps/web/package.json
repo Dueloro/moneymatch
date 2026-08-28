@@ -17,6 +17,7 @@
     "@moneymatch/api-client": "workspace:*",
     "@sentry/react": "^10.66.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@tabler/icons-react": "^3.46.0",
     "@tanstack/react-query": "^5.59.0",
     "posthog-js": "^1.404.1",
     "react": "^18.3.1",

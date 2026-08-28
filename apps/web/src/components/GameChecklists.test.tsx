@@ -55,13 +55,13 @@ describe('GameChecklists — per-game Play-tab onboarding', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('dismiss X writes the game through to dismissed_checklists', async () => {
+  it('dismiss X mutates the clicked game (hook computes the full list)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<GameChecklists />);
     await user.click(
       screen.getByRole('button', { name: 'Dismiss Counter-Strike 2 checklist' }),
     );
-    expect(setDismissed).toHaveBeenCalledWith(['cs2.steam']);
+    expect(setDismissed).toHaveBeenCalledWith('cs2.steam');
   });
 
   it('marks the link step done for a linked game', () => {

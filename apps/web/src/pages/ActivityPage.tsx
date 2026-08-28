@@ -6,14 +6,12 @@ import { ActivityCard } from '../components/activity/ActivityCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PillButton } from '../components/ui/PillButton';
-import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency } from '../lib/format';
 import { toast } from '../lib/toast';
 import { useActivity, type ActivityItem } from '../hooks/useActivity';
-import { useMe } from '../hooks/useMe';
 
 /** A newly-settled contest → a one-line toast summarizing the outcome. */
 function toastFor(item: ActivityItem): string {
@@ -34,9 +32,7 @@ function toastFor(item: ActivityItem): string {
 export function ActivityPage() {
   usePageTitle('Activity');
   const { data, isLoading, isError, refetch } = useActivity();
-  const me = useMe();
   const items = useMemo(() => data?.items ?? [], [data]);
-  const showCs2 = (me.data?.user.active_games ?? []).includes('cs2.steam');
 
   // Settlement toast: track which resolved matches we've already shown, seeding
   // from the first load so we only pop for transitions that happen live.
@@ -67,13 +63,6 @@ export function ActivityPage() {
       <SectionHeader level="page" hint="Every contest you have played, newest first.">
         Activity
       </SectionHeader>
-
-      {/* CS2 share-code setup: only visible for players who have CS2 active. */}
-      {showCs2 && (
-        <div className="mb-6">
-          <Cs2SetupCard />
-        </div>
-      )}
 
       {isError ? (
         <ErrorState

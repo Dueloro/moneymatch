@@ -18,6 +18,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { dashless, formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
+import { platformFeeNote } from '../lib/rake';
 import { useGameSelection } from '../hooks/useGameSelection';
 import {
   prizeForEntry,
@@ -215,6 +216,13 @@ export function PlayPage() {
                         entryOptions={presets}
                         payoutFor={(entry) => prizeForEntry(entry, m.multiplier_bps)}
                         payoutLabel="You win"
+                        // Pot is both stakes (1v1); the fee is what the winner
+                        // doesn't take. Matches PlaySlip's confirm-step RakeLine.
+                        feeNote={(entry) =>
+                          platformFeeNote(
+                            entry * 2 - prizeForEntry(entry, m.multiplier_bps),
+                          )
+                        }
                         capacity={2}
                         oneVsOne
                         buttonLabel="Find match"

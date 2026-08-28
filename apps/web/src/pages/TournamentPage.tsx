@@ -18,6 +18,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
+import { platformFeeNote, rakeOnPot } from '../lib/rake';
 import { filledSpots } from '../lib/spots';
 import { useAuth } from '../auth/useAuth';
 import { useGameSelection } from '../hooks/useGameSelection';
@@ -181,6 +182,9 @@ export function TournamentPage() {
                     entryOptions={presets}
                     payoutFor={(entry) => entry * fieldSize}
                     payoutLabel="Pot if full"
+                    // Rake is taken off the full pot before the top places split
+                    // it (money_math.split_by_weights).
+                    feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
                     capacity={fieldSize}
                     filled={isDemo ? filledSpots(key, fieldSize) : undefined}
                     buttonLabel="Join tournament"
