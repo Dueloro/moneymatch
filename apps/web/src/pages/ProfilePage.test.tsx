@@ -158,6 +158,13 @@ describe('ProfilePage', () => {
     expect(screen.getByDisplayValue('200')).toBeInTheDocument(); // daily loss cap ($)
   });
 
+  it('renders the CS2 setup card (its one home — removed from Activity)', () => {
+    // active_games includes cs2.steam (see the shared mock), so the CS2
+    // share-code setup card belongs here on Profile.
+    renderWithProviders(<ProfilePage />);
+    expect(screen.getByTestId('cs2-setup-card')).toBeInTheDocument();
+  });
+
   it('runs the link flow for an unlinked game', () => {
     renderWithProviders(<ProfilePage />);
     fireEvent.click(screen.getByRole('button', { name: 'Link' }));

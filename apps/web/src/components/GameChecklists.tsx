@@ -59,8 +59,9 @@ export function GameChecklists() {
 
   if (cards.length === 0) return null;
 
-  const dismiss = (game: string) =>
-    setDismissed.mutate([...(user.dismissed_checklists ?? []), game]);
+  // The hook computes the full server list from the freshest cache, so we only
+  // pass the one game being dismissed (no stale-closure append here).
+  const dismiss = (game: string) => setDismissed.mutate(game);
 
   return (
     <div className="mb-6 flex flex-col gap-3">
