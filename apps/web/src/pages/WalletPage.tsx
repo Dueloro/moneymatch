@@ -8,6 +8,7 @@ import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency, formatRelativeTime } from '../lib/format';
+import { humanizeIds } from '../lib/labels';
 import {
   DEMO_DEPOSIT_PRESETS_CENTS,
   useDemoDeposit,
@@ -29,7 +30,11 @@ const ENTRY_LABELS: Record<string, string> = {
 };
 
 function ledgerLabel(entry: LedgerEntry): string {
-  return entry.memo ?? ENTRY_LABELS[entry.entry_type] ?? entry.entry_type;
+  // Memos are server free-text that embed raw metric/market ids
+  // ("chess_accuracy easy pool entry"); humanize them so no snake_case
+  // identifier reaches the player.
+  if (entry.memo) return humanizeIds(entry.memo);
+  return ENTRY_LABELS[entry.entry_type] ?? entry.entry_type;
 }
 
 /** A small semantic dot leading each ledger row: money in, fee, or hold. */

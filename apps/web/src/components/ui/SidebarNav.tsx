@@ -1,8 +1,8 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
 import { useInboxUnread } from '../../hooks/useChat';
+import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useMe } from '../../hooks/useMe';
-import { useWallet } from '../../hooks/useWallet';
 import { AnimatedBalance } from './AnimatedBalance';
 import { Badge } from './Badge';
 import { Logo } from './brand';
@@ -23,7 +23,7 @@ import { NAV, isPlayPath } from './nav';
  */
 export function SidebarNav() {
   const me = useMe();
-  const { data: wallet } = useWallet();
+  const available = useDisplayBalance();
   const unread = useInboxUnread();
   const { pathname } = useLocation();
   const username = me.data?.user.username ?? '…';
@@ -85,10 +85,7 @@ export function SidebarNav() {
         >
           <span className="label-money block">Balance</span>
           <span className="mt-0.5 block text-lg font-semibold text-green">
-            <AnimatedBalance
-              cents={wallet?.available_cents ?? 0}
-              testId="sidebar-balance"
-            />
+            <AnimatedBalance cents={available} testId="sidebar-balance" />
           </span>
         </NavLink>
         <NavLink

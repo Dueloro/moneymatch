@@ -19,6 +19,7 @@ import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { barTitle, isLowerBetter, requiresWin } from '../lib/metrics';
+import { feeOnNetWinnings, platformFeeNote } from '../lib/rake';
 import { filledSpots } from '../lib/spots';
 import { useAuth } from '../auth/useAuth';
 import { useGameSelection } from '../hooks/useGameSelection';
@@ -242,7 +243,11 @@ export function PoolsPage() {
                         entryOptions={presets}
                         payoutFor={(entry) => estPrize(entry, c.est_multiplier_bps)}
                         payoutLabel="Est. win"
-                        feeNote="10% platform fee on winnings"
+                        feeNote={(entry) =>
+                          platformFeeNote(
+                            feeOnNetWinnings(estPrize(entry, c.est_multiplier_bps)),
+                          )
+                        }
                         capacity={POOL_CAPACITY}
                         filled={isDemo ? filledSpots(key, POOL_CAPACITY) : undefined}
                         buttonLabel="Join pool"

@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 
@@ -15,6 +16,13 @@ vi.mock('../hooks/useEventStream', () => ({ useEventStream: () => {} }));
 // Same for the settlement result overlay, which reads Activity. Its own
 // behaviour is covered in SettlementCelebration.test.tsx.
 vi.mock('./SettlementCelebration', () => ({ SettlementCelebration: () => null }));
+// The settlement provider runs the Activity-diffing detection hook; the shell
+// test has no auth/query context for it, and `useDisplayBalance` only needs it
+// to report "no settlement". Pass children through and report idle.
+vi.mock('./SettlementProvider', () => ({
+  SettlementProvider: ({ children }: { children: ReactNode }) => children,
+  useSettlement: () => ({ current: null, dismiss: () => {} }),
+}));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({ data: { available_cents: 100_800, escrow_cents: 0 } }),
 }));

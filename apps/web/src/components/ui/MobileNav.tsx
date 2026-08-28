@@ -1,8 +1,8 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
 import { useInboxUnread } from '../../hooks/useChat';
+import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useMe } from '../../hooks/useMe';
-import { useWallet } from '../../hooks/useWallet';
 import { AnimatedBalance } from './AnimatedBalance';
 import { Badge, BadgeDot } from './Badge';
 import { Logo } from './brand';
@@ -16,7 +16,7 @@ import { NAV, isPlayPath } from './nav';
  */
 export function MobileTopBar() {
   const me = useMe();
-  const { data: wallet } = useWallet();
+  const available = useDisplayBalance();
   const unread = useInboxUnread();
   const username = me.data?.user.username ?? '…';
 
@@ -28,10 +28,7 @@ export function MobileTopBar() {
           to="/wallet"
           className="rounded-pill bg-panel px-3 py-1.5 text-xs font-semibold text-green"
         >
-          <AnimatedBalance
-            cents={wallet?.available_cents ?? 0}
-            testId="mobile-balance"
-          />
+          <AnimatedBalance cents={available} testId="mobile-balance" />
         </NavLink>
         <NavLink
           to="/social?tab=inbox"
