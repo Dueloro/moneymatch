@@ -153,7 +153,12 @@ export interface GameOnboardingConfig {
   id: string;
   /** Badge under the icon, or none. */
   badge: 'BETA' | 'SOON' | null;
-  /** Pre-selected and required — cannot be deselected. Chess only. */
+  /**
+   * Checked by default in the onboarding overlay (a sensible starting choice —
+   * Chess, the launch game). This is a DEFAULT, not a lock: the user can
+   * deselect it. The Profile link surface still treats it as "always on" (a
+   * user keeps at least their launch game linkable); the overlay does not.
+   */
   preselected: boolean;
   demo: GameAvailability;
   production: GameAvailability;
@@ -179,19 +184,23 @@ const ONBOARDING: Record<string, GameOnboardingConfig> = {
     demo: ON,
     production: ON,
   },
+  // CS2 / PUBG are BETA: selectable and full-color in BOTH contexts so the
+  // onboarding overlay presents them as real, choosable tiles (not greyed-out).
+  // Production commitment is still gated — see `isBetaGated` — so a user can pick
+  // them and be told they need a beta invite, rather than the tile looking dead.
   'cs2.steam': {
     id: 'cs2.steam',
     badge: 'BETA',
     preselected: false,
     demo: ON,
-    production: OFF,
+    production: ON,
   },
   'pubg.steam': {
     id: 'pubg.steam',
     badge: 'BETA',
     preselected: false,
     demo: ON,
-    production: OFF,
+    production: ON,
   },
   'dota2.opendota': {
     id: 'dota2.opendota',
@@ -222,6 +231,37 @@ export function availabilityFor(id: string, ctx: OnboardingContext): GameAvailab
 /** Games that can be added/kept in a given context (drives Profile add-back). */
 export function selectableGames(ctx: OnboardingContext): string[] {
   return ONBOARDING_GAME_ORDER.filter((id) => availabilityFor(id, ctx).selectable);
+}
+
+/**
+ * Whether the current user has invite-only beta access to BETA games (CS2/PUBG)
+ * in production.
+ *
+ * There is NO per-user beta/invite/entitlement concept anywhere in the codebase
+ * yet: the `users` table has role + residence_state + active_games only, and
+ * game gating is global `feature_flags` + this client config. So until a real
+ * beta-invite system exists, no production user has access and this returns
+ * false for everyone.
+ *
+ * TODO(beta-invite): replace with a real per-user check (allowlist / redeemed
+ * invite / entitlement) once that system lands. When it does, thread the user's
+ * access status in as an argument rather than hard-coding false.
+ */
+export function hasBetaAccess(): boolean {
+  return false;
+}
+
+/**
+ * A game the user may toggle and see, but cannot actually commit to yet in this
+ * context: a BETA game in production, for a user without beta access. Demo has
+ * no gate — beta games are fully playable in the sandbox. Drives the overlay's
+ * "invite-only beta" submission block and the Profile link gate, so the two
+ * surfaces stay consistent (a game the overlay blocks, Profile also blocks).
+ */
+export function isBetaGated(id: string, ctx: OnboardingContext): boolean {
+  if (ctx !== 'production') return false;
+  const cfg = ONBOARDING[id];
+  return cfg?.badge === 'BETA' && !hasBetaAccess();
 }
 
 /** The brand lime used for the filled selection circle (design guidelines). */

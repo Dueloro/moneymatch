@@ -12,6 +12,7 @@ import {
   availabilityFor,
   gameMeta,
   gameOnboarding,
+  isBetaGated,
   onboardingGames,
   type OnboardingContext,
 } from '../lib/games';
@@ -158,15 +159,23 @@ function GameRow({
   const avail = availabilityFor(link.game, context);
   const preselected = cfg?.preselected ?? false;
   const hasBinding = link.status === 'LINKED' || link.status === 'BLOCKED';
-  // "Locked" = can't be added yet in this context (e.g. CS2/PUBG/Dota in prod)
-  // AND has no real binding of its own. A game already in the play set, or one
-  // the player has actually linked, always renders normally (removable/visible)
-  // — the launch gate only hides games that are neither yours nor addable yet.
+  // "Locked" = can't be added yet in this context (e.g. Dota in prod, or a
+  // beta-gated CS2/PUBG for a user without a beta invite) AND has no real
+  // binding of its own. A game already in the play set, or one the player has
+  // actually linked, always renders normally (removable/visible) — the launch
+  // gate only hides games that are neither yours nor addable yet.
+  //
+  // NB: CS2/PUBG are now `selectable` in production config (so the onboarding
+  // overlay can present them as real tiles), so `isBetaGated` — not
+  // `avail.selectable` — is what keeps them locked here. Without it, Profile
+  // would silently let a production user add a beta game the overlay blocks.
   const locked =
     !preselected &&
     !selected &&
     !hasBinding &&
-    (!avail.selectable || link.status === 'COMING_SOON');
+    (!avail.selectable ||
+      isBetaGated(link.game, context) ||
+      link.status === 'COMING_SOON');
   const grayscale = locked || (!selected && !avail.color);
   const toggleDisabled = preselected || locked;
   const lockReason = cfg?.badge === 'SOON' ? 'Coming soon' : 'Available after launch';

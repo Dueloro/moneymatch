@@ -53,17 +53,24 @@ describe('DemoSignInPage — mounted overlay', () => {
     expect(dota).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('keeps Chess required even when the user deselects everything else', async () => {
+  it('enforces the minimum-one rule (Chess is a default, not a lock)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DemoSignInPage />);
-    // Turn off the three optional games.
+    // Turn off the three optional games; Chess remains as the default choice.
     for (const re of [/^Counter-Strike 2,/, /^PUBG,/, /^Dota 2,/]) {
       await user.click(tile(re));
       expect(tile(re)).toHaveAttribute('aria-pressed', 'false');
     }
-    // Chess cannot be turned off — the minimum-one guarantee holds when mounted.
     expect(tile(/^Chess,/)).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+
+    // Chess is now deselectable too — dropping it trips the minimum-one guard.
+    await user.click(tile(/^Chess,/));
+    expect(tile(/^Chess,/)).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Pick at least one game to continue.',
+    );
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
   });
 
   it('confirming writes the chosen set and navigates to /play', async () => {
