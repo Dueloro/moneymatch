@@ -166,10 +166,15 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
         # them explicitly.
         # `users` CASCADE clears everything with a user FK; solo_pools /
         # tournaments have no user FK (their entries do), so name them explicitly.
+        # `market_reference` has no user FK, so `users CASCADE` never reaches it
+        # (its rows would leak across tests); name it explicitly like solo_pools.
+        # The user-scoped bucketing tables (match_stats, market_state, settlement,
+        # audit_events) all carry a user FK and so cascade from `users`.
         await session.execute(
             text(
                 "TRUNCATE admin_audit, platform_ledger, raw_payloads, "
-                "solo_pools, tournaments, users RESTART IDENTITY CASCADE"
+                "solo_pools, tournaments, market_reference, users "
+                "RESTART IDENTITY CASCADE"
             )
         )
         # Restore feature flags to exactly what the migration chain seeded.
