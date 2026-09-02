@@ -4,6 +4,7 @@
 from ..db.base import Base
 from .admin_audit import AdminAudit
 from .bucket_contest import BucketContest, BucketRoom
+from .bucket_dispute import BucketDispute
 from .bucketing import (
     AuditEvent,
     MarketReference,
@@ -68,4 +69,5 @@ __all__ = [
     "AuditEvent",
     "BucketRoom",
     "BucketContest",
+    "BucketDispute",
 ]
