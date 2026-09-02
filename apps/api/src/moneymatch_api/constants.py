@@ -61,6 +61,10 @@ DEMO_JWT_SECRET = "moneymatch-demo-login-signing-key-not-a-secret"  # noqa: S105
 FLAG_QUEUE_PAUSED = "queue_paused"
 FLAG_SETTLEMENT_PAUSED = "settlement_paused"
 FLAG_GEO_CONFIG = "geo_config"
+# Master switch for the bucketing layer (docs/implementation-guide/). Seeded OFF
+# by migration 0028; nothing in services/bucketing/ touches the money path until
+# an admin turns this on. Kept a single global kill switch on purpose.
+FLAG_BUCKETING_ENABLED = "bucketing_enabled"
 
 # The 14 excluded ("Any Chance") states seeded by migration 0001. The live list
 # lives in the `geo_config` flag so it is admin-editable without a deploy; this

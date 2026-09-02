@@ -3,6 +3,13 @@
 
 from ..db.base import Base
 from .admin_audit import AdminAudit
+from .bucketing import (
+    AuditEvent,
+    MarketReference,
+    MarketState,
+    MatchStat,
+    Settlement,
+)
 from .chat import Conversation, ConversationMember, Message
 from .cs2 import Cs2Match, Cs2ShareChain
 from .demo_simulation import SimulatedMatch
@@ -53,4 +60,9 @@ __all__ = [
     "SimulatedMatch",
     "Cs2Match",
     "Cs2ShareChain",
+    "MatchStat",
+    "MarketState",
+    "MarketReference",
+    "Settlement",
+    "AuditEvent",
 ]

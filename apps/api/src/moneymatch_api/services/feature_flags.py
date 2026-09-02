@@ -19,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..constants import (
+    FLAG_BUCKETING_ENABLED,
     FLAG_QUEUE_PAUSED,
     FLAG_SETTLEMENT_PAUSED,
     FLAG_WORKER_HEARTBEAT,
@@ -34,6 +35,8 @@ log = structlog.get_logger(__name__)
 DEFAULT_FLAGS: dict[str, bool] = {
     FLAG_QUEUE_PAUSED: False,
     FLAG_SETTLEMENT_PAUSED: False,
+    # The bucketing layer's master switch — off until launch (migration 0028).
+    FLAG_BUCKETING_ENABLED: False,
     **{game_flag_key(g): True for g in REGISTERED_GAMES},
 }
 
