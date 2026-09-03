@@ -23,6 +23,7 @@ from .middleware import ExceptionEnvelopeMiddleware, RequestLogMiddleware
 from .routers import (
     activity,
     admin,
+    bucketing,
     challenges,
     chat,
     cs2,
@@ -159,6 +160,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(chat.router, prefix=API_V1_PREFIX)
     app.include_router(leaderboard.router, prefix=API_V1_PREFIX)
     app.include_router(notifications.router, prefix=API_V1_PREFIX)
+    app.include_router(bucketing.router, prefix=API_V1_PREFIX)
     app.include_router(admin.router, prefix=API_V1_PREFIX)
 
     # Dev/e2e sign-in bypass — mounted only outside prod and only when explicitly

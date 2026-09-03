@@ -260,7 +260,9 @@ async def test_clawback_audits_the_money_flow(session):
     assert ev.actor == "admin"
     # The refund to honest players was funded by what was recovered from the
     # cheater — the recovered amount covers the refunds (no platform backstop).
-    assert ev.after["recovered_from_fault_cents"] >= ev.after["refunded_to_honest_cents"]
+    recovered = ev.after["recovered_from_fault_cents"]
+    refunded = ev.after["refunded_to_honest_cents"]
+    assert recovered >= refunded
     assert ev.after["platform_backstop_cents"] == 0
 
 

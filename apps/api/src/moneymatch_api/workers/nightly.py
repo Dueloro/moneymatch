@@ -22,10 +22,11 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ..constants import GAME_RATE_METRICS
+from ..constants import FLAG_BUCKETING_ENABLED, GAME_RATE_METRICS
 from ..models.linked_account import LinkedAccount
 from ..models.user import User
 from ..services import metric_models_service, risk_detectors, sandbagging_service
+from ..services.feature_flags import get_boolean_flags
 
 log = structlog.get_logger(__name__)
 
@@ -103,6 +104,18 @@ async def run_nightly(
         except Exception:  # noqa: BLE001
             await session.rollback()
             log.exception("nightly.pair_cap_failed")
+
+    # Bucketing nightly (references / promotion advice / anomaly sweep). A no-op
+    # unless `bucketing_enabled` is on; isolated so a failure can't stop the pass.
+    async with sm() as session:
+        flags = await get_boolean_flags(session)
+    if flags.get(FLAG_BUCKETING_ENABLED, False):
+        try:
+            from .bucketing_nightly import run_bucketing_nightly
+
+            await run_bucketing_nightly(sm, now=now)
+        except Exception:  # noqa: BLE001
+            log.exception("nightly.bucketing_failed")
 
     log.info("nightly.complete", **report.__dict__)
     return report

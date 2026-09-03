@@ -804,6 +804,16 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
             report = await run_cycle(sm)
             if report.settled or report.pushed or report.canceled or report.paused:
                 log.info("settlement_worker.cycle", **report.__dict__)
+            # The bucketing cycle runs alongside the money cycle but stays out of
+            # `run_cycle` so the existing money-cycle tests are untouched. It is a
+            # no-op unless `bucketing_enabled` is on, and halts on `settlement_paused`.
+            from .bucketing_worker import run_bucketing_cycle
+
+            bkt = await run_bucketing_cycle(sm)
+            if bkt.ran and (
+                bkt.rooms_formed or bkt.rooms_settled or bkt.entries_expired
+            ):
+                log.info("bucketing_worker.cycle", **bkt.__dict__)
             # The heavier nightly pass is self-throttled to once per interval.
             await maybe_run_nightly(sm)
             await _bootstrap_pending_models(sm)
