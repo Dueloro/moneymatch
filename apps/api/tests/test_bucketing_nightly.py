@@ -46,6 +46,18 @@ async def test_nightly_bootstraps_a_reference_once_enough_players(session):
     assert ref.version == 1
     assert ref.source == "ours"
 
+    # The players already ingested (bucket was None) are now placed — so they can
+    # wager immediately, not only after their next match.
+    from moneymatch_api.models.bucketing import MarketState
+
+    states = list(
+        await session.scalars(
+            select(MarketState).where(MarketState.game == "chess.lichess")
+        )
+    )
+    assert states and all(s.bucket is not None for s in states)
+    assert all(s.bucket_version == 1 for s in states)
+
 
 async def test_nightly_records_promotion_advice(session):
     for k in range(25):

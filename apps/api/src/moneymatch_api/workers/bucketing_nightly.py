@@ -86,6 +86,20 @@ async def ensure_references(
                 session, ref, market.game, market.mode, market.metric,
                 season=1, version=1,
             )
+            # Bucket the players already ingested: they were indexed before a
+            # reference existed (bucket = None), so without this they couldn't be
+            # placed until their next match. First placement has no hysteresis.
+            cuts = list(ref.cuts)
+            for p in pop:
+                if cuts:
+                    lo = min(p.index_value, cuts[0]) - 1.0
+                    hi = max(p.index_value, cuts[-1]) + 1.0
+                    p.bucket = reference.assign_with_hysteresis(
+                        p.index_value, cuts, None, lo=lo, hi=hi
+                    )
+                else:
+                    p.bucket = 0
+                p.bucket_version = 1
             await session.commit()
             report.references_created += 1
             report.markets.append(market.key_str)
