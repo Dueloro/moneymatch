@@ -1,8 +1,9 @@
 # Bucketing System — What's Built & How to Test It
 
-All 8 phases are implemented and tested against a real Postgres. Everything is
-behind the `bucketing_enabled` flag (seeded **off** by migration 0028), so it
-ships without touching live money. Branch: `feat/bucket_system`.
+All 8 phases **and the app wiring** are implemented and tested against a real
+Postgres. Everything is behind the `bucketing_enabled` flag (seeded **off** by
+migration 0028), so it ships without touching live money. Branch:
+`feat/bucket_system`.
 
 **One-command check (needs the local Postgres on port 5433):**
 
@@ -12,7 +13,7 @@ TEST_DATABASE_URL='postgresql+asyncpg://moneymatch:moneymatch@localhost:5433/mon
   .venv/Scripts/python.exe -m pytest tests/test_bucketing_*.py -q
 ```
 
-Expected: **97 passed**. If you see that, the whole layer works. Any `F` (fail)
+Expected: **~113 passed**. If you see that, the whole layer works. Any `F` (fail)
 names the exact behaviour that broke and the file:line — that's how you know
 something's wrong.
 
@@ -74,18 +75,36 @@ and Dota can filter to ranked-only. Chess and PUBG work today.
 
 ---
 
-## Before turning the flag on: what's left ("wiring")
+## The wiring (done) — how it runs in the live app
 
-The engine is done and tested. What remains is **connecting these already-tested
-functions to the running app** — no new rating/settlement logic, just plumbing:
+The engine is now connected to the running app, all behind `bucketing_enabled`:
 
-1. **Background jobs** call the services on a clock: the settlement worker calls
-   `state.record_and_update` when a match arrives; the matchmaker calls
-   `contest.form_room` / `settle_room` / `expire_unfilled`; the nightly job calls
-   `promotion.evaluate_market` + `monitoring.*`.
-2. **API endpoints** (thin) let the app reach them: `GET /markets`, `POST /wagers`,
-   `GET /contests/{id}/status`, `GET /contests/{id}/explain`, `POST /disputes`,
-   and the admin resolve/clawback.
-3. **Freeze flag** around a tier re-cut (mirrors the existing `settlement_paused`
-   flag), and route `monitoring.detect_anomalies` output to the admin risk queue.
-4. Turn `bucketing_enabled` on behind a staged rollout.
+- **Worker cycle** (`workers/bucketing_worker.py`, hooked into the settlement
+  worker's loop): every ~15s it ingests new matches → index/bucket, forms rooms
+  from the queues, attaches each player's qualifying match from the log and
+  settles vs the one bar, and refunds unfilled/expired entries. Respects
+  `settlement_paused`.
+- **Nightly** (`workers/bucketing_nightly.py`, hooked into `run_nightly`):
+  bootstraps a market's first reference once it has enough players (and buckets
+  that first cohort), records promote/demote **advice** (never a silent re-cut),
+  and sweeps for anomalies.
+- **API** (`routers/bucketing.py`): `GET /bucketing/markets`,
+  `POST /bucketing/wagers`, `GET /bucketing/contests/{id}[/explain]`,
+  `POST /bucketing/disputes`, and `POST /bucketing/admin/disputes/{id}/resolve`
+  (no_change / refund / clawback). Dark (404 / `enabled:false`) until the flag is
+  on.
+
+## Before turning the flag on for real users
+
+Only ops steps and the two known gaps remain — no more engine or wiring work:
+
+1. **Seed public references** for launch so the very first player can be placed
+   before 20 players exist (call `state.activate_reference` with cut points from
+   public data). Until then a market self-bootstraps its reference once it has 20
+   players.
+2. **Close the CS2/Dota gaps** (below) if you want those games on at launch.
+3. **Multi-worker freeze:** if you run more than one worker process, add an
+   explicit market-freeze flag around `promotion.apply_recut` (a single worker
+   serializes re-cut vs settlement already).
+4. Turn `bucketing_enabled` on behind a **staged rollout** and watch
+   `monitoring.market_health`.
