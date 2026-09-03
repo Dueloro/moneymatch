@@ -27,9 +27,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...errors import APIError
-from ...models.bucket_contest import BucketContest
+from ...models.bucket_contest import BucketContest, BucketRoom
 from ...models.bucket_dispute import BucketDispute
-from ...models.bucketing import AuditEvent, MarketReference, Settlement
+from ...models.bucketing import AuditEvent, MarketReference, MatchStat, Settlement
 from ...services import wallet_service
 from . import config as cfg
 
@@ -302,3 +302,195 @@ async def is_held(session: AsyncSession, contest_id: uuid.UUID) -> bool:
         )
     )
     return held is not None
+
+
+# --------------------------------------------------------------------------- #
+# Room evidence + fault-based clawback
+# --------------------------------------------------------------------------- #
+
+
+async def explain_room(session: AsyncSession, room_id: uuid.UUID) -> dict:
+    """Everything an admin needs to decide who was unfair in a room.
+
+    For each member: what they wagered (stake), the bar they had to beat, the
+    result they actually produced, whether it cleared, their payout — and the
+    **full recorded stat line** of their qualifying match from `match_stats` (the
+    complete metrics the adapter saw, not just the wagered one). This is the
+    "check the log to see who was unfair" surface: compare a suspicious result to
+    the rest of the room and to that player's own recorded stats.
+
+    Fault is still an admin judgement (and can be informed by the Phase-8 anomaly
+    flags); this function only lays out the evidence.
+    """
+    room = await session.get(BucketRoom, room_id)
+    if room is None:
+        raise DisputeError("room_not_found", "No such room.", status_code=404)
+
+    members = (
+        (
+            await session.execute(
+                select(BucketContest).where(BucketContest.room_id == room_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    rows = []
+    for m in members:
+        match_stats = None
+        if m.qualifying_match_id:
+            ms = await session.scalar(
+                select(MatchStat).where(
+                    MatchStat.player_id == m.player_id,
+                    MatchStat.host_match_id == m.qualifying_match_id,
+                )
+            )
+            match_stats = ms.metrics if ms else None
+        rows.append(
+            {
+                "contest_id": str(m.id),
+                "player_id": str(m.player_id),
+                "stake_cents": m.stake_cents,
+                "bar": m.bar if m.bar is not None else room.bar,
+                "result_value": m.result_value,
+                "cleared": m.cleared,
+                "payout_cents": m.payout_cents,
+                "qualifying_match_id": m.qualifying_match_id,
+                "match_stats": match_stats,  # the full recorded stat line
+            }
+        )
+    return {
+        "room_id": str(room_id),
+        "market": f"{room.game}:{room.mode}:{room.metric}",
+        "bucket": room.bucket,
+        "bar": room.bar,
+        "lower_is_better": room.lower_is_better,
+        "members": rows,
+    }
+
+
+async def resolve_with_clawback(
+    session: AsyncSession,
+    dispute_id: uuid.UUID,
+    fault_player_ids: list[uuid.UUID],
+    *,
+    admin: str,
+    note: str | None = None,
+) -> BucketDispute:
+    """Resolve a dispute by **voiding the tainted contest and making the unfair
+    player(s) pay** — the money goes back to the honest players from the cheater's
+    pocket, not the platform's.
+
+    What it does, for the room the disputed contest belongs to:
+
+    1. **Claw back every payout** that was made in the room (the results are
+       tainted, so no winnings stand) — recovered from each player's wallet,
+       best-effort (a wallet can't go negative, so it recovers up to what's
+       there).
+    2. **Refund every honest player their stake** in full — they are always made
+       whole.
+    3. The **fault player(s) forfeit**: their winnings are clawed back and their
+       stake is not returned.
+
+    Funding order is exactly what you asked for: the honest players' refunds are
+    paid out of what is recovered from the unfair player(s); the platform only
+    covers a shortfall if a cheater's wallet is already empty (so a victim is
+    never left short). Every cent — recovered, refunded, and any platform
+    backstop — is written to `audit_events`.
+    """
+    dispute = await session.get(BucketDispute, dispute_id)
+    if dispute is None:
+        raise DisputeError("dispute_not_found", "No such dispute.", status_code=404)
+    if dispute.status.startswith("resolved"):
+        raise DisputeError(
+            "already_resolved", "This dispute is already resolved.", status_code=409
+        )
+
+    contest = await session.get(BucketContest, dispute.contest_id)
+    if contest is None or contest.room_id is None:
+        raise DisputeError(
+            "not_matched",
+            "A clawback needs a matched contest (a room to void).",
+            status_code=409,
+        )
+
+    members = (
+        (
+            await session.execute(
+                select(BucketContest).where(BucketContest.room_id == contest.room_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    member_players = {m.player_id for m in members}
+    fault_set = set(fault_player_ids)
+    if not fault_set or not fault_set <= member_players:
+        raise DisputeError(
+            "invalid_fault",
+            "Every fault player must be a member of the contest's room.",
+            status_code=422,
+        )
+
+    # (1) Claw back every payout in the room (void the tainted results).
+    recovered = 0
+    for m in members:
+        if m.payout_cents and m.payout_cents > 0:
+            wallet = await wallet_service.get_wallet_or_none(session, m.player_id)
+            available = wallet.available_cents if wallet else 0
+            take = min(m.payout_cents, available)
+            if take > 0:
+                await wallet_service.debit(
+                    session,
+                    m.player_id,
+                    take,
+                    memo=f"clawback (dispute {dispute_id})",
+                    created_by=admin,
+                    ref_id=m.id,
+                )
+                recovered += take
+
+    # (2) Refund every honest player their full stake; (3) fault players forfeit.
+    refunded = 0
+    for m in members:
+        if m.player_id in fault_set:
+            m.status = cfg.STATUS_REFUNDED
+            m.payout_cents = 0  # forfeit: no winnings, no stake back
+            m.settled_at = _now()
+            continue
+        await wallet_service.credit(
+            session,
+            m.player_id,
+            m.stake_cents,
+            memo=f"clawback refund (dispute {dispute_id})",
+            created_by=admin,
+            ref_id=m.id,
+        )
+        m.status = cfg.STATUS_REFUNDED
+        m.payout_cents = m.stake_cents
+        m.settled_at = _now()
+        refunded += m.stake_cents
+
+    shortfall = max(0, refunded - recovered)
+
+    dispute.status = "resolved_adjust"
+    dispute.admin_note = note
+    dispute.hold = False
+    dispute.resolved_at = _now()
+    await session.flush()
+    await _audit(
+        session,
+        player_id=dispute.user_id,
+        event_type="dispute_clawback",
+        contest_id=str(dispute.contest_id),
+        after={
+            "dispute_id": str(dispute.id),
+            "fault_players": [str(p) for p in fault_set],
+            "recovered_from_fault_cents": recovered,
+            "refunded_to_honest_cents": refunded,
+            "platform_backstop_cents": shortfall,
+        },
+        actor="admin",
+        reason=note,
+    )
+    return dispute

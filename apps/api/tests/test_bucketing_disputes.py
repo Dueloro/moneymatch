@@ -61,7 +61,17 @@ async def _settled_room(session, results):
     )
     members = await contest._room_members(session, room.id)
     for m, r in zip(members, results, strict=True):
-        await contest.record_result(session, m, f"q-{m.id}", r)
+        qid = f"qual-{m.id}"
+        if r is not None:
+            # Ingest the qualifying match through the real path, so its full stat
+            # line lands in match_stats (what explain_room reads as evidence).
+            await stmod.record_and_update(
+                session,
+                m.player_id,
+                "chess.lichess",
+                _norm(qid, int(r), created=1_760_000_100_000),
+            )
+        await contest.record_result(session, m, qid, r)
     await contest.settle_room(session, room)
     return users, members, room
 
@@ -178,6 +188,80 @@ async def test_admin_resolution_is_audited(session):
         .where(AuditEvent.event_type == "dispute_resolved", AuditEvent.actor == "admin")
     )
     assert n == 1
+
+
+async def test_explain_room_lays_out_the_evidence(session):
+    _users, members, room = await _settled_room(session, results=[24.0, 40.0, 23.0])
+    ev = await disputes.explain_room(session, room.id)
+    assert len(ev["members"]) == 3
+    row = ev["members"][0]
+    # Everything an admin needs to judge fault: wager, bar, result, and the full
+    # recorded stat line from the match log.
+    assert set(row) >= {
+        "player_id",
+        "stake_cents",
+        "bar",
+        "result_value",
+        "cleared",
+        "match_stats",
+    }
+    assert row["match_stats"] is not None
+    assert "chess_moves" in row["match_stats"]
+
+
+async def test_clawback_refunds_honest_players_from_the_cheaters_pocket(session):
+    # 3 players stake $5. The cheater posts a great (low-moves) result and wins;
+    # the two honest players lose. Admin finds the winner was unfair → clawback.
+    users, members, room = await _settled_room(session, results=[20.0, 60.0, 62.0])
+    winner = next(m for m in members if m.cleared)
+    losers = [m for m in members if not m.cleared]
+    assert len(losers) == 2
+
+    # The winner actually got paid (their available rose above the 100_000 start).
+    w_before = await wallet_service.get_wallet(session, winner.player_id)
+    assert w_before.available_cents > 100_000
+
+    # Open a dispute (by an honest player) and clawback with the winner at fault.
+    d = await disputes.open_dispute(
+        session, losers[0].id, losers[0].player_id, "opponent was cheating"
+    )
+    await disputes.resolve_with_clawback(
+        session, d.id, [winner.player_id], admin="admin-7", note="confirmed boosting"
+    )
+
+    # Honest players are made whole — exactly their stake back, nothing lost.
+    for m in losers:
+        w = await wallet_service.get_wallet(session, m.player_id)
+        assert w.available_cents == 100_000
+
+    # The cheater forfeits: winnings clawed back AND stake gone → down their stake.
+    w_after = await wallet_service.get_wallet(session, winner.player_id)
+    assert w_after.available_cents == 100_000 - winner.stake_cents
+    fault_contest = await session.get(type(winner), winner.id)
+    assert fault_contest.payout_cents == 0
+
+
+async def test_clawback_audits_the_money_flow(session):
+    from sqlalchemy import select
+
+    from moneymatch_api.models.bucketing import AuditEvent
+
+    users, members, room = await _settled_room(session, results=[20.0, 60.0, 62.0])
+    winner = next(m for m in members if m.cleared)
+    loser = next(m for m in members if not m.cleared)
+    d = await disputes.open_dispute(session, loser.id, loser.player_id, "unfair")
+    await disputes.resolve_with_clawback(
+        session, d.id, [winner.player_id], admin="admin-7"
+    )
+    ev = await session.scalar(
+        select(AuditEvent).where(AuditEvent.event_type == "dispute_clawback")
+    )
+    assert ev is not None
+    assert ev.actor == "admin"
+    # The refund to honest players was funded by what was recovered from the
+    # cheater — the recovered amount covers the refunds (no platform backstop).
+    assert ev.after["recovered_from_fault_cents"] >= ev.after["refunded_to_honest_cents"]
+    assert ev.after["platform_backstop_cents"] == 0
 
 
 async def test_evidence_snapshot_is_immutable_after_later_recut(session):
