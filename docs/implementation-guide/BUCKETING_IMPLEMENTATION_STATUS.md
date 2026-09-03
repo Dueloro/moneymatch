@@ -13,7 +13,7 @@ TEST_DATABASE_URL='postgresql+asyncpg://moneymatch:moneymatch@localhost:5433/mon
   .venv/Scripts/python.exe -m pytest tests/test_bucketing_*.py -q
 ```
 
-Expected: **~113 passed**. If you see that, the whole layer works. Any `F` (fail)
+Expected: **110 passed**. If you see that, the whole layer works. Any `F` (fail)
 names the exact behaviour that broke and the file:line — that's how you know
 something's wrong.
 
