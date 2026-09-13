@@ -21,6 +21,7 @@ from .linked_account import LinkedAccount
 from .live import LiveSnapshot
 from .notification import Notification
 from .play import Match, MatchPlayer, QueueTicket
+from .player_streak import PlayerStreak
 from .pools import SoloEntry, SoloPool
 from .push import PushSubscription
 from .risk import RiskFlag
@@ -70,4 +71,5 @@ __all__ = [
     "BucketRoom",
     "BucketContest",
     "BucketDispute",
+    "PlayerStreak",
 ]
