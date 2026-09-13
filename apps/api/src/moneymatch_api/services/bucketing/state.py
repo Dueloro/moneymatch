@@ -106,11 +106,23 @@ async def update_market_state(
         session, player_id, market.game, market.mode, market.metric
     )
     if row is None:
+        # A server_default only fills these on INSERT/refresh, not on the
+        # in-memory object — and we read them below *before* the flush. So seed
+        # the Python-side zero state explicitly (the first-match path for every
+        # new player; a real crash if left as None).
         row = MarketState(
             player_id=player_id,
             game=market.game,
             mode=market.mode,
             metric=market.metric,
+            mean=0.0,
+            m2=0.0,
+            n_samples=0,
+            window=[],
+            index_value=0.0,
+            index_confidence=0.0,
+            peak_goodness=None,
+            provisional=True,
         )
         session.add(row)
 
