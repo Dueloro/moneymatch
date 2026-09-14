@@ -814,6 +814,23 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
                 bkt.rooms_formed or bkt.rooms_settled or bkt.entries_expired
             ):
                 log.info("bucketing_worker.cycle", **bkt.__dict__)
+            # Demo-only: advance any self-driving live tournament (inject the next
+            # round of games so standings move). Gated on the simulate flag, so it
+            # is a no-op in any real deployment.
+            from ..config import get_settings
+
+            if get_settings().demo_simulate_enabled:
+                from ..services import demo_tournament
+
+                async with sm() as session:
+                    try:
+                        if await demo_tournament.tick(session):
+                            await session.commit()
+                        else:
+                            await session.rollback()
+                    except Exception:  # noqa: BLE001
+                        await session.rollback()
+                        log.exception("demo_tournament.tick_failed")
             # The heavier nightly pass is self-throttled to once per interval.
             await maybe_run_nightly(sm)
             await _bootstrap_pending_models(sm)

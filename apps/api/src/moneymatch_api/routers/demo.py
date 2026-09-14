@@ -55,7 +55,9 @@ from ..services import (
     admin_contests_service,
     challenge_service,
     chat_service,
+    demo_mode,
     demo_simulation,
+    demo_tournament,
     linking_service,
     matchmaking,
     money_math,
@@ -1112,6 +1114,60 @@ async def simulate_result(
         created_at_ms=int(row.created_at_ms),
         metrics=row.metrics,
     )
+
+
+@router.post("/live_tournament")
+async def start_live_tournament(
+    user: CurrentUser,
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_session),
+    minutes: int = 10,
+) -> dict:
+    """Start a self-driving ~10-minute chess tournament for the demo user.
+
+    Enrols the demo user + competitive bots, injects stats fetched from the real
+    Lichess API (updating over the window), and lets the normal worker settle it.
+    The existing Tournament page renders it live. Demo account only.
+    """
+    _assert_simulation_enabled(settings)
+    if not demo_mode.is_demo_user(user):
+        raise APIError(
+            "demo_only", "The live tournament is for the demo account.", status_code=403
+        )
+    minutes = max(2, min(minutes, 60))
+    tournament = await demo_tournament.start_live(session, user, minutes=minutes)
+    await session.commit()
+    return {
+        "tournament_id": str(tournament.id),
+        "game": tournament.game,
+        "metric": tournament.ranking_metric,
+        "field_size": tournament.field_size,
+        "entry_cents": tournament.entry_cents,
+        "prize_split": tournament.prize_split,
+        "window_ends_at": tournament.window_ends_at.isoformat(),
+        "message": (
+            f"Live chess tournament started with {tournament.field_size} players. "
+            "Open the Tournament tab to watch standings update, then it settles at "
+            "the window close."
+        ),
+    }
+
+
+@router.post("/live_tournament/tick")
+async def tick_live_tournament(
+    user: CurrentUser,
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Advance every live demo tournament by one round of injected games now
+    (so a tester can fast-forward instead of waiting for the tick timer). Demo
+    account only."""
+    _assert_simulation_enabled(settings)
+    if not demo_mode.is_demo_user(user):
+        raise APIError("demo_only", "Demo account only.", status_code=403)
+    advanced = await demo_tournament.tick(session)
+    await session.commit()
+    return {"advanced": advanced}
 
 
 @router.post("/force_settle", response_model=ForceSettleResponse)
