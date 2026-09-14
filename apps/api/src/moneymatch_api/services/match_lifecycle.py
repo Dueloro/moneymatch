@@ -38,6 +38,7 @@ from ..services import (
     limits_service,
     notifications_service,
     reconciliation_service,
+    streak_service,
     wallet_service,
 )
 from ..services.hosts.errors import HostUnavailable
@@ -309,6 +310,23 @@ async def settle(
     for seat in seats:
         if seat.user_id in result.stat_lines:
             seat.stat_line = result.stat_lines[seat.user_id]
+
+    # Win-streak matchmaking ladder (non-money, best-effort): a real WIN climbs
+    # the winner's streak and resets the loser's; a push/cancel/friendly holds. A
+    # failure here must never break settlement — the streak is derived state.
+    if result.kind == WIN and not match.friendly and result.winner_user_id is not None:
+        mode = match.speed or match.market
+        for seat in seats:
+            try:
+                await streak_service.apply_result(
+                    session,
+                    seat.user_id,
+                    match.game,
+                    mode,
+                    seat.user_id == result.winner_user_id,
+                )
+            except Exception:  # noqa: BLE001 — streak must never break settlement
+                log.warning("streak.apply_failed", match_id=str(match.id))
 
     match.state = target
     match.outcome_detail = result.outcome_detail
