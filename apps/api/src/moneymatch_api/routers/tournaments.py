@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +27,7 @@ from ..constants import (
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
+from ..models.play import QueueTicket
 from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
@@ -41,6 +42,7 @@ from ..schemas.tournaments import (
 )
 from ..services import (
     aggregate_metrics,
+    fingerprint_service,
     linking_service,
     test_opponents,
     tournament_engine,
@@ -48,6 +50,41 @@ from ..services import (
 from ..services.tournament_engine import TournamentEnqueueResult
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
+
+
+def _device_signals(request: Request, user: User) -> list[str]:
+    device_id = request.headers.get("x-device-id")
+    ip = request.client.host if request.client else None
+    return fingerprint_service.build_signals(device_id=device_id, ip=ip)
+
+
+async def _guard_co_entry(
+    session: AsyncSession, user: User, request: Request, game: str, metric: str
+) -> None:
+    """Record this client's identity signals and block entry if another account
+    queued for the same market shares one (same-human co-entry). Practice
+    opponents are exempt (they're all server-made and share no device)."""
+    signals = _device_signals(request, user)
+    await fingerprint_service.record_signals(session, user.id, signals)
+    if test_opponents.is_enabled(user):
+        return  # demo/practice path never collides with itself
+    # Other accounts currently waiting for the same game+market.
+    others = list(
+        await session.scalars(
+            select(QueueTicket.user_id).where(
+                QueueTicket.game == game,
+                QueueTicket.market == metric,
+                QueueTicket.state == "waiting",
+                QueueTicket.user_id != user.id,
+            )
+        )
+    )
+    if others and not await fingerprint_service.can_co_enter(session, user.id, others):
+        raise APIError(
+            "co_entry_blocked",
+            "Another account on this device or network is already in this contest.",
+            status_code=409,
+        )
 
 
 async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
@@ -214,8 +251,15 @@ async def get_markets(
 async def enter(
     body: TournamentEnterRequest,
     user: CurrentUser,
+    request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> TournamentStatusResponse:
+    # Same-human / collusion guard: record this client's identity signals, then
+    # refuse entry if another account currently queued for the same market shares
+    # a signal (same device / IP). Unknown signals never match, so a normal player
+    # is never blocked; two accounts on one device are.
+    await _guard_co_entry(session, user, request, body.game, body.metric)
+
     result = await tournament_engine.enqueue(
         session,
         user,
