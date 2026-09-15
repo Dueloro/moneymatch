@@ -360,6 +360,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/play/streaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Streaks
+         * @description The player's current win-streak per (game, mode) — the matchmaking-ladder
+         *     signal. A streak lifts *who you're matched with* a rung per win and resets on
+         *     a loss; it never changes what you wager. Non-money, read-only.
+         */
+        get: operations["get_streaks_api_v1_play_streaks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/play/matches/{match_id}": {
         parameters: {
             query?: never;
@@ -4644,6 +4666,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_streaks_api_v1_play_streaks_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

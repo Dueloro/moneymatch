@@ -6,6 +6,7 @@ import { useAuth } from './auth/useAuth';
 import { AppShell } from './components/AppShell';
 import { Loader } from './components/ui/Loader';
 import { ActivityPage } from './pages/ActivityPage';
+import { BucketingPage } from './pages/BucketingPage';
 import { DemoSignInPage } from './pages/DemoSignInPage';
 import { InvitePage } from './pages/InvitePage';
 import { PlayPage } from './pages/PlayPage';
@@ -40,6 +41,7 @@ export function App() {
           <Route path="play" element={<PlayPage />} />
           <Route path="pools" element={<PoolsPage />} />
           <Route path="tournament" element={<TournamentPage />} />
+          <Route path="bucketing" element={<BucketingPage />} />
           <Route path="activity" element={<ActivityPage />} />
           <Route path="social" element={<SocialPage />} />
           <Route path="wallet" element={<WalletPage />} />

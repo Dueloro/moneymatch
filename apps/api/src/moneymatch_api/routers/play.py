@@ -274,6 +274,31 @@ async def leave_queue(
     return QueueStatusResponse(status="idle", can_cancel=False)
 
 
+@router.get("/streaks")
+async def get_streaks(
+    user: CurrentUser, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """The player's current win-streak per (game, mode) — the matchmaking-ladder
+    signal. A streak lifts *who you're matched with* a rung per win and resets on
+    a loss; it never changes what you wager. Non-money, read-only."""
+    from ..models.player_streak import PlayerStreak
+
+    rows = await session.scalars(
+        select(PlayerStreak).where(PlayerStreak.player_id == user.id)
+    )
+    return {
+        "streaks": [
+            {
+                "game": r.game,
+                "mode": r.mode,
+                "streak": r.streak,
+                "best_streak": r.best_streak,
+            }
+            for r in rows
+        ]
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Matches.
 # --------------------------------------------------------------------------- #

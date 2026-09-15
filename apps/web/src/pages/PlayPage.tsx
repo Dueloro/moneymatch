@@ -20,6 +20,7 @@ import { dashless, formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { platformFeeNote } from '../lib/rake';
 import { useGameSelection } from '../hooks/useGameSelection';
+import { useGameStreak } from '../hooks/useStreaks';
 import {
   prizeForEntry,
   useJoinQueue,
@@ -107,11 +108,13 @@ export function PlayPage() {
     <div className="mb-6 flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <ModeSwitcher />
+        <StreakBadge game={game} />
         <div className="ml-auto">
           <HowItWorks id="play">
             You go 1v1 with an evenly matched opponent for the same stake. Both of you
             play your own next match, we read the result from the game, and the better
-            stat line takes the pot.
+            stat line takes the pot. Win in a row and your next opponent climbs a rung
+            higher — a loss resets you to your own level.
           </HowItWorks>
         </div>
       </div>
@@ -283,5 +286,20 @@ export function PlayPage() {
         </>
       )}
     </div>
+  );
+}
+
+/** A small win-streak indicator: shows the climb (matchmaking only, not money). */
+function StreakBadge({ game }: { game: string | undefined }) {
+  const streak = useGameStreak(game);
+  if (streak <= 0) return null;
+  return (
+    <span
+      className="rounded-full bg-live/15 px-2.5 py-1 text-xs font-medium text-live"
+      title="Consecutive wins lift your matchmaking target a rung; a loss resets it."
+      data-testid="streak-badge"
+    >
+      🔥 {streak} win{streak === 1 ? '' : 's'} in a row
+    </span>
   );
 }

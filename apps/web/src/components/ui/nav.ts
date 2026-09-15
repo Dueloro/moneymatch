@@ -18,6 +18,7 @@ export const PLAY_MODES = [
   { to: '/pools', label: 'Solo pools' },
   { to: '/tournament', label: 'Tournament' },
   { to: '/play', label: 'Head-to-head' },
+  { to: '/bucketing', label: 'Bucketing' },
 ] as const;
 
 const PLAY_PATHS = new Set<string>(PLAY_MODES.map((m) => m.to));
