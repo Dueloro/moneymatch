@@ -1145,6 +1145,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bucketing/markets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Markets
+         * @description Every bucketed market, with the caller's placement + stake cap for each.
+         *
+         *     When the feature is off this returns `enabled: false` and an empty list rather
+         *     than a 404, so the app can hide the section gracefully.
+         */
+        get: operations["get_markets_api_v1_bucketing_markets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bucketing/wagers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Place Wager */
+        post: operations["place_wager_api_v1_bucketing_wagers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bucketing/contests/{contest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Contest Status */
+        get: operations["contest_status_api_v1_bucketing_contests__contest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bucketing/contests/{contest_id}/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Explain Contest */
+        get: operations["explain_contest_api_v1_bucketing_contests__contest_id__explain_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bucketing/disputes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open Dispute */
+        post: operations["open_dispute_api_v1_bucketing_disputes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bucketing/admin/disputes/{dispute_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Dispute */
+        post: operations["resolve_dispute_api_v1_bucketing_admin_disputes__dispute_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/flags": {
         parameters: {
             query?: never;
@@ -1552,6 +1660,52 @@ export interface paths {
          *     it. That is the point: a demo that proves the real path works.
          */
         post: operations["simulate_result_api_v1_demo_simulate_result_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/live_tournament": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Live Tournament
+         * @description Start a self-driving ~10-minute chess tournament for the demo user.
+         *
+         *     Enrols the demo user + competitive bots, injects stats fetched from the real
+         *     Lichess API (updating over the window), and lets the normal worker settle it.
+         *     The existing Tournament page renders it live. Demo account only.
+         */
+        post: operations["start_live_tournament_api_v1_demo_live_tournament_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/live_tournament/tick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tick Live Tournament
+         * @description Advance every live demo tournament by one round of injected games now
+         *     (so a tester can fast-forward instead of waiting for the tick timer). Demo
+         *     account only.
+         */
+        post: operations["tick_live_tournament_api_v1_demo_live_tournament_tick_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2094,6 +2248,36 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** ContestStatus */
+        ContestStatus: {
+            /**
+             * Contest Id
+             * Format: uuid
+             */
+            contest_id: string;
+            /** Game */
+            game: string;
+            /** Mode */
+            mode: string;
+            /** Metric */
+            metric: string;
+            /** Bucket */
+            bucket: number;
+            /** Status */
+            status: string;
+            /** Stake Cents */
+            stake_cents: number;
+            /** Bar */
+            bar?: number | null;
+            /** Result Value */
+            result_value?: number | null;
+            /** Cleared */
+            cleared?: boolean | null;
+            /** Payout Cents */
+            payout_cents: number;
+            /** Room Id */
+            room_id?: string | null;
+        };
         /**
          * ConversationView
          * @description A row in the conversation list (and the header of an open thread).
@@ -2215,6 +2399,28 @@ export interface components {
             clear_rate: number;
             /** Est Multiplier Bps */
             est_multiplier_bps: number;
+        };
+        /** DisputeRequest */
+        DisputeRequest: {
+            /**
+             * Contest Id
+             * Format: uuid
+             */
+            contest_id: string;
+            /** Reason */
+            reason: string;
+        };
+        /** DisputeResponse */
+        DisputeResponse: {
+            /**
+             * Dispute Id
+             * Format: uuid
+             */
+            dispute_id: string;
+            /** Status */
+            status: string;
+            /** Hold */
+            hold: boolean;
         };
         /**
          * DisputeView
@@ -2610,6 +2816,35 @@ export interface components {
             /** Unread */
             unread: number;
         };
+        /** MarketCard */
+        MarketCard: {
+            /** Game */
+            game: string;
+            /** Mode */
+            mode: string;
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Placed */
+            placed: boolean;
+            /** Bucket */
+            bucket?: number | null;
+            /** Bar */
+            bar?: number | null;
+            /** Stake Cap Cents */
+            stake_cap_cents?: number | null;
+            /**
+             * Provisional
+             * @default true
+             */
+            provisional: boolean;
+            /**
+             * Multiplier Bps
+             * @default 0
+             */
+            multiplier_bps: number;
+        };
         /**
          * MarketRow
          * @description One market row on the Play screen (design PDF p.1).
@@ -2635,17 +2870,6 @@ export interface components {
             provisional: boolean;
             /** Resolution Note */
             resolution_note: string;
-        };
-        /** MarketsResponse */
-        MarketsResponse: {
-            /** Game */
-            game: string;
-            /** Linked */
-            linked: boolean;
-            /** Entry Presets Cents */
-            entry_presets_cents: number[];
-            /** Markets */
-            markets: components["schemas"]["MarketRow"][];
         };
         /** MatchPlayerView */
         MatchPlayerView: {
@@ -3133,6 +3357,18 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** ResolveRequest */
+        ResolveRequest: {
+            /** Resolution */
+            resolution: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Fault Player Ids
+             * @default []
+             */
+            fault_player_ids: string[];
+        };
         /** RespondInviteRequest */
         RespondInviteRequest: {
             /** Action */
@@ -3581,6 +3817,17 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** WagerRequest */
+        WagerRequest: {
+            /** Game */
+            game: string;
+            /** Mode */
+            mode: string;
+            /** Metric */
+            metric: string;
+            /** Stake Cents */
+            stake_cents: number;
+        };
         /** WaitingResponse */
         WaitingResponse: {
             /** Waiting */
@@ -3662,6 +3909,24 @@ export interface components {
             /** Contests Needed */
             contests_needed: number;
             row: components["schemas"]["LeaderboardRowView"] | null;
+        };
+        /** MarketsResponse */
+        moneymatch_api__schemas__bucketing__MarketsResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Markets */
+            markets: components["schemas"]["MarketCard"][];
+        };
+        /** MarketsResponse */
+        moneymatch_api__schemas__play__MarketsResponse: {
+            /** Game */
+            game: string;
+            /** Linked */
+            linked: boolean;
+            /** Entry Presets Cents */
+            entry_presets_cents: number[];
+            /** Markets */
+            markets: components["schemas"]["MarketRow"][];
         };
     };
     responses: never;
@@ -4281,7 +4546,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MarketsResponse"];
+                    "application/json": components["schemas"]["moneymatch_api__schemas__play__MarketsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6010,6 +6275,212 @@ export interface operations {
             };
         };
     };
+    get_markets_api_v1_bucketing_markets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["moneymatch_api__schemas__bucketing__MarketsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    place_wager_api_v1_bucketing_wagers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WagerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contest_status_api_v1_bucketing_contests__contest_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContestStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explain_contest_api_v1_bucketing_contests__contest_id__explain_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_dispute_api_v1_bucketing_disputes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisputeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_dispute_api_v1_bucketing_admin_disputes__dispute_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dispute_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_flags_api_v1_admin_flags_get: {
         parameters: {
             query?: never;
@@ -6756,6 +7227,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SimulateResultResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_live_tournament_api_v1_demo_live_tournament_post: {
+        parameters: {
+            query?: {
+                minutes?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tick_live_tournament_api_v1_demo_live_tournament_tick_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
