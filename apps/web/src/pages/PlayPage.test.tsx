@@ -5,6 +5,12 @@ import { renderWithProviders } from '../test/testUtils';
 import { PlayPage } from './PlayPage';
 
 vi.mock('../hooks/useLinks', () => ({ useLinks: vi.fn() }));
+// The streak badge reads streaks (which reads auth); stub it to no streak so the
+// page renders without an AuthProvider, like the other data hooks here.
+vi.mock('../hooks/useStreaks', () => ({
+  useStreaks: () => ({ data: [] }),
+  useGameStreak: () => 0,
+}));
 // useGameSelection reads the play set from /me. Gating is fail-closed: an empty
 // set now falls back to Chess only, so these CS2 fixtures set an explicit play
 // set of ['cs2.steam'] — how a real CS2 player is configured after the backfill.

@@ -286,3 +286,36 @@ export function useResolveDispute() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'disputes'] }),
   });
 }
+
+/**
+ * Resolve a *bucketing* dispute — including fault-based **clawback**, which voids
+ * the tainted contest and refunds the honest players from the cheater's balance
+ * (the platform only backstops a shortfall). `fault_player_ids` is required for a
+ * clawback. Only works while `bucketing_enabled` is on.
+ */
+export function useResolveBucketDispute() {
+  return useMutation({
+    mutationFn: async (input: {
+      dispute_id: string;
+      resolution: 'no_change' | 'refund' | 'clawback';
+      note?: string;
+      fault_player_ids?: string[];
+    }): Promise<void> => {
+      const { error } = await api.POST(
+        '/api/v1/bucketing/admin/disputes/{dispute_id}/resolve',
+        {
+          params: { path: { dispute_id: input.dispute_id } },
+          body: {
+            resolution: input.resolution,
+            note: input.note ?? null,
+            fault_player_ids: input.fault_player_ids ?? [],
+          },
+        },
+      );
+      if (error) {
+        const code = (error as { code?: string }).code;
+        throw new Error(code ?? 'Clawback resolve failed');
+      }
+    },
+  });
+}

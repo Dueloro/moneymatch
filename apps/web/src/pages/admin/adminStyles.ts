@@ -28,6 +28,9 @@ export const styles: Record<string, CSSProperties> = {
   input: { border: '1px solid #888', padding: '3px 6px', fontSize: 13 },
   alert: { color: '#b00', fontWeight: 700 },
   ok: { color: '#080' },
+  card: { border: '1px solid #ccc', background: '#fafafa', padding: 12 },
+  h2: { fontSize: 14, fontWeight: 700, margin: '0 0 8px' },
+  muted: { color: '#666', fontSize: 12, margin: '4px 0' },
   pre: {
     background: '#f7f7f7',
     border: '1px solid #ddd',
