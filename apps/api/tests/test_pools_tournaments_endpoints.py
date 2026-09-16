@@ -263,7 +263,7 @@ async def test_tournament_markets_and_enqueue(client):
     )
     assert m.status_code == 200
     body = m.json()
-    assert body["prize_split"] == [50, 30, 20] and body["field_size"] == 10
+    assert body["prize_split"] == [60, 25, 15] and body["field_size"] == 10
 
     r = await client.post(
         f"{V1}/tournaments/queue",

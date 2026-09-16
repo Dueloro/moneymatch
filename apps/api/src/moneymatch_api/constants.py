@@ -417,13 +417,15 @@ POOL_MIN_ROOM = 3
 POOL_BAR_SPREAD_CAP_SIGMA = 1.5
 # The pool settlement window: your first qualifying match must land inside it.
 POOL_WINDOW_SECONDS = 24 * 3600
-# Tournament field. Formed under a μ-dispersion cap; scored on the mean of the
-# first-N qualifying matches; top places split per `TOURNAMENT_PRIZE_SPLIT`.
+# Tournament field. Formed under a μ-dispersion cap; scored on your **best game**
+# in the window (peer-to-peer — IMPLEMENTATION_PHASES.md, "highest scored-stat
+# from games that finished within the window"); top 3 split per
+# `TOURNAMENT_PRIZE_SPLIT`.
 TOURNAMENT_FIELD_SIZE = 10
 TOURNAMENT_MIN_FIELD = 6
 TOURNAMENT_MIN_RANKED = 4
-TOURNAMENT_SCORE_N = 3
-TOURNAMENT_PRIZE_SPLIT: tuple[int, ...] = (50, 30, 20)  # relative weights
+TOURNAMENT_SCORE_N = 3  # retained for aggregate metrics; best-game ignores it
+TOURNAMENT_PRIZE_SPLIT: tuple[int, ...] = (60, 25, 15)  # relative weights
 # max(μ) − min(μ) ≤ dispersion_cap · σ_pooled (start tight, tune with data).
 TOURNAMENT_DISPERSION_CAP = 1.0
 TOURNAMENT_WINDOW_SECONDS = 48 * 3600

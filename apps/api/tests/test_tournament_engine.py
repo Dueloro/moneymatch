@@ -110,25 +110,26 @@ async def test_dispersion_cap_refuses_a_lopsided_field(session):
 # --- first-N scoring ------------------------------------------------------ #
 
 
-async def test_first_n_average_scores_earliest_three(session):
+async def test_best_game_in_window_scores(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
-    # Give the first entrant 5 matches; only the first 3 count.
+    # The first entrant plays 5 games; their score is their BEST (highest), not
+    # an average and not first-N.
     grades = {}
-    grades[entries[0].id] = TournamentGrade(values=[2.0, 2.0, 2.0, 0.0, 0.0])
+    grades[entries[0].id] = TournamentGrade(values=[2.0, 2.0, 2.0, 0.0, 4.0])
     for e in entries[1:]:
         grades[e.id] = TournamentGrade(values=[1.0, 1.0, 1.0])
     await tournament_engine.settle_tournament(session, tournament, grades)
     top = next(e for e in await _entries(session, tournament.id) if e.rank == 1)
     assert top.id == entries[0].id
-    assert top.score == pytest.approx(2.0)  # mean of first 3, not all 5
-    assert top.matches_counted == 3
+    assert top.score == pytest.approx(4.0)  # best of the 5 games
+    assert top.matches_counted == 5  # all in-window games counted
 
 
 # --- prize split / invariants --------------------------------------------- #
 
 
-async def test_top_three_split_50_30_20_and_reconciles(session):
+async def test_top_three_split_60_25_15_and_reconciles(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
     # Distinct descending scores → unambiguous 1..10 ranking.
@@ -137,12 +138,12 @@ async def test_top_three_split_50_30_20_and_reconciles(session):
     }
     await tournament_engine.settle_tournament(session, tournament, grades)
     assert tournament.state == "SETTLED"
-    # Pool $100, rake 10% = $10, net $90 → 45/27/18.
+    # Pool $100, rake 10% = $10, net $90 → 60/25/15 = 54/22.50/13.50.
     paid = sorted(
         (e for e in await _entries(session, tournament.id) if e.payout_cents > 0),
         key=lambda e: e.rank,
     )
-    assert [e.payout_cents for e in paid] == [4500, 2700, 1800]
+    assert [e.payout_cents for e in paid] == [5400, 2250, 1350]
     assert tournament.rake_cents == 1000
     recon = await reconciliation_service.check(session, "tournament", tournament.id)
     assert recon.ok
@@ -161,9 +162,9 @@ async def test_tie_splits_combined_slices_remainder_to_earlier_enqueue(session):
     await tournament_engine.settle_tournament(session, tournament, grades)
     fresh = {e.id: e for e in await _entries(session, tournament.id)}
     a, b = fresh[entries[0].id], fresh[entries[1].id]
-    # Net $90; 1st+2nd slices = 45+27 = 72 → 36 each; both share rank 1.
+    # Net $90; 1st+2nd slices = 54+22.50 = 76.50 → split; both share rank 1.
     assert a.rank == 1 and b.rank == 1
-    assert a.payout_cents + b.payout_cents == 4500 + 2700
+    assert a.payout_cents + b.payout_cents == 5400 + 2250
     assert abs(a.payout_cents - b.payout_cents) <= 1  # remainder ≤ 1 cent
     recon = await reconciliation_service.check(session, "tournament", tournament.id)
     assert recon.ok

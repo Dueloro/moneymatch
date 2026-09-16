@@ -191,9 +191,9 @@ async def grade_tournament(
     tournament: Tournament,
     entries: list[TournamentEntry],
 ) -> dict[uuid.UUID, TournamentGrade]:
-    """Build each entry's first-N in-window metric values (keyed by entry id)."""
+    """Build each entry's in-window metric values (keyed by entry id). The engine
+    scores the player's best game from these."""
     metric = tournament.ranking_metric
-    n = tournament.score_matches
     grades: dict[uuid.UUID, TournamentGrade] = {}
     for entry in entries:
         # A practice opponent has no real host account, so ask its adapter
@@ -240,7 +240,9 @@ async def grade_tournament(
             )
             continue
 
-        scored = [g for g in games if metric in g.metrics][:n]
+        # Every in-window game (not first-N): the tournament scores your *best*
+        # game, so the whole window must be available to take the max from.
+        scored = [g for g in games if metric in g.metrics]
         values = [g.metrics[metric] for g in scored]
         payload = await raw_payload_service.persist(
             session,

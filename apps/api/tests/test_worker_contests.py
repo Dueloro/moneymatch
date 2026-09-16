@@ -390,7 +390,7 @@ async def test_tournament_settles_and_pays_top_three(monkeypatch):
             ),
             key=lambda e: e.rank,
         )
-        assert [e.payout_cents for e in paid] == [4500, 2700, 1800]
+        assert [e.payout_cents for e in paid] == [5400, 2250, 1350]  # 60/25/15
         recon = await reconciliation_service.check(s, "tournament", tid)
         assert recon.ok
         assert (await reconciliation_service.check_all(s)).ok

@@ -514,6 +514,17 @@ async def _entries(
     return list(rows)
 
 
+def _best_game(values: list[float], metric: str) -> tuple[float | None, int]:
+    """The player's best single game in the window: the highest value, or the
+    lowest for a lower-is-better metric. `None` (forfeit) when they played none."""
+    from ..constants import lower_is_better
+
+    if not values:
+        return None, 0
+    best = min(values) if lower_is_better(metric) else max(values)
+    return best, len(values)
+
+
 def compute_standings(
     entries: list[TournamentEntry],
     scores: dict[uuid.UUID, float | None],
@@ -597,7 +608,9 @@ async def settle_tournament(
         if aggregate_metrics.is_aggregate(tournament.ranking_metric):
             avg, count = g.score, (g.counted or 0)
         else:
-            avg, count = fairness.first_n_average(g.values, tournament.score_matches)
+            # Best game in the window (peer-to-peer): the highest scored-stat
+            # (lowest, for a lower-is-better metric). Extra games buy no chances.
+            avg, count = _best_game(g.values, tournament.ranking_metric)
         e.score = avg
         e.matches_counted = count
         scores[e.id] = avg
