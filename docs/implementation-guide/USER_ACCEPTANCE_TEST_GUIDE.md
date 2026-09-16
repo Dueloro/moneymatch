@@ -8,9 +8,15 @@ way the app reads game stats), updates them over ~10 minutes to simulate people
 playing, and fills the field with bots that also get updating stats. You watch it
 run and settle, and verify everything else around it.
 
-All five newer features are now wired into the UI: the **live tournament**, the
-**win-streak ladder**, the **Bucketing** page, the **collusion co-entry guard**,
-and the admin **fault-based clawback**. §3–§5 tell you where each lives.
+**The app is now peer-to-peer only: 1v1 (Head-to-head) + Tournaments.** Solo Pools
+and the Bucketing bar-wager page have been **removed** — there is no "bar" you beat.
+Skip anything below that mentions Pools or a Bucketing page; those routes now
+redirect to Play. Bucketing survives only as an invisible matchmaking input.
+
+Wired features to check: the **live tournament** (best game → 60/25/15), the
+**win-streak ladder** (shifts 1v1 matchmaking), the **collusion co-entry guard**
+(same-device accounts can't be matched/co-enter), and the **stake ladder** (new
+accounts capped). §3–§5 tell you where each lives.
 
 At the end, **write `docs/implementation-guide/CURSOR_TEST_RESULTS.md`** (format in
 §7).
