@@ -443,3 +443,41 @@ async def test_excluded_state_is_geo_blocked_from_h2h(session):
 
     with pytest.raises(RegionBlockedError):
         await enq_cs2(session, user)
+
+
+# --- win-streak ladder shifts the pairing baseline (Phase 4 wiring) --------- #
+
+
+async def test_streak_lifts_cs2_stat_baseline(session):
+    from moneymatch_api.services import streak_service
+
+    u = await cs2_player(session, "streaker", mu=1.0, sigma=0.5, n=15)
+    # No streak → baseline μ is the raw model μ.
+    res0 = await enq_cs2(session, u)
+    assert res0.ticket.baseline_snapshot["mu"] == 1.0
+    await matchmaking.cancel(session, u)
+
+    # Two wins → the pairing μ is lifted (aims at stronger opponents), stake same.
+    await streak_service.apply_result(session, u.id, CS2, "kd_ratio", True)
+    await streak_service.apply_result(session, u.id, CS2, "kd_ratio", True)
+    res2 = await enq_cs2(session, u)
+    assert res2.ticket.baseline_snapshot["mu"] > 1.0
+    assert res2.ticket.baseline_snapshot["streak_rungs"] == 2
+    await matchmaking.cancel(session, u)
+
+    # A loss resets the streak → back to the raw baseline.
+    await streak_service.apply_result(session, u.id, CS2, "kd_ratio", False)
+    res_reset = await enq_cs2(session, u)
+    assert res_reset.ticket.baseline_snapshot["mu"] == 1.0
+
+
+async def test_streak_lifts_chess_rating(session):
+    from moneymatch_api.services import streak_service
+
+    u = await chess_player(session, "chessstreak", rating=1500, speed="blitz")
+    await streak_service.apply_result(session, u.id, CHESS, "blitz", True)
+    await streak_service.apply_result(session, u.id, CHESS, "blitz", True)
+    await streak_service.apply_result(session, u.id, CHESS, "blitz", True)
+    res = await enq_chess(session, u)
+    # 3 wins × 40 Elo = +120 to the pairing rating.
+    assert res.ticket.baseline_snapshot["rating"] == 1500 + 120

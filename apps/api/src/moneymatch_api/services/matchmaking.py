@@ -203,6 +203,41 @@ async def _build_baseline(
     return baseline
 
 
+# Win-streak matchmaking ladder: how far one consecutive win lifts the pairing
+# target. A win aims you a rung higher; a loss resets the streak to 0 → back to
+# your own level (streak_service handles the reset on settlement).
+_STREAK_ELO_STEP = 40  # chess (Elo band): ~40 rating points per win
+_STREAK_STAT_SIGMA_FRAC = 0.5  # stat duels: half a σ per win
+
+
+async def _apply_streak_offset(
+    session: AsyncSession,
+    user: User,
+    game: str,
+    mode: str,
+    market: MarketDef,
+    baseline: dict,
+) -> int:
+    """Shift the frozen baseline UP by the player's current win streak, so a
+    winning run is matched against progressively stronger opponents (and a loss,
+    which reset the streak, drops them back to their own level). Matchmaking only
+    — the stake is unchanged. Returns the rungs applied (for telemetry)."""
+    from . import streak_ladder, streak_service
+
+    streak = await streak_service.get_streak(session, user.id, game, mode)
+    rungs = streak_ladder.climb_rungs(streak)
+    if rungs <= 0:
+        return 0
+    if market.kind == KIND_WIN_H2H:  # chess Elo band
+        current = int(baseline.get("rating") or 1500)
+        baseline["rating"] = current + _STREAK_ELO_STEP * rungs
+    elif "mu" in baseline:  # stat duel
+        sigma = float(baseline.get("sigma") or 0.0)
+        baseline["mu"] = float(baseline["mu"]) + _STREAK_STAT_SIGMA_FRAC * sigma * rungs
+    baseline["streak_rungs"] = rungs
+    return rungs
+
+
 # --------------------------------------------------------------------------- #
 # can_pair — the anti-collusion seam (keep every rejection in one function).
 # --------------------------------------------------------------------------- #
@@ -682,6 +717,11 @@ async def enqueue(
         return EnqueueResult(status="matched", match=existing)
 
     baseline = await _build_baseline(session, user, market, link, speed)
+    # Win-streak ladder: lift the pairing target by the player's streak so a
+    # winning run climbs toward stronger opponents (fish protection + anti-smurf).
+    await _apply_streak_offset(
+        session, user, game, speed or market.key, market, baseline
+    )
     ticket = await _get_or_create_ticket(
         session, user, market, entry_cents, speed, baseline, link, now
     )
