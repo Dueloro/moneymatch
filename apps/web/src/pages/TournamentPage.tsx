@@ -53,7 +53,6 @@ export function TournamentPage() {
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
 
   const places = markets?.prize_split.length ?? 3;
-  const scoreN = markets?.score_matches ?? 3;
 
   const header = (
     <div className="mb-6 flex flex-col gap-3">
@@ -61,9 +60,9 @@ export function TournamentPage() {
         <ModeSwitcher />
         <div className="ml-auto">
           <HowItWorks id="tournament">
-            A field of similar-skill players all chase the same stat. Your best {scoreN}{' '}
-            matches inside the window are scored automatically, and the top {places}{' '}
-            split the pot. No reporting, no brackets, just play.
+            A field of similar-skill players all chase the same stat. Your{' '}
+            <strong>best game</strong> inside the window is your score, and the top{' '}
+            {places} split the pot. No reporting, no brackets, just play.
           </HowItWorks>
         </div>
       </div>
@@ -189,7 +188,7 @@ export function TournamentPage() {
                     gameName={`${fieldSize} players`}
                     tag={`top ${places} paid`}
                     title={m.label}
-                    subtitle={`Your best ${scoreN} matches in the window are scored automatically.`}
+                    subtitle="Your best game in the window is your score — top places split the pot."
                     entryOptions={presets}
                     payoutFor={(entry) => entry * fieldSize}
                     payoutLabel="Pot if full"
