@@ -50,7 +50,7 @@ export function GameChecklists() {
         {
           done: contested.has(game),
           label: `Join your first ${name} contest`,
-          to: '/pools',
+          to: '/play',
         },
       ];
       return { game, name, steps };

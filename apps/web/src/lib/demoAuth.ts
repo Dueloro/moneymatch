@@ -50,5 +50,5 @@ export async function enterDemo(): Promise<void> {
   }
   const data = (await res.json()) as { access_token: string };
   window.localStorage.setItem(DEMO_TOKEN_KEY, data.access_token);
-  window.location.assign('/pools');
+  window.location.assign('/play');
 }

@@ -12,7 +12,7 @@ export function ComingSoonPanel({ name }: { name: string }) {
       title={`${name} is coming soon`}
       subline={`We're building ${name} matches. It's in your bar so you're ready the moment it goes live. We will let you know.`}
       action={
-        <Link to="/pools">
+        <Link to="/play">
           <PillButton>Back to your games</PillButton>
         </Link>
       }

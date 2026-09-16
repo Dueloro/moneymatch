@@ -7,18 +7,19 @@
 // mode is one tap away; the mobile bar goes from six ~62px tabs to four ~94px
 // ones, which clears the 44px touch-target floor with room to spare.
 export const NAV = [
-  { to: '/pools', label: 'Play' },
+  { to: '/play', label: 'Play' },
   { to: '/activity', label: 'Activity' },
   { to: '/social', label: 'Social' },
   { to: '/wallet', label: 'Wallet' },
 ] as const;
 
-/** The three contest modes that live under "Play". */
+// The product is peer-to-peer only (IMPLEMENTATION_PHASES.md): winners are paid
+// from the pot, never against a bar we set. So the two contest modes are the
+// head-to-head duel and the tournament. Solo Pools and the bucketing bar-wager
+// (both "beat a number we set") have been removed from the product.
 export const PLAY_MODES = [
-  { to: '/pools', label: 'Solo pools' },
-  { to: '/tournament', label: 'Tournament' },
   { to: '/play', label: 'Head-to-head' },
-  { to: '/bucketing', label: 'Bucketing' },
+  { to: '/tournament', label: 'Tournament' },
 ] as const;
 
 const PLAY_PATHS = new Set<string>(PLAY_MODES.map((m) => m.to));

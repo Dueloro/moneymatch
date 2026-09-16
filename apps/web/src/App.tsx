@@ -6,11 +6,9 @@ import { useAuth } from './auth/useAuth';
 import { AppShell } from './components/AppShell';
 import { Loader } from './components/ui/Loader';
 import { ActivityPage } from './pages/ActivityPage';
-import { BucketingPage } from './pages/BucketingPage';
 import { DemoSignInPage } from './pages/DemoSignInPage';
 import { InvitePage } from './pages/InvitePage';
 import { PlayPage } from './pages/PlayPage';
-import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SteamCallbackPage } from './pages/SteamCallbackPage';
 import { SignInPage } from './pages/SignInPage';
@@ -39,9 +37,11 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route path="play" element={<PlayPage />} />
-          <Route path="pools" element={<PoolsPage />} />
           <Route path="tournament" element={<TournamentPage />} />
-          <Route path="bucketing" element={<BucketingPage />} />
+          {/* Peer-to-peer only: Solo Pools and Bucketing (bar wagers) were
+              removed from the product; stray links fall through to Play. */}
+          <Route path="pools" element={<Navigate to="/play" replace />} />
+          <Route path="bucketing" element={<Navigate to="/play" replace />} />
           <Route path="activity" element={<ActivityPage />} />
           <Route path="social" element={<SocialPage />} />
           <Route path="wallet" element={<WalletPage />} />

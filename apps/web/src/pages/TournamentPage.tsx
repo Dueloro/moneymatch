@@ -94,8 +94,8 @@ export function TournamentPage() {
           title={`No tournaments on ${gameMeta(game).name} yet`}
           subline="Tournaments are Counter Strike 2 only for now. More games are coming."
           action={
-            <Link to="/pools">
-              <PillButton>Browse solo pools</PillButton>
+            <Link to="/play">
+              <PillButton>Play head-to-head</PillButton>
             </Link>
           }
         />
