@@ -38,12 +38,20 @@ the running stack.
 
 ---
 
-## 2. Sign in — demo account, NO real game link
+## 2. Sign in — ANY account works, NO real game link needed
 
-1. Open **http://localhost:5173** → **Demo sign-in**.
-2. **Do NOT link any real game account.** The demo account already has placeholder
-   game links and a gem balance. The chess stats used later come from the Lichess
-   **API** (a public account), injected for you — you never play.
+The simulation now works for **any signed-in user**, not just the shared demo
+account. Sign in whichever way is available:
+
+- **Real signup** (`/signin` → email/password or Google) — the "real user" path.
+  Onboard (username + state + 18+). You start with a gem balance and **no game
+  links** — that's fine, the tournament creates a synthetic sim link for you.
+- **Demo sign-in** (`/demosignin`) — the shared demo account, pre-linked.
+
+**Do NOT link any real game account.** The chess stats come from the Lichess
+**API** (a public account), injected for you — you never play. To reach the admin
+console (for the clawback test in §4.4) call **`POST /api/v1/demo/make_admin`**
+once with your token (test build only).
 
 **Expect:** you're in the app with a gem balance and a profile showing linked
 games. Report the balance and that no real linking was needed.
@@ -78,35 +86,40 @@ competitive bots**, and injects stats fetched from the real **Lichess API** that
    ranks move). To avoid waiting 10 minutes, click **"Advance now"** in the same
    panel a few times (API: `POST /api/v1/demo/live_tournament/tick`) and watch the
    board move.
-3. At the window close the worker **settles** it: final ranks, top-3 paid 60/25/15
-   of (pot − rake), and your wallet changes if you placed.
+3. At the window close it **settles**: final ranks, top-3 paid **60/25/15** of
+   (pot − rake), your wallet changes if you placed. To settle **now** instead of
+   waiting 10 minutes, call `POST /api/v1/demo/force_settle` with
+   `{"contest_id":"<tournament_id>"}` (works for any signed-in user in this build).
 
 ### 3.3 Verify (report each)
 
-- [ ] The **"Start live tournament"** button exists on the Tournament tab (demo).
+- [ ] The **"Start live tournament"** button exists on the Tournament tab.
 - [ ] After starting, a tournament with **6 players** (you + 5 bots), a **60/25/15**
-      split, and a countdown appears.
-- [ ] **Standings update** when you click "Advance now" (win counts climb, ranks
-      move) — the "stats fetched from Lichess and updating" behavior.
-- [ ] It **settles** at the window close: final standings, top-3 paid 60/25/15,
-      wallet reflects winnings.
-- [ ] **Money is conserved:** all payouts + rake == the pot (entries × players).
+      split, and a countdown appears — with **distinct opening scores** (not all the
+      same), your row highlighted.
+- [ ] **Standings move** when you click "Advance now" — scores **climb** and ranks
+      **reorder** (each advance returns `{"advanced":1}`, not `0`). Scores are a
+      running total, so they keep rising and separating the field.
+- [ ] It **settles** paying **three different players** 60/25/15 — 1st > 2nd > 3rd,
+      distinct amounts, everyone else 0.
+- [ ] **Money is conserved:** all payouts + rake == the pot (entry × players).
 - [ ] Nothing stuck: no tournament stays "in play" past its window.
 
-If anything is wrong, describe **what actually happened** (e.g. "standings never
-changed after 3 advances", "settled but payouts summed short by N gems").
+If anything is wrong, describe **what actually happened** (scores, ranks, payouts).
 
 ---
 
 ## 4. The five wired features
 
-### 4.1 Win-streak ladder (Play tab)
-- [ ] On **/play**, after you **win** a 1v1, a **🔥 streak badge** appears in the
-      header (e.g. "🔥 2 wins in a row") and grows with each win; a **loss** makes
-      it disappear (reset). Drive a win via the confirm flow or `POST
-      /api/v1/demo/simulate_result` to inject a winning result.
-- [ ] The streak shifts *who you're matched with* (a rung higher per win), never
-      what you wager. (API to read it directly: `GET /api/v1/play/streaks`.)
+### 4.1 Win-streak ladder + 1v1 (Play tab)
+- [ ] On **/play**, joining a market now **forms a match against a practice bot**
+      (in this sim build) — status goes to `matched`/PENDING. (Previously it sat in
+      "Searching" forever.)
+- [ ] `POST /api/v1/demo/simulate_result` now works for **any signed-in user** (no
+      admin needed) — it injects a result for your own account.
+- [ ] After you **win** a 1v1, a **🔥 streak badge** appears on /play and grows
+      with each win; a **loss** resets it. (`GET /api/v1/play/streaks` reads it.)
+      The streak shifts *who you're matched with*, never what you wager.
 
 ### 4.2 Bucketing page (Play modes → Bucketing)
 - [ ] There's a **Bucketing** entry in the Play mode switcher → `/bucketing`.
@@ -125,6 +138,8 @@ changed after 3 advances", "settled but payouts summed short by N gems").
       user, or just confirm the header is sent and note the guard is server-side.)
 
 ### 4.4 Fault-based clawback (Admin → Disputes)
+First reach admin: call **`POST /api/v1/demo/make_admin`** once with your token
+(test build only), then reload — `/admin/*` is now accessible.
 - [ ] In **/admin → Disputes** there's a **"Bucketing dispute — fault-based
       clawback"** panel with dispute-id + fault-user-id inputs and **Clawback** /
       **Refund** buttons.
@@ -206,6 +221,7 @@ description alone.
 | **Start live tournament** | `POST /api/v1/demo/live_tournament` |
 | **Advance it now** | `POST /api/v1/demo/live_tournament/tick` |
 | Read your win streaks | `GET /api/v1/play/streaks` |
+| Become admin (test build) | `POST /api/v1/demo/make_admin` |
 | Bucketing markets | `GET /api/v1/bucketing/markets` |
 | Bucketing clawback (admin) | `POST /api/v1/bucketing/admin/disputes/{id}/resolve` (`resolution:"clawback"`, `fault_player_ids:[...]`) |
 | Inject a 1v1/pool result | `POST /api/v1/demo/simulate_result` |
