@@ -456,6 +456,23 @@ async def enqueue(
         session, user, game, metric, link.host_account_id
     )
 
+    # Confidence-gated stake cap (fish protection / anti-smurf). Aggregate metrics
+    # (chess wins/streak) have no per-metric model, so they gate on host games.
+    from . import aggregate_metrics, stake_limits
+
+    cap_metric = None if aggregate_metrics.is_aggregate(metric) else metric
+    cap = await stake_limits.ceiling_cents(
+        session, user.id, game, metric=cap_metric, link=link
+    )
+    if entry_cents > cap:
+        raise TournamentError(
+            "stake_over_cap",
+            "This entry is above your current limit — play a few more matches to "
+            "raise it.",
+            status_code=422,
+            detail={"cap_cents": cap, "entry_cents": entry_cents},
+        )
+
     existing = await _current_tournament_for_user(session, user.id)
     if existing is not None:
         return TournamentEnqueueResult(status="formed", tournament=existing)

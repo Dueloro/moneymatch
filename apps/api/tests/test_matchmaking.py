@@ -481,3 +481,44 @@ async def test_streak_lifts_chess_rating(session):
     res = await enq_chess(session, u)
     # 3 wins × 40 Elo = +120 to the pairing rating.
     assert res.ticket.baseline_snapshot["rating"] == 1500 + 120
+
+
+# --- stake ladder / fish protection (Phase 4) ------------------------------- #
+
+
+async def test_stake_ceiling_gates_provisional_accounts(session):
+    from moneymatch_api.constants import ENTRY_PRESETS_CENTS, METRIC_PROVISIONAL_MIN_N
+    from moneymatch_api.services import stake_limits
+
+    floor = ENTRY_PRESETS_CENTS[0]
+    top = ENTRY_PRESETS_CENTS[-1]
+    # A provisional / low-record account is held to the floor stake.
+    assert stake_limits.ceiling_for_samples(0) == floor
+    assert stake_limits.ceiling_for_samples(METRIC_PROVISIONAL_MIN_N - 1) == floor
+    # An established account is uncapped (the full preset ladder).
+    assert stake_limits.ceiling_for_samples(METRIC_PROVISIONAL_MIN_N) == top
+    assert stake_limits.ceiling_for_samples(100) == top
+
+
+async def test_low_history_chess_account_is_stake_capped(session):
+    # For win-only chess there is no per-metric provisional gate, so the stake cap
+    # is the fish-protection backstop: a low-history account can't stake the top.
+    from moneymatch_api.constants import ENTRY_PRESETS_CENTS
+
+    u = await chess_player(session, "rookiechess", rating=1500)
+    # Force a low host game count on the link so the cap bites.
+    from sqlalchemy import select as _select
+
+    from moneymatch_api.models.linked_account import LinkedAccount
+
+    link = await session.scalar(
+        _select(LinkedAccount).where(LinkedAccount.user_id == u.id)
+    )
+    snap = dict(link.profile_snapshot)
+    snap["total_games"] = 3
+    link.profile_snapshot = snap
+    await session.flush()
+
+    with pytest.raises(MatchmakingError) as exc:
+        await enq_chess(session, u, entry=ENTRY_PRESETS_CENTS[-1])
+    assert exc.value.code == "stake_over_cap"

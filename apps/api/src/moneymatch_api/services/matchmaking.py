@@ -712,6 +712,22 @@ async def enqueue(
     link = await _require_link(session, user.id, game)
     await _assert_eligible(session, user, game, market, link)
 
+    # Confidence-gated stake cap (fish protection / anti-smurf): a low-record
+    # account is limited to small stakes until it builds a record.
+    from . import stake_limits
+
+    cap = await stake_limits.ceiling_cents(
+        session, user.id, game, metric=market.metric, link=link
+    )
+    if entry_cents > cap:
+        raise MatchmakingError(
+            "stake_over_cap",
+            "This stake is above your current limit — play a few more matches to "
+            "raise it.",
+            status_code=422,
+            detail={"cap_cents": cap, "entry_cents": entry_cents},
+        )
+
     existing = await _current_match_for_user(session, user.id)
     if existing is not None:
         return EnqueueResult(status="matched", match=existing)
