@@ -22,11 +22,6 @@ import { platformFeeNote, rakeOnPot } from '../lib/rake';
 import { filledSpots } from '../lib/spots';
 import { useAuth } from '../auth/useAuth';
 import { useGameSelection } from '../hooks/useGameSelection';
-import { useSimulateEnabled } from '../hooks/useMe';
-import {
-  useStartLiveTournament,
-  useTickLiveTournament,
-} from '../hooks/useLiveTournament';
 import {
   useEnterTournament,
   useLeaveTournament,
@@ -39,7 +34,6 @@ import {
 export function TournamentPage() {
   usePageTitle('Tournament');
   const { isDemo } = useAuth();
-  const simulateEnabled = useSimulateEnabled();
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
   const {
@@ -67,11 +61,6 @@ export function TournamentPage() {
         </div>
       </div>
       <GameTabs games={games} selected={game} onSelect={setGame} />
-      {(simulateEnabled || isDemo) && (
-        <LiveTournamentPanel
-          hasActive={status?.status === 'formed' || status?.status === 'searching'}
-        />
-      )}
     </div>
   );
 
@@ -303,40 +292,3 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
   );
 }
 
-/**
- * Demo-only control to run the self-driving live tournament: it injects real
- * Lichess-derived stats that update over ~10 minutes (simulating play), fills the
- * field with bots, and settles itself — all visible in the status banner above.
- * "Advance now" fast-forwards a round so a tester needn't wait for the timer.
- */
-function LiveTournamentPanel({ hasActive }: { hasActive: boolean }) {
-  const start = useStartLiveTournament();
-  const tick = useTickLiveTournament();
-  return (
-    <Card className="flex flex-col gap-3 p-4" data-testid="live-tournament-panel">
-      <div>
-        <p className="text-sm font-medium text-text">Demo · self-driving tournament</p>
-        <p className="text-xs text-text-secondary">
-          Starts a ~10-minute chess tournament with bots. Stats are fetched from the
-          Lichess API and keep changing to simulate play — no game account or real
-          play needed. Watch the standings update above, then it settles 60/25/15.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <PillButton
-          onClick={() => start.mutate()}
-          disabled={start.isPending || hasActive}
-        >
-          {hasActive ? 'Tournament running' : 'Start live tournament'}
-        </PillButton>
-        <PillButton
-          variant="text"
-          onClick={() => tick.mutate()}
-          disabled={tick.isPending || !hasActive}
-        >
-          Advance now
-        </PillButton>
-      </div>
-    </Card>
-  );
-}
