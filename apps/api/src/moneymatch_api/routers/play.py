@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -230,8 +230,19 @@ async def get_markets(
 async def join_queue(
     body: QueueRequest,
     user: CurrentUser,
+    request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> QueueStatusResponse:
+    # Record this client's identity signals (device/IP) so the same-human guard in
+    # `can_pair` can keep two accounts on one device from being matched together.
+    from ..services import fingerprint_service
+
+    device_id = request.headers.get("x-device-id")
+    ip = request.client.host if request.client else None
+    await fingerprint_service.record_signals(
+        session, user.id, fingerprint_service.build_signals(device_id=device_id, ip=ip)
+    )
+
     result = await matchmaking.enqueue(
         session,
         user,

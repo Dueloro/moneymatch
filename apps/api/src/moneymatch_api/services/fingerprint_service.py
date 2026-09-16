@@ -45,15 +45,29 @@ async def record_signals(
     await session.flush()
 
 
+# Signal kinds strong enough to HARD-BLOCK co-entry on their own. A shared device
+# or payment instrument is a strong same-human signal; a shared IP is not (a
+# household, campus, or mobile-carrier NAT puts many distinct people on one IP), so
+# IP is recorded for review but never blocks a pairing by itself.
+_BLOCKING_KINDS = ("device:", "payment:")
+
+
+def _is_blocking(signal: str) -> bool:
+    return signal.startswith(_BLOCKING_KINDS)
+
+
 async def _signals_for(
-    session: AsyncSession, player_id: uuid.UUID
+    session: AsyncSession, player_id: uuid.UUID, *, blocking_only: bool = False
 ) -> frozenset[str]:
     rows = await session.scalars(
         select(PlayerFingerprint.signal).where(
             PlayerFingerprint.player_id == player_id
         )
     )
-    return frozenset(rows)
+    signals = frozenset(rows)
+    if blocking_only:
+        return frozenset(s for s in signals if _is_blocking(s))
+    return signals
 
 
 async def can_co_enter(
@@ -67,8 +81,12 @@ async def can_co_enter(
     others = [pid for pid in existing_ids if pid != candidate_id]
     if not others:
         return True
-    candidate = await _signals_for(session, candidate_id)
+    # Only strong signals (device / payment) hard-block; a shared IP alone never
+    # does, to avoid blocking legitimate players behind one NAT.
+    candidate = await _signals_for(session, candidate_id, blocking_only=True)
     if not candidate:
         return True
-    existing = [await _signals_for(session, pid) for pid in others]
+    existing = [
+        await _signals_for(session, pid, blocking_only=True) for pid in others
+    ]
     return collusion.can_co_enter(candidate, existing)

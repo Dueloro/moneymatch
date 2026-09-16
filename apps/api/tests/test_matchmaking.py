@@ -522,3 +522,35 @@ async def test_low_history_chess_account_is_stake_capped(session):
     with pytest.raises(MatchmakingError) as exc:
         await enq_chess(session, u, entry=ENTRY_PRESETS_CENTS[-1])
     assert exc.value.code == "stake_over_cap"
+
+
+async def test_same_device_accounts_are_not_paired(session):
+    from moneymatch_api.services import fingerprint_service as fp
+
+    a = await cs2_player(session, "colluder_a")
+    b = await cs2_player(session, "colluder_b")
+    # Both accounts share a device signal.
+    await fp.record_signals(
+        session, a.id, fp.build_signals(device_id="SAME", ip="1.1.1.1")
+    )
+    await fp.record_signals(
+        session, b.id, fp.build_signals(device_id="SAME", ip="2.2.2.2")
+    )
+    await enq_cs2(session, a)
+    # b would otherwise pair with a (same μ), but the same-human guard blocks it.
+    assert (await enq_cs2(session, b)).status == "searching"
+
+
+async def test_distinct_device_accounts_still_pair(session):
+    from moneymatch_api.services import fingerprint_service as fp
+
+    a = await cs2_player(session, "fair_a")
+    b = await cs2_player(session, "fair_b")
+    await fp.record_signals(
+        session, a.id, fp.build_signals(device_id="DEV_A", ip="1.1.1.1")
+    )
+    await fp.record_signals(
+        session, b.id, fp.build_signals(device_id="DEV_B", ip="2.2.2.2")
+    )
+    await enq_cs2(session, a)
+    assert (await enq_cs2(session, b)).status == "matched"

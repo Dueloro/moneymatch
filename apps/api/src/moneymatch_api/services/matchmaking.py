@@ -300,6 +300,11 @@ async def can_pair(
             return False
     if await _recent_pair_exists(session, me.user_id, cand.user_id, now):
         return False
+    # Same-human / collusion: never pair two accounts that share a device / IP.
+    from . import fingerprint_service
+
+    if not await fingerprint_service.can_co_enter(session, me.user_id, [cand.user_id]):
+        return False
     return True
 
 
