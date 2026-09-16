@@ -55,7 +55,6 @@ from ..services import (
     admin_contests_service,
     challenge_service,
     chat_service,
-    demo_mode,
     demo_simulation,
     demo_tournament,
     linking_service,
@@ -1123,17 +1122,15 @@ async def start_live_tournament(
     session: AsyncSession = Depends(get_session),
     minutes: int = 10,
 ) -> dict:
-    """Start a self-driving ~10-minute chess tournament for the demo user.
+    """Start a self-driving ~10-minute chess tournament for the signed-in user.
 
-    Enrols the demo user + competitive bots, injects stats fetched from the real
-    Lichess API (updating over the window), and lets the normal worker settle it.
-    The existing Tournament page renders it live. Demo account only.
+    Enrols the player (no game link required — a synthetic sim link is created)
+    plus competitive bots, injects stats fetched from the real Lichess API
+    (updating over the window), and settles itself 60/25/15. The existing
+    Tournament page renders it live. Any account, but only while
+    `demo_simulate_enabled` is on (a test build) — a no-op in real production.
     """
     _assert_simulation_enabled(settings)
-    if not demo_mode.is_demo_user(user):
-        raise APIError(
-            "demo_only", "The live tournament is for the demo account.", status_code=403
-        )
     minutes = max(2, min(minutes, 60))
     tournament = await demo_tournament.start_live(session, user, minutes=minutes)
     await session.commit()
@@ -1159,13 +1156,11 @@ async def tick_live_tournament(
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Advance every live demo tournament by one round of injected games now
-    (so a tester can fast-forward instead of waiting for the tick timer). Demo
-    account only."""
+    """Advance every live simulation tournament by one round of injected games
+    **now** (force), so a tester can fast-forward instead of waiting for the tick
+    timer. Available while `demo_simulate_enabled` is on."""
     _assert_simulation_enabled(settings)
-    if not demo_mode.is_demo_user(user):
-        raise APIError("demo_only", "Demo account only.", status_code=403)
-    advanced = await demo_tournament.tick(session)
+    advanced = await demo_tournament.tick(session, force=True)
     await session.commit()
     return {"advanced": advanced}
 

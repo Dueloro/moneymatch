@@ -462,16 +462,28 @@ async def _process_due_tournaments(
             )
             if tournament is None:
                 continue
-            entries = list(
-                await session.scalars(
-                    select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
-                )
-            )
-            grades = await telemetry_fetch.grade_tournament(
-                session, tournament, entries
-            )
             try:
-                await tournament_engine.settle_tournament(session, tournament, grades)
+                # A self-driving simulation tournament settles on its own scoring
+                # path (distinct running-total scores, 60/25/15); everything else
+                # uses the generic first-N engine.
+                from ..services import demo_tournament
+
+                if demo_tournament.is_live_tournament(tournament):
+                    await demo_tournament.settle(session, tournament)
+                else:
+                    entries = list(
+                        await session.scalars(
+                            select(TournamentEntry).where(
+                                TournamentEntry.tournament_id == tid
+                            )
+                        )
+                    )
+                    grades = await telemetry_fetch.grade_tournament(
+                        session, tournament, entries
+                    )
+                    await tournament_engine.settle_tournament(
+                        session, tournament, grades
+                    )
                 await session.commit()
             except ReconciliationError as exc:
                 await session.rollback()
@@ -496,6 +508,11 @@ async def _refresh_tournament_standings(
         async with sm() as session:
             tournament = await session.get(Tournament, tid)
             if tournament is None or tournament.state != "LOCKED":
+                continue
+            # A simulation tournament keeps its own standings fresh via
+            # demo_tournament.tick each cycle — don't let the generic (first-N)
+            # refresh overwrite them with tied scores.
+            if (tournament.outcome_detail or {}).get("demo_live"):
                 continue
             fresh_enough = (
                 tournament.standings_updated_at is not None
