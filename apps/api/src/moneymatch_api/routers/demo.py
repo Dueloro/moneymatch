@@ -39,7 +39,7 @@ from ..constants import (
     game_display_name,
 )
 from ..db.session import get_session
-from ..dependencies import AdminUser, CurrentUser
+from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.chat import Conversation, ConversationMember, Message
 from ..models.linked_account import LinkedAccount
@@ -1050,24 +1050,24 @@ def _assert_simulation_enabled(settings: Settings) -> None:
         raise APIError("not_found", "Not found.", status_code=404)
 
 
-async def _demo_or_named_user(session: AsyncSession, user_id: uuid.UUID | None) -> User:
+async def _target_user(
+    session: AsyncSession, user_id: uuid.UUID | None, current: User
+) -> User:
+    """The user a simulation call targets: an explicit id, else the caller
+    themselves. (Behind `demo_simulate_enabled`, so any signed-in user can inject
+    a result for their own account in a test build.)"""
     if user_id is not None:
         target = await session.get(User, user_id)
         if target is None:
             raise APIError("not_found", "No such user.", status_code=404)
         return target
-    target = await session.scalar(select(User).where(User.auth_id == DEMO_AUTH_ID))
-    if target is None:
-        raise APIError(
-            "not_found", "The demo user does not exist yet.", status_code=404
-        )
-    return target
+    return current
 
 
 @router.post("/simulate_result", response_model=SimulateResultResponse)
 async def simulate_result(
     body: SimulateResultRequest,
-    admin: AdminUser,
+    user: CurrentUser,
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(get_session),
 ) -> SimulateResultResponse:
@@ -1077,11 +1077,12 @@ async def simulate_result(
     adapter merges it into `poll_eligible_games` alongside real history. So the
     settlement worker, the pool engine and the payout path all read it through
     the same call they use for a real match, and none of them has a branch for
-    it. That is the point: a demo that proves the real path works.
+    it. Available to any signed-in user while `demo_simulate_enabled` is on;
+    defaults to injecting a result for the caller.
     """
     _assert_simulation_enabled(settings)
 
-    target = await _demo_or_named_user(session, body.user_id)
+    target = await _target_user(session, body.user_id, user)
     link = await linking_service.get_link(session, target.id, body.game)
     if link is None:
         raise APIError(
@@ -1101,7 +1102,7 @@ async def simulate_result(
         rounds=body.rounds,
         moves=body.moves,
         played_at=body.played_at,
-        created_by=f"admin:{admin.username or admin.id}",
+        created_by=f"user:{user.username or user.id}",
     )
     await session.commit()
 
@@ -1165,10 +1166,25 @@ async def tick_live_tournament(
     return {"advanced": advanced}
 
 
+@router.post("/make_admin")
+async def make_admin(
+    user: CurrentUser,
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Promote the signed-in user to admin so a tester can reach the admin console
+    (contests, disputes, clawback, flags). **Test build only** — gated on
+    `demo_simulate_enabled`, which must be off in real production."""
+    _assert_simulation_enabled(settings)
+    user.role = "admin"
+    await session.commit()
+    return {"role": user.role}
+
+
 @router.post("/force_settle", response_model=ForceSettleResponse)
 async def force_settle(
     body: ForceSettleRequest,
-    admin: AdminUser,
+    user: CurrentUser,
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(get_session),
 ) -> ForceSettleResponse:
@@ -1177,7 +1193,8 @@ async def force_settle(
     Runs the worker's own grade-then-settle sequence for a single contest. It
     does not shortcut grading: the contest is graded from whatever match history
     the adapters return, so a forced settlement still reflects real (or injected)
-    results rather than a fabricated outcome.
+    results rather than a fabricated outcome. Available to any signed-in user
+    while `demo_simulate_enabled` is on.
     """
     _assert_simulation_enabled(settings)
 
@@ -1195,7 +1212,7 @@ async def force_settle(
             kind="pool",
             contest_id=str(pool.id),
             state=settled.state,
-            by=str(admin.id),
+            by=str(user.id),
         )
         return ForceSettleResponse(
             kind="pool",
@@ -1209,17 +1226,23 @@ async def force_settle(
         # Distinct names from the pool branch above: the two grade maps and the
         # two contest types are different shapes, and reusing one name for both
         # is how a settle path ends up passing the wrong one.
-        field = list(
-            await session.scalars(
-                select(TournamentEntry).where(
-                    TournamentEntry.tournament_id == tournament.id
+        # A self-driving simulation tournament settles on its own scoring path.
+        if demo_tournament.is_live_tournament(tournament):
+            finished = await demo_tournament.settle(session, tournament)
+        else:
+            field = list(
+                await session.scalars(
+                    select(TournamentEntry).where(
+                        TournamentEntry.tournament_id == tournament.id
+                    )
                 )
             )
-        )
-        standings = await telemetry_fetch.grade_tournament(session, tournament, field)
-        finished = await tournament_engine.settle_tournament(
-            session, tournament, standings
-        )
+            standings = await telemetry_fetch.grade_tournament(
+                session, tournament, field
+            )
+            finished = await tournament_engine.settle_tournament(
+                session, tournament, standings
+            )
         await session.commit()
         log.warning(
             "demo.force_settled",
@@ -1227,7 +1250,7 @@ async def force_settle(
             kind="tournament",
             contest_id=str(tournament.id),
             state=finished.state,
-            by=str(admin.id),
+            by=str(user.id),
         )
         return ForceSettleResponse(
             kind="tournament",

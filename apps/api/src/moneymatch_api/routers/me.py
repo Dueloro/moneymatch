@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import get_settings
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
@@ -90,6 +91,7 @@ async def _me(session: AsyncSession, user: User) -> MeResponse:
         unread_notifications=unread,
         getting_started=await _getting_started(session, user),
         contested_games=await _contested_games(session, user),
+        simulate_enabled=get_settings().demo_simulate_enabled,
     )
 
 

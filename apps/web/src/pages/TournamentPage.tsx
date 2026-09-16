@@ -22,6 +22,7 @@ import { platformFeeNote, rakeOnPot } from '../lib/rake';
 import { filledSpots } from '../lib/spots';
 import { useAuth } from '../auth/useAuth';
 import { useGameSelection } from '../hooks/useGameSelection';
+import { useSimulateEnabled } from '../hooks/useMe';
 import {
   useStartLiveTournament,
   useTickLiveTournament,
@@ -38,6 +39,7 @@ import {
 export function TournamentPage() {
   usePageTitle('Tournament');
   const { isDemo } = useAuth();
+  const simulateEnabled = useSimulateEnabled();
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
   const {
@@ -66,7 +68,7 @@ export function TournamentPage() {
         </div>
       </div>
       <GameTabs games={games} selected={game} onSelect={setGame} />
-      {isDemo && (
+      {(simulateEnabled || isDemo) && (
         <LiveTournamentPanel
           hasActive={status?.status === 'formed' || status?.status === 'searching'}
         />

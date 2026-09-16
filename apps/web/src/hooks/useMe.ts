@@ -44,6 +44,14 @@ export interface Me {
   getting_started: GettingStarted | null;
   /** Games the player has entered a contest for (per-game checklist progress). */
   contested_games: string[];
+  /** True in a simulation test build: show the self-driving tournament controls. */
+  simulate_enabled?: boolean;
+}
+
+/** Whether this build exposes the self-driving simulation tournament controls. */
+export function useSimulateEnabled(): boolean {
+  const { data } = useMe();
+  return data?.simulate_enabled === true;
 }
 
 /** Fetches `/me` once the user is authenticated. Provisions the row server-side. */

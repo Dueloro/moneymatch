@@ -75,14 +75,17 @@ _MU_FACTOR = 1.0
 
 
 def is_enabled(user: User) -> bool:
-    """Only ever for the shared demo account.
-
-    Not an environment switch and not a feature flag: this is a property of
-    *who is playing*. A real signup never sees a fabricated opponent, in any
-    environment, so the production path stays honest while the demo account
-    stays fully exercisable. Removing demo login removes this with it.
+    """Practice opponents are available for the shared demo account, and — in a
+    **simulation test build** (`demo_simulate_enabled`) — for any signed-in user,
+    so a real signup can exercise pools / 1v1 without a second human. Both gates
+    are off in real production, so the production path never sees a fabricated
+    opponent.
     """
-    return demo_mode.is_demo_user(user)
+    if demo_mode.is_demo_user(user):
+        return True
+    from ..config import get_settings
+
+    return bool(get_settings().demo_simulate_enabled)
 
 
 async def _opponent(

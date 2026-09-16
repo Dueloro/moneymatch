@@ -61,6 +61,9 @@ class MeResponse(BaseModel):
     getting_started: GettingStarted | None = None
     # Games the player has entered a contest for — per-game checklist progress.
     contested_games: list[str] = Field(default_factory=list)
+    # True in a simulation test build (`demo_simulate_enabled`): the client uses
+    # it to show the self-driving live-tournament controls. Off in real prod.
+    simulate_enabled: bool = False
 
 
 class UpdateMeRequest(BaseModel):

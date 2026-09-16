@@ -1679,7 +1679,8 @@ export interface paths {
          *     adapter merges it into `poll_eligible_games` alongside real history. So the
          *     settlement worker, the pool engine and the payout path all read it through
          *     the same call they use for a real match, and none of them has a branch for
-         *     it. That is the point: a demo that proves the real path works.
+         *     it. Available to any signed-in user while `demo_simulate_enabled` is on;
+         *     defaults to injecting a result for the caller.
          */
         post: operations["simulate_result_api_v1_demo_simulate_result_post"];
         delete?: never;
@@ -1699,11 +1700,13 @@ export interface paths {
         put?: never;
         /**
          * Start Live Tournament
-         * @description Start a self-driving ~10-minute chess tournament for the demo user.
+         * @description Start a self-driving ~10-minute chess tournament for the signed-in user.
          *
-         *     Enrols the demo user + competitive bots, injects stats fetched from the real
-         *     Lichess API (updating over the window), and lets the normal worker settle it.
-         *     The existing Tournament page renders it live. Demo account only.
+         *     Enrols the player (no game link required — a synthetic sim link is created)
+         *     plus competitive bots, injects stats fetched from the real Lichess API
+         *     (updating over the window), and settles itself 60/25/15. The existing
+         *     Tournament page renders it live. Any account, but only while
+         *     `demo_simulate_enabled` is on (a test build) — a no-op in real production.
          */
         post: operations["start_live_tournament_api_v1_demo_live_tournament_post"];
         delete?: never;
@@ -1723,11 +1726,33 @@ export interface paths {
         put?: never;
         /**
          * Tick Live Tournament
-         * @description Advance every live demo tournament by one round of injected games now
-         *     (so a tester can fast-forward instead of waiting for the tick timer). Demo
-         *     account only.
+         * @description Advance every live simulation tournament by one round of injected games
+         *     **now** (force), so a tester can fast-forward instead of waiting for the tick
+         *     timer. Available while `demo_simulate_enabled` is on.
          */
         post: operations["tick_live_tournament_api_v1_demo_live_tournament_tick_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/make_admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Admin
+         * @description Promote the signed-in user to admin so a tester can reach the admin console
+         *     (contests, disputes, clawback, flags). **Test build only** — gated on
+         *     `demo_simulate_enabled`, which must be off in real production.
+         */
+        post: operations["make_admin_api_v1_demo_make_admin_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1750,7 +1775,8 @@ export interface paths {
          *     Runs the worker's own grade-then-settle sequence for a single contest. It
          *     does not shortcut grading: the contest is graded from whatever match history
          *     the adapters return, so a forced settlement still reflects real (or injected)
-         *     results rather than a fabricated outcome.
+         *     results rather than a fabricated outcome. Available to any signed-in user
+         *     while `demo_simulate_enabled` is on.
          */
         post: operations["force_settle_api_v1_demo_force_settle_post"];
         delete?: never;
@@ -2982,6 +3008,11 @@ export interface components {
             getting_started?: components["schemas"]["GettingStarted"] | null;
             /** Contested Games */
             contested_games?: string[];
+            /**
+             * Simulate Enabled
+             * @default false
+             */
+            simulate_enabled: boolean;
         };
         /**
          * MessageView
@@ -7331,6 +7362,39 @@ export interface operations {
         };
     };
     tick_live_tournament_api_v1_demo_live_tournament_tick_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_admin_api_v1_demo_make_admin_post: {
         parameters: {
             query?: never;
             header?: {
