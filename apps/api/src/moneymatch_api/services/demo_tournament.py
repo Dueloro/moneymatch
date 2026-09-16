@@ -95,6 +95,25 @@ async def _fetch_lichess_move_pool(count: int = 40) -> list[int]:
     return moves
 
 
+def _chess_snapshot(handle: str) -> dict[str, Any]:
+    """A complete ProfileSnapshot-shaped dict so matchmaking (1v1/pools) accepts
+    the account, not just the tournament."""
+    return {
+        "username": handle,
+        "display_name": handle,
+        "url": f"https://lichess.org/@/{handle}",
+        "link_method": "username",
+        "game": GAME_CHESS_LICHESS,
+        "win_rate": 0.5,
+        "draw_rate": 0.0,
+        "total_games": 20,
+        "primary_speed": "blitz",
+        "formats": [
+            {"speed": "blitz", "rating": 1500, "games": 20, "provisional": False}
+        ],
+    }
+
+
 async def _chess_link(
     session: AsyncSession, user_id: uuid.UUID
 ) -> LinkedAccount | None:
@@ -113,18 +132,15 @@ async def _ensure_sim_link(session: AsyncSession, player: User) -> LinkedAccount
     link = await _chess_link(session, player.id)
     if link is not None:
         return link
+    handle = player.username or "player"
+    snapshot = _chess_snapshot(handle)
+    snapshot["simulated"] = True
     link = LinkedAccount(
         user_id=player.id,
         game=GAME_CHESS_LICHESS,
         host_account_id=f"sim:{player.id}",
-        host_username=player.username or "player",
-        profile_snapshot={
-            "username": player.username or "player",
-            "game": GAME_CHESS_LICHESS,
-            "primary_speed": "blitz",
-            "formats": [{"speed": "blitz", "rating": 1500, "games": 20}],
-            "simulated": True,
-        },
+        host_username=handle,
+        profile_snapshot=snapshot,
     )
     session.add(link)
     await session.flush()
@@ -159,12 +175,7 @@ async def _make_bot(session: AsyncSession, name: str) -> tuple[User, LinkedAccou
             game=GAME_CHESS_LICHESS,
             host_account_id=host_id,
             host_username=f"{name}Bot",
-            profile_snapshot={
-                "username": f"{name}Bot",
-                "game": GAME_CHESS_LICHESS,
-                "primary_speed": "blitz",
-                "formats": [{"speed": "blitz", "rating": 1500, "games": 20}],
-            },
+            profile_snapshot=_chess_snapshot(f"{name}Bot"),
         )
         session.add(linked)
     await session.flush()

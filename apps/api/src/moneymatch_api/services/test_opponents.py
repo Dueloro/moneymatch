@@ -138,16 +138,21 @@ async def _opponent(
     # Rewritten every time rather than only on creation, so opponents left over
     # from a previous session pick your current rating up instead of holding a
     # stale one.
+    # A complete ProfileSnapshot shape — matchmaking reconstructs a ProfileSnapshot
+    # from this for the chess (Elo-band) 1v1 path, which validates every field.
+    rating_int = int(rating) if rating else 1500
     snapshot = {
         "username": handle,
+        "display_name": handle,
+        "url": f"https://lichess.org/@/{handle}",
+        "link_method": "username",
         "game": game,
+        "win_rate": 0.5,
+        "draw_rate": 0.0,
+        "total_games": 20,
         "primary_speed": "bullet",
         "formats": [
-            {
-                "speed": "bullet",
-                "rating": int(rating) if rating else 1500,
-                "games": 20,
-            }
+            {"speed": "bullet", "rating": rating_int, "games": 20, "provisional": False}
         ],
     }
     if linked is None:
