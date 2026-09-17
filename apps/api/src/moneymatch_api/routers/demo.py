@@ -1090,56 +1090,6 @@ async def simulate_result(
     )
 
 
-@router.post("/live_tournament")
-async def start_live_tournament(
-    user: CurrentUser,
-    settings: Settings = Depends(get_settings),
-    session: AsyncSession = Depends(get_session),
-    minutes: int = 10,
-) -> dict:
-    """Start a self-driving ~10-minute chess tournament for the signed-in user.
-
-    Enrols the player (no game link required — a synthetic sim link is created)
-    plus competitive bots, injects stats fetched from the real Lichess API
-    (updating over the window), and settles itself 60/25/15. The existing
-    Tournament page renders it live. Any account, but only while
-    `demo_simulate_enabled` is on (a test build) — a no-op in real production.
-    """
-    _assert_simulation_enabled(settings)
-    minutes = max(2, min(minutes, 60))
-    tournament = await demo_tournament.start_live(session, user, minutes=minutes)
-    await session.commit()
-    return {
-        "tournament_id": str(tournament.id),
-        "game": tournament.game,
-        "metric": tournament.ranking_metric,
-        "field_size": tournament.field_size,
-        "entry_cents": tournament.entry_cents,
-        "prize_split": tournament.prize_split,
-        "window_ends_at": tournament.window_ends_at.isoformat(),
-        "message": (
-            f"Live chess tournament started with {tournament.field_size} players. "
-            "Open the Tournament tab to watch standings update, then it settles at "
-            "the window close."
-        ),
-    }
-
-
-@router.post("/live_tournament/tick")
-async def tick_live_tournament(
-    user: CurrentUser,
-    settings: Settings = Depends(get_settings),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Advance every live simulation tournament by one round of injected games
-    **now** (force), so a tester can fast-forward instead of waiting for the tick
-    timer. Available while `demo_simulate_enabled` is on."""
-    _assert_simulation_enabled(settings)
-    advanced = await demo_tournament.tick(session, force=True)
-    await session.commit()
-    return {"advanced": advanced}
-
-
 @router.post("/make_admin")
 async def make_admin(
     user: CurrentUser,

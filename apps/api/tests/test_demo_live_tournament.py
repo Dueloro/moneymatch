@@ -111,3 +111,39 @@ async def test_worker_routes_live_tournament_to_own_settle(session, simulate_on)
         await demo_tournament.tick(session, force=True)
     settled = await demo_tournament.settle(session, t)
     assert settled.state == "SETTLED"
+
+
+async def test_matches_the_joined_game_and_metric(session, simulate_on):
+    """A CS2 tournament fills with CS2 bots and ranks on the joined CS2 metric —
+    the self-driving tournament follows the game the player joined, not chess."""
+    user = await _player(session)
+    t = await demo_tournament.start_live(
+        session, user, game="cs2.steam", metric="cs2_kills", num_bots=4
+    )
+    assert t.game == "cs2.steam"
+    assert t.ranking_metric == "cs2_kills"
+
+    from moneymatch_api.models.linked_account import LinkedAccount
+
+    link = await session.scalar(
+        select(LinkedAccount).where(
+            LinkedAccount.user_id == user.id, LinkedAccount.game == "cs2.steam"
+        )
+    )
+    assert link is not None  # a synthetic CS2 link was created
+
+    for _ in range(3):
+        await demo_tournament.tick(session, force=True)
+    t2 = await session.get(Tournament, t.id)
+    ranks = sorted(r["rank"] for r in t2.standings_cache["rows"])
+    assert ranks == [1, 2, 3, 4, 5]  # 5 distinct places, board moved
+
+
+async def test_chess_is_limited_to_one_mode(session, simulate_on):
+    """Chess collapses to a single mode: whatever chess metric is joined, it runs
+    on per-game move count (blitz), so one chess tournament shape settles cleanly."""
+    user = await _player(session)
+    t = await demo_tournament.start_live(
+        session, user, game="chess.lichess", metric="chess_wins"
+    )
+    assert t.ranking_metric == "chess_moves"  # not the joined aggregate metric

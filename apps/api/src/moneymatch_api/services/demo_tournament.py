@@ -4,12 +4,12 @@
 simulation surface before real-money launch.
 
 It lets *any* signed-in player watch the whole tournament loop in the browser
-without linking a real game account or playing a game:
+without linking a real game account or playing a game. It runs on **whatever game
+the player joined** — the field, bots and injected stats all match that game:
 
-- Creates a short-window (default **10 min**) chess tournament and enrols the
-  player plus a handful of **competitive bots**.
-- **Injects stats the same way the app reads them**: it fetches real games from
-  the **Lichess API** for the player's move counts, and gives each bot its own
+- Creates a short-window (default **10 min**) tournament for the joined game and
+  enrols the player plus a handful of **competitive bots**.
+- **Injects stats the same way the app reads them**: each participant gets its own
   varying results, recorded as injected `SimulatedMatch` rows. The stats **keep
   changing** over the window (`tick` injects another finished game per player), so
   standings move — simulating everyone still playing.
@@ -23,6 +23,9 @@ without linking a real game account or playing a game:
 The score is a running total (not best-of-N or count-of-wins), which is what makes
 the standings both move continuously and separate the field into distinct places
 so the 60/25/15 split pays three different players.
+
+Chess is deliberately limited to a **single game mode (blitz)** and ranked on
+per-game move count ("Moves to win"), so one chess tournament shape settles cleanly.
 """
 
 from __future__ import annotations
@@ -36,31 +39,45 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..constants import GAME_CHESS_LICHESS
+from ..constants import GAME_CHESS_LICHESS, metric_label
 from ..models.demo_simulation import SimulatedMatch
 from ..models.linked_account import LinkedAccount
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from . import demo_simulation, money_math, wallet_service
-from .hosts import lichess
 from .user_service import provision_new_user
 
 log = structlog.get_logger(__name__)
 
 REF_TOURNAMENT = "tournament"
 
-# A public, always-active Lichess account we borrow realistic move counts from (we
-# never link the player to it — only the stat values are used, the same shape the
-# chess adapter reads).
-_LICHESS_SOURCE = "Zhigalko_Sergei"
-
 # Bots are ordinary users under this prefix. They are graded from their own
 # injected games and genuinely compete for a place.
 _LIVE_BOT_PREFIX = "zz_livebot_"
 _BOT_NAMES = ("Nova", "Pixel", "Echo", "Vega", "Zephyr", "Comet", "Juno", "Orbit")
 
-# The tournament's ranking metric key; the injected value lives here per game.
-DEMO_TOURNAMENT_METRIC = "chess_moves"
+# Chess is limited to one game mode. Blitz is the chosen mode, and chess is ranked
+# on per-game move count so the sum-of-values scoring stays distinct and climbing.
+_CHESS_METRIC = "chess_moves"
+_CHESS_SPEED = "blitz"
+
+# Plausible per-injected-game value ranges (lo, hi) per ranking metric, so the
+# numbers on the standings board look like the game and not like noise. A metric we
+# don't know falls back to a generic spread — the demo still separates the field.
+_METRIC_RANGE: dict[str, tuple[float, float]] = {
+    "chess_moves": (20, 60),
+    "cs2_kills": (8, 30),
+    "cs2_kd_ratio": (0.7, 2.2),
+    "cs2_headshot_pct": (30, 65),
+    "cs2_adr": (50, 120),
+    "pubg_kills": (2, 12),
+    "pubg_damage": (150, 700),
+    "pubg_headshot_pct": (10, 40),
+    "dota2_kda_ratio": (1.5, 6.0),
+    "dota2_gpm": (350, 750),
+}
+_DEFAULT_RANGE = (1.0, 50.0)
+
 DEFAULT_MINUTES = 10
 DEFAULT_BOTS = 5
 DEFAULT_ENTRY_CENTS = 500
@@ -76,79 +93,86 @@ def _is_bot(host_account_id: str) -> bool:
     return host_account_id.startswith(_LIVE_BOT_PREFIX)
 
 
-async def _fetch_lichess_move_pool(count: int = 40) -> list[int]:
-    """Real move counts from recent Lichess games (best-effort). Falls back to a
-    synthetic spread if Lichess is unreachable, so a QA run never hangs."""
-    try:
-        games = await lichess.get_user_games(
-            _LICHESS_SOURCE, since_ms=0, max_games=count, rated_only=True
-        )
-    except Exception:  # noqa: BLE001 — scaffolding must never 500
-        games = []
-    moves: list[int] = []
-    for g in games or []:
-        mv = g.get("moves")
-        if isinstance(mv, str) and mv.strip():
-            moves.append(len(mv.split()))
-    if not moves:
-        moves = [random.randint(20, 60) for _ in range(count)]
-    return moves
+def _resolve_market(game: str, metric: str) -> tuple[str, str | None]:
+    """The (ranking_metric, speed) the self-driving tournament actually runs on.
+
+    Chess collapses to one mode: blitz, ranked on per-game moves — so the joined
+    chess metric (total wins / streak / fastest win) is replaced by `chess_moves`.
+    Every other game keeps the metric the player joined on."""
+    if game == GAME_CHESS_LICHESS:
+        return _CHESS_METRIC, _CHESS_SPEED
+    return metric, None
 
 
-def _chess_snapshot(handle: str) -> dict[str, Any]:
-    """A complete ProfileSnapshot-shaped dict so matchmaking (1v1/pools) accepts
-    the account, not just the tournament."""
-    return {
+def _draw_value(metric: str) -> float:
+    lo, hi = _METRIC_RANGE.get(metric, _DEFAULT_RANGE)
+    value = random.uniform(lo, hi)
+    # Whole units for counts, two decimals for ratios — same as the host would read.
+    return float(round(value)) if hi >= 20 else round(value, 2)
+
+
+def _snapshot(game: str, handle: str) -> dict[str, Any]:
+    """A complete ProfileSnapshot-shaped dict so /links and matchmaking accept the
+    synthetic account. Chess adds its per-format fields; other titles use the
+    generic descriptors."""
+    snap: dict[str, Any] = {
         "username": handle,
         "display_name": handle,
-        "url": f"https://lichess.org/@/{handle}",
+        "url": f"https://sim.invalid/{game}/{handle}",
         "link_method": "username",
-        "game": GAME_CHESS_LICHESS,
+        "game": game,
         "win_rate": 0.5,
         "draw_rate": 0.0,
         "total_games": 20,
-        "primary_speed": "blitz",
-        "formats": [
-            {"speed": "blitz", "rating": 1500, "games": 20, "provisional": False}
-        ],
+        "simulated": True,
     }
+    if game == GAME_CHESS_LICHESS:
+        snap["url"] = f"https://lichess.org/@/{handle}"
+        snap["primary_speed"] = _CHESS_SPEED
+        snap["formats"] = [
+            {"speed": _CHESS_SPEED, "rating": 1500, "games": 20, "provisional": False}
+        ]
+    return snap
 
 
-async def _chess_link(
-    session: AsyncSession, user_id: uuid.UUID
+async def _game_link(
+    session: AsyncSession, user_id: uuid.UUID, game: str
 ) -> LinkedAccount | None:
     return await session.scalar(
         select(LinkedAccount).where(
             LinkedAccount.user_id == user_id,
-            LinkedAccount.game == GAME_CHESS_LICHESS,
+            LinkedAccount.game == game,
         )
     )
 
 
-async def _ensure_sim_link(session: AsyncSession, player: User) -> LinkedAccount:
-    """The player's chess link, or a lightweight synthetic 'sim' link if they
-    haven't linked chess — so a real signup can join without linking a game. The
-    host id never resolves to a real account, so only injected games grade them."""
-    link = await _chess_link(session, player.id)
+async def _ensure_sim_link(
+    session: AsyncSession, player: User, game: str
+) -> LinkedAccount:
+    """The player's link for `game`, or a lightweight synthetic 'sim' link if they
+    haven't linked it — so a real signup can join without linking a game. The host
+    id never resolves to a real account; only injected games grade them (scored by
+    user_id, so the real host is never polled)."""
+    link = await _game_link(session, player.id, game)
     if link is not None:
         return link
     handle = player.username or "player"
-    snapshot = _chess_snapshot(handle)
-    snapshot["simulated"] = True
     link = LinkedAccount(
         user_id=player.id,
-        game=GAME_CHESS_LICHESS,
+        game=game,
         host_account_id=f"sim:{player.id}",
         host_username=handle,
-        profile_snapshot=snapshot,
+        profile_snapshot=_snapshot(game, handle),
     )
     session.add(link)
     await session.flush()
     return link
 
 
-async def _make_bot(session: AsyncSession, name: str) -> tuple[User, LinkedAccount]:
-    """A funded, chess-linked competitive bot (idempotent)."""
+async def _make_bot(
+    session: AsyncSession, name: str, game: str
+) -> tuple[User, LinkedAccount]:
+    """A funded, `game`-linked competitive bot (idempotent)."""
     auth_id = f"{_LIVE_BOT_PREFIX}{name.lower()}"
     user = await session.scalar(select(User).where(User.auth_id == auth_id))
     if user is None:
@@ -163,19 +187,15 @@ async def _make_bot(session: AsyncSession, name: str) -> tuple[User, LinkedAccou
         await session.flush()
         await provision_new_user(session, user)
 
-    host_id = auth_id
-    linked = await session.scalar(
-        select(LinkedAccount).where(
-            LinkedAccount.user_id == user.id, LinkedAccount.game == GAME_CHESS_LICHESS
-        )
-    )
+    host_id = f"{auth_id}:{game}"
+    linked = await _game_link(session, user.id, game)
     if linked is None:
         linked = LinkedAccount(
             user_id=user.id,
-            game=GAME_CHESS_LICHESS,
+            game=game,
             host_account_id=host_id,
             host_username=f"{name}Bot",
-            profile_snapshot=_chess_snapshot(f"{name}Bot"),
+            profile_snapshot=_snapshot(game, f"{name}Bot"),
         )
         session.add(linked)
     await session.flush()
@@ -184,20 +204,23 @@ async def _make_bot(session: AsyncSession, name: str) -> tuple[User, LinkedAccou
 
 async def _inject_game(
     session: AsyncSession,
+    *,
     user_id: uuid.UUID,
     host_account_id: str,
-    value: int,
+    game: str,
+    metric: str,
+    value: float,
     played_at: datetime,
 ) -> None:
-    """Record one finished, won chess game carrying `value` as its ranked stat."""
+    """Record one finished, won game carrying `value` as its ranked stat."""
     await demo_simulation.record(
         session,
         user_id=user_id,
-        game=GAME_CHESS_LICHESS,
+        game=game,
         host_account_id=host_account_id,
-        metrics={DEMO_TOURNAMENT_METRIC: float(value)},
+        metrics={metric: float(value)},
         won=True,
-        moves=value,
+        moves=int(value) if metric == _CHESS_METRIC else 0,
         played_at=played_at,
         created_by="demo_live_tournament",
     )
@@ -207,29 +230,30 @@ async def start_live(
     session: AsyncSession,
     player: User,
     *,
+    game: str = GAME_CHESS_LICHESS,
+    metric: str = _CHESS_METRIC,
     minutes: int = DEFAULT_MINUTES,
     num_bots: int = DEFAULT_BOTS,
     entry_cents: int = DEFAULT_ENTRY_CENTS,
     tick_seconds: int = DEFAULT_TICK_SECONDS,
 ) -> Tournament:
-    """Create + fill a self-driving chess tournament for `player` (any signed-in
+    """Create + fill a self-driving tournament for `player` on `game` (any signed-in
     user). Escrows every entry, injects each participant's first game, writes the
     opening standings, and hands the rest to the worker (`tick` + `settle`)."""
-    player_link = await _ensure_sim_link(session, player)
+    ranking_metric, _speed = _resolve_market(game, metric)
+    player_link = await _ensure_sim_link(session, player, game)
 
     now = _now()
-    move_pool = await _fetch_lichess_move_pool()
-
     field: list[tuple[uuid.UUID, str, uuid.UUID]] = [
         (player.id, player_link.host_account_id, player_link.id)
     ]
     for i in range(num_bots):
-        bot, bot_link = await _make_bot(session, _BOT_NAMES[i])
+        bot, bot_link = await _make_bot(session, _BOT_NAMES[i], game)
         field.append((bot.id, bot_link.host_account_id, bot_link.id))
 
     tournament = Tournament(
-        game=GAME_CHESS_LICHESS,
-        ranking_metric=DEMO_TOURNAMENT_METRIC,
+        game=game,
+        ranking_metric=ranking_metric,
         entry_cents=entry_cents,
         rake_bps=money_math.DEFAULT_RAKE_BPS,
         prize_split=list(LIVE_PRIZE_SPLIT),
@@ -241,21 +265,18 @@ async def start_live(
         state="LOCKED",
         window_starts_at=now,
         window_ends_at=now + timedelta(minutes=minutes),
-        engine_version="demo-live-2",
+        engine_version="demo-live-3",
         outcome_detail={
             "demo_live": True,
             "tick_seconds": tick_seconds,
             "last_tick_ms": int(now.timestamp() * 1000),
             "window_start_ms": int(now.timestamp() * 1000),
-            "move_pool": move_pool,
-            "pool_cursor": 0,
-            "lichess_source": _LICHESS_SOURCE,
         },
     )
     session.add(tournament)
     await session.flush()
 
-    for idx, (user_id, host_id, link_id) in enumerate(field):
+    for user_id, host_id, link_id in field:
         await wallet_service.escrow_hold(
             session,
             user_id,
@@ -270,17 +291,19 @@ async def start_live(
                 user_id=user_id,
                 linked_account_id=link_id,
                 host_account_id=host_id,
-                baseline_snapshot={
-                    "host_account_id": host_id,
-                    "game": GAME_CHESS_LICHESS,
-                },
+                baseline_snapshot={"host_account_id": host_id, "game": game},
                 enqueued_at=now,
             )
         )
-        value = move_pool[idx % len(move_pool)] if not _is_bot(host_id) else (
-            random.randint(20, 60)
+        await _inject_game(
+            session,
+            user_id=user_id,
+            host_account_id=host_id,
+            game=game,
+            metric=ranking_metric,
+            value=_draw_value(ranking_metric),
+            played_at=now,
         )
-        await _inject_game(session, user_id, host_id, value, now)
 
     await session.flush()
     await _refresh_standings(session, tournament)
@@ -288,6 +311,8 @@ async def start_live(
     log.info(
         "demo.live_tournament.started",
         tournament_id=str(tournament.id),
+        game=game,
+        metric=ranking_metric,
         field=len(field),
         minutes=minutes,
     )
@@ -303,14 +328,18 @@ async def _score_and_count(
     session: AsyncSession, tournament: Tournament, user_id: uuid.UUID
 ) -> tuple[float, int]:
     """A player's score = the SUM of their in-window injected game values, and the
-    number of games counted. Distinct + climbing → distinct, moving standings."""
+    number of games counted. Distinct + climbing → distinct, moving standings.
+
+    Scored by user_id directly off the injected rows, so a synthetic host account is
+    never polled against a real host API."""
     detail = tournament.outcome_detail or {}
     start_ms = int(detail.get("window_start_ms", 0))
     end_ms = int(tournament.window_ends_at.timestamp() * 1000)
+    metric = tournament.ranking_metric
     rows = await session.scalars(
         select(SimulatedMatch).where(
             SimulatedMatch.user_id == user_id,
-            SimulatedMatch.game == GAME_CHESS_LICHESS,
+            SimulatedMatch.game == tournament.game,
             SimulatedMatch.created_at_ms >= start_ms,
             SimulatedMatch.created_at_ms <= end_ms,
         )
@@ -318,7 +347,7 @@ async def _score_and_count(
     total = 0.0
     count = 0
     for r in rows:
-        val = (r.metrics or {}).get(DEMO_TOURNAMENT_METRIC)
+        val = (r.metrics or {}).get(metric)
         if val is None:
             continue
         total += float(val)
@@ -364,7 +393,10 @@ async def _refresh_standings(
         }
         for e, score, count, rank in ranked
     ]
-    tournament.standings_cache = {"rows": rows}
+    tournament.standings_cache = {
+        "rows": rows,
+        "label": metric_label(tournament.ranking_metric),
+    }
     tournament.standings_updated_at = now
 
 
@@ -382,9 +414,7 @@ async def _usernames(
 # --------------------------------------------------------------------------- #
 
 
-async def _live_tournaments(
-    session: AsyncSession, now: datetime
-) -> list[Tournament]:
+async def _live_tournaments(session: AsyncSession, now: datetime) -> list[Tournament]:
     rows = await session.scalars(
         select(Tournament).where(
             Tournament.state == "LOCKED",
@@ -410,23 +440,21 @@ async def tick(
             + int(detail.get("tick_seconds", DEFAULT_TICK_SECONDS)) * 1000
         )
         if due:
-            pool: list[int] = list(detail.get("move_pool") or [30])
-            cursor = int(detail.get("pool_cursor", 0))
             entries = list(
                 await session.scalars(
-                    select(TournamentEntry).where(
-                        TournamentEntry.tournament_id == t.id
-                    )
+                    select(TournamentEntry).where(TournamentEntry.tournament_id == t.id)
                 )
             )
             for e in entries:
-                value = (
-                    random.randint(20, 60)
-                    if _is_bot(e.host_account_id)
-                    else pool[cursor % len(pool)]
+                await _inject_game(
+                    session,
+                    user_id=e.user_id,
+                    host_account_id=e.host_account_id,
+                    game=t.game,
+                    metric=t.ranking_metric,
+                    value=_draw_value(t.ranking_metric),
+                    played_at=now,
                 )
-                await _inject_game(session, e.user_id, e.host_account_id, value, now)
-            detail["pool_cursor"] = cursor + 1
             detail["last_tick_ms"] = int(now.timestamp() * 1000)
             t.outcome_detail = detail
             advanced += 1
@@ -537,3 +565,21 @@ async def _assert_reconciled(session: AsyncSession, tournament: Tournament) -> N
 def is_live_tournament(tournament: Tournament) -> bool:
     """True for a self-driving simulation tournament (route it to `settle`)."""
     return bool((tournament.outcome_detail or {}).get("demo_live"))
+
+
+async def active_live_for(
+    session: AsyncSession, user_id: uuid.UUID
+) -> Tournament | None:
+    """The player's current in-flight self-driving tournament, if any. Joining
+    while one is still running returns it instead of creating a second (and
+    double-escrowing) — the join button is idempotent while a tournament is live."""
+    rows = await session.scalars(
+        select(Tournament)
+        .join(TournamentEntry, TournamentEntry.tournament_id == Tournament.id)
+        .where(
+            TournamentEntry.user_id == user_id,
+            Tournament.state == "LOCKED",
+        )
+        .order_by(Tournament.created_at.desc())
+    )
+    return next((t for t in rows if is_live_tournament(t)), None)

@@ -240,40 +240,6 @@ async def _prepare(
     return opponents
 
 
-async def fill_tournament(
-    session: AsyncSession,
-    user: User,
-    *,
-    game: str,
-    metric: str,
-    entry_cents: int,
-    count: int = 9,
-) -> int:
-    """Enter `count` opponents into the tournament field you just joined."""
-    from . import tournament_engine
-
-    joined = 0
-    for opponent in await _prepare(session, user, game, metric, count):
-        try:
-            await tournament_engine.cancel(session, opponent)
-            await tournament_engine.enqueue(
-                session,
-                opponent,
-                game=game,
-                metric=metric,
-                entry_cents=entry_cents,
-            )
-            joined += 1
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "testbot.tournament_join_failed",
-                handle=opponent.username,
-                error=str(exc),
-            )
-    log.info("testbot.tournament_filled", joined=joined, metric=metric)
-    return joined
-
-
 async def fill_queue(
     session: AsyncSession,
     user: User,
@@ -349,7 +315,6 @@ __all__ = [
     "TEST_AUTH_PREFIX",
     "graded_as_failed",
     "fill_queue",
-    "fill_tournament",
     "is_enabled",
     "purge",
     "test_user_filter",

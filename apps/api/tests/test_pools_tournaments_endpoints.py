@@ -116,6 +116,44 @@ async def test_tournament_rejects_non_preset_entry(client):
 # --- tournament markets + enqueue ----------------------------------------- #
 
 
+@pytest.fixture
+def simulation_on(monkeypatch):
+    from moneymatch_api.config import get_settings
+
+    monkeypatch.setenv("DEMO_SIMULATE_ENABLED", "1")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+async def test_join_spins_up_a_self_driving_tournament(client, simulation_on):
+    """In a sim build, joining a tournament forms a self-driving one right away:
+    you plus competitive bots, 60/25/15. Joining again returns the same one
+    (idempotent — no second field, no double escrow)."""
+    await setup_player(client, "auth_sim", "simmer")
+
+    r = await client.post(
+        f"{V1}/tournaments/queue",
+        json={"game": CS2, "metric": KD, "entry_preset_cents": 1000},
+        headers=_hdr("auth_sim"),
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "formed"
+    tour = body["tournament"]
+    assert tour["field_size"] == 6  # you + 5 bots
+    assert tour["prize_split"] == [60, 25, 15]
+    first_id = tour["id"]
+
+    # Joining again while it's live returns the same tournament, not a new field.
+    r2 = await client.post(
+        f"{V1}/tournaments/queue",
+        json={"game": CS2, "metric": KD, "entry_preset_cents": 1000},
+        headers=_hdr("auth_sim"),
+    )
+    assert r2.json()["tournament"]["id"] == first_id
+
+
 async def test_tournament_markets_and_enqueue(client):
     await setup_player(client, "auth_t", "tt")
     m = await client.get(

@@ -260,6 +260,27 @@ async def enter(
     # is never blocked; two accounts on one device are.
     await _guard_co_entry(session, user, request, body.game, body.metric)
 
+    # --- self-driving simulation tournament (scaffolding, delete before launch) #
+    # With one real account nothing ever forms, so the whole loop is untestable.
+    # In a sim build, joining spins up a self-driving tournament for THIS game:
+    # the field fills with competitive bots whose stats drift over the window, it
+    # settles itself 60/25/15. Real signups (flag off) never take this branch.
+    if test_opponents.is_enabled(user):
+        from ..services import demo_tournament
+
+        tournament = await demo_tournament.active_live_for(session, user.id)
+        if tournament is None:
+            tournament = await demo_tournament.start_live(
+                session,
+                user,
+                game=body.game,
+                metric=body.metric,
+                entry_cents=body.entry_preset_cents,
+            )
+        await session.commit()
+        result = TournamentEnqueueResult(status="formed", tournament=tournament)
+        return await _status_view(session, result, user)
+
     result = await tournament_engine.enqueue(
         session,
         user,
@@ -267,20 +288,6 @@ async def enter(
         metric=body.metric,
         entry_cents=body.entry_preset_cents,
     )
-
-    # --- practice opponents (scaffolding, delete before launch) ------------- #
-    # With one real account nothing ever forms, so the whole fetch/grade/settle
-    # path is untestable. The demo account fills the bucket and re-polls, so the
-    # contest forms on this same request. Real signups never take this branch.
-    if test_opponents.is_enabled(user):
-        await test_opponents.fill_tournament(
-            session,
-            user,
-            game=body.game,
-            metric=body.metric,
-            entry_cents=body.entry_preset_cents,
-        )
-        result = await tournament_engine.poll_status(session, user)
     return await _status_view(session, result, user)
 
 
