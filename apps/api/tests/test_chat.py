@@ -184,7 +184,7 @@ async def test_empty_message_and_ambiguous_body_are_rejected(client):
     assert r.status_code == 422
 
 
-async def test_pool_invite_card_round_trip(client):
+async def test_tournament_invite_card_round_trip(client):
     _, bob = await _pair(client)
     cid = (
         await client.post(
@@ -199,11 +199,10 @@ async def test_pool_invite_card_round_trip(client):
         headers=auth_headers("chat_a"),
         json={
             "invite": {
-                "invite_kind": "pool",
+                "invite_kind": "tournament",
                 "game": GAME,
                 "entry_preset_cents": 1000,
                 "metric": "cs2_kd_ratio",
-                "difficulty": "medium",
             }
         },
     )
@@ -212,7 +211,7 @@ async def test_pool_invite_card_round_trip(client):
     assert card["kind"] == "invite"
     assert card["payload"]["status"] == "pending"
     assert card["payload"]["entry_cents"] == 1000
-    assert card["payload"]["redirect_path"] == "/pools"
+    assert card["payload"]["redirect_path"] == "/tournament"
     assert "K/D" in card["payload"]["title"]
 
     # The sender can't answer their own invite.
@@ -223,7 +222,7 @@ async def test_pool_invite_card_round_trip(client):
     )
     assert r.status_code == 403
 
-    # bob accepts → the card is stamped and he's pointed at the Solo Pools tab.
+    # bob accepts → the card is stamped and he's pointed at the Tournament tab.
     r = await client.post(
         f"{V1}/chat/messages/{card['id']}/respond",
         headers=auth_headers("chat_b"),
@@ -232,7 +231,7 @@ async def test_pool_invite_card_round_trip(client):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["message"]["payload"]["status"] == "accepted"
-    assert body["redirect_path"] == "/pools"
+    assert body["redirect_path"] == "/tournament"
     assert body["match_id"] is None
 
     # Answering twice is a conflict, not a second accept.
@@ -268,7 +267,7 @@ async def test_invite_rejects_a_non_preset_entry(client):
         headers=auth_headers("chat_a"),
         json={
             "invite": {
-                "invite_kind": "pool",
+                "invite_kind": "tournament",
                 "game": GAME,
                 "entry_preset_cents": 777,
             }
@@ -393,7 +392,7 @@ async def test_unfriending_closes_the_thread_to_new_messages(client):
         headers=auth_headers("chat_a"),
         json={
             "invite": {
-                "invite_kind": "pool",
+                "invite_kind": "tournament",
                 "game": GAME,
                 "entry_preset_cents": 1000,
             }
@@ -485,7 +484,7 @@ async def test_support_thread_greets_and_acknowledges(client):
         headers=auth_headers("chat_a"),
         json={
             "invite": {
-                "invite_kind": "pool",
+                "invite_kind": "tournament",
                 "game": GAME,
                 "entry_preset_cents": 1000,
             }

@@ -168,60 +168,6 @@ async def test_admin_resolves_and_notifies(session, client):
     assert row.status == "resolved" and row.resolved_at is not None
 
 
-async def test_file_pool_dispute_participant_only(session, client):
-    from datetime import timedelta
-
-    from moneymatch_api.models.pools import SoloEntry, SoloPool
-
-    a, la = await _user(session, "auth_dpa", "dpa")
-    now = datetime.now(UTC)
-    pool = SoloPool(
-        game=CS2,
-        metric="cs2_kd_ratio",
-        difficulty="medium",
-        room_bar=1.25,
-        entry_cents=1000,
-        rake_bps=1000,
-        room_size=1,
-        min_entrants=1,
-        state="SETTLED",
-        window_starts_at=now - timedelta(hours=2),
-        window_ends_at=now - timedelta(hours=1),
-        resolved_at=now,
-    )
-    session.add(pool)
-    await session.flush()
-    session.add(
-        SoloEntry(
-            pool_id=pool.id,
-            user_id=a.id,
-            linked_account_id=la.id,
-            host_account_id=la.host_account_id,
-            personal_bar=1.25,
-            status="MISSED",
-        )
-    )
-    await session.commit()
-
-    r = await client.post(
-        f"{V1}/disputes",
-        json={"ref_type": "pool", "ref_id": str(pool.id), "reason": "bar miscounted"},
-        headers=auth_headers("auth_dpa"),
-    )
-    assert r.status_code == 201, r.text
-    assert r.json()["ref_type"] == "pool" and r.json()["status"] == "open"
-
-    # A non-participant can't contest it.
-    await _user(session, "auth_dpb", "dpb")
-    await session.commit()
-    r2 = await client.post(
-        f"{V1}/disputes",
-        json={"ref_type": "pool", "ref_id": str(pool.id), "reason": "not mine"},
-        headers=auth_headers("auth_dpb"),
-    )
-    assert r2.status_code == 403
-
-
 async def test_file_tournament_dispute(session, client):
     from datetime import timedelta
 

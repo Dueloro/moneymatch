@@ -224,11 +224,7 @@ async def _prepare(
     your_link = await linking_service.get_link(session, user.id, game)
     rating = skill_prior.host_rating(your_link) if your_link else None
     opponents: list[User] = []
-    # Clearers first. A room of nothing but opponents built to miss can only end
-    # one way, and the split — the rule that actually decides the money — never
-    # gets demonstrated.
-    ordered = sorted(_HANDLES, key=lambda h: h not in CLEARING_HANDLES)
-    for handle in ordered:
+    for handle in _HANDLES:
         if len(opponents) >= count:
             break
         opponent = await _opponent(
@@ -242,48 +238,6 @@ async def _prepare(
             await _mirror_model(session, opponent, source)
         opponents.append(opponent)
     return opponents
-
-
-async def fill_pool(
-    session: AsyncSession,
-    user: User,
-    *,
-    game: str,
-    metric: str,
-    difficulty: str,
-    entry_cents: int,
-    count: int = 3,
-) -> int:
-    """Enter `count` opponents into the same pool bucket you just joined.
-
-    Uses `pool_engine.enqueue`, the same entrypoint the API uses for you, so the
-    room forms through the real composition and escrow path.
-    """
-    from . import pool_engine  # local: the engine must not import this module
-
-    joined = 0
-    for opponent in await _prepare(session, user, game, metric, count):
-        try:
-            # Drop any ticket left in another bucket first. A waiting ticket is
-            # per user, not per bucket, so a bot still queued for last attempt's
-            # difficulty or entry would be handed straight back instead of
-            # joining yours, and your room would form with only you in it.
-            await pool_engine.cancel(session, opponent)
-            await pool_engine.enqueue(
-                session,
-                opponent,
-                game=game,
-                metric=metric,
-                difficulty=difficulty,
-                entry_cents=entry_cents,
-            )
-            joined += 1
-        except Exception as exc:  # noqa: BLE001 - scaffolding must never 500 you
-            log.warning(
-                "testbot.pool_join_failed", handle=opponent.username, error=str(exc)
-            )
-    log.info("testbot.pool_filled", joined=joined, metric=metric)
-    return joined
 
 
 async def fill_tournament(
@@ -353,44 +307,13 @@ async def fill_queue(
     return 0
 
 
-#: The practice opponents that beat their bar instead of missing it.
-#:
-#: Every dummy missing meant a pool only ever had one possible outcome: you
-#: clear and take the whole prize, or you miss and everything is refunded. The
-#: rule that actually governs a pool -- clearers *split* the pot -- was never
-#: reachable with one real player, so the demo could not show the thing the
-#: product does.
-#:
-#: One clearer is enough to show both halves. Clear your bar and you split with
-#: it; miss, and it takes the pot off you. Keyed by handle so it is the same
-#: opponent every time: a demo whose outcome moves around is not a demo.
-CLEARING_HANDLES = frozenset({"testbot_ada"})
-
-
-def is_practice_opponent(host_account_id: str) -> bool:
-    """True for any practice opponent, whatever it is graded as.
-
-    Keyed off the host id rather than a user lookup, so settlement needs no
-    extra query.
-    """
-    return host_account_id.startswith(TEST_AUTH_PREFIX)
-
-
-def clears_its_bar(host_account_id: str) -> bool:
-    """True for the practice opponent built to clear (see `CLEARING_HANDLES`)."""
-    if not is_practice_opponent(host_account_id):
-        return False
-    return host_account_id[len(TEST_AUTH_PREFIX) :] in CLEARING_HANDLES
-
-
 def graded_as_failed(host_account_id: str) -> bool:
-    """True for a practice opponent's contest entry, which always misses its bar.
+    """True for a practice opponent's contest entry, which always forfeits.
 
     A real entrant with no qualifying match is *unverifiable* and gets refunded,
     because we cannot prove they failed. A dummy has no host account at all, so
-    refunding it would make every test pool a no-op: nobody wins, nobody loses,
-    the pot goes back where it came from. Grading it as a miss is what makes the
-    stake real, so clearing your bar actually pays out of their entries.
+    grading it as a forfeit (ranked last, paid nothing) is what makes the stake
+    real, so beating the bots actually pays out of their entries.
 
     Keyed off the host id rather than a user lookup, so settlement needs no
     extra query.
@@ -425,7 +348,6 @@ async def purge(session: AsyncSession) -> int:
 __all__ = [
     "TEST_AUTH_PREFIX",
     "graded_as_failed",
-    "fill_pool",
     "fill_queue",
     "fill_tournament",
     "is_enabled",

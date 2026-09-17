@@ -33,7 +33,6 @@ NO_AUTH_ENDPOINTS = [
     ("GET", f"{V1}/play/markets"),
     ("POST", f"{V1}/play/queue"),
     ("GET", f"{V1}/play/waiting"),
-    ("GET", f"{V1}/pools"),
     ("GET", f"{V1}/tournaments"),
     ("GET", f"{V1}/activity"),
     ("GET", f"{V1}/friends"),

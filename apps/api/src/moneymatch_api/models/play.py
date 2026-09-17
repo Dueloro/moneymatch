@@ -115,11 +115,8 @@ class QueueTicket(Base, TimestampMixin):
         String(16), default="waiting", server_default="waiting", nullable=False
     )
     # The contest this ticket formed into (exactly one is set when state →
-    # matched, keyed by `product`): an H2H match, a solo pool, or a tournament.
+    # matched, keyed by `product`): an H2H match or a tournament.
     match_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), nullable=True
-    )
-    pool_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), nullable=True
     )
     tournament_id: Mapped[uuid.UUID | None] = mapped_column(

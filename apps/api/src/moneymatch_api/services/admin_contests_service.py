@@ -1,6 +1,6 @@
 """Admin contest views + the two money-fix actions (09-phase-6 · deliverable 2).
 
-- ``list_contests`` — matches / pools / tournaments by state + game.
+- ``list_contests`` — matches / tournaments by state + game.
 - ``contest_detail`` — the complete money trail for one ref: participants, user
   ledger rows, platform (rake/promo) rows, adapter evidence, and a live
   reconciliation check.
@@ -23,14 +23,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import clock
 from ..errors import APIError
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..models.wallet import LedgerEntry, PlatformLedgerEntry, Wallet
 from . import match_lifecycle, reconciliation_service
 from .match_states import is_terminal
 
-REF_TYPES = ("match", "solo_pool", "tournament")
+REF_TYPES = ("match", "tournament")
 
 
 class ContestActionError(APIError):
@@ -109,35 +108,6 @@ async def list_contests(
                     participants=int(count or 0),
                     created_at=m.created_at,
                     resolved_at=m.resolved_at,
-                )
-            )
-
-    if ref_type in (None, "solo_pool"):
-        stmt_p = select(SoloPool)
-        if state:
-            stmt_p = stmt_p.where(SoloPool.state == state)
-        if game:
-            stmt_p = stmt_p.where(SoloPool.game == game)
-        for p in await session.scalars(
-            stmt_p.order_by(SoloPool.created_at.desc()).limit(limit)
-        ):
-            count = await session.scalar(
-                select(func.count())
-                .select_from(SoloEntry)
-                .where(SoloEntry.pool_id == p.id)
-            )
-            rows.append(
-                ContestListItem(
-                    ref_type="solo_pool",
-                    ref_id=p.id,
-                    game=p.game,
-                    market=p.metric,
-                    state=p.state,
-                    entry_cents=p.entry_cents,
-                    pot_cents=p.pot_cents,
-                    participants=int(count or 0),
-                    created_at=p.created_at,
-                    resolved_at=p.resolved_at,
                 )
             )
 
@@ -234,8 +204,6 @@ async def contest_detail(
 ) -> ContestDetail:
     if ref_type == "match":
         detail = await _match_detail(session, ref_id)
-    elif ref_type == "solo_pool":
-        detail = await _pool_detail(session, ref_id)
     elif ref_type == "tournament":
         detail = await _tournament_detail(session, ref_id)
     else:
@@ -290,43 +258,6 @@ async def _match_detail(session: AsyncSession, match_id: uuid.UUID) -> ContestDe
         outcome_detail=match.outcome_detail,
         created_at=match.created_at,
         resolved_at=match.resolved_at,
-        participants=participants,
-    )
-
-
-async def _pool_detail(session: AsyncSession, pool_id: uuid.UUID) -> ContestDetail:
-    pool = await session.get(SoloPool, pool_id)
-    if pool is None:
-        raise ContestActionError("contest_not_found", "No such pool.", status_code=404)
-    entries = list(
-        await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool_id))
-    )
-    names = await _usernames(session, [e.user_id for e in entries])
-    participants = [
-        {
-            "user_id": str(e.user_id),
-            "username": names.get(e.user_id),
-            "personal_bar": e.personal_bar,
-            "status": e.status,
-            "payout_cents": e.payout_cents,
-            "telemetry": e.telemetry,
-        }
-        for e in entries
-    ]
-    return ContestDetail(
-        ref_type="solo_pool",
-        ref_id=pool.id,
-        game=pool.game,
-        market=pool.metric,
-        state=pool.state,
-        entry_cents=pool.entry_cents,
-        pot_cents=pool.pot_cents,
-        prize_cents=pool.prize_cents,
-        rake_cents=pool.rake_cents,
-        engine_version=pool.engine_version,
-        outcome_detail=pool.outcome_detail,
-        created_at=pool.created_at,
-        resolved_at=pool.resolved_at,
         participants=participants,
     )
 

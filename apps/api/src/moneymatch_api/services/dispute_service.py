@@ -6,8 +6,8 @@ outcome is pushed back to the user as a notification. Money movement (a manual
 regrade/refund) stays an explicit admin action — resolving a dispute records the
 decision, it does not itself move funds.
 
-Disputes are **polymorphic**: a `(ref_type, ref_id)` pair points at a match, a
-solo pool, or a tournament. There is no single FK target, so this module owns the
+Disputes are **polymorphic**: a `(ref_type, ref_id)` pair points at a match or a
+tournament. There is no single FK target, so this module owns the
 "is this a real, settled contest the user actually played?" check for each type.
 """
 
@@ -23,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..errors import APIError
 from ..models.dispute import Dispute
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from . import notifications_service
@@ -32,7 +31,7 @@ from . import notifications_service
 _DISPUTABLE_MATCH_STATES = {"SETTLED", "PUSHED"}
 _DISPUTABLE_CONTEST_STATES = {"SETTLED", "CANCELED"}
 _RESOLUTIONS = {"resolved", "rejected"}
-_REF_TYPES = ("match", "pool", "tournament")
+_REF_TYPES = ("match", "tournament")
 
 
 async def _match_participant(
@@ -48,20 +47,6 @@ async def _match_participant(
         )
     )
     return match.state in _DISPUTABLE_MATCH_STATES, seat is not None
-
-
-async def _pool_participant(
-    session: AsyncSession, ref_id: uuid.UUID, user_id: uuid.UUID
-) -> tuple[bool, bool]:
-    pool = await session.get(SoloPool, ref_id)
-    if pool is None:
-        raise APIError("not_found", "Contest not found.", status_code=404)
-    entry = await session.scalar(
-        select(SoloEntry.id).where(
-            SoloEntry.pool_id == ref_id, SoloEntry.user_id == user_id
-        )
-    )
-    return pool.state in _DISPUTABLE_CONTEST_STATES, entry is not None
 
 
 async def _tournament_participant(
@@ -81,7 +66,6 @@ async def _tournament_participant(
 
 _CHECKS = {
     "match": _match_participant,
-    "pool": _pool_participant,
     "tournament": _tournament_participant,
 }
 

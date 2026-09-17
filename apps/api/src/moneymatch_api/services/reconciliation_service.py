@@ -96,13 +96,11 @@ async def check_contests(
     volume iterating every ref is cheap; a windowed sweep is a later optimization.
     """
     from ..models.play import Match
-    from ..models.pools import SoloPool
     from ..models.tournaments import Tournament
 
     out: list[tuple[str, uuid.UUID, ReconResult]] = []
     for ref_type, model in (
         ("match", Match),
-        ("solo_pool", SoloPool),
         ("tournament", Tournament),
     ):
         for ref_id in await session.scalars(select(model.id)):

@@ -1,7 +1,7 @@
 """Best-effort *live* view for in-flight Activity cards (07-phase-4 follow-on).
 
 The settlement worker computes a "what's happening right now" snapshot for each
-in-flight pool and head-to-head match on a slow cadence and upserts it into
+in-flight head-to-head match on a slow cadence and upserts it into
 `live_snapshots`; the `/activity` request path only ever **reads** that cache, so
 a page load never blocks on a host call (same posture as the tournament
 `standings_cache`). Tournaments already cache live standings, so their live view
@@ -28,12 +28,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
-from ..constants import lower_is_better, metric_label
+from ..constants import metric_label
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
-from . import demo_mode, markets, test_opponents
+from . import demo_mode, markets
 
 log = structlog.get_logger(__name__)
 
@@ -73,76 +72,6 @@ def _ms(dt) -> int:
 # ---------------------------------------------------------------------------
 # Snapshot builders (worker side) — participant-neutral, cached as-is.
 # ---------------------------------------------------------------------------
-
-
-async def build_pool_snapshot(
-    session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
-) -> dict[str, Any]:
-    """Each member's progress toward the shared `room_bar`, keyed by user id.
-
-    The qualifying match is the member's **first** in-window match (what grading
-    uses), so once they've played, the card shows the value that will settle."""
-    starts_ms, ends_ms = _ms(pool.window_starts_at), _ms(pool.window_ends_at)
-    members: dict[str, Any] = {}
-    for entry in entries:
-        # Practice opponents never play, so polling their host id returns
-        # nothing and they read as "waiting" forever. That is not cosmetic: a
-        # pool only settles early once *every* member is decided, so a single
-        # bot in the room kept every pool waiting for its window to close --
-        # turning "play a match and get paid" into "play a match and come back
-        # tomorrow". They are graded deterministically at settlement, so the
-        # live view reports the same answer settlement will.
-        if test_opponents.is_practice_opponent(entry.host_account_id):
-            cleared = test_opponents.clears_its_bar(entry.host_account_id)
-            members[str(entry.user_id)] = {
-                "status": "cleared" if cleared else "missed",
-                "cleared": cleared,
-                "practice_opponent": True,
-            }
-            continue
-
-        rated_only = await demo_mode.rated_only_for(session, entry.user_id, pool.game)
-        games = await _window_games(
-            pool.game, entry.host_account_id, starts_ms, ends_ms, rated_only
-        )
-        if games is None:
-            members[str(entry.user_id)] = {"status": "unavailable"}
-            continue
-        qualifying = next((g for g in games if pool.metric in g.metrics), None)
-        if qualifying is None:
-            members[str(entry.user_id)] = {"status": "waiting", "matches": len(games)}
-            continue
-        value = qualifying.metrics[pool.metric]
-        cleared = (
-            value <= pool.room_bar
-            if lower_is_better(pool.metric)
-            else value >= pool.room_bar
-        )
-        members[str(entry.user_id)] = {
-            "status": "cleared" if cleared else "missed",
-            "current": round(value, 2),
-            "cleared": cleared,
-            "matches": len(games),
-        }
-    return {
-        "kind": "pool",
-        "metric": pool.metric,
-        "label": metric_label(pool.metric),
-        "target": round(pool.room_bar, 2),
-        "members": members,
-    }
-
-
-def pool_all_decided(snapshot: dict[str, Any]) -> bool:
-    """True when every member of a pool snapshot has a *verified* result
-    (``cleared`` or ``missed``) — the pool's outcome is final and it can settle
-    before its window ends. A member still ``waiting``/``unavailable`` (hasn't
-    played, or a host read failed) keeps this False, so an incomplete or
-    unverifiable pool always falls through to window-end settlement."""
-    members = list((snapshot.get("members") or {}).values())
-    return bool(members) and all(
-        m.get("status") in ("cleared", "missed") for m in members
-    )
 
 
 async def build_match_snapshot(
@@ -221,21 +150,6 @@ async def build_match_snapshot(
 # ---------------------------------------------------------------------------
 # Read side — orient a stored/derived snapshot to one viewer.
 # ---------------------------------------------------------------------------
-
-
-def _pool_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:
-    me = (snapshot.get("members") or {}).get(str(viewer))
-    if not me:
-        return None
-    return {
-        "kind": "pool",
-        "label": snapshot.get("label"),
-        "target": snapshot.get("target"),
-        "status": me.get("status", "waiting"),
-        "current": me.get("current"),
-        "cleared": me.get("cleared"),
-        "matches": me.get("matches", 0),
-    }
 
 
 def _match_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:
@@ -320,11 +234,9 @@ def tournament_view(
 def view_for(
     ref_type: str, snapshot: dict[str, Any], viewer: uuid.UUID
 ) -> dict[str, Any] | None:
-    """Orient a stored neutral snapshot (`pool` | `match`) to one viewer."""
+    """Orient a stored neutral snapshot (`match`) to one viewer."""
     if not snapshot:
         return None
-    if ref_type == "pool":
-        return _pool_view(snapshot, viewer)
     if ref_type == "match":
         return _match_view(snapshot, viewer)
     return None

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import pytest
 
-from moneymatch_api.constants import GAME_CS2_STEAM
 from moneymatch_api.services import cs2_prior
 from moneymatch_api.services.hosts.steam import LifetimeStats
 
@@ -128,24 +127,3 @@ async def test_implausible_measurements_are_ignored(
     )
     _user, values = await _seed(session, monkeypatch, f"implausible_{hs_kills}", stats)
     assert values["cs2_headshot_pct"][0] == pytest.approx(45.0, abs=0.01), why
-
-
-async def test_seeded_bars_track_real_form(session, monkeypatch):
-    """End to end: the bars a real account would now be quoted."""
-    from moneymatch_api.services import pool_engine
-
-    from .factories import create_linked_account, cs2_profile
-
-    user, _values = await _seed(session, monkeypatch, "real_bars", REAL)
-    await create_linked_account(
-        session,
-        user,
-        GAME_CS2_STEAM,
-        host_account_id=STEAM_ID,
-        profile=cs2_profile("real"),
-    )
-
-    kills = await pool_engine.preview_bars(session, user, GAME_CS2_STEAM, "cs2_kills")
-    easy = next(c["bar"] for c in kills["cards"] if c["difficulty"] == "easy")
-    # Old heuristic quoted 13 kills to an 8.19-kill player. Must now be lower.
-    assert easy < 13, f"easy kills bar {easy} is still above the old inflated 13"

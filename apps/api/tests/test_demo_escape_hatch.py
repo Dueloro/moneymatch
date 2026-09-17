@@ -206,7 +206,12 @@ async def test_injected_matches_are_held_to_the_same_filters(session, simulation
 # --------------------------------------------------------------------------- #
 
 
-async def test_simulate_result_is_admin_only(session, client, simulation_on):
+async def test_simulate_result_works_for_any_user_when_enabled(
+    session, client, simulation_on
+):
+    """With the simulate flag on, any signed-in user can inject a result for
+    their OWN account — no admin role needed. It's how a real signup exercises
+    the fetch/grade/settle path without linking a real game."""
     from .conftest import auth_headers
 
     user = await create_user(session, username="plainuser")
@@ -225,7 +230,7 @@ async def test_simulate_result_is_admin_only(session, client, simulation_on):
         json={"game": GAME, "metrics": {"cs2_kd_ratio": 1.5}},
         headers=auth_headers("auth_plain_sim"),
     )
-    assert r.status_code == 403, r.text
+    assert r.status_code == 200, r.text
 
 
 async def test_simulate_result_is_hidden_when_the_flag_is_off(

@@ -112,19 +112,6 @@ async def test_refresh_with_no_stored_matches_keeps_the_prior(session, monkeypat
     assert after.sigma == pytest.approx(before.sigma)
 
 
-async def test_bar_stays_quotable_after_refresh(session, monkeypatch):
-    """The player-visible consequence: pools are still offered."""
-    from moneymatch_api.services import pool_engine
-
-    user = await _seeded_user(session, monkeypatch, "bar_keeper")
-    monkeypatch.setattr(registry, "get", lambda _g: _FakeAdapter([]))
-    await metric_models_service.bootstrap(session, user.id, GAME_CS2_STEAM, STEAM_ID)
-
-    preview = await pool_engine.preview_bars(session, user, GAME_CS2_STEAM, KD)
-    assert preview["provisional"] is False
-    assert preview["cards"], "a refreshed account must still be offered pools"
-
-
 async def test_real_history_dominates_the_prior(session, monkeypatch):
     """Evidence must still win — this is not a rule that freezes the model."""
     user = await _seeded_user(session, monkeypatch, "history_wins")

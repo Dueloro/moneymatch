@@ -144,7 +144,6 @@ async def send_message(
             game=body.invite.game,
             entry_preset_cents=body.invite.entry_preset_cents,
             metric=body.invite.metric,
-            difficulty=body.invite.difficulty,
         )
     else:
         await chat_service.send_text(session, user, conversation_id, body.body or "")

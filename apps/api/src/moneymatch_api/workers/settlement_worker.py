@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import structlog
-from sqlalchemy import or_, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .. import clock
@@ -45,7 +45,6 @@ from ..models.feature_flag import FeatureFlag
 from ..models.linked_account import LinkedAccount
 from ..models.live import LiveSnapshot
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
@@ -57,7 +56,6 @@ from ..services import (
     match_lifecycle,
     matchmaking,
     metric_models_service,
-    pool_engine,
     raw_payload_service,
     telemetry_fetch,
     tournament_engine,
@@ -88,7 +86,6 @@ class CycleReport:
     expired_pending: int = 0
     expired_tickets: int = 0
     drained_tickets: int = 0
-    pools_settled: int = 0
     tournaments_settled: int = 0
     standings_refreshed: int = 0
     live_refreshed: int = 0
@@ -351,7 +348,7 @@ async def _drain_queue_if_paused(
 
 
 # --------------------------------------------------------------------------- #
-# Pool & tournament window settlement (server-fetched telemetry).
+# Tournament window settlement (server-fetched telemetry).
 # --------------------------------------------------------------------------- #
 
 
@@ -364,8 +361,8 @@ async def _sync_share_chains(
     only advances when somebody calls the endpoint by hand, which is the paste
     step wearing a different hat.
 
-    Never fatal to a cycle. Valve being slow must not stop pools and matches
-    from settling out of history that is already stored.
+    Never fatal to a cycle. Valve being slow must not stop matches and
+    tournaments from settling out of history that is already stored.
 
     **The one non-game-agnostic call in the worker, left as-is on purpose.**
     Generalizing this into an adapter ``pre_cycle_hook()`` only pays off once a
@@ -385,61 +382,6 @@ async def _sync_share_chains(
             log.info("worker.chains_synced", collected=collected)
     except Exception as exc:  # noqa: BLE001 - collection is never worth a cycle
         log.warning("worker.chain_sync_failed", error=str(exc))
-
-
-async def _process_due_pools(
-    sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
-) -> None:
-    async with sm() as session:
-        # Due at window end, OR flagged ready early: every entrant's result is in,
-        # so the outcome is already final (see `_refresh_live_snapshots`). Settling
-        # now moves the contest out of "In play" / "Room formed" the moment it is
-        # decided instead of stranding it until the window closes.
-        ids = list(
-            await session.scalars(
-                select(SoloPool.id).where(
-                    SoloPool.state == "LOCKED",
-                    or_(
-                        SoloPool.window_ends_at <= now,
-                        SoloPool.outcome_detail["live_ready"].astext == "true",
-                    ),
-                )
-            )
-        )
-    for pool_id in ids:
-        async with sm() as session:
-            pool = await session.scalar(
-                select(SoloPool)
-                .where(SoloPool.id == pool_id, SoloPool.state == "LOCKED")
-                .with_for_update(skip_locked=True)
-            )
-            if pool is None:
-                continue
-            entries = list(
-                await session.scalars(
-                    select(SoloEntry).where(SoloEntry.pool_id == pool_id)
-                )
-            )
-            grades = await telemetry_fetch.grade_pool(session, pool, entries)
-            # Early path: only settle if the authoritative grade confirms every
-            # entry is verified. If the live flag was optimistic (a grade still
-            # comes back unverifiable), leave the pool for a later cycle / the
-            # window-end path, which refunds the unverifiable entries correctly.
-            window_over = pool.window_ends_at <= now
-            all_verified = bool(grades) and all(
-                g.cleared is not None for g in grades.values()
-            )
-            if not window_over and not all_verified:
-                await session.rollback()
-                continue
-            try:
-                await pool_engine.settle_pool(session, pool, grades)
-                await session.commit()
-            except ReconciliationError as exc:
-                await session.rollback()
-                await _halt_on_breach(sm, report, "solo_pool", pool_id, exc)
-                raise SettlementHalted from exc
-            report.pools_settled += 1
 
 
 async def _process_due_tournaments(
@@ -566,44 +508,12 @@ async def _upsert_live(
 async def _refresh_live_snapshots(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
-    """Refresh the under-the-card live view for in-flight pools & H2H matches.
+    """Refresh the under-the-card live view for in-flight H2H matches.
 
     One host read per participant on a slow cadence, cached in `live_snapshots`;
     the `/activity` request path reads the cache only. A host outage on any one
     contest is swallowed (the builder returns an "unavailable" cell) so the loop
     never halts settlement."""
-    async with sm() as session:
-        pool_ids = list(
-            await session.scalars(
-                select(SoloPool.id).where(
-                    SoloPool.state == "LOCKED", SoloPool.window_ends_at > now
-                )
-            )
-        )
-    for pid in pool_ids:
-        async with sm() as session:
-            pool = await session.get(SoloPool, pid)
-            if pool is None or pool.state != "LOCKED":
-                continue
-            if await _live_is_fresh(session, "pool", pid, now):
-                continue
-            entries = list(
-                await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pid))
-            )
-            snapshot = await live_activity_service.build_pool_snapshot(
-                session, pool, entries
-            )
-            await _upsert_live(session, "pool", pid, snapshot, now)
-            # Flag a fully-decided pool so `_process_due_pools` settles it early
-            # (next cycle) rather than waiting for the window to close.
-            if live_activity_service.pool_all_decided(snapshot):
-                pool.outcome_detail = {
-                    **(pool.outcome_detail or {}),
-                    "live_ready": True,
-                }
-            await session.commit()
-            report.live_refreshed += 1
-
     async with sm() as session:
         match_ids = list(
             await session.scalars(
@@ -685,14 +595,13 @@ async def run_cycle(
             report.paused = True
             return report
 
-    # Before anything settles. A match played minutes before a pool's window
-    # closes has to be *in* the database by the time that pool is graded, or it
+    # Before anything settles. A match played minutes before a tournament's
+    # window closes has to be *in* the database by the time it is graded, or it
     # grades as unverifiable and refunds a wager the player actually won.
     await _sync_share_chains(sm, report)
 
     try:
         await _process_due_matches(sm, now, report)
-        await _process_due_pools(sm, now, report)
         await _process_due_tournaments(sm, now, report)
     except SettlementHalted:
         return report

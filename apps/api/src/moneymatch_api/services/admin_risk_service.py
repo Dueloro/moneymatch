@@ -24,11 +24,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.play import Match, MatchPlayer, QueueTicket
-from ..models.pools import SoloEntry, SoloPool
 from ..models.risk import RiskFlag
 from ..models.user import User
 from ..models.wallet import PlatformLedgerEntry
-from . import fairness, markets
+from . import markets
 
 # Only alert with enough settled samples for the rate to mean anything, and only
 # when it drifts past this absolute band (tune with data).
@@ -163,68 +162,6 @@ async def _favorite_win_rate(
     return 0.5, favorite_wins / decisive
 
 
-async def _pool_rates(session: AsyncSession) -> list[RateRow]:
-    rows: list[RateRow] = []
-    groups = await session.execute(
-        select(SoloPool.game, SoloPool.metric, SoloPool.difficulty).distinct()
-    )
-    for game, metric, difficulty in groups:
-        pool_ids = list(
-            await session.scalars(
-                select(SoloPool.id).where(
-                    SoloPool.game == game,
-                    SoloPool.metric == metric,
-                    SoloPool.difficulty == difficulty,
-                )
-            )
-        )
-        settled_pool_ids = list(
-            await session.scalars(
-                select(SoloPool.id).where(
-                    SoloPool.game == game,
-                    SoloPool.metric == metric,
-                    SoloPool.difficulty == difficulty,
-                    SoloPool.state == "SETTLED",
-                )
-            )
-        )
-        graded = 0
-        cleared = 0
-        if settled_pool_ids:
-            entries = await session.scalars(
-                select(SoloEntry).where(SoloEntry.pool_id.in_(settled_pool_ids))
-            )
-            for e in entries:
-                if e.status in ("CLEARED", "MISSED"):
-                    graded += 1
-                if e.status == "CLEARED":
-                    cleared += 1
-        rake = await session.scalar(
-            select(func.coalesce(func.sum(PlatformLedgerEntry.amount_cents), 0)).where(
-                PlatformLedgerEntry.account == "platform:rake",
-                PlatformLedgerEntry.ref_type == "solo_pool",
-                PlatformLedgerEntry.ref_id.in_(pool_ids),
-            )
-        )
-        expected = fairness.p_target_for_k(fairness.k_for_difficulty(difficulty))
-        actual = (cleared / graded) if graded else None
-        rows.append(
-            RateRow(
-                game=game,
-                market=f"{metric}/{difficulty}",
-                offered=graded,
-                accepted=len(pool_ids),
-                settled=len(settled_pool_ids),
-                expected_rate=expected,
-                actual_rate=actual,
-                rake_cents=int(rake or 0),
-                dispute_count=0,
-                alert=_drift_alert(expected, actual, graded),
-            )
-        )
-    return rows
-
-
 async def _open_flags(session: AsyncSession) -> list[FlagRow]:
     rows = await session.execute(
         select(RiskFlag, User.username)
@@ -249,7 +186,7 @@ async def _open_flags(session: AsyncSession) -> list[FlagRow]:
 
 async def risk_view(session: AsyncSession) -> RiskView:
     view = RiskView()
-    view.rates = await _match_rates(session) + await _pool_rates(session)
+    view.rates = await _match_rates(session)
     view.flags = await _open_flags(session)
     return view
 

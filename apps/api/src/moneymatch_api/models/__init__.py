@@ -23,7 +23,6 @@ from .notification import Notification
 from .play import Match, MatchPlayer, QueueTicket
 from .player_fingerprint import PlayerFingerprint
 from .player_streak import PlayerStreak
-from .pools import SoloEntry, SoloPool
 from .push import PushSubscription
 from .risk import RiskFlag
 from .skill import MetricModel, RawPayload
@@ -53,8 +52,6 @@ __all__ = [
     "Match",
     "MatchPlayer",
     "Notification",
-    "SoloPool",
-    "SoloEntry",
     "PushSubscription",
     "Tournament",
     "TournamentEntry",

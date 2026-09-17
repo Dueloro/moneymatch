@@ -164,19 +164,19 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
         # CASCADE from users clears wallets/limits/ledger_entries/linked_accounts/
         # metric_models; platform_ledger and raw_payloads have no user FK, so name
         # them explicitly.
-        # `users` CASCADE clears everything with a user FK; solo_pools /
-        # tournaments have no user FK (their entries do), so name them explicitly.
+        # `users` CASCADE clears everything with a user FK; `tournaments` has no
+        # user FK (their entries do), so name it explicitly.
         # Some bucketing tables have no user FK, so `users CASCADE` never reaches
         # them and their rows would leak across tests: `market_reference` and
         # `bucket_room` have no user column at all, and `audit_events` rows written
         # by system jobs (room_formed, market_recut) carry a NULL player_id. Name
-        # them explicitly, like solo_pools/tournaments. (The user-scoped bucketing
+        # them explicitly, like `tournaments`. (The user-scoped bucketing
         # tables — match_stats, market_state, settlement, bucket_contest,
         # bucket_dispute — cascade from `users`.)
         await session.execute(
             text(
                 "TRUNCATE admin_audit, platform_ledger, raw_payloads, "
-                "solo_pools, tournaments, market_reference, bucket_room, "
+                "tournaments, market_reference, bucket_room, "
                 "audit_events, users "
                 "RESTART IDENTITY CASCADE"
             )

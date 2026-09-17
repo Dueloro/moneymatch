@@ -1,8 +1,8 @@
 """`/activity` — the unified activity feed (design Activity screen, PDF p.9).
 
-Phase 3 surfaces head-to-head matches; pools and tournaments join the same feed
-in Phase 4. Every number here is server-derived: your realized net comes from the
-ledger-backed `payout_cents`, never from anything the client sent.
+Phase 3 surfaces head-to-head matches; tournaments join the same feed. Every
+number here is server-derived: your realized net comes from the ledger-backed
+`payout_cents`, never from anything the client sent.
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..models.live import LiveSnapshot
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..schemas.play import ActivityItem, ActivityResponse
@@ -46,9 +45,9 @@ async def get_activity(
             .limit(limit)
         )
     )
-    # No early return on an empty match list — a user can have only pools /
-    # tournaments in flight, and those still belong in the feed (they are
-    # appended below). Bailing here would hide a just-entered pool wager.
+    # No early return on an empty match list — a user can have only tournaments
+    # in flight, and those still belong in the feed (they are appended below).
+    # Bailing here would hide a just-entered tournament.
     match_ids = [m.id for m in match_rows]
     seats = (
         list(
@@ -105,7 +104,6 @@ async def get_activity(
             )
         )
 
-    await _append_pools(session, user, items, limit)
     await _append_tournaments(session, user, items, limit)
     await _attach_live(session, user, items)
     await _attach_disputes(session, user, items)
@@ -164,15 +162,15 @@ async def _attach_disputes(
 async def _attach_live(
     session: AsyncSession, user: User, items: list[ActivityItem]
 ) -> None:
-    """Orient each in-flight pool/match's cached snapshot to the viewer.
+    """Orient each in-flight match's cached snapshot to the viewer.
 
     Tournaments already carry `live` (derived from `standings_cache` when the row
-    is built); here we join the `live_snapshots` cache for the pool/match rows in
+    is built); here we join the `live_snapshots` cache for the match rows in
     one query — the request path never touches a host."""
     wanted = {
         i.id: i.type
         for i in items
-        if i.type in ("pool", "match") and i.state not in _TERMINAL
+        if i.type == "match" and i.state not in _TERMINAL
     }
     if not wanted:
         return
@@ -182,54 +180,8 @@ async def _attach_live(
     snapshots = {row.ref_id: row.data for row in rows}
     for item in items:
         data = snapshots.get(item.id)
-        if data is not None and item.type in ("pool", "match"):
+        if data is not None and item.type == "match":
             item.live = live_activity_service.view_for(item.type, data, user.id)
-
-
-async def _append_pools(
-    session: AsyncSession, user: User, items: list[ActivityItem], limit: int
-) -> None:
-    rows = await session.execute(
-        select(SoloEntry, SoloPool)
-        .join(SoloPool, SoloPool.id == SoloEntry.pool_id)
-        .where(SoloEntry.user_id == user.id)
-        .order_by(SoloPool.created_at.desc())
-        .limit(limit)
-    )
-    for entry, pool in rows:
-        terminal = pool.state in ("SETTLED", "CANCELED")
-        net = (entry.payout_cents - pool.entry_cents) if terminal else None
-        items.append(
-            ActivityItem(
-                type="pool",
-                id=pool.id,
-                game=pool.game,
-                market=pool.metric,
-                market_label=metric_label(pool.metric),
-                kind="pool",
-                state=pool.state,
-                entry_cents=pool.entry_cents,
-                title=f"{metric_label(pool.metric)} · {pool.difficulty.title()} pool",
-                net_cents=net,
-                opponent_username=None,
-                your_stat_line=entry.telemetry,
-                opponent_stat_line=None,
-                detail={
-                    "kind": "pool",
-                    "game": pool.game,
-                    "difficulty": pool.difficulty,
-                    "metric_label": metric_label(pool.metric),
-                    "room_bar": round(pool.room_bar, 2),
-                    "personal_bar": round(entry.personal_bar, 2),
-                    "entry_cents": pool.entry_cents,
-                    "prize_cents": pool.prize_cents,
-                    "room_size": pool.room_size,
-                    "your_stats": entry.telemetry or None,
-                },
-                created_at=pool.created_at,
-                resolved_at=pool.resolved_at,
-            )
-        )
 
 
 async def _append_tournaments(

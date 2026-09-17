@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from moneymatch_api.models.pools import SoloEntry, SoloPool
+from moneymatch_api.models.tournaments import Tournament, TournamentEntry
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers
@@ -30,29 +30,29 @@ async def test_contested_games_is_per_game(client, session):
         session, user, "chess.lichess", host_account_id="cg_ch"
     )
     now = datetime.now(UTC)
-    pool = SoloPool(
+    tour = Tournament(
         game="chess.lichess",
-        metric="chess_moves",
-        difficulty="medium",
+        ranking_metric="chess_moves",
         entry_cents=500,
         rake_bps=1000,
-        room_bar=30.0,
-        room_size=1,
-        min_entrants=1,
+        prize_split=[100],
+        field_size=4,
+        min_field=2,
+        min_ranked=1,
+        score_matches=3,
         pot_cents=500,
         window_starts_at=now,
         window_ends_at=now,
     )
-    session.add(pool)
+    session.add(tour)
     await session.flush()
     session.add(
-        SoloEntry(
-            pool_id=pool.id,
+        TournamentEntry(
+            tournament_id=tour.id,
             user_id=user.id,
             linked_account_id=link.id,
             host_account_id="cg_ch",
-            personal_bar=30.0,
-            baseline_snapshot={},
+            enqueued_at=now,
         )
     )
     await session.commit()

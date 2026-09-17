@@ -69,11 +69,10 @@ class InviteDraft(BaseModel):
     """The client's half of an invite card. Entry is a preset choice — the
     server validates it against the offered presets and owns the cents."""
 
-    invite_kind: str  # pool | tournament
+    invite_kind: str  # tournament
     game: str
     entry_preset_cents: int
     metric: str | None = None
-    difficulty: str | None = None
 
 
 class SendMessageRequest(BaseModel):

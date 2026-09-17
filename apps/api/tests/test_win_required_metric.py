@@ -1,10 +1,10 @@
 """`chess_moves` must only ever count a game you won.
 
 Without the win requirement the metric is exploitable in the cheapest possible
-way. The bar reads "at or under N moves" and a resignation on move one scores 1,
-so instantly resigning clears **every** tier of **every** pool. It costs
-nothing, takes a second, needs no skill, and always works. That is not a
-loophole at the edges, it is a strictly dominant strategy.
+way. A "fewest moves" ranking rewards a resignation on move one with a score of
+1, so instantly resigning tops **every** field. It costs nothing, takes a
+second, needs no skill, and always works. That is not a loophole at the edges,
+it is a strictly dominant strategy.
 
 Two halves make it safe, and they have to agree:
 
@@ -107,7 +107,7 @@ def test_an_aborted_game_with_no_winner_scores_nothing():
 
 
 def _outcome(metric: str, value: float | None, played: bool) -> str:
-    """Mirror `grade_pool`'s decision for one entrant."""
+    """Mirror the win-required grading decision for one entrant."""
     if not played:
         return "refund"  # nothing to look at, so nothing can be claimed
     if value is None:

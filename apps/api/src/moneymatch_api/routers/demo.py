@@ -44,7 +44,6 @@ from ..errors import APIError
 from ..models.chat import Conversation, ConversationMember, Message
 from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.skill import MetricModel
 from ..models.social import Friendship
 from ..models.tournaments import Tournament, TournamentEntry
@@ -60,7 +59,6 @@ from ..services import (
     linking_service,
     matchmaking,
     money_math,
-    pool_engine,
     telemetry_fetch,
     tournament_engine,
     wallet_service,
@@ -602,15 +600,14 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
                 _DAY + 90,
                 None,
                 {
-                    "invite_kind": "pool",
+                    "invite_kind": "tournament",
                     "game": GAME_CS2_STEAM,
                     "entry_cents": 1000,
                     "metric": "cs2_kd_ratio",
-                    "difficulty": "medium",
                     "status": "accepted",
                 },
             ),
-            _ChatLine(True, _DAY + 80, "in. cleared the bar with room to spare"),
+            _ChatLine(True, _DAY + 80, "in. took the top seed with room to spare"),
             _ChatLine(False, 55, "queueing now — send me something for tonight"),
         ),
     ),
@@ -639,11 +636,10 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
                 180,
                 None,
                 {
-                    "invite_kind": "pool",
+                    "invite_kind": "tournament",
                     "game": GAME_PUBG_STEAM,
                     "entry_cents": 500,
                     "metric": "pubg_kills",
-                    "difficulty": "easy",
                     "status": "pending",
                 },
             ),
@@ -661,15 +657,16 @@ _DEMO_THREADS: tuple[_DemoThread, ...] = (
                 3 * _DAY,
                 None,
                 {
-                    "invite_kind": "pool",
+                    "invite_kind": "tournament",
                     "game": GAME_CS2_STEAM,
                     "entry_cents": 2500,
                     "metric": "cs2_kills",
-                    "difficulty": "hard",
                     "status": "declined",
                 },
             ),
-            _ChatLine(False, 3 * _DAY - 10, "hard ADR bar is not my week, sorry"),
+            _ChatLine(
+                False, 3 * _DAY - 10, "back-to-back tourneys is not my week, sorry"
+            ),
         ),
     ),
 )
@@ -706,9 +703,7 @@ def _seed_message(
     if line.invite is not None:
         payload = {
             **line.invite,
-            "redirect_path": (
-                "/pools" if line.invite["invite_kind"] == "pool" else "/tournament"
-            ),
+            "redirect_path": "/tournament",
         }
         payload["title"] = chat_service.invite_title(payload)
     session.add(
@@ -896,14 +891,14 @@ class DemoResetResponse(BaseModel):
 async def _reset_demo_state(session: AsyncSession, user: User) -> None:
     """Return the shared demo account to its fresh-login state.
 
-    Formed rooms are deliberately uncancelable for real accounts, so testers need
-    a way to start over once the "New pool" escape hatch is gone. This refunds and
-    clears every in-flight contest (tickets, pools, matches, tournaments), restores
-    the wallet to the starting funded balance, then re-applies the idempotent seed
-    so the sample Activity + friends are present again. Every money move goes
-    through the normal ledger paths, so reconciliation still holds afterwards.
+    Formed contests are deliberately uncancelable for real accounts, so testers
+    need a way to start over. This refunds and clears every in-flight contest
+    (tickets, matches, tournaments), restores the wallet to the starting funded
+    balance, then re-applies the idempotent seed so the sample Activity + friends
+    are present again. Every money move goes through the normal ledger paths, so
+    reconciliation still holds afterwards.
     """
-    # 1. Waiting tickets (no escrow held yet) across all three modes.
+    # 1. Waiting tickets (no escrow held yet) across both modes.
     await matchmaking.cancel(session, user)
     await tournament_engine.cancel(session, user)
 
@@ -921,28 +916,7 @@ async def _reset_demo_state(session: AsyncSession, user: User) -> None:
     for match_id in match_ids:
         await admin_contests_service.void_match(session, match_id, reason="demo reset")
 
-    # 3. Forming/formed pools the demo is in → refund every entry. `cancel` covers
-    #    a waiting ticket or the demo's own formed room; the query mops up any
-    #    other OPEN/LOCKED pool the demo entered.
-    for _ in range(10):
-        if not await pool_engine.cancel(session, user):
-            break
-    pool_ids = list(
-        await session.scalars(
-            select(SoloPool.id)
-            .join(SoloEntry, SoloEntry.pool_id == SoloPool.id)
-            .where(
-                SoloEntry.user_id == user.id,
-                SoloPool.state.in_(("OPEN", "LOCKED")),
-            )
-        )
-    )
-    for pool_id in pool_ids:
-        pool = await session.get(SoloPool, pool_id)
-        if pool is not None:
-            await pool_engine.cancel_pool(session, pool, reason="demo reset")
-
-    # 4. In-flight tournaments the demo entered → cancel + refund the field.
+    # 3. In-flight tournaments the demo entered → cancel + refund the field.
     tournament_ids = list(
         await session.scalars(
             select(Tournament.id)
@@ -960,7 +934,7 @@ async def _reset_demo_state(session: AsyncSession, user: User) -> None:
                 session, tournament, reason="demo reset"
             )
 
-    # 5. Restore the wallet to the starting funded balance ($1,000, zero escrow).
+    # 4. Restore the wallet to the starting funded balance ($1,000, zero escrow).
     #    Refunds above have already released escrow back to available; a ledger
     #    adjustment (booked against platform:promo) squares the balance.
     await session.flush()
@@ -1188,7 +1162,7 @@ async def force_settle(
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(get_session),
 ) -> ForceSettleResponse:
-    """Settle one pool or tournament now, instead of at its window close.
+    """Settle one tournament now, instead of at its window close.
 
     Runs the worker's own grade-then-settle sequence for a single contest. It
     does not shortcut grading: the contest is graded from whatever match history
@@ -1198,34 +1172,8 @@ async def force_settle(
     """
     _assert_simulation_enabled(settings)
 
-    pool = await session.get(SoloPool, body.contest_id)
-    if pool is not None:
-        entries = list(
-            await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool.id))
-        )
-        grades = await telemetry_fetch.grade_pool(session, pool, entries)
-        settled = await pool_engine.settle_pool(session, pool, grades)
-        await session.commit()
-        log.warning(
-            "demo.force_settled",
-            simulated=True,
-            kind="pool",
-            contest_id=str(pool.id),
-            state=settled.state,
-            by=str(user.id),
-        )
-        return ForceSettleResponse(
-            kind="pool",
-            contest_id=pool.id,
-            state=settled.state,
-            detail={str(uid): {"cleared": g.cleared} for uid, g in grades.items()},
-        )
-
     tournament = await session.get(Tournament, body.contest_id)
     if tournament is not None:
-        # Distinct names from the pool branch above: the two grade maps and the
-        # two contest types are different shapes, and reusing one name for both
-        # is how a settle path ends up passing the wrong one.
         # A self-driving simulation tournament settles on its own scoring path.
         if demo_tournament.is_live_tournament(tournament):
             finished = await demo_tournament.settle(session, tournament)
@@ -1258,4 +1206,4 @@ async def force_settle(
             state=finished.state,
         )
 
-    raise APIError("not_found", "No pool or tournament with that id.", status_code=404)
+    raise APIError("not_found", "No tournament with that id.", status_code=404)

@@ -8,7 +8,11 @@ import pytest
 from moneymatch_api.models.user import User
 from moneymatch_api.models.wallet import SIGNUP_GRANT_CENTS
 from moneymatch_api.routers import demo
-from moneymatch_api.services import pool_engine, reconciliation_service, wallet_service
+from moneymatch_api.services import (
+    reconciliation_service,
+    tournament_engine,
+    wallet_service,
+)
 
 from .conftest import new_sessionmaker
 from .factories import (
@@ -63,8 +67,8 @@ async def test_reset_restores_balance_up_and_down(monkeypatch):
         assert (await reconciliation_service.check_all(s)).ok
 
 
-async def test_reset_clears_a_waiting_pool_ticket(monkeypatch):
-    """A demo user sitting in the pool queue is unstuck by the reset."""
+async def test_reset_clears_a_waiting_tournament_ticket(monkeypatch):
+    """A demo user sitting in the tournament queue is unstuck by the reset."""
     _stub_seed(monkeypatch)
     sm = new_sessionmaker()
 
@@ -76,15 +80,13 @@ async def test_reset_clears_a_waiting_pool_ticket(monkeypatch):
         await create_metric_model(s, user, CS2, KD, mu=1.50, sigma=0.30, n=15)
         await create_wallet(s, user, available_cents=0)
         await _fund(s, user, SIGNUP_GRANT_CENTS)
-        # One entrant can't form a room, so this parks a waiting ticket.
-        await pool_engine.enqueue(
-            s, user, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
-        )
+        # One entrant can't fill a field, so this parks a waiting ticket.
+        await tournament_engine.enqueue(s, user, game=CS2, metric=KD, entry_cents=1000)
         user_id = user.id
         await s.commit()
 
     async with sm() as s:
-        ticket = await pool_engine.get_waiting_ticket(s, user_id)
+        ticket = await tournament_engine.get_waiting_ticket(s, user_id)
         assert ticket is not None  # parked before reset
 
     async with sm() as s:
@@ -92,7 +94,7 @@ async def test_reset_clears_a_waiting_pool_ticket(monkeypatch):
         await s.commit()
 
     async with sm() as s:
-        assert await pool_engine.get_waiting_ticket(s, user_id) is None
+        assert await tournament_engine.get_waiting_ticket(s, user_id) is None
         w = await wallet_service.get_wallet(s, user_id)
         assert w.available_cents == SIGNUP_GRANT_CENTS
         assert (await reconciliation_service.check_all(s)).ok

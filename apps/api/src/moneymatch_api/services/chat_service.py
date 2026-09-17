@@ -55,7 +55,6 @@ SUPPORT_AUTO_REPLY = (
 
 # Where each invite kind sends the client once it's accepted.
 _INVITE_REDIRECT = {
-    "pool": "/pools",
     "tournament": "/tournament",
     "h2h": "/play",
 }
@@ -298,10 +297,6 @@ def invite_title(payload: dict[str, Any]) -> str:
         return f"Head-to-head · {payload.get('market_label') or 'match'}"
     metric = payload.get("metric")
     stat = metric_label(metric) if metric else None
-    if kind == "pool":
-        difficulty = payload.get("difficulty")
-        bits = [b for b in (difficulty, stat) if b]
-        return "Solo pool" + (f" · {' '.join(bits)}" if bits else "")
     if kind == "tournament":
         return "Tournament" + (f" · {stat}" if stat else "")
     return "Invite"
@@ -316,20 +311,19 @@ async def send_invite(
     game: str,
     entry_preset_cents: int,
     metric: str | None = None,
-    difficulty: str | None = None,
 ) -> Message:
-    """Post a pool/tournament invite card into a thread.
+    """Post a tournament invite card into a thread.
 
     Head-to-head invites aren't created here — those come from the challenge
     flow, which posts its own card once the `challenges` row exists.
     """
     await _membership(session, user.id, conversation_id)
-    if invite_kind not in ("pool", "tournament"):
+    if invite_kind != "tournament":
         raise ChatError(
             "invalid_invite_kind",
-            "Invites from chat are for pools and tournaments.",
+            "Invites from chat are for tournaments.",
             status_code=422,
-            detail={"allowed": ["pool", "tournament"]},
+            detail={"allowed": ["tournament"]},
         )
     if game not in registry.all_ids():
         raise ChatError("unknown_game", f"'{game}' isn't a game here.", status_code=404)
@@ -353,7 +347,6 @@ async def send_invite(
         "game": game,
         "entry_cents": entry_preset_cents,
         "metric": metric,
-        "difficulty": difficulty,
         "status": "pending",
         "redirect_path": _INVITE_REDIRECT[invite_kind],
     }

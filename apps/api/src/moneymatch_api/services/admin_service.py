@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import USER_ROLES, User
 from ..models.wallet import LedgerEntry
@@ -140,7 +139,7 @@ async def force_unbind(
 
 
 async def user_contests(session: AsyncSession, user_id: uuid.UUID) -> list[ContestRow]:
-    """A user's contests across matches / pools / tournaments, newest first."""
+    """A user's contests across matches / tournaments, newest first."""
     rows: list[ContestRow] = []
 
     match_q = await session.execute(
@@ -160,26 +159,6 @@ async def user_contests(session: AsyncSession, user_id: uuid.UUID) -> list[Conte
                 payout_cents=payout,
                 created_at=match.created_at,
                 resolved_at=match.resolved_at,
-            )
-        )
-
-    pool_q = await session.execute(
-        select(SoloPool, SoloEntry.payout_cents)
-        .join(SoloEntry, SoloEntry.pool_id == SoloPool.id)
-        .where(SoloEntry.user_id == user_id)
-    )
-    for pool, payout in pool_q:
-        rows.append(
-            ContestRow(
-                ref_type="solo_pool",
-                ref_id=pool.id,
-                game=pool.game,
-                market=pool.metric,
-                state=pool.state,
-                entry_cents=pool.entry_cents,
-                payout_cents=payout,
-                created_at=pool.created_at,
-                resolved_at=pool.resolved_at,
             )
         )
 

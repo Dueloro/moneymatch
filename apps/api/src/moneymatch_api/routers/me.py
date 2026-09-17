@@ -14,7 +14,6 @@ from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer
-from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..models.wallet import LedgerEntry, Wallet
@@ -57,15 +56,10 @@ async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
 
 
 async def _contested_games(session: AsyncSession, user: User) -> list[str]:
-    """Games the player has entered at least one contest for (pool / H2H /
-    tournament). Computed, not stored: three `user_id`-indexed lookups unioned
+    """Games the player has entered at least one contest for (H2H /
+    tournament). Computed, not stored: two `user_id`-indexed lookups unioned
     into a small distinct set — cheap enough for a checklist and avoids a
     per-game counter that every escrow path would have to keep in sync."""
-    pools = (
-        select(SoloPool.game)
-        .join(SoloEntry, SoloEntry.pool_id == SoloPool.id)
-        .where(SoloEntry.user_id == user.id)
-    )
     matches = (
         select(Match.game)
         .join(MatchPlayer, MatchPlayer.match_id == Match.id)
@@ -76,7 +70,7 @@ async def _contested_games(session: AsyncSession, user: User) -> list[str]:
         .join(TournamentEntry, TournamentEntry.tournament_id == Tournament.id)
         .where(TournamentEntry.user_id == user.id)
     )
-    rows = await session.execute(pools.union(matches, tournaments))
+    rows = await session.execute(matches.union(tournaments))
     return sorted({game for (game,) in rows})
 
 
