@@ -10,60 +10,46 @@ import { PresetSelector } from '../ui/PresetSelector';
 // The server validates entry against its own presets (`ENTRY_PRESETS_CENTS`);
 // these are the same three amounts every wager surface offers.
 const ENTRY_PRESETS = [500, 1000, 2500];
-const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 const COPY = {
-  pool: {
-    title: 'Invite to a solo pool',
-    blurb:
-      'Drops an invite card in this chat. Rooms are joined on the Solo Pools tab. Open it to pick the exact room.',
-    tab: 'Solo Pools',
-    path: '/pools',
-  },
-  tournament: {
-    title: 'Invite to a tournament',
-    blurb:
-      'Drops an invite card in this chat. Fields are joined on the Tournament tab. Open it to pick the exact field.',
-    tab: 'Tournament',
-    path: '/tournament',
-  },
+  title: 'Invite to a tournament',
+  blurb:
+    'Drops an invite card in this chat. Fields are joined on the Tournament tab. Open it to pick the exact field.',
+  tab: 'Tournament',
+  path: '/tournament',
 } as const;
 
 /**
- * Compose a pool / tournament invite from inside a thread: pick a game and an
- * entry preset, and the card lands in the conversation. "Open <tab>" is the
- * escape hatch to the surface where rooms are actually joined.
+ * Compose a tournament invite from inside a thread: pick a game and an entry
+ * preset, and the card lands in the conversation. "Open Tournament" is the
+ * escape hatch to the surface where fields are actually joined.
  */
 export function InviteSheet({
   conversationId,
-  kind,
   peerName,
   onClose,
 }: {
   conversationId: string;
-  kind: 'pool' | 'tournament';
   peerName: string;
   onClose: () => void;
 }) {
   const navigate = useNavigate();
   const { games } = useGameSelection();
   const send = useSendMessage();
-  const copy = COPY[kind];
+  const copy = COPY;
 
   const gameIds = games.length > 0 ? games.map((g) => g.game) : ['cs2.steam'];
   const [game, setGame] = useState(gameIds[0]);
   const [entryCents, setEntryCents] = useState<number | null>(ENTRY_PRESETS[1]);
-  const [difficulty, setDifficulty] = useState<string>('medium');
 
   async function sendInvite() {
     if (!entryCents) return;
     await send.mutateAsync({
       conversationId,
       invite: {
-        invite_kind: kind,
+        invite_kind: 'tournament',
         game,
         entry_preset_cents: entryCents,
-        difficulty: kind === 'pool' ? difficulty : null,
       },
     });
     onClose();
@@ -106,29 +92,6 @@ export function InviteSheet({
             </button>
           ))}
         </div>
-
-        {kind === 'pool' && (
-          <>
-            <p className="label-money mb-2.5">Difficulty</p>
-            <div className="mb-6 flex flex-wrap gap-2">
-              {DIFFICULTIES.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDifficulty(d)}
-                  className={[
-                    'rounded-pill border px-4 py-1.5 text-xs font-semibold capitalize transition',
-                    d === difficulty
-                      ? 'is-selected text-text'
-                      : 'border-hairline text-text-secondary hover:text-text',
-                  ].join(' ')}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
 
         <p className="label-money mb-2.5">Entry</p>
         <PresetSelector

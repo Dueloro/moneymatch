@@ -7,7 +7,7 @@ import {
   type NotificationItem,
 } from '../hooks/useNotifications';
 import { formatRelativeTime } from '../lib/format';
-import { PoolDetail, TournamentDetail } from './notifications/ContestDetail';
+import { TournamentDetail } from './notifications/ContestDetail';
 import { EmptyState } from './ui/EmptyState';
 import { ExpandableCard } from './ui/ExpandableCard';
 import { PillButton } from './ui/PillButton';
@@ -56,8 +56,6 @@ function describe(note: NotificationItem): string {
         : `${name} sent you a friend request`;
     case 'match_found':
       return 'You have a match. Confirm to play';
-    case 'room_filled':
-      return 'Your pool room filled';
     case 'settled':
       return 'A contest settled';
     case 'refund':
@@ -86,9 +84,8 @@ function NotificationRow({ note }: { note: NotificationItem }) {
       : null;
 
   // A contest notification carries the id of the thing it is about, so the row
-  // can open into the room itself: who is in it, and once it settles, what
+  // can open into the standings itself: who is in it, and once it settles, what
   // everyone did. Anything else stays a plain row.
-  const poolId = p.kind === 'pool' ? ((p.pool_id as string) ?? null) : null;
   const tournamentId =
     p.kind === 'tournament' ? ((p.tournament_id as string) ?? null) : null;
 
@@ -101,7 +98,7 @@ function NotificationRow({ note }: { note: NotificationItem }) {
   return (
     <ExpandableCard
       ariaLabel={
-        poolId || tournamentId ? `${describe(note)}, open for detail` : undefined
+        tournamentId ? `${describe(note)}, open for detail` : undefined
       }
       left={
         <span
@@ -138,9 +135,7 @@ function NotificationRow({ note }: { note: NotificationItem }) {
         ) : undefined
       }
     >
-      {poolId ? (
-        <PoolDetail poolId={poolId} />
-      ) : tournamentId ? (
+      {tournamentId ? (
         <TournamentDetail tournamentId={tournamentId} />
       ) : undefined}
     </ExpandableCard>

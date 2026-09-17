@@ -9,7 +9,7 @@ import { useNotifications } from './useNotifications';
 // choice — the server owns timestamps, invite state, and match formation.
 
 export type MessageKind = 'text' | 'invite' | 'system';
-export type InviteKind = 'pool' | 'tournament' | 'h2h';
+export type InviteKind = 'tournament' | 'h2h';
 export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 
 /** The invite card's whole contract, carried on an `invite` message. */
@@ -18,7 +18,6 @@ export interface InvitePayload {
   title?: string;
   game?: string;
   metric?: string | null;
-  difficulty?: string | null;
   market?: string | null;
   market_label?: string | null;
   entry_cents?: number;
@@ -156,11 +155,10 @@ export interface SendVars {
   conversationId: string;
   body?: string;
   invite?: {
-    invite_kind: 'pool' | 'tournament';
+    invite_kind: 'tournament';
     game: string;
     entry_preset_cents: number;
     metric?: string | null;
-    difficulty?: string | null;
   };
 }
 

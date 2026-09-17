@@ -5,10 +5,9 @@ import { useRespondInvite, type ChatMessage } from '../../hooks/useChat';
 import { formatCurrency } from '../../lib/format';
 import { gameMeta } from '../../lib/games';
 import { PillButton } from '../ui/PillButton';
-import { SwordsIcon, TrophyIcon, UsersIcon } from './icons';
+import { SwordsIcon, TrophyIcon } from './icons';
 
 const KIND_META = {
-  pool: { label: 'Solo pool invite', Icon: UsersIcon, path: '/pools' },
   tournament: { label: 'Tournament invite', Icon: TrophyIcon, path: '/tournament' },
   h2h: { label: 'Head-to-head challenge', Icon: SwordsIcon, path: '/play' },
 } as const;
@@ -44,15 +43,15 @@ const STATUS_STYLE: Record<string, string> = {
 /**
  * An invite rendered inside the thread (design: the invite lands where you talk,
  * not only in the notification feed). A head-to-head card wraps a real challenge
- * — accepting forms the PENDING match and jumps to it. Pool / tournament cards
- * open the tab where the room is actually joined.
+ * — accepting forms the PENDING match and jumps to it. A tournament card opens
+ * the tab where the field is actually joined.
  */
 export function InviteCard({ message }: { message: ChatMessage }) {
   const navigate = useNavigate();
   const respond = useRespondInvite();
   const p = message.payload;
-  const kind = (p.invite_kind ?? 'pool') as keyof typeof KIND_META;
-  const meta = KIND_META[kind] ?? KIND_META.pool;
+  const kind = (p.invite_kind ?? 'tournament') as keyof typeof KIND_META;
+  const meta = KIND_META[kind] ?? KIND_META.tournament;
   const status = p.status ?? 'pending';
   const accent = p.game ? gameMeta(p.game).accent : 'var(--green)';
   const pending = status === 'pending';

@@ -11,6 +11,6 @@ import { useMe } from '../hooks/useMe';
 export function RequireAdmin() {
   const me = useMe();
   if (me.isLoading) return <Loader />;
-  if (me.data?.user.role !== 'admin') return <Navigate to="/pools" replace />;
+  if (me.data?.user.role !== 'admin') return <Navigate to="/play" replace />;
   return <Outlet />;
 }

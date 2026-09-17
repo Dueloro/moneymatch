@@ -163,10 +163,9 @@ export function MessageThread({
         onPickInvite={setInvite}
       />
 
-      {(invite === 'pool' || invite === 'tournament') && (
+      {invite === 'tournament' && (
         <InviteSheet
           conversationId={conversationId}
-          kind={invite}
           peerName={peerName}
           onClose={() => setInvite(null)}
         />
