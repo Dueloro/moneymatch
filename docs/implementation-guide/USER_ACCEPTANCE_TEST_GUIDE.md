@@ -2,19 +2,19 @@
 
 You (Cursor) will **test this app in a browser like a real user**, then **write a
 results report**. You will **not** play any real game and you will **not** link the
-account to any real game account. Instead, the app has a **self-driving demo
-tournament**: it injects real chess stats fetched from the Lichess API (the same
-way the app reads game stats), updates them over ~10 minutes to simulate people
-playing, and fills the field with bots that also get updating stats. You watch it
-run and settle, and verify everything else around it.
+account to any real game account. Instead, in a **sim build** (`DEMO_SIMULATE_ENABLED`
+on), **just joining a tournament** spins up a **self-driving tournament for that
+game**: you plus competitive bots whose stats drift randomly over ~10 minutes
+(simulating everyone still playing), settling itself **60/25/15**. There is **no
+"live tournament" panel** — the join button is the trigger.
 
 **The app is now peer-to-peer only: 1v1 (Head-to-head) + Tournaments.** Solo Pools
-and the Bucketing bar-wager page have been **removed** — there is no "bar" you beat.
-Skip anything below that mentions Pools or a Bucketing page; those routes now
-redirect to Play. Bucketing survives only as an invisible matchmaking input.
+and the Bucketing bar-wager page have been **removed** (backend and frontend) —
+there is no "bar" you beat. Any old `/pools` or `/bucketing` route redirects to
+Play. Bucketing survives only as an invisible matchmaking input.
 
-Wired features to check: the **live tournament** (best game → 60/25/15), the
-**win-streak ladder** (shifts 1v1 matchmaking), the **collusion co-entry guard**
+Wired features to check: the **self-driving tournament** (join → bots → 60/25/15),
+the **win-streak ladder** (shifts 1v1 matchmaking), the **collusion co-entry guard**
 (same-device accounts can't be matched/co-enter), and the **stake ladder** (new
 accounts capped). §3–§5 tell you where each lives.
 
@@ -72,26 +72,26 @@ TOKEN=$(curl -s -XPOST http://localhost:8000/api/v1/demo/login | python -c "impo
 
 ## 3. ⭐ The self-driving tournament (the main event)
 
-This creates a **~10-minute chess tournament**, enters the demo user + **5
-competitive bots**, and injects stats fetched from the real **Lichess API** that
-**keep changing** over the window. It **settles itself**, splitting the prize
-**60 / 25 / 15**.
+Joining any tournament (in a sim build) enters you + **5 competitive bots** and
+injects each participant's stats, which **keep changing** over a **~10-minute**
+window. It **settles itself**, splitting the prize **60 / 25 / 15**. It runs on
+**whatever game you joined** (chess is limited to one mode, **blitz**, ranked on
+"Moves to win").
 
 ### 3.1 Start it — from the UI
 
 1. Go to the **Tournament** tab (`/tournament`).
-2. You'll see a **"Demo · self-driving tournament"** panel with a **"Start live
-   tournament"** button. Click it.
-   - (Equivalent API: `POST /api/v1/demo/live_tournament`.)
+2. Pick any game + metric and click **"Join tournament"**. That's it — the
+   self-driving tournament forms right away (there is no separate panel).
+   - (Equivalent API: `POST /api/v1/tournaments/queue`
+     `{"game":"…","metric":"…","entry_preset_cents":1000}`.)
 
 ### 3.2 Watch it
 
 1. The tournament appears with a **standings board**, your row highlighted, a
    **window countdown**, the entry, the **60/25/15** split, and rake.
-2. **Standings should change over time** as games are injected (win counts climb,
-   ranks move). To avoid waiting 10 minutes, click **"Advance now"** in the same
-   panel a few times (API: `POST /api/v1/demo/live_tournament/tick`) and watch the
-   board move.
+2. **Standings change over time** as the worker injects more games (scores climb,
+   ranks reorder). The worker drives this on its own cadence.
 3. At the window close it **settles**: final ranks, top-3 paid **60/25/15** of
    (pot − rake), your wallet changes if you placed. To settle **now** instead of
    waiting 10 minutes, call `POST /api/v1/demo/force_settle` with
@@ -99,13 +99,13 @@ competitive bots**, and injects stats fetched from the real **Lichess API** that
 
 ### 3.3 Verify (report each)
 
-- [ ] The **"Start live tournament"** button exists on the Tournament tab.
-- [ ] After starting, a tournament with **6 players** (you + 5 bots), a **60/25/15**
-      split, and a countdown appears — with **distinct opening scores** (not all the
-      same), your row highlighted.
-- [ ] **Standings move** when you click "Advance now" — scores **climb** and ranks
-      **reorder** (each advance returns `{"advanced":1}`, not `0`). Scores are a
-      running total, so they keep rising and separating the field.
+- [ ] Clicking **Join tournament** immediately shows a tournament with **6 players**
+      (you + 5 bots), a **60/25/15** split, and a countdown — with **distinct opening
+      scores** (not all the same), your row highlighted.
+- [ ] Joining again while it runs returns the **same** tournament (no second field,
+      no double charge).
+- [ ] **Standings move** over time — scores **climb** and ranks **reorder** (the
+      running total keeps rising and separating the field).
 - [ ] It **settles** paying **three different players** 60/25/15 — 1st > 2nd > 3rd,
       distinct amounts, everyone else 0.
 - [ ] **Money is conserved:** all payouts + rake == the pot (entry × players).
@@ -172,10 +172,10 @@ For each, ✅ / ⚠️ / ❌ + actual behavior.
 - [ ] Settle (inject via `POST /api/v1/demo/simulate_result`) → higher stat wins
       pot − rake; a missing result **voids + refunds**.
 
-### 5.3 Solo pools (`/pools`)
-- [ ] Markets with difficulty tiers; enter → bots fill → settle (`POST
-      /api/v1/demo/force_settle`) → clearers split, or all refunded if nobody
-      clears.
+### 5.3 Tournaments (`/tournament`) — see §3
+
+Solo Pools are gone (backend + frontend); `/pools` redirects to Play. Nothing to
+test here beyond §3.
 
 ### 5.4 Activity / Social / Notifications
 - [ ] Activity shows in-flight + recent contests live; Social has friends /
@@ -224,14 +224,13 @@ description alone.
 | Purpose | Call |
 |---|---|
 | Demo login | `POST /api/v1/demo/login` → `{access_token}` |
-| **Start live tournament** | `POST /api/v1/demo/live_tournament` |
-| **Advance it now** | `POST /api/v1/demo/live_tournament/tick` |
+| **Join a tournament** (spins up the self-driving one) | `POST /api/v1/tournaments/queue` `{"game","metric","entry_preset_cents"}` |
 | Read your win streaks | `GET /api/v1/play/streaks` |
 | Become admin (test build) | `POST /api/v1/demo/make_admin` |
 | Bucketing markets | `GET /api/v1/bucketing/markets` |
 | Bucketing clawback (admin) | `POST /api/v1/bucketing/admin/disputes/{id}/resolve` (`resolution:"clawback"`, `fault_player_ids:[...]`) |
-| Inject a 1v1/pool result | `POST /api/v1/demo/simulate_result` |
-| Settle a pool/tournament now | `POST /api/v1/demo/force_settle` |
+| Inject a 1v1 result | `POST /api/v1/demo/simulate_result` |
+| Settle a tournament now | `POST /api/v1/demo/force_settle` |
 | Reset the demo account | `POST /api/v1/demo/reset` |
 | Wallet / ledger | `GET /api/v1/wallet`, `GET /api/v1/wallet/ledger` |
 | Tournaments | `GET /api/v1/tournaments`, `GET /api/v1/tournaments/{id}` |
