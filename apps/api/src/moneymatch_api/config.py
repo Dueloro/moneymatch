@@ -157,7 +157,6 @@ class Settings(BaseSettings):
     demo_simulate_enabled: bool = Field(default=False)
     # Tournament timing overrides for local testing (see
     # services/tournament_timing.py). Unset = the constants.py defaults.
-    tournament_join_window_seconds: int | None = Field(default=None, ge=0)
     tournament_window_seconds: int | None = Field(default=None, ge=60)
     tournament_grace_seconds: int | None = Field(default=None, ge=0)
     # Automatic share-code collection (Valve's GetNextMatchSharingCode chain).

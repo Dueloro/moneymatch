@@ -82,8 +82,9 @@ class TournamentView(BaseModel):
     players: int
     score_matches: int
     state: str
-    window_starts_at: datetime
-    window_ends_at: datetime
+    # Null while waiting for a second player (the clock hasn't started).
+    window_starts_at: datetime | None
+    window_ends_at: datetime | None
     join_closes_at: datetime | None
     your_entered_at: datetime | None
     # Anonymized field fairness: the μ spread ("Field: K/D 1.42–1.58").

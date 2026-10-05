@@ -151,12 +151,27 @@ async def test_tournament_players_are_polled_before_idle_accounts(fake_host, ses
     # tournament player is due on the fast cadence.
     for link in (idle, busy):
         link.ingest_attempted_at = link.ingest_polled_at = now - timedelta(minutes=5)
-    await tournament_engine.enqueue(
-        session, busy_user, game=CS2, metric=KD, entry_cents=1000
-    )
+    rival_user, rival = await player(session, "rival")
+    rival.ingest_attempted_at = rival.ingest_polled_at = now - timedelta(minutes=5)
+    for u in (busy_user, rival_user):
+        await tournament_engine.enqueue(
+            session, u, game=CS2, metric=KD, entry_cents=1000
+        )
     await session.commit()
     due = await match_ingestion.due_links(session, CS2, now, limit=5)
     assert busy.id in due and idle.id not in due
+
+
+async def test_a_player_waiting_alone_is_not_polled_fast(fake_host, session):
+    """Nothing can count before the clock starts, so no host calls on it."""
+    now = clock.now()
+    user, link = await player(session, "alone")
+    link.ingest_attempted_at = link.ingest_polled_at = now - timedelta(minutes=5)
+    await tournament_engine.enqueue(
+        session, user, game=CS2, metric=KD, entry_cents=1000
+    )
+    await session.commit()
+    assert link.id not in await match_ingestion.due_links(session, CS2, now, limit=5)
 
 
 # --- PUBG: only new match ids are fetched --------------------------------------- #
@@ -325,9 +340,9 @@ async def test_settlement_waits_for_the_final_poll_then_refunds_the_missing(
         assert (await reconciliation_service.check(s, "tournament", t.id)).ok
 
 
-async def test_a_solo_tournament_runs_to_the_end_then_refunds(fake_host, session):
-    """One player: games are fetched and shown while it runs; at the end the
-    entry comes back in full (no opponent, so nothing to win, no rake)."""
+async def test_a_solo_tournament_waits_and_never_settles(fake_host, session):
+    """One player: no clock, so the worker never ends or settles it, and a game
+    played while waiting does not count. Leaving refunds in full."""
     user, _ = await player(session, "lonely")
     t = (
         await tournament_engine.enqueue(
@@ -335,44 +350,73 @@ async def test_a_solo_tournament_runs_to_the_end_then_refunds(fake_host, session
         )
     ).tournament
     await session.commit()
-    fake_host.games = {
-        "host_lonely": [game("x1", t.window_starts_at + timedelta(minutes=5), 1.4)]
-    }
+    fake_host.games = {"host_lonely": [game("x1", clock.now(), 1.4)]}
     sm = get_sessionmaker()
 
-    # Joining closes: still running, standings show the fetched game.
-    mid = t.join_closes_at + timedelta(seconds=1)
-    await settlement_worker.run_cycle(sm, now=mid)
+    await settlement_worker.run_cycle(sm, now=clock.now() + timedelta(days=2))
     async with sm() as s:
-        running = await s.get(Tournament, t.id)
-        assert running.state == "LOCKED"
-        (row,) = running.standings_cache["rows"]
-        assert row["score"] == 1.4 and row["games"][0]["reason"] == "COUNTED"
-
-    # After the end + grace: refunded in full.
-    after = t.window_ends_at + timedelta(minutes=31)
-    await settlement_worker.run_cycle(sm, now=after)
-    async with sm() as s:
-        done = await s.get(Tournament, t.id)
-        assert done.state == "CANCELED"
-        assert done.outcome_detail["reason"] == "not_enough_players"
+        waiting = await s.get(Tournament, t.id)
+        assert waiting.state == "OPEN" and waiting.window_ends_at is None
+        w = await wallet_service.get_wallet(s, user.id)
+        assert (w.available_cents, w.escrow_cents) == (9_000, 1_000)
+        me = await s.get(type(user), user.id)
+        assert await tournament_engine.cancel(s, me) is True
+        await s.commit()
         w = await wallet_service.get_wallet(s, user.id)
         assert (w.available_cents, w.escrow_cents) == (10_000, 0)
+
+
+async def test_games_before_the_second_player_joined_do_not_count(fake_host, session):
+    first, _ = await player(session, "first")
+    second, _ = await player(session, "second")
+    await tournament_engine.enqueue(
+        session, first, game=CS2, metric=KD, entry_cents=1000
+    )
+    await session.commit()
+    played_while_waiting = clock.now()
+    t = (
+        await tournament_engine.enqueue(
+            session, second, game=CS2, metric=KD, entry_cents=1000
+        )
+    ).tournament
+    await session.commit()
+    fake_host.games = {
+        "host_first": [
+            game("early", played_while_waiting - timedelta(minutes=1), 9.0),
+            game("late", t.window_starts_at + timedelta(minutes=5), 1.2),
+        ],
+        "host_second": [game("s1", t.window_starts_at + timedelta(minutes=5), 1.0)],
+    }
+    after = t.window_ends_at + timedelta(minutes=31)
+    sm = get_sessionmaker()
+    for i in range(3):
+        await settlement_worker.run_cycle(sm, now=after + timedelta(minutes=i * 2))
+    async with sm() as s:
+        done = await s.get(Tournament, t.id)
+        assert done.state == "SETTLED"
+        entries = {
+            e.user_id: e
+            for e in await s.scalars(
+                select(TournamentEntry).where(TournamentEntry.tournament_id == t.id)
+            )
+        }
+        # The 9.0 game was played while waiting, so 1.2 is first's best.
+        assert entries[first.id].score == 1.2 and entries[first.id].rank == 1
         assert (await reconciliation_service.check(s, "tournament", t.id)).ok
 
 
 async def test_timings_can_be_shortened_for_testing(fake_host, session, monkeypatch):
     settings = get_settings()
-    monkeypatch.setattr(settings, "tournament_join_window_seconds", 120)
     monkeypatch.setattr(settings, "tournament_window_seconds", 600)
-    user, _ = await player(session, "quick")
-    t = (
-        await tournament_engine.enqueue(
-            session, user, game=CS2, metric=KD, entry_cents=1000
-        )
-    ).tournament
-    assert t.join_closes_at - t.window_starts_at == timedelta(seconds=120)
+    for name in ("quick", "quicker"):
+        user, _ = await player(session, name)
+        t = (
+            await tournament_engine.enqueue(
+                session, user, game=CS2, metric=KD, entry_cents=1000
+            )
+        ).tournament
     assert t.window_ends_at - t.window_starts_at == timedelta(seconds=600)
+    assert t.join_closes_at == t.window_ends_at
 
 
 async def test_live_standings_come_from_stored_games(fake_host, session):

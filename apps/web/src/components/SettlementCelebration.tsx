@@ -47,7 +47,7 @@ export function SettlementCelebration() {
   // used here and on the balance. A loss shows no amount, so it never runs.
   const [target, setTarget] = useState(0);
   const amount = useCountUp(target, 850);
-  useEffect(() => setTarget(win && show ? Math.abs(show.netCents) : 0), [win, show]);
+  useEffect(() => setTarget(win && show ? show.amountCents : 0), [win, show]);
 
   // Consume every outcome so the queue drains, but only hold the screen for the
   // ones that have a sequence.
@@ -84,7 +84,7 @@ export function SettlementCelebration() {
   // Accessibility mirrors the visible copy: the win says the amount, the loss
   // deliberately does not.
   const announced = win
-    ? `You won ${formatCurrency(show.netCents)} on ${show.title}`
+    ? `You won ${formatCurrency(show.amountCents)} on ${show.title}`
     : `You lost on ${show.title}`;
 
   return (

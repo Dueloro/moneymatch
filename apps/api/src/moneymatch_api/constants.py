@@ -480,18 +480,19 @@ POOL_WINDOW_SECONDS = 24 * 3600
 # Tournaments are **rolling**: clicking a stat tournament drops you straight
 # into the open one for that (game, stat, entry), or opens a new one if none is
 # accepting players. No waiting for a full field, no admin scheduling. A
-# tournament takes joiners for `TOURNAMENT_JOIN_WINDOW_SECONDS` (or until it is
-# full) and ends `TOURNAMENT_WINDOW_SECONDS` after it opened. Each player's
-# games count from the moment *they* joined, and only their first
-# `TOURNAMENT_SCORE_N` qualifying games count, so a late joiner is not behind.
+# tournament opened by one player waits (no clock, leave any time for a full
+# refund) until `TOURNAMENT_MIN_FIELD` players are in; then it starts and ends
+# `TOURNAMENT_WINDOW_SECONDS` later, taking joiners until then or until it is
+# full. Each player's games count from the later of the start and the moment
+# *they* joined, and only their first `TOURNAMENT_SCORE_N` qualifying games
+# count, so a late joiner is not behind.
 TOURNAMENT_FIELD_SIZE = 10  # the most players one tournament takes
-# Fewer players than this when joining closes → void, everyone refunded.
+# Players needed for a tournament to start its clock.
 TOURNAMENT_MIN_FIELD = 2
 # Fewer verifiable participants than this at settlement → void + refund.
 TOURNAMENT_MIN_RANKED = 2
 TOURNAMENT_SCORE_N = 3
 TOURNAMENT_PRIZE_SPLIT: tuple[int, ...] = (60, 25, 15)  # relative weights
-TOURNAMENT_JOIN_WINDOW_SECONDS = 3600
 TOURNAMENT_WINDOW_SECONDS = 3 * 3600
 # After the end, wait this long before the final poll + settle, so games that
 # finished just before the end have time to appear in the host's API.

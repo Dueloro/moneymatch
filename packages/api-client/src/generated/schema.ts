@@ -3721,16 +3721,10 @@ export interface components {
             score_matches: number;
             /** State */
             state: string;
-            /**
-             * Window Starts At
-             * Format: date-time
-             */
-            window_starts_at: string;
-            /**
-             * Window Ends At
-             * Format: date-time
-             */
-            window_ends_at: string;
+            /** Window Starts At */
+            window_starts_at: string | null;
+            /** Window Ends At */
+            window_ends_at: string | null;
             /** Join Closes At */
             join_closes_at: string | null;
             /** Your Entered At */

@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import select
 
 from moneymatch_api import clock
+from moneymatch_api.constants import TOURNAMENT_WINDOW_SECONDS
 from moneymatch_api.errors import APIError
 from moneymatch_api.models.tournaments import Tournament, TournamentEntry
 from moneymatch_api.services import (
@@ -86,8 +87,32 @@ async def test_first_joiner_opens_a_tournament_and_is_escrowed(session):
     t = result.tournament
     assert result.status == "formed"
     assert t.state == "OPEN" and t.pot_cents == 1000
-    assert t.join_closes_at is not None and t.join_closes_at < t.window_ends_at
+    # Alone: waiting for a second player, no clock yet.
+    assert t.window_starts_at is None and t.window_ends_at is None
+    assert t.join_closes_at is None
     assert await _bal(session, user) == (9000, 1000)
+
+
+async def test_the_second_player_starts_the_clock(session):
+    a, b = await t_player(session, "a"), await t_player(session, "b")
+    t = (await join(session, a)).tournament
+    assert tournament_engine.is_waiting(t)
+    t = (await join(session, b)).tournament
+    assert not tournament_engine.is_waiting(t) and t.state == "OPEN"
+    assert t.window_ends_at - t.window_starts_at == timedelta(
+        seconds=TOURNAMENT_WINDOW_SECONDS
+    )
+    # Others can keep joining until it ends (no separate join timer yet).
+    assert t.join_closes_at == t.window_ends_at
+
+
+async def test_a_third_and_fourth_player_join_the_running_tournament(session):
+    players = [await t_player(session, n) for n in ("a", "b", "c", "d")]
+    ids = {(await join(session, p)).tournament.id for p in players}
+    assert len(ids) == 1
+    (t_id,) = ids
+    t = await session.get(Tournament, t_id)
+    assert t.pot_cents == 4000 and len(await _entries(session, t_id)) == 4
 
 
 async def test_second_joiner_lands_in_the_same_tournament(session):
@@ -152,13 +177,16 @@ async def test_cannot_leave_once_someone_else_joined(session):
 # --- joins closing ---------------------------------------------------------- #
 
 
-async def test_a_solo_tournament_keeps_running_after_joins_close(session):
+async def test_a_solo_tournament_waits_however_long_it_takes(session):
     a = await t_player(session, "a")
     t = (await join(session, a)).tournament
-    later = t.join_closes_at + timedelta(seconds=1)
-    await tournament_engine.close_joins(session, t, later)
-    assert t.state == "LOCKED"  # not voided: it runs to the end
+    much_later = clock.now() + timedelta(days=3)
+    await tournament_engine.close_joins(session, t, much_later)
+    assert t.state == "OPEN" and tournament_engine.is_waiting(t)
     assert await _bal(session, a) == (9000, 1000)
+    # And the next player still lands in it, starting the clock.
+    b = await t_player(session, "b")
+    assert (await join(session, b)).tournament.id == t.id
 
 
 async def test_a_solo_tournament_refunds_at_settlement(session):

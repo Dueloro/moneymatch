@@ -571,7 +571,7 @@ async def _process_due_tournaments(
                 .where(Tournament.id == tid, Tournament.state.in_(("OPEN", "LOCKED")))
                 .with_for_update(skip_locked=True)
             )
-            if tournament is None:
+            if tournament is None or tournament.window_ends_at is None:
                 continue
             grace = timedelta(seconds=tournament_timing.grace_seconds(tournament.game))
             final_at = tournament.window_ends_at + grace

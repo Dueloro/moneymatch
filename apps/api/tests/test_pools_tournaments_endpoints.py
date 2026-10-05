@@ -271,7 +271,8 @@ async def test_join_is_instant_and_the_next_player_joins_the_same_one(client):
     assert r1.status_code == 200 and r1.json()["status"] == "formed"
     t1 = r1.json()["tournament"]
     assert t1["state"] == "OPEN" and t1["players"] == 1
-    assert t1["join_closes_at"] and t1["your_entered_at"]
+    # Alone: waiting, no clock yet.
+    assert t1["window_ends_at"] is None and t1["your_entered_at"]
 
     m = await client.get(
         f"{V1}/tournaments/markets", params={"game": CS2}, headers=_hdr("auth_j2")
@@ -284,6 +285,7 @@ async def test_join_is_instant_and_the_next_player_joins_the_same_one(client):
     )
     t2 = r2.json()["tournament"]
     assert t2["id"] == t1["id"] and t2["players"] == 2
+    assert t2["window_starts_at"] and t2["window_ends_at"]  # clock started
 
     # With someone else in, the first player's entry is final.
     leave = await client.delete(f"{V1}/tournaments/queue", headers=_hdr("auth_j1"))

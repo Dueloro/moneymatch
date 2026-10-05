@@ -237,6 +237,8 @@ async def stored_games_for(
 ) -> list[GameMatch]:
     """An entrant's stored games from an hour before the tournament to an hour
     after (the extra margin is shown in the log, never counted)."""
+    if tournament.window_starts_at is None or tournament.window_ends_at is None:
+        return []  # waiting for a second player: no window yet
     return list(
         await session.scalars(
             select(GameMatch)
@@ -259,6 +261,9 @@ async def score_entries(
     """Score every entrant from stored games (no host calls)."""
     out: dict[uuid.UUID, EntryScore] = {}
     metric = tournament.ranking_metric
+    if tournament.window_starts_at is None or tournament.window_ends_at is None:
+        # Still waiting for a second player: nothing can count yet.
+        return {e.id: EntryScore(score=None, counted=0) for e in entries}
     for entry in entries:
         if test_opponents.is_practice_opponent(entry.host_account_id):
             out[entry.id] = EntryScore(score=None, counted=0)  # demo bot: forfeits

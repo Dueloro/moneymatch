@@ -76,11 +76,13 @@ class Tournament(Base, TimestampMixin):
     state: Mapped[str] = mapped_column(
         String(16), default="LOCKED", server_default="LOCKED", nullable=False
     )
-    window_starts_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+    # Null while the tournament is waiting for its second player; the clock
+    # starts when that player joins (tournament_engine.enqueue).
+    window_starts_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
-    window_ends_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+    window_ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
     )
     # Rolling tournaments: joins are accepted while OPEN and before this time.
     # Null on tournaments formed by the old full-field matcher.

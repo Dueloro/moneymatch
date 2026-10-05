@@ -166,6 +166,9 @@ async def _live_user_ids(session: AsyncSession, game: str) -> set[uuid.UUID]:
         .where(
             Tournament.game == game,
             Tournament.state.in_(_LIVE_TOURNAMENT_STATES),
+            # A tournament still waiting for its second player has no clock,
+            # so nothing can count yet: no need to spend host calls on it.
+            Tournament.window_starts_at.isnot(None),
             TournamentEntry.status == "LOCKED",
         )
     )

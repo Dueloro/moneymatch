@@ -146,6 +146,46 @@ describe('SettlementCelebration', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/You won \$90\.00/);
   });
 
+  // A tournament is won by placing in the money, whatever the place.
+  const tournamentItem = (net: number) =>
+    item({
+      id: 't',
+      type: 'tournament',
+      kind: 'tournament',
+      state: 'SETTLED',
+      entry_cents: 1_000,
+      title: 'Kills tournament · #3',
+      net_cents: net,
+    });
+
+  it('a paid tournament place is a win showing the prize, even below the entry', () => {
+    // 3rd of 4 at $10: prize $5.40, net -$4.60. Still placed in the money.
+    setActivity([item({ id: 't', type: 'tournament', state: 'LOCKED' })]);
+    const { rerender } = render(<Cel />);
+    act(() => {
+      setActivity([tournamentItem(-460)]);
+      rerender(<Cel />);
+    });
+    expect(screen.getByText('You won')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/You won \$5\.40/);
+  });
+
+  it('a tournament win shows the prize, not the net', () => {
+    setActivity([item({ id: 't', type: 'tournament', state: 'LOCKED' })]);
+    const { rerender } = render(<Cel />);
+    act(() => {
+      setActivity([tournamentItem(800)]); // $18 prize on a $10 entry
+      rerender(<Cel />);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(/You won \$18\.00/);
+  });
+
+  it('an unpaid tournament finish is a loss', () => {
+    expect(outcomeOf(tournamentItem(-1_000))).toBe('loss');
+    expect(outcomeOf(tournamentItem(-460))).toBe('win');
+    expect(outcomeOf({ ...tournamentItem(0), state: 'CANCELED' })).toBe('refund');
+  });
+
   it('announces a loss without dressing it up as anything else', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
     const { rerender } = render(<Cel />);

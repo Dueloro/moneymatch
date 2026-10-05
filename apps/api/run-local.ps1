@@ -12,11 +12,11 @@
 # (migrated to 0034). Your main `moneymatch` database (feat/bucket_system) is
 # never touched. No --reload: it wedges on this machine.
 #
-# Test timings: joins close after 2 min and the tournament runs 40 min. A PUBG
-# game counts if it starts after you join and you die (or win) before the end;
-# your first 3 such games count. Then a 2 min grace before the final fetch.
-# Delete these three lines for the real 1 h join window / 3 h tournament /
-# per-game grace.
+# Test timings: a tournament starts when its 2nd player joins and runs 40 min.
+# A PUBG game counts if it starts after the tournament starts (and after you
+# joined) and you die or win before the end; your first 3 such games count.
+# Then a 2 min grace before the final fetch. Delete these two lines for the
+# real 3 h tournament / per-game grace.
 param([ValidateSet('api', 'worker')][string]$What = 'api')
 
 Set-Location $PSScriptRoot
@@ -26,7 +26,6 @@ Get-Content ..\..\.env | ForEach-Object {
     }
 }
 $env:DATABASE_URL = 'postgresql+asyncpg://moneymatch:moneymatch@localhost:5432/moneymatch_future'
-$env:TOURNAMENT_JOIN_WINDOW_SECONDS = '120'
 $env:TOURNAMENT_WINDOW_SECONDS = '2400'
 $env:TOURNAMENT_GRACE_SECONDS = '120'
 # The worker loop runs inside the API process (also the default in config).

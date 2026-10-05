@@ -71,8 +71,9 @@ export interface TournamentView {
   players: number;
   score_matches: number;
   state: string;
-  window_starts_at: string;
-  window_ends_at: string;
+  /** Null while waiting for a second player (the clock hasn't started). */
+  window_starts_at: string | null;
+  window_ends_at: string | null;
   join_closes_at: string | null;
   your_entered_at: string | null;
   field_mu_low: number | null;

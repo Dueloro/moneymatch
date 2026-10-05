@@ -35,9 +35,14 @@ function isLive(t: TournamentView): boolean {
   return t.state === 'OPEN' || t.state === 'LOCKED';
 }
 
+function isWaiting(t: TournamentView): boolean {
+  return isLive(t) && t.window_ends_at == null;
+}
+
 function stateLine(t: TournamentView): string {
+  if (isWaiting(t)) return 'Waiting for a second player';
   if (t.state === 'OPEN') {
-    return `Open to join until ${clockTime(t.join_closes_at)} · ends ${clockTime(t.window_ends_at)}`;
+    return `Open to join · ends ${clockTime(t.window_ends_at)}`;
   }
   if (t.state === 'LOCKED')
     return `Joining closed · ends ${clockTime(t.window_ends_at)}`;
@@ -188,9 +193,9 @@ function SoloNote({ t }: { t: TournamentView }) {
   if (!(isLive(t) && t.players <= 1)) return null;
   return (
     <p className="text-xs text-text-secondary">
-      You&apos;re first in. Others who pick this stat and entry join you. Your games
-      count from the moment you joined. If nobody else joins, the tournament still runs
-      and your entry is refunded in full when it ends.
+      You&apos;re first in. The tournament starts, and your games start counting, the
+      moment a second player picks this stat and entry. Until then you can leave and get
+      your entry back in full.
     </p>
   );
 }
@@ -311,7 +316,13 @@ export function RailTournamentCard({ tournament: t }: { tournament: TournamentVi
       </button>
       <p className="mt-0.5 text-xs text-text-secondary">
         {t.players} of {t.field_size} players · pot {formatCurrency(t.pot_cents)}
-        {live ? ` · ends ${clockTime(t.window_ends_at)}` : settled ? ' · final' : ''}
+        {isWaiting(t)
+          ? ' · waiting for a 2nd player'
+          : live
+            ? ` · ends ${clockTime(t.window_ends_at)}`
+            : settled
+              ? ' · final'
+              : ''}
       </p>
       <div className="mt-2 flex items-baseline justify-between gap-2 text-xs text-text-secondary">
         <span className="min-w-0 truncate" data-testid="rail-tournament-summary">

@@ -117,6 +117,23 @@ describe('RailTournamentCard', () => {
     ).toBeInTheDocument();
   });
 
+  it('says when it is waiting for a second player', () => {
+    renderWithProviders(
+      <RailTournamentCard
+        tournament={tournament({
+          state: 'OPEN',
+          players: 1,
+          window_starts_at: null,
+          window_ends_at: null,
+        })}
+      />,
+    );
+    expect(screen.getByText(/waiting for a 2nd player/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/starts, and your games start counting/),
+    ).toBeInTheDocument();
+  });
+
   it('collapses to the summary and remembers it', () => {
     const { unmount } = renderWithProviders(
       <RailTournamentCard tournament={tournament()} />,

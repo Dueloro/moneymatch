@@ -272,6 +272,30 @@ def _has_sandbox_entry() -> Any:
     )
 
 
+def _joinable(now: datetime) -> Any:
+    """SQL: still taking players — waiting for a second one (no clock yet), or
+    running with its join window open."""
+    return or_(Tournament.join_closes_at.is_(None), Tournament.join_closes_at > now)
+
+
+def is_waiting(tournament: Tournament) -> bool:
+    """Opened by one player and waiting for a second; no clock yet."""
+    return tournament.window_starts_at is None
+
+
+def _start_clock(tournament: Tournament, now: datetime) -> None:
+    """The second player is in: the tournament starts now. Games count from
+    here (earlier ones are 'started before the tournament'), and others can
+    keep joining, up to the field size, until it ends."""
+    tournament.window_starts_at = now
+    tournament.window_ends_at = now + timedelta(
+        seconds=tournament_timing.duration_seconds()
+    )
+    tournament.join_closes_at = now + timedelta(
+        seconds=tournament_timing.join_window_seconds()
+    )
+
+
 async def _open_tournament(
     session: AsyncSession,
     game: str,
@@ -291,7 +315,7 @@ async def _open_tournament(
             Tournament.ranking_metric == metric,
             Tournament.entry_cents == entry_cents,
             Tournament.state == OPEN,
-            Tournament.join_closes_at > now,
+            _joinable(now),
             _has_sandbox_entry() if sandbox else ~_has_sandbox_entry(),
         )
         .order_by(Tournament.created_at.asc())
@@ -311,7 +335,7 @@ async def open_counts(
         .where(
             Tournament.game == game,
             Tournament.state == OPEN,
-            Tournament.join_closes_at > now,
+            _joinable(now),
             TournamentEntry.status == ACTIVE_ENTRY,
         )
         .group_by(Tournament.ranking_metric, Tournament.entry_cents)
@@ -339,9 +363,10 @@ async def _new_tournament(
         score_matches=TOURNAMENT_SCORE_N,
         pot_cents=0,
         state=OPEN,
-        window_starts_at=now,
-        join_closes_at=now + timedelta(seconds=tournament_timing.join_window_seconds()),
-        window_ends_at=now + timedelta(seconds=tournament_timing.duration_seconds()),
+        # No clock until a second player joins (see `_start_clock`).
+        window_starts_at=None,
+        join_closes_at=None,
+        window_ends_at=None,
         engine_version=TOURNAMENT_ENGINE_VERSION,
     )
     session.add(tournament)
@@ -432,7 +457,11 @@ async def enqueue(
     )
     tournament.pot_cents += entry_cents
     await session.flush()
-    if await active_count(session, tournament.id) >= tournament.field_size:
+    players = await active_count(session, tournament.id)
+    if is_waiting(tournament) and players >= tournament.min_field:
+        _start_clock(tournament, now)
+        log.info("tournament.started", tournament_id=str(tournament.id))
+    if players >= tournament.field_size:
         tournament.state = LOCKED
         await session.flush()
 
@@ -511,7 +540,7 @@ async def close_joins(
     A small field is not voided here: it runs to the end so a solo player still
     sees their games fetched and scored, and settlement refunds a tournament
     that ends with fewer than two players."""
-    if tournament.state != OPEN:
+    if tournament.state != OPEN or is_waiting(tournament):
         return tournament
     if tournament.join_closes_at is not None and tournament.join_closes_at > now:
         return tournament

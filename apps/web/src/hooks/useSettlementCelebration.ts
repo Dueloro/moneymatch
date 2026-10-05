@@ -88,6 +88,11 @@ export interface Settlement {
   id: string;
   outcome: SettlementOutcome;
   netCents: number;
+  /** The amount the win overlay counts up to: a tournament prize, else the net. */
+  amountCents: number;
+  /** How much the available balance moved at settlement. A tournament entry
+   * already left the balance when you joined, so settlement adds the prize. */
+  balanceDeltaCents: number;
   title: string;
   game: string;
   /** `pool` | `tournament` | `match` — drives the wording. */
@@ -104,10 +109,18 @@ export interface Settlement {
 export function outcomeOf(item: ActivityItem): SettlementOutcome {
   if (item.state === 'CANCELED') return 'refund';
   if (item.state === 'PUSHED') return 'push';
+  // A tournament is won by placing in the money: any prize (1st, 2nd or 3rd)
+  // is a win, even one smaller than the entry; no prize is a loss.
+  if (item.type === 'tournament') return tournamentPrize(item) > 0 ? 'win' : 'loss';
   const net = item.net_cents ?? 0;
   if (net > 0) return 'win';
   if (net < 0) return 'loss';
   return 'push';
+}
+
+/** A settled tournament's prize: the net result plus the entry paid. */
+function tournamentPrize(item: ActivityItem): number {
+  return Math.max(0, (item.net_cents ?? 0) + item.entry_cents);
 }
 
 function loadAnnounced(): Set<string> {
@@ -245,6 +258,12 @@ export function useSettlementCelebration(): {
           id: item.id,
           outcome: outcomeOf(item),
           netCents: item.net_cents ?? 0,
+          amountCents:
+            item.type === 'tournament'
+              ? tournamentPrize(item)
+              : Math.abs(item.net_cents ?? 0),
+          balanceDeltaCents:
+            item.type === 'tournament' ? tournamentPrize(item) : (item.net_cents ?? 0),
           title: item.title ?? item.market_label,
           game: item.game,
           type: item.type,

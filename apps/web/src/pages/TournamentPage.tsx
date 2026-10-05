@@ -54,13 +54,12 @@ export function TournamentPage() {
         <ModeSwitcher />
         <div className="ml-auto">
           <HowItWorks id="tournament">
-            Pick a stat and you&apos;re in, no waiting for a full field. Joining stays
-            open for {hours(markets?.join_window_seconds ?? 3600)} (up to{' '}
-            {markets?.field_size ?? 10} players), and the tournament runs{' '}
-            {hours(markets?.duration_seconds ?? 10800)} from when it opened. Your first{' '}
-            {scoreN} qualifying games after you join are scored automatically, and the
-            top places split the pot {split.join('/')}. If fewer than{' '}
-            {markets?.min_players ?? 2} players join, everyone is refunded.
+            Pick a stat and you&apos;re in. The tournament starts as soon as a second
+            player joins and runs {hours(markets?.duration_seconds ?? 10800)} from then;
+            others can join until it ends (up to {markets?.field_size ?? 10} players).
+            Until it starts you can leave for a full refund. Your first {scoreN}{' '}
+            qualifying games after it starts (and after you join) are scored
+            automatically, and the top places split the pot {split.join('/')}.
           </HowItWorks>
         </div>
       </div>
