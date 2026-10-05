@@ -87,7 +87,9 @@ class GameMatch(Base):
     # "win" | "loss" | "draw" | null (unknown).
     result: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # Full moves (chess); 0 elsewhere.
-    moves: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    moves: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     # Per-match rate stats, keyed like `metric_models` (e.g. "pubg_kills").
     metrics: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=dict, server_default="{}", nullable=False
