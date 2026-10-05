@@ -8,6 +8,7 @@ import { useWallet } from '../../hooks/useWallet';
 import { formatCurrency } from '../../lib/format';
 import { gameMeta } from '../../lib/games';
 import { LiveLine } from '../activity/LiveLine';
+import { RailTournamentCard } from '../tournament/TournamentPanel';
 import { AnimatedBalance } from '../ui/AnimatedBalance';
 import { Card } from '../ui/Card';
 import { ClearBar } from '../ui/ClearBar';
@@ -228,15 +229,27 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
   const searchingTournament = tournamentStatus?.status === 'searching';
   const queuing = searchingPool || searchingTournament;
   const formedPool = poolStatus?.status === 'formed' ? poolStatus.pool : null;
+  // Your running tournament gets its own card. Once it is paid out (or
+  // refunded) it leaves the rail: the result shows in the settlement overlay
+  // and Activity, and the full record is kept server-side (tournament_log).
+  const formed =
+    tournamentStatus?.status === 'formed' ? tournamentStatus.tournament : null;
+  const tournament =
+    formed && ['OPEN', 'LOCKED'].includes(formed.state) ? formed : null;
 
   // A formed pool is also an OPEN/LOCKED row in the activity feed, so it would
   // otherwise render twice: once as the rich room card, once as a generic
   // in-play card. The room card wins (it carries the bar and the play cue).
   const inPlay = (activity?.items ?? [])
-    .filter((i) => IN_PLAY.has(i.state) && i.id !== formedPool?.id)
+    .filter(
+      (i) => IN_PLAY.has(i.state) && i.id !== formedPool?.id && i.id !== tournament?.id,
+    )
     .slice(0, 3);
 
   const nothingRunning = !formedPool && inPlay.length === 0;
+  // A live tournament is already on screen as its own card; "Nothing running"
+  // under it would be wrong.
+  const tournamentLive = tournament?.state === 'OPEN' || tournament?.state === 'LOCKED';
 
   return (
     <div className="flex flex-col gap-6">
@@ -289,22 +302,30 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
         </RailSection>
       )}
 
-      <RailSection title="In play" action={{ to: '/activity', label: 'All' }}>
-        {nothingRunning ? (
-          <p className="text-xs text-text-tertiary">
-            {queuing
-              ? 'Nothing running yet. Your contest lands here once it forms.'
-              : 'Nothing running. Join a pool to get started.'}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {formedPool && <RoomFormed />}
-            {inPlay.map((item) => (
-              <InPlayCard key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </RailSection>
+      {tournament && (
+        <RailSection title="Tournament">
+          <RailTournamentCard key={tournament.id} tournament={tournament} />
+        </RailSection>
+      )}
+
+      {!(nothingRunning && tournamentLive) && (
+        <RailSection title="In play" action={{ to: '/activity', label: 'All' }}>
+          {nothingRunning ? (
+            <p className="text-xs text-text-tertiary">
+              {queuing
+                ? 'Nothing running yet. Your contest lands here once it forms.'
+                : 'Nothing running. Join a pool to get started.'}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {formedPool && <RoomFormed />}
+              {inPlay.map((item) => (
+                <InPlayCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
+        </RailSection>
+      )}
     </div>
   );
 }

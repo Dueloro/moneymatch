@@ -97,7 +97,8 @@ async def test_pool_markets_quote_bars_from_own_baseline(client):
 # --- pool enqueue + geo-fence --------------------------------------------- #
 
 
-async def test_pool_enqueue_searches_then_room_status(client):
+async def test_pool_entry_is_closed(client):
+    """Solo pools are closed to new entries (the bar is not an offered format)."""
     await setup_player(client, "auth_a", "aa")
     r = await client.post(
         f"{V1}/pools/queue",
@@ -109,7 +110,7 @@ async def test_pool_enqueue_searches_then_room_status(client):
         },
         headers=_hdr("auth_a"),
     )
-    assert r.status_code == 200 and r.json()["status"] == "searching"
+    assert r.status_code == 410 and r.json()["code"] == "pools_closed"
 
 
 async def test_activity_shows_pool_wager_and_live_without_any_match(client):
@@ -187,7 +188,6 @@ async def test_activity_shows_pool_wager_and_live_without_any_match(client):
 async def test_geo_fence_blocks_before_any_ledger_write(client):
     await _set_geo(["FL"])
     await setup_player(client, "auth_fl", "fl", state="FL")
-    # Count ledger rows before the blocked entry.
     sm = new_sessionmaker()
     async with sm() as s:
         user = await s.scalar(select(User).where(User.auth_id == "auth_fl"))
@@ -199,13 +199,8 @@ async def test_geo_fence_blocks_before_any_ledger_write(client):
         )
 
     r = await client.post(
-        f"{V1}/pools/queue",
-        json={
-            "game": CS2,
-            "metric": KD,
-            "difficulty": "medium",
-            "entry_preset_cents": 1000,
-        },
+        f"{V1}/tournaments/queue",
+        json={"game": CS2, "metric": KD, "entry_preset_cents": 1000},
         headers=_hdr("auth_fl"),
     )
     assert r.status_code == 403 and r.json()["code"] == "region_blocked"
@@ -219,55 +214,87 @@ async def test_geo_fence_blocks_before_any_ledger_write(client):
     assert after == before  # no ledger row written on a geo-block
 
 
-async def test_pool_rejects_non_preset_entry(client):
+async def test_tournament_rejects_non_preset_entry(client):
     await setup_player(client, "auth_np", "np")
     r = await client.post(
-        f"{V1}/pools/queue",
-        json={
-            "game": CS2,
-            "metric": KD,
-            "difficulty": "medium",
-            "entry_preset_cents": 1234,
-        },
+        f"{V1}/tournaments/queue",
+        json={"game": CS2, "metric": KD, "entry_preset_cents": 1234},
         headers=_hdr("auth_np"),
     )
     assert r.status_code == 422 and r.json()["code"] == "invalid_entry"
 
 
-async def test_no_endpoint_accepts_a_bar_or_room_bar(client):
+async def test_no_endpoint_accepts_a_score_or_payout(client):
     await setup_player(client, "auth_b", "bb")
-    # A crafted body with bar/room_bar/payout is ignored — the server derives them.
+    # A crafted body with score/payout is ignored — the server derives them.
     r = await client.post(
-        f"{V1}/pools/queue",
+        f"{V1}/tournaments/queue",
         json={
             "game": CS2,
             "metric": KD,
-            "difficulty": "medium",
             "entry_preset_cents": 1000,
-            "personal_bar": 0.1,
-            "room_bar": 0.1,
+            "score": 99.0,
             "payout_cents": 999999,
         },
         headers=_hdr("auth_b"),
     )
-    assert r.status_code == 200  # extra fields ignored, not honored
+    assert r.status_code == 200
+    t = r.json()["tournament"]
+    assert t["standings"][0]["score"] is None and t["pot_cents"] == 1000
 
 
-# --- tournament markets + enqueue ----------------------------------------- #
+# --- tournament markets + join ------------------------------------------------ #
 
 
-async def test_tournament_markets_and_enqueue(client):
+async def test_tournament_markets(client):
     await setup_player(client, "auth_t", "tt")
     m = await client.get(
         f"{V1}/tournaments/markets", params={"game": CS2}, headers=_hdr("auth_t")
     )
     assert m.status_code == 200
     body = m.json()
-    assert body["prize_split"] == [50, 30, 20] and body["field_size"] == 10
+    assert body["prize_split"] == [60, 25, 15] and body["field_size"] == 10
+    assert body["min_players"] == 2 and body["score_matches"] == 3
+    kd = next(x for x in body["metrics"] if x["metric"] == KD)
+    assert kd["provisional"] is False and kd["rules"]
+    assert all(t["players"] == 0 for t in kd["open_tables"])
 
-    r = await client.post(
-        f"{V1}/tournaments/queue",
-        json={"game": CS2, "metric": KD, "entry_preset_cents": 1000},
-        headers=_hdr("auth_t"),
+
+async def test_join_is_instant_and_the_next_player_joins_the_same_one(client):
+    await setup_player(client, "auth_j1", "j1")
+    await setup_player(client, "auth_j2", "j2")
+    body = {"game": CS2, "metric": KD, "entry_preset_cents": 1000}
+
+    r1 = await client.post(
+        f"{V1}/tournaments/queue", json=body, headers=_hdr("auth_j1")
     )
-    assert r.status_code == 200 and r.json()["status"] == "searching"
+    assert r1.status_code == 200 and r1.json()["status"] == "formed"
+    t1 = r1.json()["tournament"]
+    assert t1["state"] == "OPEN" and t1["players"] == 1
+    assert t1["join_closes_at"] and t1["your_entered_at"]
+
+    m = await client.get(
+        f"{V1}/tournaments/markets", params={"game": CS2}, headers=_hdr("auth_j2")
+    )
+    kd = next(x for x in m.json()["metrics"] if x["metric"] == KD)
+    assert {t["entry_cents"]: t["players"] for t in kd["open_tables"]}[1000] == 1
+
+    r2 = await client.post(
+        f"{V1}/tournaments/queue", json=body, headers=_hdr("auth_j2")
+    )
+    t2 = r2.json()["tournament"]
+    assert t2["id"] == t1["id"] and t2["players"] == 2
+
+    # With someone else in, the first player's entry is final.
+    leave = await client.delete(f"{V1}/tournaments/queue", headers=_hdr("auth_j1"))
+    assert leave.status_code == 409 and leave.json()["code"] == "entry_final"
+
+
+async def test_the_only_player_can_leave(client):
+    await setup_player(client, "auth_l", "ll")
+    body = {"game": CS2, "metric": KD, "entry_preset_cents": 1000}
+    await client.post(f"{V1}/tournaments/queue", json=body, headers=_hdr("auth_l"))
+    r = await client.delete(f"{V1}/tournaments/queue", headers=_hdr("auth_l"))
+    assert r.status_code == 200 and r.json()["status"] == "idle"
+    status = await client.get(f"{V1}/tournaments/queue/status", headers=_hdr("auth_l"))
+    assert status.json()["status"] == "idle"

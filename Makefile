@@ -28,18 +28,18 @@ down: ## Stop all Docker services
 migrate: ## Apply DB migrations
 	cd apps/api && $(LOADENV) uv run alembic upgrade head
 
-api: ## Run the API (reload) on :8000
+api: ## Run the API on :8000 — the worker loop runs inside it (one process)
 	cd apps/api && uv run uvicorn moneymatch_api.main:app --reload --port 8000 --env-file ../../.env
 
 web: ## Run the web app (Vite) on :5173
 	cd apps/web && pnpm dev
 
-worker: ## Run the settlement worker (polls Postgres; separate process)
+worker: ## Optional standalone worker (the API already runs one; a DB lock keeps only one active)
 	cd apps/api && uv run --env-file ../../.env python -m moneymatch_api.workers.settlement_worker
 
-dev: db migrate ## Start db + api + worker + web together
-	@echo "starting api + worker + web (Ctrl-C to stop)..."
-	@$(MAKE) -j3 api worker web
+dev: db migrate ## Start db + api (with its worker loop) + web together
+	@echo "starting api (+ in-process worker) + web (Ctrl-C to stop)..."
+	@$(MAKE) -j2 api web
 
 test: test-api test-web ## Run all tests
 

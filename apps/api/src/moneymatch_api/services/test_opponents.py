@@ -39,7 +39,7 @@ from ..models.linked_account import LinkedAccount
 from ..models.skill import MetricModel
 from ..models.user import User
 from ..models.wallet import Limit
-from . import demo_mode, linking_service, skill_prior
+from . import demo_mode, linking_service, skill_prior, wallet_service
 from .user_service import provision_new_user
 
 log = structlog.get_logger(__name__)
@@ -47,6 +47,8 @@ log = structlog.get_logger(__name__)
 #: Daily caps for a practice opponent: high enough that the scaffolding never
 #: refuses itself, and irrelevant either way since none of this is real money.
 _BOT_CAP_CENTS = 100_000_000
+#: What a practice opponent is topped up with when it can no longer cover an entry.
+_BOT_TOP_UP_CENTS = 100_000
 
 # Every fake row is findable by this one prefix. `purge()` relies on it.
 TEST_AUTH_PREFIX = "zz_testbot_"
@@ -293,14 +295,25 @@ async def fill_tournament(
     joined = 0
     for opponent in await _prepare(session, user, game, metric, count):
         try:
-            await tournament_engine.cancel(session, opponent)
-            await tournament_engine.enqueue(
-                session,
-                opponent,
-                game=game,
-                metric=metric,
-                entry_cents=entry_cents,
-            )
+            # A savepoint per bot, so one failed join cannot poison the demo
+            # player's own entry in the same transaction.
+            async with session.begin_nested():
+                # Bots finish last in every demo tournament, so they lose their
+                # entry each time. Top them up rather than let them drain and
+                # silently stop filling the field.
+                wallet = await wallet_service.get_wallet(session, opponent.id)
+                if wallet.available_cents < entry_cents:
+                    await wallet_service.demo_deposit(
+                        session, opponent.id, _BOT_TOP_UP_CENTS, memo="testbot top-up"
+                    )
+                await tournament_engine.cancel(session, opponent)
+                await tournament_engine.enqueue(
+                    session,
+                    opponent,
+                    game=game,
+                    metric=metric,
+                    entry_cents=entry_cents,
+                )
             joined += 1
         except Exception as exc:  # noqa: BLE001
             log.warning(

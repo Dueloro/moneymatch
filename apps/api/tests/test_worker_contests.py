@@ -12,12 +12,10 @@ from sqlalchemy import select, update
 from moneymatch_api.adapters import registry
 from moneymatch_api.adapters.base import NormGame
 from moneymatch_api.models.pools import SoloEntry, SoloPool
-from moneymatch_api.models.tournaments import Tournament, TournamentEntry
 from moneymatch_api.services import (
     live_activity_service,
     pool_engine,
     reconciliation_service,
-    tournament_engine,
     wallet_service,
 )
 from moneymatch_api.workers import settlement_worker
@@ -340,97 +338,4 @@ async def test_pool_not_settled_early_while_a_member_is_still_playing(monkeypatc
         assert not (pool.outcome_detail or {}).get("live_ready")
 
 
-# --------------------------------------------------------------------------- #
-# Tournaments.
-# --------------------------------------------------------------------------- #
-
-
-async def test_tournament_settles_and_pays_top_three(monkeypatch):
-    sm = new_sessionmaker()
-    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
-    async with sm() as s:
-        players = []
-        for i in range(10):
-            u, host = await _player(s, f"t{i}", mu=1.50 + i * 0.01)
-            players.append((u, host))
-        for u, _ in players[:-1]:
-            await tournament_engine.enqueue(s, u, game=CS2, metric=KD, entry_cents=1000)
-        res = await tournament_engine.enqueue(
-            s, players[-1][0], game=CS2, metric=KD, entry_cents=1000
-        )
-        tid = res.tournament.id
-        start = datetime.now(UTC) - timedelta(hours=2)
-        end = datetime.now(UTC) - timedelta(hours=1)
-        await s.execute(
-            update(Tournament)
-            .where(Tournament.id == tid)
-            .values(window_starts_at=start, window_ends_at=end)
-        )
-        await s.commit()
-        mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
-
-    # Distinct descending KDs so ranking is unambiguous.
-    games = {
-        host: [_game(mid_ms, 2.0 - i * 0.1)] for i, (_, host) in enumerate(players)
-    }
-    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
-
-    report = await settlement_worker.run_cycle(sm)
-    assert report.tournaments_settled == 1
-    async with sm() as s:
-        tournament = await s.get(Tournament, tid)
-        assert tournament.state == "SETTLED"
-        paid = sorted(
-            (
-                e
-                for e in await s.scalars(
-                    select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
-                )
-                if e.payout_cents > 0
-            ),
-            key=lambda e: e.rank,
-        )
-        assert [e.payout_cents for e in paid] == [4500, 2700, 1800]
-        recon = await reconciliation_service.check(s, "tournament", tid)
-        assert recon.ok
-        assert (await reconciliation_service.check_all(s)).ok
-
-
-async def test_tournament_standings_refresh_during_window(monkeypatch):
-    sm = new_sessionmaker()
-    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
-    async with sm() as s:
-        players = []
-        for i in range(10):
-            u, host = await _player(s, f"s{i}", mu=1.50 + i * 0.01)
-            players.append((u, host))
-        for u, _ in players[:-1]:
-            await tournament_engine.enqueue(s, u, game=CS2, metric=KD, entry_cents=1000)
-        res = await tournament_engine.enqueue(
-            s, players[-1][0], game=CS2, metric=KD, entry_cents=1000
-        )
-        tid = res.tournament.id
-        # Window still open (started an hour ago, ends in the future).
-        start = datetime.now(UTC) - timedelta(hours=1)
-        end = datetime.now(UTC) + timedelta(hours=1)
-        await s.execute(
-            update(Tournament)
-            .where(Tournament.id == tid)
-            .values(window_starts_at=start, window_ends_at=end)
-        )
-        await s.commit()
-        mid_ms = int((start + timedelta(minutes=10)).timestamp() * 1000)
-
-    games = {
-        host: [_game(mid_ms, 2.0 - i * 0.1)] for i, (_, host) in enumerate(players)
-    }
-    monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
-
-    report = await settlement_worker.run_cycle(sm)
-    assert report.standings_refreshed == 1
-    assert report.tournaments_settled == 0  # still in-window, not settled
-    async with sm() as s:
-        tournament = await s.get(Tournament, tid)
-        rows = tournament.standings_cache["rows"]
-        assert len(rows) == 10 and rows[0]["rank"] == 1
-        assert rows[0]["score"] is not None
+# Tournaments settle from stored games now: see tests/test_match_ingestion.py.

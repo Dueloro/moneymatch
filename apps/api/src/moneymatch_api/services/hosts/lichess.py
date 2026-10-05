@@ -60,6 +60,9 @@ async def get_user_games(
     perf_types: set[str] | None = None,
     max_games: int = 50,
     rated_only: bool = True,
+    *,
+    oldest_first: bool = False,
+    raise_errors: bool = False,
 ) -> list[dict]:
     """Fetch a user's games since ``since_ms`` (epoch ms), newest first.
 
@@ -69,6 +72,11 @@ async def get_user_games(
 
     ``moves=true`` so plies are countable. Fails soft (``[]``) on any host error
     so a metric bootstrap / settlement poll degrades rather than crashes.
+
+    The background ingester passes ``oldest_first=True`` (so a busy player is
+    paged forward from a cursor instead of losing their earliest games to the
+    ``max`` cap) and ``raise_errors=True`` (so a rate limit or outage is a
+    failure it retries, never "no new games").
     """
     params = {
         "since": str(int(since_ms)),
@@ -83,6 +91,8 @@ async def get_user_games(
         params["rated"] = "true"
     if perf_types:
         params["perfType"] = ",".join(sorted(perf_types))
+    if oldest_first:
+        params["sort"] = "dateAsc"
     try:
         response = await request_json(
             HOST,
@@ -93,6 +103,8 @@ async def get_user_games(
             timeout_s=12.0,
         )
     except HostError:
+        if raise_errors:
+            raise
         return []
     return _parse_ndjson(response.text)
 

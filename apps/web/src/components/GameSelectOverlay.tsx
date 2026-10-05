@@ -28,8 +28,8 @@ import {
  *  - "Coming soon" (Dota 2) is non-interactive in production; demo keeps it
  *    selectable (the original demo exception), just visually muted.
  *  - Continue is gated by two independent, distinctly-messaged checks: at least
- *    one game must be selected (empty), and any selected BETA game requires beta
- *    access, which no production user has yet (see `isBetaGated` / `hasBetaAccess`).
+ *    one game must be selected (empty), and a still-gated BETA game (CS2) requires
+ *    beta access (see `isBetaGated`). PUBG is open to every player (`OPEN_BETA_GAMES`).
  *
  * Accessibility: each tile is a real `<button>` with `aria-pressed`, keyboard
  * focus + activation, a visible lime focus ring, and a label naming the game,

@@ -1,25 +1,28 @@
-"""`/tournaments` — matchmade single-metric fields (07-phase-4).
+"""`/tournaments` — rolling stat tournaments.
 
-Queue-matched like pools: pick a metric + entry and enqueue; the matcher forms a
-field under the μ-dispersion cap. Standings are server-computed (cached during
-the window, final at settle). No endpoint accepts a score, rank, or payout.
+Pick a stat tournament (game + stat + entry) and you are in: you join the one
+that is open for that choice, or open a new one. Standings and per-game verdicts
+are computed on the server from stored matches. No endpoint accepts a score,
+rank, or payout.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import clock
 from ..constants import (
+    CHESS_MIN_MOVES_TO_SCORE,
+    CHESS_TOURNAMENT_SPEED,
     ENTRY_PRESETS_CENTS,
-    STAT_BASELINE_MIN_N,
     TOURNAMENT_FIELD_SIZE,
     TOURNAMENT_GAMES,
     TOURNAMENT_METRICS,
+    TOURNAMENT_MIN_FIELD,
     TOURNAMENT_PRIZE_SPLIT,
     TOURNAMENT_SCORE_N,
     metric_label,
@@ -27,12 +30,13 @@ from ..constants import (
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
-from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..schemas.tournaments import (
+    OpenTable,
     StandingRow,
     TournamentEnterRequest,
+    TournamentGame,
     TournamentMarketsResponse,
     TournamentMetric,
     TournamentsListResponse,
@@ -40,14 +44,33 @@ from ..schemas.tournaments import (
     TournamentView,
 )
 from ..services import (
-    aggregate_metrics,
+    demo_mode,
     linking_service,
     test_opponents,
     tournament_engine,
+    tournament_scoring,
+    tournament_timing,
 )
 from ..services.tournament_engine import TournamentEnqueueResult
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
+
+_LIVE = ("OPEN", "LOCKED")
+
+
+def rules_for(game: str, metric: str) -> str:
+    """The card's one-line rules, in plain words."""
+    n = TOURNAMENT_SCORE_N
+    if metric == tournament_scoring.CHESS_POINTS:
+        return (
+            f"Points from your first {n} rated {CHESS_TOURNAMENT_SPEED} games after "
+            f"you join: win 1, draw ½. Games under {CHESS_MIN_MOVES_TO_SCORE} moves "
+            "score 0. Games against provisional or repeat opponents don't count."
+        )
+    return (
+        f"Your best {metric_label(metric)} from your first {n} ranked or official "
+        "matches after you join, finished before the tournament ends."
+    )
 
 
 async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
@@ -57,48 +80,24 @@ async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str |
     return {uid: uname for uid, uname in rows}
 
 
-def _standings(
-    tournament: Tournament,
-    entries: list[TournamentEntry],
-    names: dict[UUID, str | None],
-    user_id: UUID,
-) -> list[StandingRow]:
-    if tournament.state == "SETTLED":
-        rows = [
-            StandingRow(
-                user_id=e.user_id,
-                username=names.get(e.user_id),
-                score=e.score,
-                matches=e.matches_counted,
-                rank=e.rank,
-                is_you=e.user_id == user_id,
-                payout_cents=e.payout_cents,
-            )
-            for e in entries
-        ]
-        rows.sort(key=lambda r: (r.rank is None, r.rank or 0))
-        return rows
-
-    # In-window: server-computed cache (may be empty until the first refresh).
-    cache = {
-        r["user_id"]: r for r in ((tournament.standings_cache or {}).get("rows") or [])
-    }
-    rows = []
-    for e in entries:
-        c = cache.get(str(e.user_id), {})
-        rows.append(
-            StandingRow(
-                user_id=e.user_id,
-                username=names.get(e.user_id),
-                score=c.get("score"),
-                matches=c.get("matches", 0),
-                rank=c.get("rank"),
-                is_you=e.user_id == user_id,
-                payout_cents=0,
+def _games(raw: list[dict] | None) -> list[TournamentGame]:
+    out = []
+    for g in raw or []:
+        out.append(
+            TournamentGame(
+                host_match_id=g["host_match_id"],
+                started_at=datetime.fromisoformat(g["started_at"]),
+                ended_at=(
+                    datetime.fromisoformat(g["ended_at"]) if g.get("ended_at") else None
+                ),
+                mode=g.get("mode"),
+                result=g.get("result"),
+                reason=g["reason"],
+                reason_text=g.get("reason_text") or g["reason"],
+                value=g.get("value"),
             )
         )
-    rows.sort(key=lambda r: (r.score is None, -(r.score or 0.0)))
-    return rows
+    return out
 
 
 async def _view(
@@ -111,14 +110,52 @@ async def _view(
             )
         )
     )
+    live_state = tournament.state in _LIVE
     names = await _usernames(session, [e.user_id for e in entries])
+    your = next((e for e in entries if e.user_id == user.id), None)
+    your_games: list[TournamentGame] = []
+
+    if live_state:
+        # Computed per request from stored games: a few indexed reads, no host
+        # calls, and never staler than the last ingestion poll.
+        live = await tournament_scoring.live_standings(session, tournament)
+        standings = [
+            StandingRow(
+                user_id=UUID(r["user_id"]),
+                username=r["username"],
+                score=r["score"],
+                matches=r["matches"],
+                rank=r["rank"],
+                is_you=r["user_id"] == str(user.id),
+                payout_cents=0,
+            )
+            for r in live
+        ]
+        mine = next((r for r in live if r["user_id"] == str(user.id)), None)
+        your_games = _games(mine["games"] if mine else None)
+        standings.sort(key=lambda r: (r.rank is None, r.rank or 0))
+    else:
+        standings = [
+            StandingRow(
+                user_id=e.user_id,
+                username=names.get(e.user_id),
+                score=e.score,
+                matches=e.matches_counted,
+                rank=e.rank,
+                is_you=e.user_id == user.id,
+                payout_cents=e.payout_cents,
+            )
+            for e in entries
+        ]
+        standings.sort(key=lambda r: (r.rank is None, r.rank or 0))
+        if your is not None:
+            your_games = _games((your.telemetry or {}).get("games"))
+
     mus = [
         float(e.baseline_snapshot["mu"])
         for e in entries
         if e.baseline_snapshot and "mu" in e.baseline_snapshot
     ]
-    standings = _standings(tournament, entries, names, user.id)
-    your = next((e for e in entries if e.user_id == user.id), None)
     return TournamentView(
         id=tournament.id,
         game=tournament.game,
@@ -130,15 +167,25 @@ async def _view(
         rake_cents=tournament.rake_cents,
         prize_split=list(tournament.prize_split),
         field_size=tournament.field_size,
+        # While running: players still in (someone who left is refunded).
+        players=(
+            sum(1 for e in entries if e.status != "REFUNDED")
+            if live_state
+            else len(entries)
+        ),
         score_matches=tournament.score_matches,
         state=tournament.state,
         window_starts_at=tournament.window_starts_at,
         window_ends_at=tournament.window_ends_at,
+        join_closes_at=tournament.join_closes_at,
+        your_entered_at=your.enqueued_at if your else None,
         field_mu_low=round(min(mus), 2) if mus else None,
         field_mu_high=round(max(mus), 2) if mus else None,
         standings=standings,
         your_rank=your.rank if your else None,
         your_payout_cents=your.payout_cents if your else None,
+        your_games=your_games,
+        outcome_reason=(tournament.outcome_detail or {}).get("reason"),
         resolved_at=tournament.resolved_at,
     )
 
@@ -149,11 +196,6 @@ async def _status_view(
     if result.status == "formed" and result.tournament is not None:
         return TournamentStatusResponse(
             status="formed", tournament=await _view(session, result.tournament, user)
-        )
-    if result.status == "searching" and result.ticket is not None:
-        waited = int((clock.now() - result.ticket.created_at).total_seconds())
-        return TournamentStatusResponse(
-            status="searching", metric=result.ticket.market, waited_seconds=waited
         )
     return TournamentStatusResponse(status="idle")
 
@@ -170,42 +212,31 @@ async def get_markets(
             f"No tournaments for {game}.",
             status_code=404,
         )
-    # Deterministic ordering (active first, most-recent next) so the readiness
-    # shown matches the account settlement actually grades on.
     linked = await linking_service.get_link(session, user.id, game)
-    metrics = []
-    for metric in TOURNAMENT_METRICS[game]:
-        if aggregate_metrics.is_aggregate(metric):
-            # Total wins / streak / fastest win are scored straight off the host
-            # record over the window, so there is no per-match rate model to
-            # gate on. The field forms on the host rating instead, which is what
-            # `tournament_engine._build_baseline` requires, so mirror that here.
-            provisional = (
-                linked is None or tournament_engine.host_rating(linked) is None
-            )
-        else:
-            model = await session.scalar(
-                select(MetricModel).where(
-                    MetricModel.user_id == user.id,
-                    MetricModel.game == game,
-                    MetricModel.metric == metric,
-                )
-            )
-            provisional = (model.n if model else 0) < STAT_BASELINE_MIN_N
-        metrics.append(
-            TournamentMetric(
-                metric=metric,
-                label=metric_label(metric),
-                provisional=provisional,
-            )
+    counts = await tournament_engine.open_counts(session, game)
+    metrics = [
+        TournamentMetric(
+            metric=metric,
+            label=metric_label(metric),
+            provisional=False,
+            rules=rules_for(game, metric),
+            open_tables=[
+                OpenTable(entry_cents=e, players=counts.get((metric, e), 0))
+                for e in ENTRY_PRESETS_CENTS
+            ],
         )
+        for metric in TOURNAMENT_METRICS[game]
+    ]
     return TournamentMarketsResponse(
         game=game,
         linked=linked is not None,
         entry_presets_cents=list(ENTRY_PRESETS_CENTS),
         prize_split=list(TOURNAMENT_PRIZE_SPLIT),
         field_size=TOURNAMENT_FIELD_SIZE,
+        min_players=TOURNAMENT_MIN_FIELD,
         score_matches=TOURNAMENT_SCORE_N,
+        join_window_seconds=tournament_timing.join_window_seconds(),
+        duration_seconds=tournament_timing.duration_seconds(),
         metrics=metrics,
     )
 
@@ -216,6 +247,19 @@ async def enter(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> TournamentStatusResponse:
+    """Join the open tournament for this stat + entry (or open one)."""
+    if demo_mode.is_demo_user(user):
+        # The demo scores from real games, so it needs a real account first.
+        link = await linking_service.get_link(session, user.id, body.game)
+        if link is not None and demo_mode.is_placeholder_link(
+            body.game, link.host_account_id
+        ):
+            raise APIError(
+                "demo_needs_real_account",
+                "The demo is still on its placeholder name for this game. Set "
+                "your real in-game name under Profile -> Demo handles, then join.",
+                status_code=409,
+            )
     result = await tournament_engine.enqueue(
         session,
         user,
@@ -223,20 +267,24 @@ async def enter(
         metric=body.metric,
         entry_cents=body.entry_preset_cents,
     )
-
     # --- practice opponents (scaffolding, delete before launch) ------------- #
-    # With one real account nothing ever forms, so the whole fetch/grade/settle
-    # path is untestable. The demo account fills the bucket and re-polls, so the
-    # contest forms on this same request. Real signups never take this branch.
-    if test_opponents.is_enabled(user):
-        await test_opponents.fill_tournament(
-            session,
-            user,
-            game=body.game,
-            metric=body.metric,
-            entry_cents=body.entry_preset_cents,
+    # Demo account only: bots fill the rest of the field so the demo plays a
+    # full tournament alone. They never play, so they finish last and the demo
+    # is paid from their entries. The engine keeps demo tournaments apart from
+    # real ones, so a real signup never meets a bot.
+    if test_opponents.is_enabled(user) and result.tournament is not None:
+        missing = result.tournament.field_size - await tournament_engine.active_count(
+            session, result.tournament.id
         )
-        result = await tournament_engine.poll_status(session, user)
+        if missing > 0:
+            await test_opponents.fill_tournament(
+                session,
+                user,
+                game=body.game,
+                metric=body.metric,
+                entry_cents=body.entry_preset_cents,
+                count=missing,
+            )
     return await _status_view(session, result, user)
 
 
@@ -249,9 +297,10 @@ async def queue_status(
 
 
 @router.delete("/queue", response_model=TournamentStatusResponse)
-async def leave_queue(
+async def leave(
     user: CurrentUser, session: AsyncSession = Depends(get_session)
 ) -> TournamentStatusResponse:
+    """Leave — only while you are still the only player (full refund)."""
     await tournament_engine.cancel(session, user)
     return TournamentStatusResponse(status="idle")
 

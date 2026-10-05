@@ -19,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..constants import (
+    FLAG_BUCKETING_ENABLED,
     FLAG_QUEUE_PAUSED,
     FLAG_SETTLEMENT_PAUSED,
     FLAG_WORKER_HEARTBEAT,
@@ -34,6 +35,8 @@ log = structlog.get_logger(__name__)
 DEFAULT_FLAGS: dict[str, bool] = {
     FLAG_QUEUE_PAUSED: False,
     FLAG_SETTLEMENT_PAUSED: False,
+    # Bucketing's master switch — off (migration 0028; code on feat/bucket_system).
+    FLAG_BUCKETING_ENABLED: False,
     **{game_flag_key(g): True for g in REGISTERED_GAMES},
 }
 
@@ -49,6 +52,8 @@ async def get_boolean_flags(session: AsyncSession) -> dict[str, bool]:
 
     flags = dict(DEFAULT_FLAGS)
     for row in rows:
+        if row.key.startswith("worker_lease:"):
+            continue  # the worker's lock row (settlement_worker.WorkerLock)
         flags[row.key] = bool(row.enabled)
     return flags
 

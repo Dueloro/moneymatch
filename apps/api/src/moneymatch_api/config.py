@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Env = Literal["local", "dev", "prod"]
@@ -155,6 +155,11 @@ class Settings(BaseSettings):
     # downstream can tell them apart — which is exactly why this must default
     # off and never be set on a real-money deployment.
     demo_simulate_enabled: bool = Field(default=False)
+    # Tournament timing overrides for local testing (see
+    # services/tournament_timing.py). Unset = the constants.py defaults.
+    tournament_join_window_seconds: int | None = Field(default=None, ge=0)
+    tournament_window_seconds: int | None = Field(default=None, ge=60)
+    tournament_grace_seconds: int | None = Field(default=None, ge=0)
     # Automatic share-code collection (Valve's GetNextMatchSharingCode chain).
     #
     # On by default. It was off while it was new and pasting was the real
@@ -164,13 +169,24 @@ class Settings(BaseSettings):
     # is worth keeping for pausing collection during a sidecar outage.
     valve_chain_enabled: bool = Field(default=True)
 
-    # Run the settlement worker loop *inside* the API process (a background asyncio
-    # task started on lifespan startup) instead of as a separate service. This is
-    # for hosts with no free/available Background Worker (e.g. Render's free tier):
-    # one web service runs both. Safe because the worker claims work with FOR UPDATE
-    # SKIP LOCKED and every transition is idempotent, so N in-process copies don't
-    # double-settle. Default off — the standalone worker process is the norm.
-    run_worker_in_process: bool = Field(default=False)
+    # Run the worker loop (settlement + background match fetching) *inside* the
+    # API process as a background asyncio task. **On by default**: one process
+    # runs everything, which is what free tiers (Render web service, no
+    # Background Worker) allow. A Postgres advisory lock (`WorkerLock`) makes
+    # sure only one loop works even if several processes start one, so the
+    # standalone `python -m moneymatch_api.workers.settlement_worker` is optional
+    # and safe to run alongside. Set RUN_WORKER_IN_PROCESS=false to serve the
+    # API only (e.g. extra API replicas on a paid plan).
+    run_worker_in_process: bool = Field(default=True)
+
+    # Public base URL the API pings itself on so a free-tier host does not put
+    # it (and the in-process worker) to sleep (services/keep_alive.py). Render
+    # sets RENDER_EXTERNAL_URL automatically; set KEEP_ALIVE_URL="" to turn
+    # this off, or to another URL to override.
+    keep_alive_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("KEEP_ALIVE_URL", "RENDER_EXTERNAL_URL"),
+    )
 
     @field_validator("database_url")
     @classmethod

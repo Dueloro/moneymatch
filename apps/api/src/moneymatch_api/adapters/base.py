@@ -31,6 +31,29 @@ class NormGame:
     won: bool | None  # True/False for the linked user; None if unknown/draw
     drawn: bool
     metrics: dict[str, float] = field(default_factory=dict)  # rate stats (CS2/Dota)
+    # When the game finished on the host (epoch ms). None when the host does not
+    # say; the tournament cutoff then falls back to the start time.
+    ended_at_ms: int | None = None
+    # False for a game the host reports but that can never settle a contest
+    # (PUBG custom/arcade/event modes). Ingestion stores it anyway, marked.
+    eligible: bool = True
+    # Host-specific facts worth keeping for scoring and later skill grouping
+    # (chess: opponent id / rating / provisional; PUBG: placement, mode).
+    detail: dict = field(default_factory=dict)
+
+
+@dataclass
+class HistoryBatch:
+    """What one ingestion poll fetched.
+
+    ``complete`` is False when the host had more new games than one poll reads
+    (a very active player's backfill). The ingester then keeps polling the
+    account every cycle and does **not** mark it caught up, so a tournament
+    never settles on a history that stops short of the present.
+    """
+
+    games: list[NormGame]
+    complete: bool = True
 
 
 @dataclass
@@ -77,6 +100,30 @@ class GameAdapter(abc.ABC):
         self, account_id: str, since_ms: int, filters: GameFilters
     ) -> list[NormGame]:
         """Return the user's finished, eligible games since ``since_ms``."""
+
+    async def fetch_history(
+        self,
+        account_id: str,
+        since_ms: int,
+        *,
+        known_ids: set[str],
+        first_poll: bool,
+    ) -> HistoryBatch:
+        """New games for the background ingester (`services/match_ingestion`).
+
+        Returns every game the host reports since ``since_ms`` that is not in
+        ``known_ids``, **including ineligible ones** (they are stored, marked),
+        oldest first. Must raise a `HostError` on a host failure rather than
+        return ``[]``: an empty list means "nothing new", and the ingester
+        advances its cursor on it.
+
+        The default reuses ``poll_eligible_games`` with the rated filter off,
+        which suits hosts whose history call is a single cheap request.
+        """
+        games = await self.poll_eligible_games(
+            account_id, since_ms, GameFilters(rated_only=False)
+        )
+        return HistoryBatch([g for g in games if g.id not in known_ids])
 
     # --- Phase-3 brokering/settlement seams (implemented per-adapter later) ---
 

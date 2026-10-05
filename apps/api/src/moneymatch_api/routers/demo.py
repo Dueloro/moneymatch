@@ -57,10 +57,12 @@ from ..services import (
     chat_service,
     demo_simulation,
     linking_service,
+    match_ingestion,
     matchmaking,
     money_math,
     pool_engine,
     telemetry_fetch,
+    test_opponents,
     tournament_engine,
     wallet_service,
 )
@@ -1155,20 +1157,29 @@ async def force_settle(
 
     tournament = await session.get(Tournament, body.contest_id)
     if tournament is not None:
-        # Distinct names from the pool branch above: the two grade maps and the
-        # two contest types are different shapes, and reusing one name for both
-        # is how a settle path ends up passing the wrong one.
+        # Pull each entrant's latest games first, then score from the store
+        # exactly as the worker does at the end of the tournament.
+        from ..workers.settlement_worker import settle_tournament_now
+
         field = list(
             await session.scalars(
                 select(TournamentEntry).where(
-                    TournamentEntry.tournament_id == tournament.id
+                    TournamentEntry.tournament_id == tournament.id,
+                    TournamentEntry.status == "LOCKED",
                 )
             )
         )
-        standings = await telemetry_fetch.grade_tournament(session, tournament, field)
-        finished = await tournament_engine.settle_tournament(
-            session, tournament, standings
-        )
+        for entry in field:
+            link = await session.get(LinkedAccount, entry.linked_account_id)
+            if link is None or test_opponents.is_practice_opponent(
+                link.host_account_id
+            ):
+                continue
+            try:
+                await match_ingestion.poll_account(session, link)
+            except Exception:  # noqa: BLE001 — score on what is stored
+                log.warning("demo.force_settle_poll_failed", link_id=str(link.id))
+        finished = await settle_tournament_now(session, tournament)
         await session.commit()
         log.warning(
             "demo.force_settled",

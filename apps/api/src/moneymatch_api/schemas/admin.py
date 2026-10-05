@@ -266,3 +266,74 @@ class RiskFlagRow(BaseModel):
 class RiskResponse(BaseModel):
     rates: list[RiskRateRow]
     flags: list[RiskFlagRow]
+
+
+class AdminGameMatch(BaseModel):
+    """One stored game from the background ingester (the admin match log)."""
+
+    id: UUID
+    user_id: UUID
+    username: str | None
+    host_username: str | None
+    game: str
+    host_account_id: str
+    host_match_id: str
+    started_at: datetime
+    ended_at: datetime | None
+    mode: str | None
+    rated: bool
+    eligible: bool
+    result: str | None
+    moves: int
+    metrics: dict[str, Any]
+    detail: dict[str, Any]
+    fetched_at: datetime
+    account_last_polled_at: datetime | None
+
+
+class AdminGameMatchesResponse(BaseModel):
+    matches: list[AdminGameMatch]
+
+
+class AdminTournamentLogMatch(BaseModel):
+    """One fetched match of one entrant, as the rules judged it at settlement."""
+
+    host_match_id: str
+    game_match_id: UUID | None
+    started_at: datetime
+    ended_at: datetime | None
+    fetched_at: datetime | None
+    mode: str | None
+    result: str | None
+    reason: str
+    reason_text: str
+    counted: bool
+    value: float | None
+    metrics: dict[str, Any]
+    recorded_at: datetime
+
+
+class AdminTournamentLogEntrant(BaseModel):
+    """One entrant's final result and every match of theirs we had."""
+
+    entry_id: UUID
+    user_id: UUID
+    username: str | None
+    host_account_id: str
+    entered_at: datetime
+    score: float | None
+    matches_counted: int
+    rank: int | None
+    entry_cents: int
+    payout_cents: int
+    outcome: str
+    matches: list[AdminTournamentLogMatch]
+
+
+class AdminTournamentLogResponse(BaseModel):
+    """The permanent settlement log of one finished tournament."""
+
+    tournament_id: UUID
+    tournament_outcome: str | None
+    recorded_at: datetime | None
+    entrants: list[AdminTournamentLogEntrant]

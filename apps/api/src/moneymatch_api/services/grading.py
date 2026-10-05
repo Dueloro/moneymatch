@@ -27,12 +27,16 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import structlog
+from sqlalchemy import select
 
+from .. import clock
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
 from ..constants import (
     FORFEIT_GRACE_SECONDS,
     GRADE_MATCH_SKEW_MS,
+    INGEST_STALE_SECONDS,
+    STORED_HISTORY_GAMES,
 )
 from ..models.play import Match, MatchPlayer
 from ..services.hosts.errors import HostUnavailable
@@ -87,6 +91,8 @@ async def _player_result(
     match: Match, market: MarketDef, seat: MatchPlayer, rated_only: bool = True
 ) -> _PlayerResult:
     """Fetch this seat's first qualifying match after `matched_at` (win + stat)."""
+    if match.game in STORED_HISTORY_GAMES:
+        await _require_fresh_history(seat)
     adapter = registry.get(match.game)
     games = await adapter.poll_eligible_games(
         # Rated only for real accounts: a casual game should not settle a money
@@ -106,6 +112,24 @@ async def _player_result(
             # Match played but the graded stat wasn't readable → not a result yet.
             return _PlayerResult(found=False, game_id=game.id)
     return _PlayerResult(found=True, won=game.won is True, stat=stat, game_id=game.id)
+
+
+async def _require_fresh_history(seat: MatchPlayer) -> None:
+    """Stored-history games grade from `game_matches`. If this seat's account
+    has not been polled recently, "no game found" could just mean "not fetched
+    yet", so treat it like a host outage: the worker extends the window rather
+    than grading a forfeit or a cancel off stale data."""
+    from ..db.session import get_sessionmaker
+    from ..models.linked_account import LinkedAccount
+
+    async with get_sessionmaker()() as session:
+        polled = await session.scalar(
+            select(LinkedAccount.ingest_polled_at).where(
+                LinkedAccount.id == seat.linked_account_id
+            )
+        )
+    if polled is None or clock.now() - polled > timedelta(seconds=INGEST_STALE_SECONDS):
+        raise HostUnavailable("stored", f"history for {seat.host_account_id} is stale")
 
 
 def _deadline_passed(match: Match, now: datetime) -> bool:

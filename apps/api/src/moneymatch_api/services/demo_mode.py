@@ -49,6 +49,17 @@ async def is_demo_user_id(session: AsyncSession, user_id: uuid.UUID) -> bool:
     return demo is not None and demo == user_id
 
 
+def is_placeholder_link(game: str, host_account_id: str) -> bool:
+    """True for a made-up demo handle (`<game>_<name>`), which no host knows.
+
+    The demo account and its sample-history opponents are linked this way
+    until the demo is relinked to a real account (`/demo/relink`). No real host
+    id has that shape: Lichess names cannot contain a dot, PUBG ids start with
+    `account.`, Steam and Dota ids are numeric.
+    """
+    return host_account_id.startswith(f"{game}_")
+
+
 async def rated_only_for(session: AsyncSession, user_id: uuid.UUID, game: str) -> bool:
     """Whether this user's stats for `game` should be built from rated games only.
 
@@ -65,5 +76,6 @@ __all__ = [
     "demo_user_id",
     "is_demo_user",
     "is_demo_user_id",
+    "is_placeholder_link",
     "rated_only_for",
 ]

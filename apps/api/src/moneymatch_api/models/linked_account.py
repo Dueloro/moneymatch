@@ -19,7 +19,15 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -94,4 +102,18 @@ class LinkedAccount(Base, TimestampMixin):
     # claim; cheap hosts bootstrap inline at link and stamp it immediately.
     models_bootstrapped_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
+    )
+    # Background match ingestion (services/match_ingestion.py). `attempted`
+    # moves on every try so a failing account cannot hog the front of the
+    # queue; `polled` moves only on success, and a tournament settles only once
+    # every entrant has been polled after its end. `cursor_ms` is where the
+    # next history page starts (hosts that page by time).
+    ingest_attempted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    ingest_polled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    ingest_cursor_ms: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, default=None
     )

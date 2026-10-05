@@ -19,7 +19,7 @@ function renderAt(role: string | undefined, isLoading = false) {
         <Route element={<RequireAdmin />}>
           <Route path="/admin/users" element={<div>ADMIN CONTENT</div>} />
         </Route>
-        <Route path="/pools" element={<div>POOLS PAGE</div>} />
+        <Route path="/tournament" element={<div>TOURNAMENT PAGE</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -33,9 +33,9 @@ describe('RequireAdmin', () => {
     expect(screen.getByText('ADMIN CONTENT')).toBeInTheDocument();
   });
 
-  it('bounces a non-admin to /pools', () => {
+  it('bounces a non-admin to /tournament', () => {
     renderAt('user');
-    expect(screen.getByText('POOLS PAGE')).toBeInTheDocument();
+    expect(screen.getByText('TOURNAMENT PAGE')).toBeInTheDocument();
     expect(screen.queryByText('ADMIN CONTENT')).not.toBeInTheDocument();
   });
 });

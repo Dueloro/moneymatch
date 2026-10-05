@@ -2,38 +2,37 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { ModeSwitcher } from '../components/ModeSwitcher';
-import { AmountText } from '../components/ui/AmountText';
-import { Card } from '../components/ui/Card';
+import { TournamentPanel } from '../components/tournament/TournamentPanel';
 import { CardGrid } from '../components/ui/CardGrid';
 import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
 import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
 import { GameTabs } from '../components/ui/GameTabs';
-import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
-import { formatCurrency } from '../lib/format';
 import { gameMeta, isComingSoon } from '../lib/games';
 import { platformFeeNote, rakeOnPot } from '../lib/rake';
-import { filledSpots } from '../lib/spots';
-import { useAuth } from '../auth/useAuth';
 import { useGameSelection } from '../hooks/useGameSelection';
 import {
   useEnterTournament,
-  useLeaveTournament,
   useTournamentMarkets,
   useTournamentStatus,
-  type TournamentView,
 } from '../hooks/useTournaments';
 
-/** The Tournament section: browse joinable skill fields as cards. */
+function hours(seconds: number): string {
+  const h = seconds / 3600;
+  return Number.isInteger(h)
+    ? `${h} hour${h === 1 ? '' : 's'}`
+    : `${h.toFixed(1)} hours`;
+}
+
+/** The Tournament section: pick a stat tournament and you're in. */
 export function TournamentPage() {
   usePageTitle('Tournament');
-  const { isDemo } = useAuth();
   const { games, selected: game, select: setGame } = useGameSelection();
   const playableGame = game && !isComingSoon(game) ? game : undefined;
   const {
@@ -46,8 +45,8 @@ export function TournamentPage() {
 
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
 
-  const places = markets?.prize_split.length ?? 3;
   const scoreN = markets?.score_matches ?? 3;
+  const split = markets?.prize_split ?? [60, 25, 15];
 
   const header = (
     <div className="mb-6 flex flex-col gap-3">
@@ -55,9 +54,13 @@ export function TournamentPage() {
         <ModeSwitcher />
         <div className="ml-auto">
           <HowItWorks id="tournament">
-            A field of similar-skill players all chase the same stat. Your best {scoreN}{' '}
-            matches inside the window are scored automatically, and the top {places}{' '}
-            split the pot. No reporting, no brackets, just play.
+            Pick a stat and you&apos;re in, no waiting for a full field. Joining stays
+            open for {hours(markets?.join_window_seconds ?? 3600)} (up to{' '}
+            {markets?.field_size ?? 10} players), and the tournament runs{' '}
+            {hours(markets?.duration_seconds ?? 10800)} from when it opened. Your first{' '}
+            {scoreN} qualifying games after you join are scored automatically, and the
+            top places split the pot {split.join('/')}. If fewer than{' '}
+            {markets?.min_players ?? 2} players join, everyone is refunded.
           </HowItWorks>
         </div>
       </div>
@@ -81,10 +84,10 @@ export function TournamentPage() {
         {header}
         <EmptyState
           title={`No tournaments on ${gameMeta(game).name} yet`}
-          subline="Tournaments are Counter Strike 2 only for now. More games are coming."
+          subline="More games are coming."
           action={
-            <Link to="/pools">
-              <PillButton>Browse solo pools</PillButton>
+            <Link to="/play">
+              <PillButton>Play head-to-head</PillButton>
             </Link>
           }
         />
@@ -98,7 +101,7 @@ export function TournamentPage() {
         {header}
         <EmptyState
           title={`Link your ${game ? gameMeta(game).name : 'game'} account`}
-          subline="Tournaments score your best matches automatically, so we need to know which account is yours."
+          subline="Tournaments score your games automatically, so we need to know which account is yours."
           action={
             <Link to="/profile">
               <PillButton>Link a game</PillButton>
@@ -110,42 +113,43 @@ export function TournamentPage() {
   }
 
   const presets = markets?.entry_presets_cents ?? [];
-  const openMetrics = markets?.metrics.filter((m) => !m.provisional) ?? [];
-  const fieldSize = markets?.field_size ?? 16;
-  const busy = status?.status === 'searching' || status?.status === 'formed';
+  const metrics = markets?.metrics ?? [];
+  const fieldSize = markets?.field_size ?? 10;
+  const inOne = status?.status === 'formed';
 
-  const filteredMetrics = openMetrics.filter(
+  const filteredMetrics = metrics.filter(
     (m) => metricFilter === ALL || m.metric === metricFilter,
   );
   const activeCount = metricFilter !== ALL ? 1 : 0;
-  const hasResults = filteredMetrics.length > 0 && presets.length > 0;
 
   return (
     <div>
       {header}
 
-      {status && (status.status === 'searching' || status.status === 'formed') && (
-        <TournamentStatusBanner status={status} />
-      )}
+      {/* From xl up your tournament lives in the right rail (collapsible), so
+       * it stops pushing the cards down. Narrower screens have no rail. */}
+      <div className="xl:hidden">
+        {inOne && status?.tournament && (
+          <TournamentPanel tournament={status.tournament} />
+        )}
+      </div>
 
       <SectionHeader
         level="page"
         action={
           !marketsLoading &&
-          openMetrics.length > 1 && (
+          metrics.length > 1 && (
             <FilterBar
               testId="tournament-filters"
               activeCount={activeCount}
               onClear={() => setMetricFilter(ALL)}
             >
               <FilterChips
-                label="Metric"
-                options={openMetrics.map((m) => m.metric)}
+                label="Stat"
+                options={metrics.map((m) => m.metric)}
                 selected={metricFilter}
                 onSelect={(v) => setMetricFilter(v as string)}
-                format={(m) =>
-                  openMetrics.find((x) => x.metric === m)?.label ?? String(m)
-                }
+                format={(m) => metrics.find((x) => x.metric === m)?.label ?? String(m)}
               />
             </FilterBar>
           )
@@ -154,141 +158,55 @@ export function TournamentPage() {
         Tournaments
       </SectionHeader>
 
+      {enter.isError && (
+        <p className="mb-4 text-sm text-red" role="alert">
+          {(enter.error as Error).message}
+        </p>
+      )}
+
       {marketsLoading ? (
         <SkeletonList rows={3} />
-      ) : openMetrics.length === 0 ? (
+      ) : filteredMetrics.length === 0 || presets.length === 0 ? (
         <EmptyState
           title="No tournaments on this game yet"
-          subline="Play a match on it and they appear here."
+          subline="Check back soon."
         />
       ) : (
-        <>
-          {!hasResults ? (
-            <EmptyState
-              title="Nothing matches those filters"
-              subline="Clear them to see every open tournament."
-            />
-          ) : (
-            <CardGrid count={filteredMetrics.length}>
-              {filteredMetrics.map((m) => {
-                const key = `${game}:${m.metric}`;
-                return (
-                  <WagerCard
-                    key={key}
-                    gameName={`${fieldSize} players`}
-                    tag={`top ${places} paid`}
-                    title={m.label}
-                    subtitle={`Your best ${scoreN} matches in the window are scored automatically.`}
-                    entryOptions={presets}
-                    payoutFor={(entry) => entry * fieldSize}
-                    payoutLabel="Pot if full"
-                    // Rake is taken off the full pot before the top places split
-                    // it (money_math.split_by_weights).
-                    feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
-                    capacity={fieldSize}
-                    filled={isDemo ? filledSpots(key, fieldSize) : undefined}
-                    buttonLabel="Join tournament"
-                    disabled={busy}
-                    joining={enter.isPending}
-                    onJoin={(entry) =>
-                      enter.mutate({
-                        game: markets!.game,
-                        metric: m.metric,
-                        entry_preset_cents: entry,
-                      })
-                    }
-                  />
-                );
-              })}
-            </CardGrid>
-          )}
-        </>
+        <CardGrid count={filteredMetrics.length}>
+          {filteredMetrics.map((m) => {
+            const inNow = (entry: number) =>
+              (m.open_tables ?? []).find((t) => t.entry_cents === entry)?.players ?? 0;
+            return (
+              <WagerCard
+                key={`${game}:${m.metric}`}
+                gameName={game ? gameMeta(game).name : ''}
+                tag={`top ${split.length} paid`}
+                title={m.label}
+                subtitle={m.rules}
+                entryOptions={presets}
+                payoutFor={(entry) => entry * fieldSize}
+                payoutLabel="Pot if full"
+                // Rake comes off the whole pot before the places split it.
+                feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
+                capacity={fieldSize}
+                filledFor={inNow}
+                buttonLabel={inOne ? "You're in a tournament" : 'Join tournament'}
+                // Once anyone else joins, your entry is final.
+                requireConfirm
+                disabled={inOne}
+                joining={enter.isPending}
+                onJoin={(entry) =>
+                  enter.mutate({
+                    game: markets!.game,
+                    metric: m.metric,
+                    entry_preset_cents: entry,
+                  })
+                }
+              />
+            );
+          })}
+        </CardGrid>
       )}
     </div>
-  );
-}
-
-/** In-flight tournament: forming banner (with cancel) or live/final standings. */
-function TournamentStatusBanner({
-  status,
-}: {
-  status: NonNullable<ReturnType<typeof useTournamentStatus>['data']>;
-}) {
-  const leave = useLeaveTournament();
-
-  if (status.status === 'formed' && status.tournament) {
-    return <StandingsPanel tournament={status.tournament} />;
-  }
-
-  return (
-    <Card
-      className="mb-6 flex items-center justify-between gap-4 p-4"
-      data-testid="tournament-status"
-    >
-      <div className="flex items-center gap-3">
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-live" />
-        <div>
-          <p className="text-sm font-medium text-text">Finding your field</p>
-          <p className="text-xs text-text-secondary">
-            Matching you with players of a similar standard.
-          </p>
-        </div>
-      </div>
-      <PillButton
-        variant="text"
-        onClick={() => leave.mutate()}
-        disabled={leave.isPending}
-      >
-        Cancel
-      </PillButton>
-    </Card>
-  );
-}
-
-function StandingsPanel({ tournament }: { tournament: TournamentView }) {
-  const settled = tournament.state === 'SETTLED';
-  return (
-    <Card className="mb-6 p-5" data-testid="standings-panel">
-      <div className="flex items-center gap-2">
-        {!settled && <span className="h-2 w-2 rounded-full bg-live" aria-hidden />}
-        <p
-          className={[
-            'text-xs font-semibold uppercase tracking-wide',
-            settled ? 'text-text-tertiary' : 'text-live',
-          ].join(' ')}
-        >
-          {settled ? 'Final standings' : 'Live standings'}
-        </p>
-      </div>
-      <h2 className="mt-2 text-xl font-semibold text-text">
-        {tournament.metric_label}
-      </h2>
-      <div className="mt-3">
-        {tournament.standings.map((row) => (
-          <ListRow
-            key={row.user_id}
-            title={
-              <span className={row.is_you ? 'font-semibold text-text' : undefined}>
-                {row.rank ? `#${row.rank}` : '-'} {row.username ?? 'Player'}
-                {row.is_you ? ' (you)' : ''}
-              </span>
-            }
-            subline={
-              row.score != null
-                ? `${row.score.toFixed(2)} · ${row.matches} matches`
-                : 'No qualifying match yet'
-            }
-            right={
-              settled && row.payout_cents > 0 ? (
-                <AmountText cents={row.payout_cents} win />
-              ) : undefined
-            }
-          />
-        ))}
-      </div>
-      <p className="mt-3 text-xs text-text-secondary">
-        Pot {formatCurrency(tournament.pot_cents)} · the window closes automatically.
-      </p>
-    </Card>
   );
 }

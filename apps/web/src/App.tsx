@@ -9,7 +9,6 @@ import { ActivityPage } from './pages/ActivityPage';
 import { DemoSignInPage } from './pages/DemoSignInPage';
 import { InvitePage } from './pages/InvitePage';
 import { PlayPage } from './pages/PlayPage';
-import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SteamCallbackPage } from './pages/SteamCallbackPage';
 import { SignInPage } from './pages/SignInPage';
@@ -20,6 +19,7 @@ import { AdminContestsPage } from './pages/admin/AdminContestsPage';
 import { AdminDisputesPage } from './pages/admin/AdminDisputesPage';
 import { AdminFlagsPage } from './pages/admin/AdminFlagsPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
+import { AdminMatchesPage } from './pages/admin/AdminMatchesPage';
 import { AdminQueuePage } from './pages/admin/AdminQueuePage';
 import { AdminReconciliationPage } from './pages/admin/AdminReconciliationPage';
 import { AdminRiskPage } from './pages/admin/AdminRiskPage';
@@ -38,7 +38,8 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route path="play" element={<PlayPage />} />
-          <Route path="pools" element={<PoolsPage />} />
+          {/* Solo pools are closed; old links land on tournaments. */}
+          <Route path="pools" element={<Navigate to="/tournament" replace />} />
           <Route path="tournament" element={<TournamentPage />} />
           <Route path="activity" element={<ActivityPage />} />
           <Route path="social" element={<SocialPage />} />
@@ -53,6 +54,7 @@ export function App() {
             <Route index element={<Navigate to="/admin/users" replace />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="contests" element={<AdminContestsPage />} />
+            <Route path="matches" element={<AdminMatchesPage />} />
             <Route path="disputes" element={<AdminDisputesPage />} />
             <Route path="queue" element={<AdminQueuePage />} />
             <Route path="flags" element={<AdminFlagsPage />} />
@@ -68,7 +70,7 @@ export function App() {
 
 /**
  * The bare domain has no marketing page: send visitors straight into the app.
- * Authenticated → Solo Pools (the default mode); everyone else → sign-in.
+ * Authenticated → Play; everyone else → sign-in.
  */
 function RootRedirect() {
   const { session, loading } = useAuth();

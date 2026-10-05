@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from ..schemas.profile import ProfileSnapshot
 from ..services import demo_simulation
-from .base import GameAdapter, GameFilters, NormGame
+from .base import GameAdapter, GameFilters, HistoryBatch, NormGame
 
 
 class SimulatedGamesAdapter(GameAdapter):
@@ -44,6 +44,28 @@ class SimulatedGamesAdapter(GameAdapter):
         merged = real + keep
         merged.sort(key=lambda g: g.created_at_ms)
         return merged
+
+    async def fetch_history(
+        self,
+        account_id: str,
+        since_ms: int,
+        *,
+        known_ids: set[str],
+        first_poll: bool,
+    ) -> HistoryBatch:
+        """The real adapter's ingestion fetch (so PUBG keeps its call budget),
+        plus any injected demo matches not stored yet."""
+        batch = await self._inner.fetch_history(
+            account_id, since_ms, known_ids=known_ids, first_poll=first_poll
+        )
+        injected = await demo_simulation.games_for(
+            self.id, account_id, since_ms, speed=self._speed_hint(batch.games)
+        )
+        extra = [g for g in injected if g.id not in known_ids]
+        if not extra:
+            return batch
+        games = sorted(batch.games + extra, key=lambda g: g.created_at_ms)
+        return HistoryBatch(games, complete=batch.complete)
 
     def _speed_hint(self, real: list[NormGame]) -> str:
         """Label injected matches like the host labels real ones.

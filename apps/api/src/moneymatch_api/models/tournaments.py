@@ -82,6 +82,11 @@ class Tournament(Base, TimestampMixin):
     window_ends_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
+    # Rolling tournaments: joins are accepted while OPEN and before this time.
+    # Null on tournaments formed by the old full-field matcher.
+    join_closes_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # Cheap live standings for the panel (server-computed; refreshed on a cadence).
     standings_cache: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     standings_updated_at: Mapped[datetime | None] = mapped_column(

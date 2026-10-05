@@ -27,7 +27,9 @@ const DISPUTABLE_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 function dotClass(item: ActivityItem): string {
   const won = item.state === 'SETTLED' && (item.net_cents ?? 0) > 0;
   if (won) return 'bg-green';
-  const live = LIVE_STATES.has(item.state) || item.state === 'LOCKED';
+  // OPEN / LOCKED: a tournament taking joiners or running.
+  const live =
+    LIVE_STATES.has(item.state) || item.state === 'OPEN' || item.state === 'LOCKED';
   return live ? 'bg-live' : 'bg-text-tertiary';
 }
 

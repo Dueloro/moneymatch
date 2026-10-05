@@ -10,7 +10,7 @@ from the DB by the caller and passed in, so the registry stays pure/importable.
 
 from __future__ import annotations
 
-from ..constants import game_flag_key
+from ..constants import STORED_HISTORY_GAMES, game_flag_key
 from .base import GameAdapter
 from .chess_lichess import ChessLichessAdapter
 from .cs2_steam import CS2SteamAdapter
@@ -35,6 +35,23 @@ def get(game_id: str) -> GameAdapter:
     resolves through here, which is what lets a simulated result settle a wager
     without a single `if simulated` branch downstream. With the flag off the
     untouched adapter is returned and the wrapper is never constructed.
+    """
+    adapter = host(game_id)
+    if game_id in STORED_HISTORY_GAMES:
+        # History for these games is read from `game_matches`, never the host:
+        # the background ingester is the only thing that spends their API
+        # budget (see adapters/stored.py).
+        from .stored import StoredHistoryAdapter
+
+        return StoredHistoryAdapter(adapter)
+    return adapter
+
+
+def host(game_id: str) -> GameAdapter:
+    """The adapter that actually talks to the game's API.
+
+    Only the background ingester should call this for history; everything else
+    goes through `get()`, which reads stored history where the game requires it.
     """
     try:
         adapter = _ADAPTERS[game_id]

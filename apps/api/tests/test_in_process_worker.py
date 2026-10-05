@@ -5,6 +5,7 @@ on lifespan startup and is cancelled cleanly on shutdown."""
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 import pytest
 
@@ -75,3 +76,58 @@ async def test_worker_not_started_when_disabled(monkeypatch):
     async with lifespan(app):
         await asyncio.sleep(0.05)
     assert not started.is_set()
+
+
+async def test_the_worker_runs_in_the_api_process_by_default(monkeypatch):
+    """One process runs everything unless explicitly turned off (free tiers)."""
+    monkeypatch.delenv("RUN_WORKER_IN_PROCESS", raising=False)
+    assert _settings().run_worker_in_process is True
+
+
+async def test_only_one_worker_loop_holds_the_lock():
+    """Two processes (or two loops) starting the worker: one works, one waits,
+    and the waiting one takes over when the first lets go."""
+    from moneymatch_api.workers.settlement_worker import WorkerLock
+
+    # A key of its own so this test never collides with a real worker.
+    first, second = WorkerLock(key=987_654_321), WorkerLock(key=987_654_321)
+    try:
+        assert await first.acquire() is True
+        assert await first.acquire() is True  # re-checking keeps it
+        assert await second.acquire() is False  # standby
+        await first.release()
+        assert await second.acquire() is True  # takeover
+    finally:
+        await first.release()
+        await second.release()
+
+
+async def test_a_standby_loop_does_no_work(monkeypatch):
+    """While another process holds the lock, run_forever never runs a cycle."""
+    from moneymatch_api.workers import settlement_worker
+    from moneymatch_api.workers.settlement_worker import WORKER_LOCK_KEY, WorkerLock
+
+    holder = WorkerLock(key=WORKER_LOCK_KEY)
+    cycles = 0
+
+    async def counting_pass(sm):
+        nonlocal cycles
+        cycles += 1
+
+    monkeypatch.setattr(settlement_worker, "_one_pass", counting_pass)
+    try:
+        assert await holder.acquire()
+        task = asyncio.create_task(settlement_worker.run_forever(interval=0))
+        await asyncio.sleep(0.3)
+        assert cycles == 0  # standing by
+        await holder.release()
+        for _ in range(50):
+            if cycles:
+                break
+            await asyncio.sleep(0.05)
+        assert cycles > 0  # took over once the lock was free
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    finally:
+        await holder.release()

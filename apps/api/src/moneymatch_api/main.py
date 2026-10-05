@@ -93,13 +93,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         worker_task = asyncio.create_task(run_forever())
         log.info("api.worker_in_process_started")
 
+    keep_alive_task: asyncio.Task[None] | None = None
+    if settings.run_worker_in_process and settings.keep_alive_url:
+        # Free tiers sleep an idle web service, and the worker with it.
+        from .services import keep_alive
+
+        keep_alive_task = asyncio.create_task(
+            keep_alive.run_forever(settings.keep_alive_url)
+        )
+
     try:
         yield
     finally:
-        if worker_task is not None:
-            worker_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await worker_task
+        for task in (keep_alive_task, worker_task):
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
         await dispose_engine()
         log.info("api.shutdown")
 

@@ -24,6 +24,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from ..constants import (
+    PUBG_INGEST_MATCHES_PER_POLL,
     PUBG_MATCH_FANOUT,
     PUBG_OFFICIAL_GAME_MODES,
     PUBG_OFFICIAL_MATCH_TYPES,
@@ -31,7 +32,13 @@ from ..constants import (
 from ..schemas.profile import ProfileSnapshot
 from ..services.hosts import pubg
 from ..services.hosts.errors import HostNotConfigured
-from .base import GameAdapter, GameFilters, NormGame, TelemetrySample
+from .base import (
+    GameAdapter,
+    GameFilters,
+    HistoryBatch,
+    NormGame,
+    TelemetrySample,
+)
 
 # Lifetime totals we sum across game modes for the profile's soft skill signals.
 _LIFETIME_FIELDS = ("roundsPlayed", "wins", "kills", "losses", "damageDealt")
@@ -69,8 +76,10 @@ class PubgAdapter(GameAdapter):
         player = await pubg.get_player_by_name(identifier.strip(), self._shard)
         if player is None:
             raise ValueError(
-                f"PUBG player '{identifier}' not found — names are case-sensitive; "
-                "check the exact spelling and platform."
+                f"PUBG player '{identifier}' not found. Names are case-sensitive, "
+                "so check the exact spelling. A brand-new account only appears "
+                "after it finishes its first match: play one, wait a few "
+                "minutes, then try again."
             )
         account_id = player.get("id") or ""
         name = (player.get("attributes") or {}).get("name") or identifier
@@ -111,7 +120,7 @@ class PubgAdapter(GameAdapter):
             if not match:
                 continue
             norm = self._normalize(match, account_id)
-            if norm is None:
+            if norm is None or not norm.eligible:
                 continue  # unreadable or a non-official mode — skip, keep scanning
             if norm.created_at_ms < since_ms:
                 # The match list is newest-first, so everything past here is older.
@@ -119,6 +128,64 @@ class PubgAdapter(GameAdapter):
             out.append(norm)
         out.sort(key=lambda x: x.created_at_ms)  # oldest first
         return out
+
+    async def fetch_history(
+        self,
+        account_id: str,
+        since_ms: int,
+        *,
+        known_ids: set[str],
+        first_poll: bool,
+    ) -> HistoryBatch:
+        """New matches for the background ingester, spending as few calls as
+        possible out of PUBG's ~10 req/min.
+
+        One call lists the player's recent match ids; only ids we have never
+        stored are then fetched, one call each. The first poll of an account
+        backfills the newest `PUBG_MATCH_FANOUT`; after that, new ids are taken
+        **oldest first**, capped at `PUBG_INGEST_MATCHES_PER_POLL`, so a player
+        who played a lot between polls catches up over the next polls without
+        their earliest (tournament-counting) matches being skipped.
+
+        A host outage raises (`HostUnavailable` from the client), so the
+        ingester retries instead of recording "no new matches".
+        """
+        # Without a key every lookup "finds nothing", which would read as a
+        # successful poll with no new matches and let a tournament settle on an
+        # empty history. A missing key is a failure: the account stays unpolled
+        # (its entrants are refunded at the timeout, never scored as absent).
+        if not pubg.is_configured():
+            raise HostNotConfigured("pubg", "PUBG_API_KEY is not configured")
+        player = await pubg.get_player_by_id(account_id, self._shard)
+        if player is None:
+            return HistoryBatch([])
+        ids = [
+            m.get("id")
+            for m in (player.get("relationships") or {})
+            .get("matches", {})
+            .get("data", [])
+            if m.get("id")
+        ]  # newest first
+        new_ids = [i for i in ids if i not in known_ids]
+        # The first poll deliberately stops at the newest `PUBG_MATCH_FANOUT`
+        # (older matches are not needed), so it counts as complete.
+        complete = True
+        if first_poll:
+            new_ids = new_ids[:PUBG_MATCH_FANOUT]
+        else:
+            complete = len(new_ids) <= PUBG_INGEST_MATCHES_PER_POLL
+            new_ids = list(reversed(new_ids))[:PUBG_INGEST_MATCHES_PER_POLL]
+
+        out: list[NormGame] = []
+        for match_id in new_ids:
+            match = await pubg.get_match(match_id, self._shard)
+            if not match:
+                continue  # expired (404) — nothing to store
+            norm = self._normalize(match, account_id)
+            if norm is not None:
+                out.append(norm)
+        out.sort(key=lambda x: x.created_at_ms)
+        return HistoryBatch(out, complete=complete)
 
     @staticmethod
     def norm_to_telemetry(norm: NormGame) -> TelemetrySample:
@@ -130,8 +197,10 @@ class PubgAdapter(GameAdapter):
         """Turn a raw match document into a NormGame for ``account_id``."""
         data = match.get("data") or {}
         attrs = data.get("attributes") or {}
-        if not self._is_official(attrs):
-            return None  # custom / arcade / war / event / training don't settle
+        # Custom / arcade / war / event / training never settle a contest, but
+        # the match is still returned (marked ineligible) so the ingester can
+        # store it: it is history, and the admin log should show it.
+        official = self._is_official(attrs)
         stats = self._participant_stats(match, account_id)
         if stats is None:
             return None
@@ -143,15 +212,37 @@ class PubgAdapter(GameAdapter):
             "pubg_damage": round(_num(stats.get("damageDealt")), 1),
             "pubg_headshot_pct": round(100.0 * headshots / kills, 1) if kills else 0.0,
         }
+        created_ms = _created_ms(attrs.get("createdAt"))
+        # When *this player's* game ended: start + their time survived. Their
+        # kills/damage/headshots are final from that moment. The match's own
+        # `duration` runs until the last player dies (and overshoots: a match
+        # fetched at 23:12 reported an end of 23:22), which wrongly pushed games
+        # past a tournament's cutoff.
+        survived_s = stats.get("timeSurvived")
+        duration_s = survived_s if survived_s else attrs.get("duration")
+        ended_ms = (
+            created_ms + int(duration_s) * 1000
+            if created_ms and isinstance(duration_s, (int, float))
+            else None
+        )
         return NormGame(
             id=data.get("id", ""),
             speed=str(attrs.get("gameMode") or "unknown"),
-            rated=True,
-            created_at_ms=_created_ms(attrs.get("createdAt")),
+            rated=official,
+            created_at_ms=created_ms,
             moves=0,
             won=stats.get("winPlace") == 1,
             drawn=False,  # battle royale has no draws
             metrics=metrics,
+            ended_at_ms=ended_ms,
+            eligible=official,
+            detail={
+                "win_place": stats.get("winPlace"),
+                "game_mode": attrs.get("gameMode"),
+                "match_type": attrs.get("matchType"),
+                "map": attrs.get("mapName"),
+                "time_survived": stats.get("timeSurvived"),
+            },
         )
 
     @staticmethod

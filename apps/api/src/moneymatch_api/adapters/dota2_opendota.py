@@ -114,6 +114,8 @@ class Dota2OpenDotaAdapter(GameAdapter):
             return None
         is_radiant = slot < 128
         won = is_radiant == bool(radiant_win)
+        start_s = int(m.get("start_time", 0))
+        duration_s = m.get("duration")
         return NormGame(
             id=str(m.get("match_id", "")),
             speed=_MODE,
@@ -123,6 +125,12 @@ class Dota2OpenDotaAdapter(GameAdapter):
             won=won,
             drawn=False,
             metrics=_match_metrics(m),
+            ended_at_ms=(
+                (start_s + int(duration_s)) * 1000
+                if start_s and isinstance(duration_s, (int, float))
+                else None
+            ),
+            detail={"lobby_type": m.get("lobby_type"), "game_mode": m.get("game_mode")},
         )
 
 

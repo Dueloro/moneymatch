@@ -18,12 +18,13 @@ sets `settlement_paused` and stops — money never commits against a broken book
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import structlog
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .. import clock
@@ -37,10 +38,12 @@ from ..constants import (
     LIVE_SNAPSHOT_REFRESH_SECONDS,
     MATCH_MAX_LIFETIME_SECONDS,
     NIGHTLY_INTERVAL_SECONDS,
+    STORED_HISTORY_GAMES,
+    TOURNAMENT_FINAL_POLL_TIMEOUT_SECONDS,
     TOURNAMENT_STANDINGS_REFRESH_SECONDS,
     WORKER_POLL_INTERVAL_SECONDS,
 )
-from ..db.session import get_sessionmaker
+from ..db.session import get_engine, get_sessionmaker
 from ..models.feature_flag import FeatureFlag
 from ..models.linked_account import LinkedAccount
 from ..models.live import LiveSnapshot
@@ -54,13 +57,18 @@ from ..services import (
     demo_mode,
     grading,
     live_activity_service,
+    match_ingestion,
     match_lifecycle,
     matchmaking,
     metric_models_service,
     pool_engine,
     raw_payload_service,
     telemetry_fetch,
+    test_opponents,
     tournament_engine,
+    tournament_log,
+    tournament_scoring,
+    tournament_timing,
 )
 from ..services.feature_flags import get_boolean_flags
 from ..services.match_lifecycle import (
@@ -93,6 +101,7 @@ class CycleReport:
     standings_refreshed: int = 0
     live_refreshed: int = 0
     expired_challenges: int = 0
+    accounts_polled: int = 0
     paused: bool = False
 
 
@@ -442,14 +451,15 @@ async def _process_due_pools(
             report.pools_settled += 1
 
 
-async def _process_due_tournaments(
+async def _close_tournament_joins(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
+    """OPEN tournaments whose join window passed → LOCKED, or void if too few."""
     async with sm() as session:
         ids = list(
             await session.scalars(
                 select(Tournament.id).where(
-                    Tournament.state == "LOCKED", Tournament.window_ends_at <= now
+                    Tournament.state == "OPEN", Tournament.join_closes_at <= now
                 )
             )
         )
@@ -457,21 +467,140 @@ async def _process_due_tournaments(
         async with sm() as session:
             tournament = await session.scalar(
                 select(Tournament)
-                .where(Tournament.id == tid, Tournament.state == "LOCKED")
+                .where(Tournament.id == tid, Tournament.state == "OPEN")
                 .with_for_update(skip_locked=True)
             )
             if tournament is None:
                 continue
-            entries = list(
-                await session.scalars(
-                    select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
+            try:
+                await tournament_engine.close_joins(session, tournament, now)
+                await session.commit()
+            except ReconciliationError as exc:
+                await session.rollback()
+                await _halt_on_breach(sm, report, "tournament", tid, exc)
+                raise SettlementHalted from exc
+
+
+async def _tournament_grades(
+    session: AsyncSession,
+    tournament: Tournament,
+    entries: list[TournamentEntry],
+    unverifiable: set[uuid.UUID],
+    scores: dict[uuid.UUID, tournament_scoring.EntryScore],
+) -> dict[uuid.UUID, tournament_engine.TournamentGrade]:
+    """Turn every entrant's score into a grade; persist the evidence."""
+    grades: dict[uuid.UUID, tournament_engine.TournamentGrade] = {}
+    for entry in entries:
+        if entry.id in unverifiable:
+            grades[entry.id] = tournament_engine.TournamentGrade(values=None)
+            continue
+        sc = scores[entry.id]
+        games = [g.as_dict() for g in sc.games]
+        payload = await raw_payload_service.persist(
+            session,
+            f"grade:{tournament.game}",
+            {
+                "entry_id": str(entry.id),
+                "metric": tournament.ranking_metric,
+                "score": sc.score,
+                "games": games,
+            },
+            memo=f"tournament {tournament.ranking_metric}",
+        )
+        grades[entry.id] = tournament_engine.TournamentGrade(
+            values=[] if sc.score is None else [sc.score],
+            score=sc.score,
+            counted=sc.counted,
+            telemetry={"score": sc.score, "counted": sc.counted, "games": games},
+            raw_payload_id=payload.id,
+        )
+    return grades
+
+
+async def settle_tournament_now(
+    session: AsyncSession,
+    tournament: Tournament,
+    *,
+    unverifiable: set[uuid.UUID] | None = None,
+) -> Tournament:
+    """Score from stored games and settle (worker + demo force-settle), then
+    write the permanent settlement log in the same transaction."""
+    unverifiable = unverifiable or set()
+    entries = list(
+        await session.scalars(
+            select(TournamentEntry).where(
+                TournamentEntry.tournament_id == tournament.id,
+                TournamentEntry.status == "LOCKED",
+            )
+        )
+    )
+    scores = await tournament_scoring.score_entries(session, tournament, entries)
+    grades = await _tournament_grades(
+        session, tournament, entries, unverifiable, scores
+    )
+    was_live = tournament.state in ("OPEN", "LOCKED")
+    settled = await tournament_engine.settle_tournament(session, tournament, grades)
+    if was_live and settled.state in ("SETTLED", "CANCELED"):
+        await tournament_log.record(session, settled, entries, scores, unverifiable)
+    return settled
+
+
+def _polled_since(polled_at: datetime | None, since: datetime) -> bool:
+    return polled_at is not None and polled_at >= since
+
+
+async def _process_due_tournaments(
+    sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
+) -> None:
+    """Settle tournaments past their end + grace, once every entrant's account
+    has been polled after that point (so late-posted games are in). An entrant
+    still unpolled after the final-poll timeout is refunded as unverifiable."""
+    async with sm() as session:
+        ids = list(
+            await session.scalars(
+                select(Tournament.id).where(
+                    Tournament.state.in_(("OPEN", "LOCKED")),
+                    Tournament.window_ends_at <= now,
                 )
             )
-            grades = await telemetry_fetch.grade_tournament(
-                session, tournament, entries
+        )
+    for tid in ids:
+        async with sm() as session:
+            tournament = await session.scalar(
+                select(Tournament)
+                .where(Tournament.id == tid, Tournament.state.in_(("OPEN", "LOCKED")))
+                .with_for_update(skip_locked=True)
             )
+            if tournament is None:
+                continue
+            grace = timedelta(seconds=tournament_timing.grace_seconds(tournament.game))
+            final_at = tournament.window_ends_at + grace
+            if now < final_at:
+                continue
+            entries = list(
+                await session.scalars(
+                    select(TournamentEntry).where(
+                        TournamentEntry.tournament_id == tid,
+                        TournamentEntry.status == "LOCKED",
+                    )
+                )
+            )
+            polled = await match_ingestion.last_polled(
+                session, [e.linked_account_id for e in entries]
+            )
+            missing = {
+                e.id
+                for e in entries
+                if not test_opponents.is_practice_opponent(e.host_account_id)
+                and not _polled_since(polled.get(e.linked_account_id), final_at)
+            }
+            timed_out = now >= final_at + timedelta(
+                seconds=TOURNAMENT_FINAL_POLL_TIMEOUT_SECONDS
+            )
+            if missing and not timed_out:
+                continue  # the ingester polls these first; settle next cycle
             try:
-                await tournament_engine.settle_tournament(session, tournament, grades)
+                await settle_tournament_now(session, tournament, unverifiable=missing)
                 await session.commit()
             except ReconciliationError as exc:
                 await session.rollback()
@@ -483,19 +612,17 @@ async def _process_due_tournaments(
 async def _refresh_tournament_standings(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
-    """Refresh live standings for in-window tournaments on a slow cadence."""
+    """Live standings for running tournaments, from stored games (no host calls)."""
     async with sm() as session:
         ids = list(
             await session.scalars(
-                select(Tournament.id).where(
-                    Tournament.state == "LOCKED", Tournament.window_ends_at > now
-                )
+                select(Tournament.id).where(Tournament.state.in_(("OPEN", "LOCKED")))
             )
         )
     for tid in ids:
         async with sm() as session:
             tournament = await session.get(Tournament, tid)
-            if tournament is None or tournament.state != "LOCKED":
+            if tournament is None or tournament.state not in ("OPEN", "LOCKED"):
                 continue
             fresh_enough = (
                 tournament.standings_updated_at is not None
@@ -504,16 +631,9 @@ async def _refresh_tournament_standings(
             )
             if fresh_enough:
                 continue
-            entries = list(
-                await session.scalars(
-                    select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
-                )
-            )
-            names = await _usernames(session, [e.user_id for e in entries])
-            standings = await telemetry_fetch.live_standings(
-                session, tournament, entries, names
-            )
-            tournament.standings_cache = {"rows": standings}
+            tournament.standings_cache = {
+                "rows": await tournament_scoring.live_standings(session, tournament)
+            }
             tournament.standings_updated_at = now
             await session.commit()
             report.standings_refreshed += 1
@@ -673,9 +793,17 @@ async def run_cycle(
     # grades as unverifiable and refunds a wager the player actually won.
     await _sync_share_chains(sm, report)
 
+    # Fetch players' new games into `game_matches` before anything is scored.
+    # Never fatal: a host being slow must not stop settlement.
+    try:
+        report.accounts_polled = await match_ingestion.run_cycle(sm, now)
+    except Exception:  # noqa: BLE001
+        log.exception("ingest.cycle_failed")
+
     try:
         await _process_due_matches(sm, now, report)
         await _process_due_pools(sm, now, report)
+        await _close_tournament_joins(sm, now, report)
         await _process_due_tournaments(sm, now, report)
     except SettlementHalted:
         return report
@@ -760,6 +888,12 @@ async def _bootstrap_pending_models(
                     LinkedAccount.status == "active",
                     LinkedAccount.game.in_(deferred),
                     LinkedAccount.models_bootstrapped_at.is_(None),
+                    # Stored-history games bootstrap from `game_matches`, so
+                    # wait until the ingester has stored the account's matches.
+                    or_(
+                        LinkedAccount.game.notin_(STORED_HISTORY_GAMES),
+                        LinkedAccount.ingest_polled_at.isnot(None),
+                    ),
                 )
                 .order_by(LinkedAccount.created_at)
                 .limit(_BOOTSTRAP_BATCH_PER_CYCLE)
@@ -795,21 +929,114 @@ async def _bootstrap_pending_models(
     return done
 
 
+#: Identifies the lease row for "the one running worker loop" (any int).
+WORKER_LOCK_KEY = 0x6D6D_5752_4B52  # "mmWRKR"
+#: How long a lease lasts without renewal. Renewed every loop iteration; long
+#: enough to outlast a slow cycle (a PUBG backfill waits on the rate limit), and
+#: a clean shutdown hands it over at once by deleting it.
+WORKER_LEASE_SECONDS = 600
+
+
+class WorkerLock:
+    """Make sure exactly one worker loop runs, however many processes start one.
+
+    The loop normally runs inside the API process (`RUN_WORKER_IN_PROCESS`, the
+    default). If a second copy starts (another uvicorn worker, a standalone
+    worker, a redeploy overlapping the old instance) only the holder of this
+    lease works; the others idle and take over when it is released or expires.
+    That keeps the PUBG call budget, which is per process, from being spent
+    twice.
+
+    A lease row in `feature_flags` rather than a session-level advisory lock:
+    behind a transaction pooler (Supabase's port 6543) an advisory lock lands
+    on whichever server connection the pooler picked and outlives this process,
+    so after one restart no worker could ever take it again.
+    """
+
+    def __init__(self, key: int = WORKER_LOCK_KEY) -> None:
+        self._name = f"worker_lease:{key}"
+        self._holder = uuid.uuid4().hex
+        self._held = False
+
+    @property
+    def held(self) -> bool:
+        return self._held
+
+    async def acquire(self) -> bool:
+        """True if this process holds the lease (taking or renewing it)."""
+        async with get_engine().begin() as conn:
+            got = await conn.scalar(
+                text(
+                    """
+                    INSERT INTO feature_flags (key, enabled, payload)
+                    VALUES (:k, false, jsonb_build_object(
+                        'holder', CAST(:h AS text),
+                        'expires_at', now() + make_interval(secs => :ttl)))
+                    ON CONFLICT (key) DO UPDATE
+                        SET payload = EXCLUDED.payload, updated_at = now()
+                        WHERE feature_flags.payload->>'holder' = :h
+                           OR (feature_flags.payload->>'expires_at')::timestamptz
+                              < now()
+                    RETURNING key
+                    """
+                ),
+                {"k": self._name, "h": self._holder, "ttl": WORKER_LEASE_SECONDS},
+            )
+        self._held = got is not None
+        return self._held
+
+    async def release(self) -> None:
+        if not self._held:
+            return
+        self._held = False
+        with contextlib.suppress(Exception):
+            async with get_engine().begin() as conn:
+                await conn.execute(
+                    text(
+                        "DELETE FROM feature_flags "
+                        "WHERE key = :k AND payload->>'holder' = :h"
+                    ),
+                    {"k": self._name, "h": self._holder},
+                )
+
+
 async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
-    """Poll forever. `settlement_paused` idles the loop rather than exiting it."""
+    """Poll forever. `settlement_paused` idles the loop rather than exiting it.
+
+    Only the process holding `WorkerLock` does work; any other copy waits and
+    takes over if the holder goes away.
+    """
     sm = get_sessionmaker()
+    lock = WorkerLock()
+    waiting_logged = False
     log.info("settlement_worker.start", interval=interval)
-    while True:
-        try:
-            report = await run_cycle(sm)
-            if report.settled or report.pushed or report.canceled or report.paused:
-                log.info("settlement_worker.cycle", **report.__dict__)
-            # The heavier nightly pass is self-throttled to once per interval.
-            await maybe_run_nightly(sm)
-            await _bootstrap_pending_models(sm)
-        except Exception:  # noqa: BLE001 — never let the loop die on one bad cycle
-            log.exception("settlement_worker.cycle_failed")
-        await asyncio.sleep(interval)
+    try:
+        while True:
+            try:
+                if not await lock.acquire():
+                    if not waiting_logged:
+                        log.info("settlement_worker.standby_another_worker_running")
+                        waiting_logged = True
+                    await asyncio.sleep(interval)
+                    continue
+                if waiting_logged:
+                    log.info("settlement_worker.took_over")
+                    waiting_logged = False
+                await _one_pass(sm)
+            except Exception:  # noqa: BLE001 — never let the loop die on one bad cycle
+                log.exception("settlement_worker.cycle_failed")
+            await asyncio.sleep(interval)
+    finally:
+        await lock.release()
+
+
+async def _one_pass(sm: async_sessionmaker[AsyncSession]) -> None:
+    report = await run_cycle(sm)
+    if report.settled or report.pushed or report.canceled or report.paused:
+        log.info("settlement_worker.cycle", **report.__dict__)
+    # The heavier nightly pass is self-throttled to once per interval.
+    await maybe_run_nightly(sm)
+    await _bootstrap_pending_models(sm)
 
 
 def main() -> None:
