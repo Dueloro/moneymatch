@@ -41,6 +41,41 @@ target_metadata = Base.metadata
 # skip just these (the values are still enforced by the migration + model).
 _SERVER_DEFAULT_SKIP = {("users", "friend_code")}
 
+# Tables migrations 0028-0033 create for the bucketing layer, whose models live
+# on feat/bucket_system. The migration chain is shared, so on a branch without
+# those models the tables exist in the database with nothing on the metadata,
+# and autogenerate would propose dropping them. `match_stats` is also range-
+# partitioned by month (`match_stats_YYYYMM`, `match_stats_default`), and
+# partitions never have models. Only *unmodeled* tables are skipped: once a
+# model for one of these exists, it is compared like any other.
+_UNMODELED_TABLES = {
+    "audit_events",
+    "bucket_contest",
+    "bucket_dispute",
+    "bucket_room",
+    "market_reference",
+    "market_state",
+    "match_stats",
+    "player_fingerprint",
+    "player_streak",
+    "settlement",
+}
+
+
+def _is_unmodeled(table_name: str | None) -> bool:
+    if table_name is None or table_name in target_metadata.tables:
+        return False
+    return table_name in _UNMODELED_TABLES or table_name.startswith("match_stats_")
+
+
+def _include_object(obj, name, type_, reflected, compare_to) -> bool:
+    if not reflected or compare_to is not None:
+        return True
+    if type_ == "table":
+        return not _is_unmodeled(name)
+    table = getattr(obj, "table", None)
+    return not _is_unmodeled(getattr(table, "name", None))
+
 
 def _compare_server_default(
     _context,
@@ -61,6 +96,7 @@ def _run_migrations(connection: Connection) -> None:
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=_compare_server_default,
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

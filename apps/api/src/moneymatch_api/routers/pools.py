@@ -20,6 +20,7 @@ from ..constants import (
     POOL_GAMES,
     POOL_METRICS,
     POOL_ROOM_SIZE,
+    SOLO_POOLS_OPEN,
     metric_label,
 )
 from ..db.session import get_session
@@ -178,6 +179,15 @@ async def enter_pool(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> PoolStatusResponse:
+    # Solo pools are closed to new entries: a platform-set bar is not a format
+    # we offer. Pools already running still settle through the worker, and
+    # their history stays readable.
+    if not SOLO_POOLS_OPEN:
+        raise APIError(
+            "pools_closed",
+            "Solo pools are closed. Try a tournament or a head-to-head instead.",
+            status_code=410,
+        )
     # Practice opponents join *first* (scaffolding, delete before launch). The
     # matcher can only build a room out of tickets that already exist, so
     # filling afterwards would leave them stranded while you formed a room of

@@ -184,10 +184,10 @@ const ONBOARDING: Record<string, GameOnboardingConfig> = {
     demo: ON,
     production: ON,
   },
-  // CS2 / PUBG are BETA: selectable and full-color in BOTH contexts so the
-  // onboarding overlay presents them as real, choosable tiles (not greyed-out).
-  // Production commitment is still gated — see `isBetaGated` — so a user can pick
-  // them and be told they need a beta invite, rather than the tile looking dead.
+  // CS2 / PUBG carry the BETA badge and are selectable in both contexts. PUBG is
+  // open to every player (`OPEN_BETA_GAMES`); CS2 is still invite-only in
+  // production — see `isBetaGated` — so picking it explains the invite instead
+  // of the tile looking dead.
   'cs2.steam': {
     id: 'cs2.steam',
     badge: 'BETA',
@@ -234,18 +234,19 @@ export function selectableGames(ctx: OnboardingContext): string[] {
 }
 
 /**
- * Whether the current user has invite-only beta access to BETA games (CS2/PUBG)
- * in production.
+ * BETA games that are open to every signed-up player in the close beta. PUBG is
+ * in (its matches are fetched in the background and tournaments settle from
+ * them); CS2 stays invite-only until its Steam match pipeline is ready.
+ */
+export const OPEN_BETA_GAMES: ReadonlySet<string> = new Set(['pubg.steam']);
+
+/**
+ * Whether the current user has invite-only beta access to the still-gated BETA
+ * games (CS2) in production.
  *
- * There is NO per-user beta/invite/entitlement concept anywhere in the codebase
- * yet: the `users` table has role + residence_state + active_games only, and
- * game gating is global `feature_flags` + this client config. So until a real
- * beta-invite system exists, no production user has access and this returns
- * false for everyone.
- *
- * TODO(beta-invite): replace with a real per-user check (allowlist / redeemed
- * invite / entitlement) once that system lands. When it does, thread the user's
- * access status in as an argument rather than hard-coding false.
+ * There is no per-user beta/invite/entitlement concept in the codebase yet, so
+ * this is false for everyone. TODO(beta-invite): replace with a real per-user
+ * check (allowlist / redeemed invite) and thread it in as an argument.
  */
 export function hasBetaAccess(): boolean {
   return false;
@@ -260,6 +261,7 @@ export function hasBetaAccess(): boolean {
  */
 export function isBetaGated(id: string, ctx: OnboardingContext): boolean {
   if (ctx !== 'production') return false;
+  if (OPEN_BETA_GAMES.has(id)) return false;
   const cfg = ONBOARDING[id];
   return cfg?.badge === 'BETA' && !hasBetaAccess();
 }

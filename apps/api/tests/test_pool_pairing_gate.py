@@ -24,7 +24,7 @@ import textwrap
 import pytest
 
 from moneymatch_api.constants import METRIC_PROVISIONAL_MIN_N, STAT_BASELINE_MIN_N
-from moneymatch_api.services import matchmaking, pool_engine, tournament_engine
+from moneymatch_api.services import matchmaking, pool_engine
 
 pytestmark = pytest.mark.nodb
 
@@ -40,14 +40,16 @@ def test_a_duel_still_refuses_a_provisional_baseline_by_default():
     assert sig.parameters["require_established_metric"].default is True
 
 
-@pytest.mark.parametrize("engine", [pool_engine, tournament_engine])
+# Tournaments no longer pair players (rolling join), so only pools apply.
+@pytest.mark.parametrize("engine", [pool_engine])
 def test_a_bar_contest_opts_out_of_the_duel_floor(engine):
     """Pools and tournaments must both waive it, and only it."""
     src = inspect.getsource(engine._all_pairs_pairable)
     assert "require_established_metric=False" in src, engine.__name__
 
 
-@pytest.mark.parametrize("engine", [pool_engine, tournament_engine])
+# Tournaments no longer pair players (rolling join), so only pools apply.
+@pytest.mark.parametrize("engine", [pool_engine])
 def test_waiving_it_does_not_mean_skipping_the_check(engine):
     """The collusion guards live in the same call, so it must still be made."""
     src = inspect.getsource(engine._all_pairs_pairable)

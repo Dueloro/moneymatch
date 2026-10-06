@@ -182,13 +182,13 @@ describe('InboxPage (chat)', () => {
     });
   });
 
-  it('offers pool, tournament, and head-to-head invites next to the typing bar', () => {
+  it('offers tournament and head-to-head invites (no solo pools) next to the typing bar', () => {
     renderWithProviders(<InboxPage />);
     fireEvent.click(screen.getByText('jordn_cs'));
     fireEvent.click(screen.getByRole('button', { name: 'Send an invite' }));
 
     const menu = screen.getByTestId('invite-menu');
-    expect(menu).toHaveTextContent('Solo pool');
+    expect(menu).not.toHaveTextContent('Solo pool');
     expect(menu).toHaveTextContent('Tournament');
     expect(menu).toHaveTextContent('Head-to-head');
   });

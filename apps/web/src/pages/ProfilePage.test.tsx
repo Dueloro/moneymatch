@@ -167,7 +167,8 @@ describe('ProfilePage', () => {
 
   it('runs the link flow for an unlinked game', () => {
     renderWithProviders(<ProfilePage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Link' }));
+    // Chess is listed first; PUBG (open to everyone) has its own Link button.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Link' })[0]);
     fireEvent.change(screen.getByPlaceholderText('Your Lichess username'), {
       target: { value: 'magnus' },
     });

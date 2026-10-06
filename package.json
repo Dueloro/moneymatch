@@ -20,7 +20,8 @@
   },
   "pnpm": {
     "overrides": {
-      "dompurify@<3.4.13": ">=3.4.13"
+      "dompurify@<3.4.16": ">=3.4.16",
+      "fflate@<0.4.9": "^0.4.9"
     },
     "auditConfig": {
       "ignoreGhsas": [

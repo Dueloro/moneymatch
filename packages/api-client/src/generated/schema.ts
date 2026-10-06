@@ -602,10 +602,16 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Enter */
+        /**
+         * Enter
+         * @description Join the open tournament for this stat + entry (or open one).
+         */
         post: operations["enter_api_v1_tournaments_queue_post"];
-        /** Leave Queue */
-        delete: operations["leave_queue_api_v1_tournaments_queue_delete"];
+        /**
+         * Leave
+         * @description Leave — only while you are still the only player (full refund).
+         */
+        delete: operations["leave_api_v1_tournaments_queue_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1468,6 +1474,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/game-matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Game Matches */
+        get: operations["list_game_matches_api_v1_admin_game_matches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tournaments/{tournament_id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tournament Log View
+         * @description The permanent settlement log: every entrant's result and every match of
+         *     theirs we had, with the verdict and timestamps. Empty until it finishes.
+         */
+        get: operations["tournament_log_view_api_v1_admin_tournaments__tournament_id__log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tournaments/{tournament_id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Void Tournament */
+        post: operations["void_tournament_api_v1_admin_tournaments__tournament_id__void_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/login": {
         parameters: {
             query?: never;
@@ -1832,6 +1893,69 @@ export interface components {
             /** Resolved At */
             resolved_at: string | null;
         };
+        /**
+         * AdminGameMatch
+         * @description One stored game from the background ingester (the admin match log).
+         */
+        AdminGameMatch: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Host Username */
+            host_username: string | null;
+            /** Game */
+            game: string;
+            /** Host Account Id */
+            host_account_id: string;
+            /** Host Match Id */
+            host_match_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Mode */
+            mode: string | null;
+            /** Rated */
+            rated: boolean;
+            /** Eligible */
+            eligible: boolean;
+            /** Result */
+            result: string | null;
+            /** Moves */
+            moves: number;
+            /** Metrics */
+            metrics: {
+                [key: string]: unknown;
+            };
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /** Account Last Polled At */
+            account_last_polled_at: string | null;
+        };
+        /** AdminGameMatchesResponse */
+        AdminGameMatchesResponse: {
+            /** Matches */
+            matches: components["schemas"]["AdminGameMatch"][];
+        };
         /** AdminLedgerPage */
         AdminLedgerPage: {
             /** Entries */
@@ -1865,6 +1989,102 @@ export interface components {
             link_method: string;
             /** Status */
             status: string;
+        };
+        /**
+         * AdminTournamentLogEntrant
+         * @description One entrant's final result and every match of theirs we had.
+         */
+        AdminTournamentLogEntrant: {
+            /**
+             * Entry Id
+             * Format: uuid
+             */
+            entry_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Host Account Id */
+            host_account_id: string;
+            /**
+             * Entered At
+             * Format: date-time
+             */
+            entered_at: string;
+            /** Score */
+            score: number | null;
+            /** Matches Counted */
+            matches_counted: number;
+            /** Rank */
+            rank: number | null;
+            /** Entry Cents */
+            entry_cents: number;
+            /** Payout Cents */
+            payout_cents: number;
+            /** Outcome */
+            outcome: string;
+            /** Matches */
+            matches: components["schemas"]["AdminTournamentLogMatch"][];
+        };
+        /**
+         * AdminTournamentLogMatch
+         * @description One fetched match of one entrant, as the rules judged it at settlement.
+         */
+        AdminTournamentLogMatch: {
+            /** Host Match Id */
+            host_match_id: string;
+            /** Game Match Id */
+            game_match_id: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Mode */
+            mode: string | null;
+            /** Result */
+            result: string | null;
+            /** Reason */
+            reason: string;
+            /** Reason Text */
+            reason_text: string;
+            /** Counted */
+            counted: boolean;
+            /** Value */
+            value: number | null;
+            /** Metrics */
+            metrics: {
+                [key: string]: unknown;
+            };
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+        };
+        /**
+         * AdminTournamentLogResponse
+         * @description The permanent settlement log of one finished tournament.
+         */
+        AdminTournamentLogResponse: {
+            /**
+             * Tournament Id
+             * Format: uuid
+             */
+            tournament_id: string;
+            /** Tournament Outcome */
+            tournament_outcome: string | null;
+            /** Recorded At */
+            recorded_at: string | null;
+            /** Entrants */
+            entrants: components["schemas"]["AdminTournamentLogEntrant"][];
         };
         /** AdminUserDetail */
         AdminUserDetail: {
@@ -2815,6 +3035,16 @@ export interface components {
             kind: string;
         };
         /**
+         * OpenTable
+         * @description How many players are already in the open tournament at one entry.
+         */
+        OpenTable: {
+            /** Entry Cents */
+            entry_cents: number;
+            /** Players */
+            players: number;
+        };
+        /**
          * PoolEnterRequest
          * @description Enter a pool = enqueue. Ids + preset only — no bar, no amount.
          */
@@ -3386,6 +3616,31 @@ export interface components {
             /** Entry Preset Cents */
             entry_preset_cents: number;
         };
+        /**
+         * TournamentGame
+         * @description One of your games around the tournament, and whether/why it counted.
+         */
+        TournamentGame: {
+            /** Host Match Id */
+            host_match_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Mode */
+            mode: string | null;
+            /** Result */
+            result: string | null;
+            /** Reason */
+            reason: string;
+            /** Reason Text */
+            reason_text: string;
+            /** Value */
+            value: number | null;
+        };
         /** TournamentMarketsResponse */
         TournamentMarketsResponse: {
             /** Game */
@@ -3398,8 +3653,14 @@ export interface components {
             prize_split: number[];
             /** Field Size */
             field_size: number;
+            /** Min Players */
+            min_players: number;
             /** Score Matches */
             score_matches: number;
+            /** Join Window Seconds */
+            join_window_seconds: number;
+            /** Duration Seconds */
+            duration_seconds: number;
             /** Metrics */
             metrics: components["schemas"]["TournamentMetric"][];
         };
@@ -3411,6 +3672,13 @@ export interface components {
             label: string;
             /** Provisional */
             provisional: boolean;
+            /** Rules */
+            rules: string;
+            /**
+             * Open Tables
+             * @default []
+             */
+            open_tables: components["schemas"]["OpenTable"][];
         };
         /** TournamentStatusResponse */
         TournamentStatusResponse: {
@@ -3447,20 +3715,20 @@ export interface components {
             prize_split: number[];
             /** Field Size */
             field_size: number;
+            /** Players */
+            players: number;
             /** Score Matches */
             score_matches: number;
             /** State */
             state: string;
-            /**
-             * Window Starts At
-             * Format: date-time
-             */
-            window_starts_at: string;
-            /**
-             * Window Ends At
-             * Format: date-time
-             */
-            window_ends_at: string;
+            /** Window Starts At */
+            window_starts_at: string | null;
+            /** Window Ends At */
+            window_ends_at: string | null;
+            /** Join Closes At */
+            join_closes_at: string | null;
+            /** Your Entered At */
+            your_entered_at: string | null;
             /** Field Mu Low */
             field_mu_low: number | null;
             /** Field Mu High */
@@ -3471,6 +3739,13 @@ export interface components {
             your_rank: number | null;
             /** Your Payout Cents */
             your_payout_cents: number | null;
+            /**
+             * Your Games
+             * @default []
+             */
+            your_games: components["schemas"]["TournamentGame"][];
+            /** Outcome Reason */
+            outcome_reason?: string | null;
             /** Resolved At */
             resolved_at: string | null;
         };
@@ -4922,7 +5197,7 @@ export interface operations {
             };
         };
     };
-    leave_queue_api_v1_tournaments_queue_delete: {
+    leave_api_v1_tournaments_queue_delete: {
         parameters: {
             query?: never;
             header?: {
@@ -6635,6 +6910,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminDisputeItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_game_matches_api_v1_admin_game_matches_get: {
+        parameters: {
+            query?: {
+                /** @description Username, or the host account id / handle */
+                player?: string | null;
+                game?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminGameMatchesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tournament_log_view_api_v1_admin_tournaments__tournament_id__log_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                tournament_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTournamentLogResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    void_tournament_api_v1_admin_tournaments__tournament_id__void_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                tournament_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResettleResult"];
                 };
             };
             /** @description Validation Error */

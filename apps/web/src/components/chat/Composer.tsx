@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FC } from 'react';
 
 import { useSendMessage } from '../../hooks/useChat';
 import { track } from '../../lib/telemetry';
-import { PlusIcon, SendIcon, SwordsIcon, TrophyIcon, UsersIcon } from './icons';
+import { PlusIcon, SendIcon, SwordsIcon, TrophyIcon } from './icons';
 
 export type InviteChoice = 'pool' | 'tournament' | 'h2h';
 
@@ -12,7 +12,6 @@ const INVITE_OPTIONS: {
   hint: string;
   Icon: FC<{ className?: string }>;
 }[] = [
-  { key: 'pool', label: 'Solo pool', hint: 'Same bar, shared pot', Icon: UsersIcon },
   {
     key: 'tournament',
     label: 'Tournament',
@@ -24,8 +23,8 @@ const INVITE_OPTIONS: {
 
 /**
  * The typing bar. The invite button sits right next to it (design ask): it opens
- * the three things you can invite a friend to, which is also the shortcut into
- * the Solo Pools / Tournament tabs.
+ * the things you can invite a friend to, which is also the shortcut into the
+ * Tournament / Head-to-head tabs.
  */
 export function Composer({
   conversationId,

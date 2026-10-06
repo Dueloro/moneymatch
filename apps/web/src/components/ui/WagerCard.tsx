@@ -35,6 +35,7 @@ export function WagerCard({
   payoutLabel,
   capacity,
   filled,
+  filledFor,
   oneVsOne = false,
   feeNote,
   speedOptions,
@@ -76,6 +77,9 @@ export function WagerCard({
    * production, where pools/tournaments form via matchmaking and there is no
    * real roster to read, so no fabricated count is shown. */
   filled?: number;
+  /** Real "players in now" for the selected entry (rolling tournaments). Wins
+   * over `filled` when given. */
+  filledFor?: (entryCents: number) => number;
   oneVsOne?: boolean;
   /**
    * Optional pre-commit fee disclosure shown below the payout, computed from the
@@ -102,6 +106,7 @@ export function WagerCard({
     () => entryOptions[Math.floor(entryOptions.length / 2)] ?? entryOptions[0],
   );
   const selected = entryOptions.includes(entry) ? entry : entryOptions[0];
+  const inNow = filledFor ? filledFor(selected) : filled;
   // Armed = the first tap happened; a confirm button is showing beneath.
   const [armed, setArmed] = useState(false);
 
@@ -185,9 +190,9 @@ export function WagerCard({
             <p className="mt-0.5 text-xs text-text-secondary">{feeNote(selected)}</p>
           )}
         </div>
-        {(oneVsOne || filled != null) && (
+        {(oneVsOne || inNow != null) && (
           <p className="text-xs text-text-tertiary">
-            {oneVsOne ? '1v1' : `${filled} of ${capacity} in`}
+            {oneVsOne ? '1v1' : `${inNow} of ${capacity} in`}
           </p>
         )}
       </div>

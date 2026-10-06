@@ -17,7 +17,13 @@ from collections.abc import Sequence
 # Installed by migration 0002 — do not change (a later table joins the full set).
 APPEND_ONLY_TABLES: tuple[str, ...] = ("ledger_entries", "platform_ledger")
 # Every append-only table across all migrations (used by the test schema).
-ALL_APPEND_ONLY_TABLES: tuple[str, ...] = (*APPEND_ONLY_TABLES, "raw_payloads")
+ALL_APPEND_ONLY_TABLES: tuple[str, ...] = (
+    *APPEND_ONLY_TABLES,
+    "raw_payloads",
+    "game_matches",
+    "tournament_results",
+    "tournament_match_log",
+)
 
 _FUNCTION_DDL = """
 CREATE OR REPLACE FUNCTION mm_reject_mutation() RETURNS trigger AS $$

@@ -61,6 +61,10 @@ DEMO_JWT_SECRET = "moneymatch-demo-login-signing-key-not-a-secret"  # noqa: S105
 FLAG_QUEUE_PAUSED = "queue_paused"
 FLAG_SETTLEMENT_PAUSED = "settlement_paused"
 FLAG_GEO_CONFIG = "geo_config"
+# The bucketing layer's master switch, seeded OFF by migration 0028_bucketing.
+# The bucketing code lives on feat/bucket_system; on this branch the flag only
+# exists because the shared migration chain seeds it. Nothing reads it here.
+FLAG_BUCKETING_ENABLED = "bucketing_enabled"
 
 # The 14 excluded ("Any Chance") states seeded by migration 0001. The live list
 # lives in the `geo_config` flag so it is admin-editable without a deploy; this
@@ -195,6 +199,55 @@ GAME_HISTORY_FLOOR: dict[str, int] = {
 # poll's newest-first early-exit + the finished-match cache.
 PUBG_MATCH_FANOUT = 15
 
+# After an account's first (backfill) poll, the most new PUBG matches one poll
+# fetches. Anything beyond it is picked up on the next poll, oldest first.
+PUBG_INGEST_MATCHES_PER_POLL = 6
+
+
+# --------------------------------------------------------------------------- #
+# Background match ingestion (services/match_ingestion.py).
+#
+# Every linked account's finished games are fetched on a schedule and stored in
+# `game_matches`, so contests score from our own database instead of calling a
+# host at settlement time. That is what keeps PUBG inside its ~10 req/min: the
+# budget is spent steadily, a little per worker cycle, not all at once when a
+# tournament ends.
+# --------------------------------------------------------------------------- #
+
+# Games whose *every* history read (grading, skill models, sandbagging) comes
+# from the stored table rather than the host. PUBG, because its rate limit
+# cannot afford live reads. Chess and Dota are cheap enough to read live for
+# duels, and CS2 already reads its own stored scoreboards.
+STORED_HISTORY_GAMES: frozenset[str] = frozenset({GAME_PUBG_STEAM})
+
+# An account in a live contest (open tournament or active duel) is re-polled
+# this often; everyone else linked is polled on the slow cadence, which keeps
+# history accruing for later skill grouping.
+INGEST_HOT_INTERVAL_SECONDS = 120
+INGEST_COLD_INTERVAL_SECONDS = 6 * 3600
+# The soonest an account is polled again after any attempt, including a failed
+# one or a partial backfill.
+INGEST_RETRY_SECONDS = 60
+
+# How many accounts per game one worker cycle may poll. PUBG is sized so a
+# cycle never waits long on the token bucket: one poll is one call plus one per
+# new match, and a cycle runs every ~15 s.
+INGEST_MAX_POLLS_PER_CYCLE: dict[str, int] = {
+    GAME_PUBG_STEAM: 2,
+    GAME_CHESS_LICHESS: 10,
+    GAME_DOTA2_OPENDOTA: 5,
+    GAME_CS2_STEAM: 20,
+}
+
+# The first poll of an account reaches back this far (chess/Dota; PUBG is
+# capped by PUBG_MATCH_FANOUT instead).
+INGEST_BACKFILL_DAYS = 30
+
+# A stored history older than this is not trusted to *grade* a PUBG duel: the
+# grader treats it as a host outage (extends the window) rather than reading
+# "no game played" off a poll that simply has not happened lately.
+INGEST_STALE_SECONDS = 20 * 60
+
 # Official PUBG modes eligible to settle money. Everything else — custom games,
 # arcade, war/zombie, event, training — is excluded so only standard
 # battle-royale play grades a duel.
@@ -281,6 +334,10 @@ WORKER_POLL_INTERVAL_SECONDS = 15
 # here, never inline in the engines ("all constants in config").
 # --------------------------------------------------------------------------- #
 
+# Solo pools are closed to new entries (the bar is not an offered format).
+# Existing pools still settle. Flip only with a product decision.
+SOLO_POOLS_OPEN = False
+
 # Which games offer pools/tournaments (config, not code — the engine is
 # game-agnostic; chess/dota wait for richer/validated telemetry).
 # Solo pools & tournaments run on every playable game's rate metrics.
@@ -301,7 +358,11 @@ POOL_METRICS: dict[str, tuple[str, ...]] = {
 TOURNAMENT_METRICS: dict[str, tuple[str, ...]] = {
     GAME_CS2_STEAM: CS2_STEAM_METRICS,
     **POOL_METRICS,
-    GAME_CHESS_LICHESS: ("chess_win_streak", "chess_wins", "chess_fastest_win"),
+    # Chess runs one contest: points from your first counted rated blitz games
+    # (win 1, draw ½, loss 0). The old streak / total-wins / fastest-win
+    # contests were farmable with a throwaway account (fastest win could be won
+    # in one move against an alt that resigns), so they are retired.
+    GAME_CHESS_LICHESS: ("chess_points",),
 }
 
 # Personal-bar difficulty multipliers, as z-scores. Implied clear rate is
@@ -415,16 +476,45 @@ POOL_BAR_SPREAD_CAP_SIGMA = 1.5
 POOL_WINDOW_SECONDS = 24 * 3600
 # Tournament field. Formed under a μ-dispersion cap; scored on the mean of the
 # first-N qualifying matches; top places split per `TOURNAMENT_PRIZE_SPLIT`.
-TOURNAMENT_FIELD_SIZE = 10
-TOURNAMENT_MIN_FIELD = 6
-TOURNAMENT_MIN_RANKED = 4
+#
+# Tournaments are **rolling**: clicking a stat tournament drops you straight
+# into the open one for that (game, stat, entry), or opens a new one if none is
+# accepting players. No waiting for a full field, no admin scheduling. A
+# tournament opened by one player waits (no clock, leave any time for a full
+# refund) until `TOURNAMENT_MIN_FIELD` players are in; then it starts and ends
+# `TOURNAMENT_WINDOW_SECONDS` later, taking joiners until then or until it is
+# full. Each player's games count from the later of the start and the moment
+# *they* joined, and only their first `TOURNAMENT_SCORE_N` qualifying games
+# count, so a late joiner is not behind.
+TOURNAMENT_FIELD_SIZE = 10  # the most players one tournament takes
+# Players needed for a tournament to start its clock.
+TOURNAMENT_MIN_FIELD = 2
+# Fewer verifiable participants than this at settlement → void + refund.
+TOURNAMENT_MIN_RANKED = 2
 TOURNAMENT_SCORE_N = 3
-TOURNAMENT_PRIZE_SPLIT: tuple[int, ...] = (50, 30, 20)  # relative weights
-# max(μ) − min(μ) ≤ dispersion_cap · σ_pooled (start tight, tune with data).
-TOURNAMENT_DISPERSION_CAP = 1.0
-TOURNAMENT_WINDOW_SECONDS = 48 * 3600
-# Live standings refresh cadence during the window (cheap, cached).
-TOURNAMENT_STANDINGS_REFRESH_SECONDS = 10 * 60
+TOURNAMENT_PRIZE_SPLIT: tuple[int, ...] = (60, 25, 15)  # relative weights
+TOURNAMENT_WINDOW_SECONDS = 3 * 3600
+# After the end, wait this long before the final poll + settle, so games that
+# finished just before the end have time to appear in the host's API.
+TOURNAMENT_GRACE_SECONDS: dict[str, int] = {
+    GAME_CHESS_LICHESS: 10 * 60,
+    GAME_CS2_STEAM: 30 * 60,
+    GAME_PUBG_STEAM: 30 * 60,
+    GAME_DOTA2_OPENDOTA: 60 * 60,
+}
+# If an entrant's account still has not been polled successfully this long
+# after the grace period, stop waiting: that entrant is unverifiable (refunded)
+# and everyone else settles on what is stored.
+TOURNAMENT_FINAL_POLL_TIMEOUT_SECONDS = 2 * 3600
+# Chess tournaments count rated blitz only, so one field plays one format.
+CHESS_TOURNAMENT_SPEED = "blitz"
+# A chess game shorter than this (full moves) still uses one of your counted
+# games but scores nothing, win or draw. Resigning early to an alt earns
+# nothing, and resigning early yourself does not erase a loss.
+CHESS_MIN_MOVES_TO_SCORE = 10
+# Live standings refresh cadence during the window. Computed from stored games,
+# so it costs no host calls.
+TOURNAMENT_STANDINGS_REFRESH_SECONDS = 60
 # Live under-the-card refresh cadence for in-flight pools & H2H matches. Faster
 # than standings — a chess board wants to feel live — but still host-cached so
 # the Activity request path never makes a host call.
@@ -451,6 +541,7 @@ METRIC_LABELS: dict[str, str] = {
     "chess_win_streak": "Longest win streak",
     "chess_wins": "Total wins",
     "chess_fastest_win": "Fastest win",
+    "chess_points": "Points (blitz)",
     "cs2_kd_ratio": "K/D ratio",
     # `cs2_adr` intentionally absent — retired with the FACEIT adapter (migration
     # 0024); ADR needs a parsed demo the Game Coordinator scoreboard lacks.

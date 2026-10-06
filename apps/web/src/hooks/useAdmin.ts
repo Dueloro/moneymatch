@@ -193,6 +193,69 @@ export function useVoidMatch() {
   });
 }
 
+export function useVoidTournament() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      tournamentId: string;
+      reason: string;
+    }): Promise<void> => {
+      const { error } = await api.POST(
+        '/api/v1/admin/tournaments/{tournament_id}/void',
+        {
+          params: { path: { tournament_id: input.tournamentId } },
+          body: { reason: input.reason },
+        },
+      );
+      if (error) throw new Error('Void failed');
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
+  });
+}
+
+// --- Stored match log (background ingestion) ------------------------------ //
+
+export interface AdminGameMatch {
+  id: string;
+  user_id: string;
+  username: string | null;
+  host_username: string | null;
+  game: string;
+  host_account_id: string;
+  host_match_id: string;
+  started_at: string;
+  ended_at: string | null;
+  mode: string | null;
+  rated: boolean;
+  eligible: boolean;
+  result: string | null;
+  moves: number;
+  metrics: Record<string, number>;
+  detail: Record<string, unknown>;
+  fetched_at: string;
+  account_last_polled_at: string | null;
+}
+
+export function useAdminGameMatches(filters: { player?: string; game?: string }) {
+  return useQuery({
+    queryKey: ['admin', 'game-matches', filters],
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<AdminGameMatch[]> => {
+      const { data, error } = await api.GET('/api/v1/admin/game-matches', {
+        params: {
+          query: {
+            player: filters.player || undefined,
+            game: filters.game || undefined,
+            limit: 200,
+          },
+        },
+      });
+      if (error) throw new Error('Failed to load stored matches');
+      return (data as { matches: AdminGameMatch[] }).matches;
+    },
+  });
+}
+
 // --- Queue / Reconciliation / Risk ---------------------------------------- //
 
 export function useAdminQueue() {
@@ -284,5 +347,60 @@ export function useResolveDispute() {
       if (error) throw new Error('Resolve failed');
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'disputes'] }),
+  });
+}
+
+// --- Tournament settlement log (permanent, written at settlement) ---------- //
+
+export interface AdminTournamentLogMatch {
+  host_match_id: string;
+  game_match_id: string | null;
+  started_at: string;
+  ended_at: string | null;
+  fetched_at: string | null;
+  mode: string | null;
+  result: string | null;
+  reason: string;
+  reason_text: string;
+  counted: boolean;
+  value: number | null;
+  metrics: Record<string, number>;
+  recorded_at: string;
+}
+
+export interface AdminTournamentLogEntrant {
+  entry_id: string;
+  user_id: string;
+  username: string | null;
+  host_account_id: string;
+  entered_at: string;
+  score: number | null;
+  matches_counted: number;
+  rank: number | null;
+  entry_cents: number;
+  payout_cents: number;
+  outcome: string;
+  matches: AdminTournamentLogMatch[];
+}
+
+export interface AdminTournamentLog {
+  tournament_id: string;
+  tournament_outcome: string | null;
+  recorded_at: string | null;
+  entrants: AdminTournamentLogEntrant[];
+}
+
+export function useTournamentLog(tournamentId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'tournament-log', tournamentId],
+    enabled: !!tournamentId,
+    queryFn: async (): Promise<AdminTournamentLog> => {
+      const { data, error } = await api.GET(
+        '/api/v1/admin/tournaments/{tournament_id}/log',
+        { params: { path: { tournament_id: tournamentId! } } },
+      );
+      if (error) throw new Error('Failed to load the tournament log');
+      return data as AdminTournamentLog;
+    },
   });
 }

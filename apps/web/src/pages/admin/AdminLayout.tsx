@@ -5,6 +5,7 @@ import { styles } from './adminStyles';
 const TABS = [
   ['users', 'Users'],
   ['contests', 'Contests'],
+  ['matches', 'Matches'],
   ['disputes', 'Disputes'],
   ['queue', 'Queue'],
   ['flags', 'Flags'],

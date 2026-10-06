@@ -12,7 +12,7 @@ import time
 
 from ..schemas.profile import FormatStat, ProfileSnapshot, Speed
 from ..services.hosts import lichess
-from .base import GameAdapter, GameFilters, NormGame
+from .base import GameAdapter, GameFilters, HistoryBatch, NormGame
 
 _SPEEDS: tuple[Speed, ...] = ("bullet", "blitz", "rapid", "classical")
 
@@ -30,6 +30,11 @@ _FINISHED = {
 _DRAW_STATUSES = {"draw", "stalemate"}
 
 _CLOCK_FOR_SPEED = {"bullet": 60, "blitz": 300, "rapid": 600, "classical": 1800}
+
+# Games per ingestion page. Lichess streams the export, so a page this size is
+# one cheap request; a poll reads at most this many pages.
+_HISTORY_PAGE = 100
+_HISTORY_MAX_PAGES = 5
 
 
 def _move_count(moves: str | None) -> int:
@@ -75,6 +80,41 @@ class ChessLichessAdapter(GameAdapter):
             out.append(norm)
         out.sort(key=lambda x: x.created_at_ms)  # oldest first
         return out
+
+    async def fetch_history(
+        self,
+        account_id: str,
+        since_ms: int,
+        *,
+        known_ids: set[str],
+        first_poll: bool,
+    ) -> HistoryBatch:
+        """Every finished standard game since ``since_ms``, rated or not, oldest
+        first. Pages forward up to `_HISTORY_MAX_PAGES` pages per poll; if the
+        last page was still full there is more, so the batch is marked
+        incomplete and the ingester polls again next cycle from its cursor."""
+        out: list[NormGame] = []
+        cursor = since_ms
+        complete = False
+        for _ in range(_HISTORY_MAX_PAGES):
+            raw_games = await lichess.get_user_games(
+                account_id,
+                cursor,
+                max_games=_HISTORY_PAGE,
+                rated_only=False,
+                oldest_first=True,
+                raise_errors=True,
+            )
+            for g in raw_games:
+                norm = self._normalize(g, account_id)
+                if norm is not None and norm.id not in known_ids:
+                    out.append(norm)
+            if len(raw_games) < _HISTORY_PAGE:
+                complete = True
+                break
+            cursor = max(int(g.get("createdAt", 0)) for g in raw_games) + 1
+        out.sort(key=lambda x: x.created_at_ms)
+        return HistoryBatch(out, complete=complete)
 
     # --- Phase-3 brokering seams ------------------------------------------- #
 
@@ -220,6 +260,10 @@ class ChessLichessAdapter(GameAdapter):
             won = winner == my_color
 
         moves = _move_count(g.get("moves"))
+        opp_color = "black" if my_color == "white" else "white"
+        me_j = players.get(my_color) or {}
+        opp_j = players.get(opp_color) or {}
+        last_move = g.get("lastMoveAt")
         return NormGame(
             id=g.get("id", ""),
             speed=g.get("speed", "blitz"),
@@ -251,4 +295,17 @@ class ChessLichessAdapter(GameAdapter):
             # a 0-move "win" would sit below every bar and clear for free, and
             # drag the baseline mean toward zero. No value ⇒ unqualified match.
             metrics=({"chess_moves": float(moves)} if won and moves > 0 else {}),
+            ended_at_ms=int(last_move) if last_move else None,
+            detail={
+                "status": status,
+                "color": my_color,
+                "rating": me_j.get("rating"),
+                "opponent_id": ((opp_j.get("user") or {}).get("id") or "").lower()
+                or None,
+                "opponent_rating": opp_j.get("rating"),
+                # Lichess marks a rating provisional until it has settled over
+                # enough rated games. A brand-new throwaway account always is,
+                # which is what the tournament farming guard keys on.
+                "opponent_provisional": bool(opp_j.get("provisional", False)),
+            },
         )

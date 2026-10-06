@@ -92,14 +92,24 @@ describe('GameSelectOverlay', () => {
       expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('production: both BETA games selected name both in the error', async () => {
+    it('production: PUBG is open to everyone, only CS2 is named in the error', async () => {
       const user = userEvent.setup();
       render(<GameSelectOverlay context="production" onConfirm={vi.fn()} />);
       await user.click(tile(/^Counter-Strike 2,/));
       await user.click(tile(/^PUBG,/));
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'CS2 and PUBG are only available in an invite-only beta.',
+        'CS2 is only available in an invite-only beta.',
       );
+      expect(screen.getByRole('alert')).not.toHaveTextContent('PUBG');
+    });
+
+    it('production: PUBG alone is valid — Continue is enabled', async () => {
+      const user = userEvent.setup();
+      const onConfirm = vi.fn();
+      render(<GameSelectOverlay context="production" onConfirm={onConfirm} />);
+      await user.click(tile(/^PUBG,/));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(cont()).toBeEnabled();
     });
 
     it('production: deselecting the BETA game clears the error and re-enables Continue', async () => {

@@ -73,11 +73,12 @@ describe('LinkGames — availability-aware add/remove', () => {
   });
 
   describe('production', () => {
-    it('locks CS2/PUBG/Dota (disabled) and keeps Chess always-on', () => {
+    it('locks CS2/Dota (disabled), opens PUBG, and keeps Chess always-on', () => {
       renderWithProviders(<LinkGames context="production" />);
       expect(checkbox(/Chess \(always on\)/)).toBeDisabled();
       expect(checkbox(/Counter-Strike 2 \(available after launch\)/)).toBeDisabled();
-      expect(checkbox(/PUBG \(available after launch\)/)).toBeDisabled();
+      // PUBG is open to every player in the close beta.
+      expect(checkbox(/Add PUBG/)).not.toBeDisabled();
       expect(checkbox(/Dota 2 \(coming soon\)/)).toBeDisabled();
     });
 

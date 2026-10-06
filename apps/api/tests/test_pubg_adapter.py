@@ -378,3 +378,28 @@ async def test_poll_early_exits_on_first_out_of_window_match(pubg_key):
     assert [g.id for g in games] == ["new"]
     assert new_route.called and old_route.called
     assert not older_route.called  # early-exit: never fetched the 3rd match
+
+
+def test_a_game_ends_when_the_player_dies_not_when_the_match_does():
+    """Kills/damage are final at death, and the match `duration` overshoots
+    (a match fetched at 23:12 claimed to end at 23:22), so the tournament cutoff
+    must read start + timeSurvived."""
+    raw = _match(
+        "m1",
+        kills=0,
+        headshots=0,
+        damage=10.0,
+        win_place=45,
+        created="2026-10-04T22:50:53Z",
+    )
+    raw["data"]["attributes"]["duration"] = 1907
+    raw["included"][1]["attributes"]["stats"]["timeSurvived"] = 184
+    g = ADAPTER._normalize(raw, ACCOUNT)
+    assert g.ended_at_ms - g.created_at_ms == 184_000
+
+
+def test_without_time_survived_the_match_duration_is_used():
+    raw = _match("m2", kills=1, headshots=0, damage=10.0, win_place=3)
+    raw["data"]["attributes"]["duration"] = 1800
+    g = ADAPTER._normalize(raw, ACCOUNT)
+    assert g.ended_at_ms - g.created_at_ms == 1_800_000

@@ -214,6 +214,14 @@ async def test_worker_bootstraps_pending_pubg_link(session, monkeypatch):
             )
         )
 
+    # PUBG history is read from `game_matches`, so bootstrap waits for the
+    # ingester's first poll instead of spending API calls of its own.
+    assert await settlement_worker._bootstrap_pending_models(sm) == 0
+
+    from moneymatch_api.services import match_ingestion
+
+    assert await match_ingestion.run_cycle(sm) >= 1
+
     count = await settlement_worker._bootstrap_pending_models(sm)
     assert count == 1
 

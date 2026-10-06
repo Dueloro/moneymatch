@@ -114,12 +114,15 @@ def split_weighted(
 ) -> Split:
     """Split `pot_cents` among prize places by integer `weights` (e.g. 50/30/20).
 
-    Takes `rake_bps` off the pot, then floors each place's share of the
-    distributable by weight; any flooring remainder lands in the **rake** so the
-    books reconcile exactly (00-README §3.3). The returned `payouts_cents` are one
-    slice **per weight**, best place first — the tournament engine maps them to
-    ranks and re-divides tied places itself (tie remainder goes to the earlier
-    enqueue, not the rake, so the invariant still holds exactly).
+    Takes exactly `floor(pot × rake_bps / 10000)` as rake, then floors each
+    place's share of the distributable by weight; any flooring remainder goes to
+    the **largest weight** (first place), never to the house, so the rake is
+    never more than the stated rate and the books still reconcile exactly. E.g.
+    1000 at 10% split 60/25 pays 636/264, not 635/264 with 101 rake. The
+    returned `payouts_cents` are one slice **per weight**, best place first —
+    the tournament engine maps them to ranks and re-divides tied places itself
+    (tie remainder goes to the earlier enqueue, not the rake, so the invariant
+    still holds exactly).
 
     Pass only the weights for the places that are actually filled (renormalize by
     truncating `weights` when fewer entrants ranked than there are places).
@@ -137,10 +140,14 @@ def split_weighted(
         # decides whether that path means refund (it does — and never calls here).
         return Split(pot_cents=pot_cents, rake_cents=pot_cents, payouts_cents=())
 
-    slices = tuple(distributable * w // wsum for w in weights)
+    slices = [distributable * w // wsum for w in weights]
     remainder = distributable - sum(slices)
+    # To the largest weight (first place in a normal best-first split), so a
+    # bigger weight can never end up paid less than a smaller one.
+    top = weights.index(max(weights))
+    slices[top] += remainder
     return Split(
         pot_cents=pot_cents,
-        rake_cents=rake + remainder,
-        payouts_cents=slices,
+        rake_cents=rake,
+        payouts_cents=tuple(slices),
     )
