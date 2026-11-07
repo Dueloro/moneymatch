@@ -13,19 +13,14 @@ LinkStatus = Literal["LINKED", "BLOCKED", "UNLINKED"]
 
 
 class CreateLinkRequest(BaseModel):
-    """Intent to bind a host account. The server fetches + verifies everything;
-    the client only names the game and the handle to claim."""
+    """Intent to bind a host account."""
 
     game: str
     username: str = Field(..., min_length=1, max_length=128)
 
 
 class GameLink(BaseModel):
-    """One game's row on Profile: linked snapshot or an empty/blocked slot.
-
-    `status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),
-    UNLINKED (available to link).
-    """
+    """One game's row on Profile: linked snapshot or an empty/blocked slot."""
 
     game: str
     display_name: str
@@ -33,8 +28,6 @@ class GameLink(BaseModel):
     host_username: str | None = None
     linked_at: datetime | None = None
     profile: ProfileSnapshot | None = None
-    # Current consecutive-win streak on this game (0 when none). Never negative —
-    # a loss resets it; we don't surface losing streaks.
     win_streak: int = 0
 
 

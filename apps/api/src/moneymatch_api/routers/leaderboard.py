@@ -1,8 +1,4 @@
-"""`/leaderboard` — real users ranked by ROI over a rolling window (design p.7).
-
-The PoC's seeded bot field is gone; every number is computed server-side from the
-ledger (08-phase-5 · deliverable 5). Honest empty state when nobody qualifies yet.
-"""
+"""`/leaderboard` — real users ranked by ROI over a rolling window."""
 
 from __future__ import annotations
 

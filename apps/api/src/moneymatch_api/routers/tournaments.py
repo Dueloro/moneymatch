@@ -1,9 +1,4 @@
-"""`/tournaments` — matchmade single-metric fields (07-phase-4).
-
-Queue-matched like pools: pick a metric + entry and enqueue; the matcher forms a
-field under the μ-dispersion cap. Standings are server-computed (cached during
-the window, final at settle). No endpoint accepts a score, rank, or payout.
-"""
+"""`/tournaments` — matchmade single-metric fields."""
 
 from __future__ import annotations
 
@@ -74,7 +69,6 @@ def _standings(
         rows.sort(key=lambda r: (r.rank is None, r.rank or 0))
         return rows
 
-    # In-window: server-computed cache (may be empty until the first refresh).
     cache = {
         r["user_id"]: r for r in ((tournament.standings_cache or {}).get("rows") or [])
     }
@@ -164,13 +158,9 @@ async def get_markets(
             f"No tournaments for {game}.",
             status_code=404,
         )
-    # Deterministic ordering (active first, most-recent next) so the readiness
-    # shown matches the account settlement actually grades on.
     linked = await linking_service.get_link(session, user.id, game)
     metrics = []
     for metric in TOURNAMENT_METRICS[game]:
-        # Every tournament metric is scored off the host record, and the field
-        # forms on the host rating (`tournament_engine._build_baseline`).
         provisional = linked is None or tournament_engine.host_rating(linked) is None
         metrics.append(
             TournamentMetric(

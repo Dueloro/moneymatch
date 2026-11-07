@@ -1,5 +1,6 @@
-"""Tournament wire types (07-phase-4). Ids + preset in; server-derived scores,
-ranks, and payouts out. The field's μ-spread is *displayed* fairness, not odds."""
+"""Tournament wire types. Ids + preset in; server-derived scores, ranks, and payouts
+out.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ class TournamentMarketsResponse(BaseModel):
     game: str
     linked: bool
     entry_presets_cents: list[int]
-    prize_split: list[int]  # relative weights, e.g. [50, 30, 20]
+    prize_split: list[int]
     field_size: int
     metrics: list[TournamentMetric]
 
@@ -54,7 +55,6 @@ class TournamentView(BaseModel):
     state: str
     window_starts_at: datetime
     window_ends_at: datetime
-    # Anonymized field fairness: the μ spread ("Field: K/D 1.42–1.58").
     field_mu_low: float | None
     field_mu_high: float | None
     standings: list[StandingRow]
@@ -64,7 +64,7 @@ class TournamentView(BaseModel):
 
 
 class TournamentStatusResponse(BaseModel):
-    status: str  # idle | searching | formed
+    status: str
     tournament: TournamentView | None = None
     metric: str | None = None
     waited_seconds: int | None = None

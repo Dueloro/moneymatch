@@ -1,10 +1,4 @@
-"""`/links` — linked host accounts + the link/refresh/unlink flow.
-
-The server owns verification: POST carries only `{game, username}`; the adapter
-fetches and validates the account, and the binding is immutable to users (DELETE
-is admin-only in MVP). GET returns a row per registered game so the Profile
-screen can render LINKED / BLOCKED / UNLINKED directly.
-"""
+"""`/links` — linked host accounts + the link/refresh/unlink flow."""
 
 from __future__ import annotations
 
@@ -109,7 +103,6 @@ async def delete_link(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> LinksResponse:
-    # Bindings are immutable to users; unlink is an admin action in MVP.
     if user.role != "admin":
         raise APIError(
             "admin_only",

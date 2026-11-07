@@ -1,10 +1,4 @@
-"""`/pools` — queue-matched solo pools (07-phase-4).
-
-Pools are **not** browse-and-join: a player picks metric + difficulty + entry and
-enqueues; the matcher forms a fair room. "Open pools" = your in-flight rooms +
-your queue state. Entering escrows only at formation (no escrow while waiting).
-No endpoint accepts a bar, room bar, or payout — the server owns every number.
-"""
+"""`/pools` — queue-matched solo pools."""
 
 from __future__ import annotations
 
@@ -71,8 +65,6 @@ async def _pool_view(session: AsyncSession, pool: SoloPool, user: User) -> PoolV
         for e in entries
     ]
     your_bar = your.personal_bar if your else None
-    # Reflect the live result while the window runs, read host-free from the cached
-    # snapshot the worker maintains (never a host call on the request path).
     your_cleared: bool | None = None
     your_current: float | None = None
     if pool.state == "LOCKED":

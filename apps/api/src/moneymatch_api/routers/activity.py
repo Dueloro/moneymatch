@@ -1,8 +1,6 @@
-"""`/activity` — the unified activity feed (design Activity screen, PDF p.9).
-
-Phase 3 surfaces head-to-head matches; pools and tournaments join the same feed
-in Phase 4. Every number here is server-derived: your realized net comes from the
-ledger-backed `payout_cents`, never from anything the client sent.
+"""`/activity` — the unified activity feed. Every number here is server-derived: your
+realized net comes from the ledger-backed `payout_cents`, never from anything the
+client sent.
 """
 
 from __future__ import annotations
@@ -36,7 +34,6 @@ async def get_activity(
     limit: int = Query(default=_DEFAULT_LIMIT, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
 ) -> ActivityResponse:
-    # The viewer's matches, newest first.
     match_rows = list(
         await session.scalars(
             select(Match)
@@ -46,9 +43,6 @@ async def get_activity(
             .limit(limit)
         )
     )
-    # No early return on an empty match list — a user can have only pools /
-    # tournaments in flight, and those still belong in the feed (they are
-    # appended below). Bailing here would hide a just-entered pool wager.
     match_ids = [m.id for m in match_rows]
     seats = (
         list(
@@ -114,11 +108,6 @@ async def get_activity(
 
 
 def _seat_stats(match: Match, seat: MatchPlayer | None) -> dict | None:
-    """Rich per-seat stats for the expanded card.
-
-    Prefers the structured per-seat block the sample/graded match stored in
-    ``outcome_detail['detail']``; falls back to the graded
-    ``stat_line`` (minus the internal ``game_id``) for older matches."""
     if seat is None:
         return None
     detail = (match.outcome_detail or {}).get("detail") or {}
@@ -150,7 +139,6 @@ def _match_detail(
 async def _attach_disputes(
     session: AsyncSession, user: User, items: list[ActivityItem]
 ) -> None:
-    """Flag which contests the viewer has already contested (one query)."""
     statuses = await dispute_service.statuses_for_user(session, user.id)
     if not statuses:
         return
@@ -161,11 +149,6 @@ async def _attach_disputes(
 async def _attach_live(
     session: AsyncSession, user: User, items: list[ActivityItem]
 ) -> None:
-    """Orient each in-flight pool/match's cached snapshot to the viewer.
-
-    Tournaments already carry `live` (derived from `standings_cache` when the row
-    is built); here we join the `live_snapshots` cache for the pool/match rows in
-    one query — the request path never touches a host."""
     wanted = {
         i.id: i.type
         for i in items

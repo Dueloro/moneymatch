@@ -1,8 +1,4 @@
-"""`/wallet` — balances, cursor-paginated ledger, and the demo rails.
-
-No endpoint accepts an arbitrary client amount except demo-withdrawal (bounded
-by available balance and a daily velocity cap); deposits are server presets.
-"""
+"""`/wallet` — balances, cursor-paginated ledger, and the demo rails."""
 
 from __future__ import annotations
 
@@ -65,7 +61,7 @@ async def _page(
         select(LedgerEntry)
         .where(LedgerEntry.wallet_id == wallet_id)
         .order_by(LedgerEntry.created_at.desc(), LedgerEntry.id.desc())
-        .limit(size + 1)  # fetch one extra to detect a further page
+        .limit(size + 1)
     )
     if cursor:
         ts, last_id = _decode_cursor(cursor)
@@ -119,7 +115,6 @@ async def demo_deposit(
             status_code=422,
             detail={"allowed": list(DEMO_DEPOSIT_PRESETS_CENTS)},
         )
-    # Responsible-gaming deposit cap (trailing-24h funding velocity).
     await limits_service.assert_can_deposit(session, user, body.amount_preset_cents)
     # KYC boundary (inert at MVP; the call site exists + is tested).
     enforce_kyc(user, KycAction.DEPOSIT, amount_cents=body.amount_preset_cents)

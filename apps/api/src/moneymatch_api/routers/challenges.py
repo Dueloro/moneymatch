@@ -1,10 +1,6 @@
-"""`/challenges` — direct challenges, rematches, and invite links.
-
-Accepting a challenge forms a PENDING match through the shared lifecycle (both
-confirm → escrow → activate); the client then navigates to the match slip. The
-token preview is **public** (the acquisition funnel's first step — sign-in comes
-after). Every write is an intent; the server owns entry cents, expiry, friendly
-determination, and match formation (08-phase-5 · deliverable 3).
+"""`/challenges` — direct challenges, rematches, and invite links. Every write is an
+intent; the server owns entry cents, expiry, friendly determination, and match
+formation.
 """
 
 from __future__ import annotations

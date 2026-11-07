@@ -31,13 +31,11 @@ router = APIRouter(tags=["me"])
 
 
 async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
-    """First-match funnel progress for the getting-started checklist."""
     linked = await session.scalar(
         select(LinkedAccount.id)
         .where(LinkedAccount.user_id == user.id, LinkedAccount.status != "unbound")
         .limit(1)
     )
-    # Any escrow ever held = they've entered a contest (H2H / pool / tournament).
     wagered = await session.scalar(
         select(LedgerEntry.id)
         .join(Wallet, Wallet.id == LedgerEntry.wallet_id)
@@ -54,10 +52,6 @@ async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
 
 
 async def _contested_games(session: AsyncSession, user: User) -> list[str]:
-    """Games the player has entered at least one contest for (pool / H2H /
-    tournament). Computed, not stored: three `user_id`-indexed lookups unioned
-    into a small distinct set — cheap enough for a checklist and avoids a
-    per-game counter that every escrow path would have to keep in sync."""
     pools = (
         select(SoloPool.game)
         .join(SoloEntry, SoloEntry.pool_id == SoloPool.id)

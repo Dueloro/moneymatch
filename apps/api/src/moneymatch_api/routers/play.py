@@ -1,9 +1,6 @@
-"""`/play` — markets, the DB-backed queue, the match slip, and the waiting list.
-
-Every write is an **intent with ids** (join a market, confirm a match, take a
+"""Every write is an **intent with ids** (join a market, confirm a match, take a
 waiting slot): the server owns the entry cents, the pairing, the timestamps, and
-the settlement. There is deliberately **no settle endpoint** — only the worker
-settles (00-README §3; 06-phase-3 exit criteria).
+the settlement.
 """
 
 from __future__ import annotations
@@ -43,10 +40,6 @@ from ..services.match_lifecycle import cancel_pending, confirm, players
 router = APIRouter(prefix="/play", tags=["play"])
 
 _CHESS_SPEEDS = ["bullet", "blitz", "rapid", "classical"]
-
-# --------------------------------------------------------------------------- #
-# View builders.
-# --------------------------------------------------------------------------- #
 
 
 _RESOLUTION_NOTE = "Brokered game between you both · draw = push, entries refunded."
@@ -131,11 +124,6 @@ async def _status_view(
     return QueueStatusResponse(status="idle", can_cancel=False)
 
 
-# --------------------------------------------------------------------------- #
-# Markets.
-# --------------------------------------------------------------------------- #
-
-
 @router.get("/markets", response_model=MarketsResponse)
 async def get_markets(
     user: CurrentUser,
@@ -189,11 +177,6 @@ async def get_markets(
     )
 
 
-# --------------------------------------------------------------------------- #
-# Queue.
-# --------------------------------------------------------------------------- #
-
-
 @router.post("/queue", response_model=QueueStatusResponse)
 async def join_queue(
     body: QueueRequest,
@@ -228,11 +211,6 @@ async def leave_queue(
     return QueueStatusResponse(status="idle", can_cancel=False)
 
 
-# --------------------------------------------------------------------------- #
-# Matches.
-# --------------------------------------------------------------------------- #
-
-
 async def _load_match(session: AsyncSession, match_id: UUID) -> Match:
     match = await session.scalar(select(Match).where(Match.id == match_id))
     if match is None:
@@ -262,8 +240,7 @@ async def get_match_grading(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> GradingExplanation:
-    """Transparent grading record: the rule, each side's stat line, the decision.
-    Only a participant can read it."""
+    """Transparent grading record: the rule, each side's stat line, the decision."""
     match = await _load_match(session, match_id)
     seats = await players(session, match.id)
     your_seat = next((s for s in seats if s.user_id == user.id), None)
@@ -316,7 +293,6 @@ async def get_dispute(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> DisputeView | None:
-    """The viewer's dispute for this match, if any."""
     dispute = await dispute_service.get_for(session, "match", match_id, user.id)
     return DisputeView.model_validate(dispute) if dispute else None
 
@@ -344,11 +320,6 @@ async def decline_match(
         raise APIError("not_a_player", "You are not in this match.", status_code=403)
     await cancel_pending(session, match, reason="declined")
     return await _match_view(session, match, user)
-
-
-# --------------------------------------------------------------------------- #
-# Waiting list ("Waiting to play").
-# --------------------------------------------------------------------------- #
 
 
 @router.get("/waiting", response_model=WaitingResponse)

@@ -1,9 +1,4 @@
-"""Admin surface schemas (09-phase-6).
-
-The admin API is a plain, dense operator surface — not the consumer design
-system. These models still go through Pydantic → OpenAPI → the generated TS
-client so the admin web tables stay type-safe.
-"""
+"""Admin surface schemas."""
 
 from __future__ import annotations
 
@@ -14,10 +9,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from .wallet import LedgerEntryResponse
-
-# --------------------------------------------------------------------------- #
-# Flags
-# --------------------------------------------------------------------------- #
 
 
 class FlagItem(BaseModel):
@@ -32,15 +23,11 @@ class FlagsResponse(BaseModel):
 
 class UpdateFlagRequest(BaseModel):
     """Patch a flag: toggle `enabled` and/or replace its `payload` (e.g.
-    `geo_config`'s excluded-state list). At least one field must be present."""
+    `geo_config`'s excluded-state list).
+    """
 
     enabled: bool | None = None
     payload: dict[str, Any] | None = None
-
-
-# --------------------------------------------------------------------------- #
-# Users
-# --------------------------------------------------------------------------- #
 
 
 class AdminUserSummary(BaseModel):
@@ -117,7 +104,7 @@ class AdminUserDetail(BaseModel):
 
 
 class AdjustRequest(BaseModel):
-    """Manual ledger adjustment. Signed cents (credit/debit); reason required."""
+    """Manual ledger adjustment."""
 
     amount_cents: int = Field(..., description="Signed cents; positive credits.")
     reason: str = Field(..., min_length=1)
@@ -133,11 +120,6 @@ class ActionResult(BaseModel):
 class AdminLedgerPage(BaseModel):
     entries: list[LedgerEntryResponse]
     next_cursor: str | None
-
-
-# --------------------------------------------------------------------------- #
-# Contests
-# --------------------------------------------------------------------------- #
 
 
 class AdminContestListItem(BaseModel):
@@ -186,11 +168,6 @@ class ResettleResult(BaseModel):
     state: str
 
 
-# --------------------------------------------------------------------------- #
-# Queue
-# --------------------------------------------------------------------------- #
-
-
 class QueueDepthRow(BaseModel):
     game: str
     market: str
@@ -206,11 +183,6 @@ class QueueResponse(BaseModel):
     canceled: int
     expiry_rate: float
     depth: list[QueueDepthRow]
-
-
-# --------------------------------------------------------------------------- #
-# Reconciliation
-# --------------------------------------------------------------------------- #
 
 
 class ReconViolationRow(BaseModel):
@@ -232,11 +204,6 @@ class ReconciliationResponse(BaseModel):
     totals: dict[str, int]
     contest_violations: list[ReconViolationRow]
     worker: WorkerStatus
-
-
-# --------------------------------------------------------------------------- #
-# Risk
-# --------------------------------------------------------------------------- #
 
 
 class RiskRateRow(BaseModel):

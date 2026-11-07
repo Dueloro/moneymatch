@@ -29,14 +29,10 @@ async def health(session: AsyncSession = Depends(get_session)) -> HealthResponse
         stale = (
             datetime.now(UTC) - heartbeat
         ).total_seconds() > WORKER_HEARTBEAT_STALE_SECONDS
-    # `status` stays "ok" for liveness (the API is up); the worker's staleness is
-    # the red signal ops/admin read (09-phase-6 · deliverable 4).
     return HealthResponse(
         status="ok",
         env=settings.env,
         version=__version__,
-        # Registered games come from the adapter registry, filtered by flags —
-        # a disabled game:<id> flag drops the game here too (05-phase-2 · d.7).
         games=registry.enabled_ids(flags),
         flags=flags,
         worker=WorkerHealth(heartbeat_at=heartbeat, stale=stale),

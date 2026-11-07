@@ -1,10 +1,4 @@
-"""`/friends` — the friends list, add-by-username/code, and request lifecycle.
-
-Every GET bumps the caller's presence heartbeat (the design's green dot). Writes
-are intents (`{username_or_code}`, a friendship id); the server owns the rest.
-No host-game handles are ever exposed here — friendship is a MoneyMatch-only
-relation (08-phase-5 · deliverable 2).
-"""
+"""`/friends` — the friends list, add-by-username/code, and request lifecycle."""
 
 from __future__ import annotations
 

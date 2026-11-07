@@ -1,9 +1,4 @@
-"""`/chat` — friend DMs, the support thread, and invite cards.
-
-Reading any chat surface bumps the presence heartbeat (it's a polled surface,
-like friends and notifications). Every write is an intent: the server owns
-message timestamps, invite state, and match formation.
-"""
+"""`/chat` — friend DMs, the support thread, and invite cards."""
 
 from __future__ import annotations
 
@@ -40,7 +35,6 @@ def _conversation_view(row: chat_service.ConversationRow) -> ConversationView:
         title=row.title,
         peer_user_id=row.peer.id if row.peer else None,
         peer_username=row.peer.username if row.peer else None,
-        # Support is always "on" — a person answers it, just not instantly.
         online=(
             True
             if conversation.kind == "support"
@@ -148,7 +142,6 @@ async def send_message(
         )
     else:
         await chat_service.send_text(session, user, conversation_id, body.body or "")
-    # Sending is also reading — don't badge the sender for their own thread.
     await chat_service.mark_read(session, user, conversation_id)
     return await _thread(session, user, conversation_id)
 
@@ -170,8 +163,6 @@ async def respond_invite(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> RespondInviteResponse:
-    """Accept or decline an invite card. Accepting a head-to-head forms a PENDING
-    match (same lifecycle as the Inbox Respond pill)."""
     message, match_id = await chat_service.respond_invite(
         session, user, message_id, body.action
     )

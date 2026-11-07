@@ -1,5 +1,6 @@
-"""Leaderboard wire types (design PDF p.7): ROI-ranked real users, you-row
-highlighted. ROI is basis points (`3120` → +31.2%); all money is integer cents."""
+"""Leaderboard wire types: ROI-ranked real users, you-row highlighted. ROI is basis
+points (`3120` → +31.2%); all money is integer cents.
+"""
 
 from __future__ import annotations
 
