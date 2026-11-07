@@ -119,9 +119,10 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _require_async_driver(cls, v: str) -> str:
-        if v.startswith("postgresql://"):
-            # Nudge toward the async driver so the engine actually works.
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Hosts (Render) give postgres:// or postgresql://; the engine needs asyncpg.
+        for scheme in ("postgres://", "postgresql://"):
+            if v.startswith(scheme):
+                return "postgresql+asyncpg://" + v[len(scheme) :]
         return v
 
     @model_validator(mode="after")

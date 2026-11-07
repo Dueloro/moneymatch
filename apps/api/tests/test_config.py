@@ -34,13 +34,22 @@ def test_auth_requires_secret_or_jwks():
         )
 
 
-def test_async_driver_is_coerced():
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("postgresql://u:p@h:5432/db", "postgresql+asyncpg://u:p@h:5432/db"),
+        ("postgres://u:p@h:5432/db", "postgresql+asyncpg://u:p@h:5432/db"),
+        ("postgresql+asyncpg://u:p@h/db", "postgresql+asyncpg://u:p@h/db"),
+        ("sqlite+aiosqlite:///x.db", "sqlite+aiosqlite:///x.db"),
+    ],
+)
+def test_async_driver_is_coerced(given: str, expected: str):
     s = _settings(
-        database_url="postgresql://u:p@h/db",
+        database_url=given,
         supabase_url="https://x.supabase.co",
         supabase_jwt_secret="s",
     )
-    assert s.database_url.startswith("postgresql+asyncpg://")
+    assert s.database_url == expected
 
 
 def test_jwks_url_derived_when_no_secret():

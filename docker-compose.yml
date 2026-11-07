@@ -1,6 +1,5 @@
-# Local infrastructure. `make dev` uses the `db` service; `api`/`web`/`worker`
-# run on the host for fast reloads. The api/worker containers exist behind the
-# `full` profile for a container-only full-stack run (`docker compose --profile full up`).
+# `make dev` uses only `db`; api/worker/web run on the host.
+# `docker compose --profile full up` runs migrate, then api + worker, in containers.
 services:
   db:
     image: postgres:16
@@ -19,19 +18,39 @@ services:
       timeout: 3s
       retries: 20
 
-  api:
+  migrate:
     profiles: ['full']
-    build:
+    build: &api-build
       context: .
       dockerfile: apps/api/Dockerfile
     env_file: .env
-    environment:
+    environment: &api-env
       DATABASE_URL: postgresql+asyncpg://moneymatch:moneymatch@db:5432/moneymatch
+    command: ['alembic', 'upgrade', 'head']
     depends_on:
       db:
         condition: service_healthy
+
+  api:
+    profiles: ['full']
+    build: *api-build
+    env_file: .env
+    environment: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     ports:
       - '8000:8000'
+
+  worker:
+    profiles: ['full']
+    build: *api-build
+    env_file: .env
+    environment: *api-env
+    command: ['python', '-m', 'moneymatch_api.workers.settlement_worker']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:

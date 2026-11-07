@@ -1,54 +1,27 @@
-# Render blueprint (10-phase-7 §4). Declares one web service (api + in-process
-# settlement worker) + a managed Postgres. The web app deploys on Vercel
-# (apps/web/vercel.json). The worker runs inside the api process by default
-# (RUN_WORKER_IN_PROCESS=true) because Render's free tier has no Background Worker
-# instance type; a standalone `type: worker` is commented below for paid tiers.
-#
-# Migrations run at api startup, never at import time: the image ENTRYPOINT
-# (apps/api/docker-entrypoint.sh) runs `alembic upgrade head` before the app
-# command binds. It lives in the image (not this file's start command) on purpose
-# — that way the migration runs even if the Render service has a dashboard-level
-# Docker Command override, which is what left beta stuck at 0010 and 500'd every
-# authed request (`users.active_games` missing). Render's preDeployCommand is a
-# paid feature; baking it into the entrypoint keeps free-tier deploys migrating.
-# `alembic upgrade head` is idempotent and the free tier runs a single instance,
-# so there's no multi-instance migration race. The in-process worker loop starts
-# only after uvicorn boots the app — i.e. after migrations apply. Roll back by
-# redeploying the previous image from the dashboard (docs/runbook.md).
-#
-# Set the sync:false secrets in the dashboard (or an env group named
-# `moneymatch-shared`): DATABASE_URL is wired from the managed DB below;
-# SUPABASE_*, STEAM_API_KEY, PUBG_API_KEY, SENTRY_DSN, POSTHOG_API_KEY are
-# per-environment. Without STEAM_API_KEY / PUBG_API_KEY, that game's account
-# linking returns a `host_not_configured` error (503) — set both so CS2 and PUBG
-# are linkable in the deployed environment, not just locally.
-#
-# CS2 additionally needs the Game Coordinator sidecar to turn a share code into
-# a scoreboard: GC_SIDECAR_URL and GC_SHARED_SECRET. Without them share codes
-# resolve to a 503 and no CS2 wager can settle — the rest of the app is
-# unaffected. VALVE_CHAIN_ENABLED turns on automatic collection; leave it off
-# until the sidecar is reachable, or players connect a chain that cannot
-# deliver.
+# Render Blueprint. The web app is on Vercel (apps/web/vercel.json).
+# Secrets live in the `moneymatch-shared` group; fill them in when the Blueprint is created.
 
 databases:
   - name: moneymatch-postgres
-    plan: standard # PITR-capable plan; Neon is the alternative per the stack doc
+    plan: 0.1c-256mb # paid, 256 MB / 0.1 CPU
     postgresMajorVersion: '16'
+    region: ohio # match the Supabase project's region
 
 services:
   - type: web
     name: moneymatch-api
     runtime: docker
+    region: ohio # match the Supabase project's region
+    plan: starter
+    branch: main
+    autoDeployTrigger: commit
     dockerfilePath: apps/api/Dockerfile
     dockerContext: .
+    # Runs once per deploy, before the new instance takes traffic; a failure aborts the deploy.
+    preDeployCommand: alembic upgrade head
     healthCheckPath: /api/v1/health
-    plan: starter
-    # No dockerCommand: the image ENTRYPOINT migrates then runs the default CMD,
-    # which serves uvicorn on $PORT (Render injects it). Migration lives in the
-    # entrypoint, not here, so it can't be skipped by a dashboard command override
-    # — if it fails the container exits and the deploy fails, so we never serve a
-    # stale schema. (Do NOT re-add a start command that only runs uvicorn; that is
-    # the mistake that stranded beta at migration 0010.)
+    domains:
+      - api.dueloro.com
     envVars:
       - key: ENV
         value: prod
@@ -56,79 +29,47 @@ services:
         fromDatabase:
           name: moneymatch-postgres
           property: connectionString
-      # Run the settlement worker loop *inside* this web service (a background
-      # asyncio task on startup) so no separate Background Worker is needed —
-      # Render's free tier has no free worker instance type. Safe on one instance
-      # (and on N: FOR UPDATE SKIP LOCKED + idempotent transitions prevent double-
-      # settle). To split the worker back out for scale, set this to false and add
-      # the standalone `type: worker` service shown below.
-      - key: RUN_WORKER_IN_PROCESS
-        value: "true"
-      # The one address that has to be right. The Steam OpenID realm and return
-      # URL follow it, and the API refuses to boot with ENV=prod if it still
-      # points at localhost — a failed deploy being much louder than Steam
-      # quietly returning every user to a laptop.
-      - key: WEB_ORIGIN
-        sync: false
-      - key: RELEASE
-        value: "" # Render injects the deploy commit SHA via $RENDER_GIT_COMMIT at runtime
-      # The sidecar's internal address. Render exposes a private service on its
-      # own hostname; only services in this account can reach it.
-      - key: GC_SIDECAR_URL
-        fromService:
-          name: moneymatch-gc
-          type: pserv
-          property: hostport
       - fromGroup: moneymatch-shared
 
-  # Optional standalone worker — only for paid tiers that want the loop isolated
-  # from the API. If you enable this, set RUN_WORKER_IN_PROCESS=false on the api
-  # service above so the loop doesn't run in both places. It is NOT a web service:
-  # it binds no port (Render would time out a web service that never opens a port).
-  # - type: worker
-  #   name: moneymatch-worker
-  #   runtime: docker
-  #   dockerfilePath: apps/api/Dockerfile
-  #   dockerContext: .
-  #   plan: starter
-  #   dockerCommand: python -m moneymatch_api.workers.settlement_worker
-  #   envVars:
-  #     - key: ENV
-  #       value: prod
-  #     - key: DATABASE_URL
-  #       fromDatabase:
-  #         name: moneymatch-postgres
-  #         property: connectionString
-  #     - fromGroup: moneymatch-shared
-
-  # ---------------------------------------------------------------------------
-  # Game Coordinator sidecar.
-  #
-  # A *private* service: no public URL, reachable only from the API. It can read
-  # match data for arbitrary Steam players, so it must never face the internet —
-  # the mandatory shared secret is a second lock, not the first one.
-  #
-  # Without this deployed, share codes cannot be resolved and no CS2 wager can
-  # settle. Everything else in the product is unaffected, which is exactly why
-  # its absence is easy to miss until someone's wager does not pay out.
-  # ---------------------------------------------------------------------------
-  - type: pserv
-    name: moneymatch-gc
+  - type: worker
+    name: moneymatch-worker
     runtime: docker
-    dockerfilePath: gc-sidecar/Dockerfile
-    dockerContext: .
+    region: ohio # match the Supabase project's region
     plan: starter
+    branch: main
+    autoDeployTrigger: commit
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    dockerCommand: python -m moneymatch_api.workers.settlement_worker
     envVars:
-      # Its own Steam account, which owns CS2 and which nobody plays on.
-      # Sharing an account with a player means each side evicts the other.
-      # Only the sidecar signs in, so the token lives only here.
-      - key: GC_REFRESH_TOKEN
-        sync: false
-      # GC_SHARED_SECRET comes from the shared group, so the API sends exactly
-      # what this checks. Two independent copies drift, and the failure is a
-      # 401 on every settlement.
+      - key: ENV
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: moneymatch-postgres
+          property: connectionString
       - fromGroup: moneymatch-shared
-      # Stay connected. The idle-logout mode exists for sharing an account with
-      # a human, which production should never do.
-      - key: GC_IDLE_LOGOUT_SECONDS
-        value: "0"
+
+envVarGroups:
+  - name: moneymatch-shared
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET # leave empty to verify via the project's JWKS
+        sync: false
+      - key: WEB_ORIGIN # exact Vercel origin, no trailing slash
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: POSTHOG_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
