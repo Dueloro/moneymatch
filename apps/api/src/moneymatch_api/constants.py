@@ -12,12 +12,6 @@ GAME_CHESS_LICHESS = "chess.lichess"
 # its adapter and metrics exist.
 REGISTERED_GAMES: tuple[str, ...] = (GAME_CHESS_LICHESS,)
 
-# Announced games with no adapter yet (the UI shows "coming soon").
-COMING_SOON_GAMES: tuple[str, ...] = ()
-
-# The full selectable catalog surfaced by /links and the games bar.
-CATALOG_GAMES: tuple[str, ...] = REGISTERED_GAMES + COMING_SOON_GAMES
-
 # Human labels for the Profile "Games" rows (design PDF p.12).
 GAME_DISPLAY_NAMES: dict[str, str] = {
     GAME_CHESS_LICHESS: "Chess — Lichess",
@@ -26,10 +20,6 @@ GAME_DISPLAY_NAMES: dict[str, str] = {
 
 def game_display_name(game_id: str) -> str:
     return GAME_DISPLAY_NAMES.get(game_id, game_id)
-
-
-def is_coming_soon(game_id: str) -> bool:
-    return game_id in COMING_SOON_GAMES
 
 
 # Feature-flag keys seeded in the first migration and readable/writable by admin.

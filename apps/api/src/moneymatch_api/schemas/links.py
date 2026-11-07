@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from .profile import ProfileSnapshot
 
-LinkStatus = Literal["LINKED", "BLOCKED", "UNLINKED", "COMING_SOON"]
+LinkStatus = Literal["LINKED", "BLOCKED", "UNLINKED"]
 
 
 class CreateLinkRequest(BaseModel):
@@ -24,7 +24,7 @@ class GameLink(BaseModel):
     """One game's row on Profile: linked snapshot or an empty/blocked slot.
 
     `status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),
-    UNLINKED (available to link), COMING_SOON (in the catalog, no adapter yet).
+    UNLINKED (available to link).
     """
 
     game: str

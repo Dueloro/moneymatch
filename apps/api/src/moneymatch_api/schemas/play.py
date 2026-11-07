@@ -204,7 +204,7 @@ class ActivityItem(BaseModel):
     # read, oriented to the viewer); null when there's nothing live to show.
     live: dict | None = None
     # Structured "learn more" payload for the expanded card (per-match stats,
-    # map/mode, prize/entry, host link). Shape depends on the contest kind.
+    # prize/entry, host link). Shape depends on the contest kind.
     detail: dict | None = None
     # The viewer's dispute status on this contest, if they've filed one:
     # "open" | "resolved" | "rejected"; null when not contested.

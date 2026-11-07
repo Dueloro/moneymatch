@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..constants import CATALOG_GAMES
+from ..constants import REGISTERED_GAMES
 
 USERNAME_PATTERN = r"^[a-z0-9_]{3,20}$"
 STATE_PATTERN = r"^[A-Za-z]{2}$"
@@ -88,7 +88,7 @@ class UpdateMeRequest(BaseModel):
             return None
         seen: list[str] = []
         for game in v:
-            if game not in CATALOG_GAMES:
+            if game not in REGISTERED_GAMES:
                 raise ValueError(f"Unknown game id: {game}")
             if game not in seen:
                 seen.append(game)

@@ -140,7 +140,6 @@ function DetailBody({ item }: { item: ActivityItem }) {
     return <p className="text-sm text-text-secondary">No details for this one.</p>;
 
   if (d.kind === 'match') {
-    const meta = [d.map, d.mode].filter(Boolean).join(' · ');
     return (
       <div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
@@ -149,7 +148,6 @@ function DetailBody({ item }: { item: ActivityItem }) {
               Opponent <span className="text-text">{d.opponent}</span>
             </span>
           )}
-          {meta && <span>{meta}</span>}
           {item.resolved_at && <span>{formatRelativeTime(item.resolved_at)}</span>}
         </div>
         <StatCompare detail={d} />

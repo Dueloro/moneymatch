@@ -2040,7 +2040,7 @@ export interface components {
          * @description One game's row on Profile: linked snapshot or an empty/blocked slot.
          *
          *     `status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),
-         *     UNLINKED (available to link), COMING_SOON (in the catalog, no adapter yet).
+         *     UNLINKED (available to link).
          */
         GameLink: {
             /** Game */
@@ -2051,7 +2051,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "LINKED" | "BLOCKED" | "UNLINKED" | "COMING_SOON";
+            status: "LINKED" | "BLOCKED" | "UNLINKED";
             /** Host Username */
             host_username?: string | null;
             /** Linked At */

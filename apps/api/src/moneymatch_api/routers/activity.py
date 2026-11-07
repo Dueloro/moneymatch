@@ -117,7 +117,7 @@ def _seat_stats(match: Match, seat: MatchPlayer | None) -> dict | None:
     """Rich per-seat stats for the expanded card.
 
     Prefers the structured per-seat block the sample/graded match stored in
-    ``outcome_detail['detail']`` (kills/deaths/adr/…); falls back to the graded
+    ``outcome_detail['detail']``; falls back to the graded
     ``stat_line`` (minus the internal ``game_id``) for older matches."""
     if seat is None:
         return None
@@ -135,7 +135,6 @@ def _match_detail(
     opp: MatchPlayer | None,
     names: dict,
 ) -> dict:
-    od = match.outcome_detail or {}
     return {
         "kind": "match",
         "game": match.game,
@@ -143,8 +142,6 @@ def _match_detail(
         "entry_cents": match.entry_cents,
         "prize_cents": match.prize_cents,
         "host_game_id": match.host_game_id,
-        "map": od.get("map"),
-        "mode": od.get("mode"),
         "your_stats": _seat_stats(match, yours),
         "opponent_stats": _seat_stats(match, opp),
     }

@@ -12,10 +12,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..constants import (
-    CATALOG_GAMES,
+    REGISTERED_GAMES,
     game_display_name,
     game_flag_key,
-    is_coming_soon,
 )
 from ..db.session import get_session
 from ..dependencies import CurrentUser
@@ -43,10 +42,7 @@ def _game_link(
     win_streak: int = 0,
 ) -> GameLink:
     blocked = (not flag_enabled) or (link is not None and link.status == "frozen")
-    if is_coming_soon(game):
-        # No adapter yet: selectable in the catalog but not linkable.
-        status = "COMING_SOON"
-    elif blocked:
+    if blocked:
         status = "BLOCKED"
     elif link is not None:
         status = "LINKED"
@@ -75,7 +71,7 @@ async def _links_response(session: AsyncSession, user_id) -> LinksResponse:
                 flags.get(game_flag_key(game), True),
                 streaks.get(game, 0),
             )
-            for game in CATALOG_GAMES
+            for game in REGISTERED_GAMES
         ]
     )
 

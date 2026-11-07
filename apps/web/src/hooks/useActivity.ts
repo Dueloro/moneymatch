@@ -39,8 +39,6 @@ export interface ActivityDetail {
   entry_cents?: number;
   prize_cents?: number;
   host_game_id?: string | null;
-  map?: string | null;
-  mode?: string | null;
   your_stats?: Record<string, number | string> | null;
   opponent_stats?: Record<string, number | string> | null;
   // pool

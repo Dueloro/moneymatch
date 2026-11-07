@@ -26,7 +26,7 @@ export interface ProfileSnapshot {
   avatar_url: string | null;
 }
 
-export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED' | 'COMING_SOON';
+export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED';
 
 export interface GameLink {
   game: string;

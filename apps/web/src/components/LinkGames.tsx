@@ -122,9 +122,7 @@ function GameRow({ link }: { link: GameLink }) {
                 : (link.host_username ?? 'Linked')
               : link.status === 'BLOCKED'
                 ? 'Unavailable right now'
-                : link.status === 'COMING_SOON'
-                  ? 'Coming soon'
-                  : 'Link it to play'}
+                : 'Link it to play'}
           </div>
           {link.status === 'LINKED' && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
