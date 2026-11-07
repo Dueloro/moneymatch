@@ -40,7 +40,7 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        mono: ['var(--font-mono)'],
       },
       maxWidth: {
         read: '40rem',

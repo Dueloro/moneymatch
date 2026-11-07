@@ -41,9 +41,7 @@ export function Loader({
       <div className="flex items-center gap-2 text-xs">
         <span className="text-text-secondary">{label}</span>
         {!reduced && (
-          <span className="font-mono tabular-nums text-text-tertiary">
-            {elapsed.toFixed(1)}s
-          </span>
+          <span className="num text-text-tertiary">{elapsed.toFixed(1)}s</span>
         )}
       </div>
     </div>

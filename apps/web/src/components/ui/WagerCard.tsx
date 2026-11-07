@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { formatCurrency } from '../../lib/format';
+import { AmountText } from './AmountText';
 import { Card } from './Card';
 import { ClearRate } from './ClearBar';
 import { PillButton } from './PillButton';
@@ -78,7 +79,7 @@ export function WagerCard({
       {target != null ? (
         <div className="mt-4">
           <div className="mb-2 flex items-baseline gap-2">
-            <span className="text-3xl font-semibold text-text">
+            <span className="num text-3xl font-semibold text-text">
               {Number.isInteger(target) ? target : target.toFixed(2)}
             </span>
             <span className="text-xs text-text-secondary">
@@ -125,7 +126,7 @@ export function WagerCard({
           ariaLabel={`Entry for ${title}`}
           options={entryOptions.map((cents) => ({
             value: cents,
-            label: formatCurrency(cents),
+            label: <span className="num">{formatCurrency(cents)}</span>,
           }))}
           value={selected}
           onChange={setEntry}
@@ -135,8 +136,8 @@ export function WagerCard({
       <div className="mt-4 flex items-end justify-between gap-3">
         <div>
           <p className="label-money">{payoutLabel}</p>
-          <p className="text-lg font-semibold text-green">
-            {formatCurrency(payoutFor(selected))}
+          <p className="text-lg font-semibold">
+            <AmountText cents={payoutFor(selected)} signed={false} money />
           </p>
           {feeNote && (
             <p className="mt-0.5 text-xs text-text-secondary">{feeNote(selected)}</p>

@@ -4,6 +4,7 @@ import { useCountUp } from '../hooks/useCountUp';
 import { useSettlement } from '../hooks/useSettlement';
 import type { SettlementOutcome } from '../hooks/useSettlementCelebration';
 import { formatCurrency } from '../lib/format';
+import { AmountText } from './ui/AmountText';
 
 const HOLD_MS = 1_900;
 
@@ -130,10 +131,10 @@ export function SettlementCelebration() {
         {win && (
           <p
             data-testid="settlement-amount"
-            className="mt-3 font-semibold tabular-nums text-green"
+            className="mt-3 font-semibold"
             style={{ fontSize: 'clamp(1.25rem, 3.5vw, 1.75rem)', lineHeight: 1.1 }}
           >
-            {formatCurrency(amount)}
+            <AmountText cents={amount} signed={false} money />
           </p>
         )}
 

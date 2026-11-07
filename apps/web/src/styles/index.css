@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Martian Mono at wdth 87.5 advances 0.65em; Menlo / Courier New advance 0.6em,
+   so scaling them 108% keeps figures the same width when the webfont swaps in. */
+@font-face {
+  font-family: 'Martian Mono Fallback';
+  src: local('Menlo'), local('Courier New');
+  size-adjust: 108%;
+}
+
 /* Design tokens. Lime means money only; tailwind colour names map to these vars. */
 :root {
   /* Surfaces, dark to light. */
@@ -36,7 +44,8 @@
   --shadow-overlay:
     0 16px 48px -24px rgb(0 0 0 / 0.85), 0 2px 8px -2px rgb(0 0 0 / 0.45);
 
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The numeric face: money, scores and their captions. */
+  --font-mono: 'Martian Mono', 'Martian Mono Fallback', ui-monospace, monospace;
 
   /* Motion: two durations and one easing. */
   --dur-fast: 120ms;
@@ -100,6 +109,12 @@ body {
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* Money and score figures. Use through AmountText / AnimatedBalance where possible. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* The tiny caption above a money figure (Entry, Pot, Balance). */

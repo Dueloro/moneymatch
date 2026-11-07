@@ -74,7 +74,17 @@ linked-game row and on chat invite cards. It is not used on browse cards.
 
 ## 2. Type
 
-**Inter**, loaded from Google Fonts at 400/500/600/700 with `display=swap`.
+**Inter** for everything you read, loaded from Google Fonts at 400/500/600/700
+with `display=swap`.
+
+**Martian Mono** (semi-condensed `wdth 87.5`, 400–700) is the numeric face for
+money and score figures and their `.label-money` captions. *Why:* a crisp,
+fixed-width scoreboard figure gives the lime number a signature Inter can't, and
+equal-width digits mean balances never jitter. It reaches the UI only through
+`AmountText`, `AnimatedBalance` and the `.num` utility (stake chips, the bar
+target, timers). A local fallback (`Menlo` / `Courier New` at `size-adjust: 108%`)
+matches its 0.65em advance, so the swap doesn't shift layout.
+
 Tabular figures are **scoped, not global**: `tabular-nums` sits on the amount
 primitives, badges, timers and standings lists. On `body` it made Inter set
 hyphens at digit width ("Skill - based").
@@ -90,7 +100,7 @@ One scale (overrides Tailwind defaults). There are no arbitrary sizes.
 | `text-lg` | 18 / 24 | Card headlines, dialog titles |
 | `text-xl` | 20 / 26 | Section headings |
 | `text-2xl` | 24 / 30 | Page titles |
-| `text-3xl` | 30 / 36 | Hero numbers: balance, the bar target |
+| `text-3xl` | 30 / 36 | Hero numbers: balance, the bar target (in `.num`) |
 
 Headings tighten letter-spacing as they grow (−0.006em at 18px → −0.022em at
 30px). **One mono label survives**, `.label-money`: 11px, uppercase, 0.08em
@@ -154,6 +164,9 @@ primitive rather than a one-off.
   active-count badge; opens a `Card` of chip rows.
 - **`EmptyState`** — a dashed hairline box (title, grey line, usually a button).
   **`ErrorState`** is the same with a red-tinted dashed border + "Try again".
+- **`AmountText`** / **`AnimatedBalance`** — every money figure. Numeric face,
+  tabular; `win` is lime when positive, `money` is always lime (a balance, a
+  payout to come). Don't hand-format a hero figure with `formatCurrency`.
 - **`Skeleton`** / **`SkeletonList`** — `panel-raised` pulses at 8px radius. The
   only loading treatment in the app (`inline` for a figure inside text, e.g. the
   loading balance; never a dash).

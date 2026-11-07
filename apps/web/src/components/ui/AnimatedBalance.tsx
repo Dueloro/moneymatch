@@ -78,7 +78,7 @@ function LoadedBalance({
   return (
     <span className={`relative inline-block ${className}`} data-testid={testId}>
       <span
-        className={`tabular-nums transition-colors duration-300 ${tint}`}
+        className={`num transition-colors duration-300 ${tint}`}
         data-direction={delta === null ? 'none' : up ? 'up' : 'down'}
       >
         {formatCurrency(shown)}
@@ -88,7 +88,7 @@ function LoadedBalance({
         <span
           aria-hidden
           data-testid={testId ? `${testId}-delta` : undefined}
-          className={`animate-money-delta pointer-events-none absolute -top-4 left-1/2 whitespace-nowrap text-xs font-semibold ${
+          className={`animate-money-delta num pointer-events-none absolute -top-4 left-1/2 whitespace-nowrap text-xs font-semibold ${
             up ? 'text-green' : 'text-red'
           }`}
         >

@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- Inter was always the intended face but was never actually loaded, so the
-         app silently rendered in whatever system-ui resolved to. Two weights is
-         all the UI uses; `display=swap` keeps first paint immediate. -->
+    <!-- Inter for UI; Martian Mono (semi-condensed, 400-700) for money and
+         score figures. `display=swap` keeps first paint immediate; the
+         size-adjusted fallback in index.css matches its advance. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Martian+Mono:wdth,wght@87.5,400..700&display=swap"
     />
     <meta
       name="description"

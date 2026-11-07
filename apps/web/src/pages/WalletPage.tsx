@@ -83,8 +83,8 @@ export function WalletPage() {
            * its context. */}
           <Card className="p-5">
             <p className="label-money">Available</p>
-            <p className="mt-1 text-3xl font-semibold text-green">
-              {formatCurrency(available)}
+            <p className="mt-1 text-3xl font-semibold">
+              <AmountText cents={available} signed={false} money />
             </p>
             <p className="mt-2 text-xs text-text-secondary">
               {formatCurrency(escrow)} in play ·{' '}

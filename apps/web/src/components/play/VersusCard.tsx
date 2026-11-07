@@ -1,4 +1,4 @@
-import { formatCurrency } from '../../lib/format';
+import { AmountText } from '../ui/AmountText';
 
 interface Side {
   name: string;
@@ -41,14 +41,14 @@ export function VersusCard({
       <div className="mt-5 flex items-center justify-between border-t border-hairline pt-4">
         <div>
           <div className="label-money">Pot</div>
-          <div className="text-lg font-bold tabular-nums">
-            {formatCurrency(potCents)}
+          <div className="text-lg font-semibold">
+            <AmountText cents={potCents} signed={false} />
           </div>
         </div>
         <div className="text-right">
           <div className="label-money">You&apos;d win</div>
-          <div className="text-lg font-bold tabular-nums text-green">
-            {formatCurrency(prizeCents)}
+          <div className="text-lg font-semibold">
+            <AmountText cents={prizeCents} signed={false} money />
           </div>
         </div>
       </div>
