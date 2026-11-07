@@ -8,9 +8,8 @@
 // (`GET /api/v1/admin/reconciliation`, admin token) confirms
 // `sum(payouts) + rake == sum(entries)` held under load with no violations.
 //
-// Auth: every virtual user needs a real Supabase JWT. Until the dev/e2e
-// sign-in bypass lands (BACKLOG · "Browser e2e test-auth seam"), mint tokens
-// out of band and pass them as a JSON array:
+// Auth: every virtual user needs a Supabase JWT. Mint tokens out of band (or
+// via the dev e2e token route on a non-prod stack) and pass them as a JSON array:
 //
 //   BASE_URL=https://staging.api.moneymatch... \
 //   TOKENS='["<jwt1>","<jwt2>", ...]' \

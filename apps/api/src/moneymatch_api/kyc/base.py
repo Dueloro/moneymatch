@@ -1,11 +1,10 @@
 """The `KycProvider` seam (10-phase-7 §1).
 
-Identity verification is a real-rails, Stage-C concern
-(`docs/legal/legal-compliance.md` §5). The MVP ships the interface and the
-`users.kyc_status` column so a real provider (Persona/Onfido/etc.) is an
-additive integration: implement this protocol, register it, and flip
-`kyc_live`. Nothing at MVP advances a user past `none` — the `kyc_required`
-policy hook returns False everywhere (see `policy.py`).
+Identity verification is a real-rails, Stage-C concern. The MVP ships the
+interface and the `users.kyc_status` column so a real provider
+(Persona/Onfido/etc.) is an additive integration: implement this protocol,
+register it, and flip `kyc_live`. Nothing at MVP advances a user past `none` —
+the `kyc_required` policy hook returns False everywhere (see `policy.py`).
 """
 
 from __future__ import annotations

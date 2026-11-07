@@ -27,11 +27,11 @@ From `PRODUCT_CONTEXT.md` §6. Any change to money, matches or settlement keeps 
 
 | # | Invariant | Enforced in |
 |---|---|---|
-| 1 | `sum(payouts) + fee = sum(entries)` on every settlement | `services/money_math.py:Split.__post_init__`; `services/reconciliation_service.py:check`, called after each settle by `match_lifecycle.py:_assert_reconciled`, `pool_engine.py:_assert_reconciled`, `tournament_engine.py:_assert_reconciled` |
-| 2 | The server owns every number | Request schemas carry ids and preset choices only (`schemas/`); entries must be in `ENTRY_PRESETS_CENTS` (`pool_engine.py:_validate_bucket`, `tournament_engine.py:_validate_bucket`); amounts come from `money_math.py` |
+| 1 | `sum(payouts) + fee = sum(entries)` on every settlement | `services/money_math.py:Split.__post_init__`; `services/reconciliation_service.py:check`, called after each settle by `_assert_reconciled` in `services/match_lifecycle.py`, `services/pool_engine.py`, `services/tournament_engine.py` |
+| 2 | The server owns every number | Request schemas carry ids and preset choices only (`schemas/`); entries must be in `ENTRY_PRESETS_CENTS` (`services/matchmaking.py:enqueue`, `_validate_bucket` in `services/pool_engine.py` and `services/tournament_engine.py`); amounts come from `services/money_math.py` |
 | 3 | Results come from the game's API | `services/grading.py:grade` (head-to-head, via the adapter's `match_winner`); `services/telemetry_fetch.py:grade_pool` / `grade_tournament`. No endpoint accepts a result |
-| 4 | Fee only when a pot pays out | `match_lifecycle.py:settle` (push/cancel/friendly refund, no rake); `pool_engine.py:settle_pool` (nobody clears → full refund, zero rake) |
-| 5 | Integer cents, append-only ledger | `BigInteger` money columns and `mm_reject_mutation` triggers on `ledger_entries`, `platform_ledger`, `raw_payloads` (`apps/api/migrations/versions/0001_baseline.py`); all writes through `services/wallet_service.py:_apply`; `tests/test_no_floats_in_money_path.py` |
+| 4 | Fee only when a pot pays out | `services/match_lifecycle.py:settle` (push/cancel/friendly refund, no rake); `services/pool_engine.py:settle_pool` (nobody clears → full refund, zero rake) |
+| 5 | Integer cents, append-only ledger | `BigInteger` money columns and `mm_reject_mutation` triggers on `ledger_entries`, `platform_ledger`, `raw_payloads` (`apps/api/migrations/versions/0001_baseline.py`); all writes through `services/wallet_service.py:_apply`; `apps/api/tests/test_no_floats_in_money_path.py` |
 | 6 | The platform never plays against users | The only platform accounts are `platform:rake` and `platform:promo` (`models/wallet.py:PLATFORM_ACCOUNTS`); payouts come only from escrowed entries |
 
 Fail closed: if reconciliation breaks after a settle, the worker raises

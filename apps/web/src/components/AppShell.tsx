@@ -79,7 +79,7 @@ export function AppShell() {
 
 /** Persistent notice for users whose residence state has no cash play yet, so
  * they learn it up front rather than being bounced at escrow. Free play is
- * available everywhere (docs/product/overview.md §9.2). */
+ * available everywhere. */
 function EligibilityBanner() {
   const me = useMe();
   const state = me.data?.user.residence_state;

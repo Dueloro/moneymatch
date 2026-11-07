@@ -1,5 +1,5 @@
-"""Phase-1 caps table (10-phase-7 §1): the values match overview.md §7.3 and
-the entry band enforces server-side at the staking boundary."""
+"""Phase-1 caps table (10-phase-7 §1): the entry band enforces server-side at
+the staking boundary."""
 
 from __future__ import annotations
 

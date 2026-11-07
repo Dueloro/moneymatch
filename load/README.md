@@ -1,7 +1,6 @@
 # Load sanity
 
-Phase-7 load-sanity harness (`10-phase-7-hardening-beta.md` §2). Drives ~50
-concurrent users through the synchronous money path (markets → queue → confirm)
+Load-sanity harness. Drives ~50 concurrent users through the synchronous money path (markets → queue → confirm)
 against a **staging** deployment and asserts the bar:
 
 - `http_req_duration` **p95 < 300 ms**
@@ -17,9 +16,9 @@ staging env and real host APIs).
 - [k6](https://k6.io/docs/get-started/installation/) installed.
 - A staging deployment (`api` + `worker` + Postgres) with at least 50 onboarded
   users, each with a linked Lichess account.
-- One Supabase JWT per virtual user. Until the dev/e2e sign-in bypass lands
-  (see `docs/implementation-guide/BACKLOG.md` · "Browser e2e test-auth seam"),
-  mint these out of band from the staging Supabase project.
+- One Supabase JWT per virtual user, minted out of band from the staging
+  Supabase project (or via `POST /api/v1/dev/e2e/token` on a non-prod stack
+  with `E2E_AUTH_ENABLED=true`).
 
 ## Run
 

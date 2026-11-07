@@ -1,4 +1,4 @@
-// Conventional Commits enforcement (optional — see CONTRIBUTING.md).
+// Conventional Commits enforcement (optional — see docs/development.md).
 //
 // This config is inert until you opt in:
 //   pnpm add -D @commitlint/cli @commitlint/config-conventional
@@ -9,7 +9,7 @@
 module.exports = {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    // The types we actually use (matches CONTRIBUTING.md and the git history).
+    // The types we actually use (matches docs/development.md).
     'type-enum': [
       2,
       'always',

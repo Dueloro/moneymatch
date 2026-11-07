@@ -1,10 +1,10 @@
 """The `PaymentProvider` seam (10-phase-7 §1).
 
-Real payment rails are a Stage-C workstream gated on counsel + underwriting
-(`docs/legal/legal-compliance.md` §4–5). The MVP ships the *interface* so that
-integration is purely additive: a future Aeropay/Nuvei/Stripe provider
-implements this same protocol, and the only code that changes is the provider
-module — call sites (the wallet router) already speak `PaymentProvider`.
+Real payment rails are a Stage-C workstream gated on counsel + underwriting.
+The MVP ships the *interface* so that integration is purely additive: a future
+Aeropay/Nuvei/Stripe provider implements this same protocol, and the only code
+that changes is the provider module — call sites (the wallet router) already
+speak `PaymentProvider`.
 
 Design mirrors the engineering invariant that *the server owns every number*
 (00-README §3.1): the client sends an intent (a preset id / a bounded amount),

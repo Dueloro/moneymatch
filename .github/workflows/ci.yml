@@ -79,8 +79,7 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
       # Dependency audit (10-phase-7 §2). Scoped to production deps: dev-only
-      # build tooling (vite dev server) is not in the shipped bundle. Tightening
-      # to a full audit is tracked in BACKLOG.
+      # build tooling (vite dev server) is not in the shipped bundle.
       - name: pnpm audit (prod)
         run: pnpm audit --prod
       - name: Generate API client

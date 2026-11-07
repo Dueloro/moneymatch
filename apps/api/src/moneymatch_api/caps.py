@@ -1,6 +1,6 @@
 """Phase-1 launch caps — the single config table (10-phase-7 §1).
 
-Every numeric staking/money limit from `docs/product/overview.md` §7.3 lives
+Every numeric staking/money limit lives
 here, in one place, so risk/compliance tune values without hunting through
 services. The schema is load-bearing; the values are tunable. Enforcement stays
 server-side at the boundary (00-README §3.1): `limits_service` reads the entry
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Caps:
-    """Phase-1 caps (overview.md §7.3). All money fields are integer cents."""
+    """Phase-1 caps. All money fields are integer cents."""
 
     # Per-contest entry band, enforced at escrow time in addition to the
     # server-defined presets (a preset is always inside the band; the band is
@@ -37,7 +37,7 @@ class Caps:
     # (kyc_required policy hook; inert at MVP because kyc_live is False).
     kyc_entry_threshold_cents: int = 50_000  # $500 cumulative entries
 
-    # Demo withdrawals below this are refused (overview.md §7.3 withdrawal min).
+    # Demo withdrawals below this are refused.
     withdrawal_min_cents: int = 2_000  # $20
 
 

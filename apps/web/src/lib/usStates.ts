@@ -59,7 +59,7 @@ export const US_STATES: { code: string; name: string }[] = [
 ];
 
 // The 14 "Any Chance" states where cash skill contests are not offered
-// (docs/product/overview.md §9.2). Free play is available everywhere.
+// Free play is available everywhere.
 export const EXCLUDED_STATES = new Set([
   'AZ',
   'AR',

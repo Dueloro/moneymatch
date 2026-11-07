@@ -9,7 +9,7 @@ Three concerns, all server-side and dependency-free:
   handler runs, capping input abuse (`Content-Length` guard).
 - `RateLimitMiddleware` — a fixed-window per-client cap on write / auth-sensitive
   requests (`429`). In-process and single-instance at MVP scale; a shared store
-  (Redis) is the multi-instance follow-up, tracked in BACKLOG.
+  (Redis) is the multi-instance follow-up.
 """
 
 from __future__ import annotations
