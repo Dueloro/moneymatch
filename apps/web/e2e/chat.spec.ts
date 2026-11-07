@@ -44,20 +44,24 @@ test('friends → DM → unread badge → reply', async ({ browser }) => {
 
   await pageA.getByLabel('Message').fill('run it back?');
   await pageA.getByLabel('Message').press('Enter');
-  await expect(pageA.getByText('run it back?')).toBeVisible();
+  const threadA = pageA.getByLabel(`Chat with ${b.username}`);
+  await expect(threadA.getByText('run it back?')).toBeVisible();
 
   await pageB.goto('/wallet');
-  await expect(pageB.getByTestId('inbox-unread-dot').first()).toBeVisible(POLL);
+  // Desktop shows a count badge on the Social link; the dot only exists in the mobile header.
+  const unreadLink = pageB.getByRole('link', { name: /^Social \d+$/ });
+  await expect(unreadLink.first()).toBeVisible(POLL);
 
   await pageB.goto('/social?tab=inbox');
   await pageB.getByRole('button').filter({ hasText: a.username }).first().click(POLL);
   const threadB = pageB.getByLabel(`Chat with ${a.username}`);
   await expect(threadB.getByText('run it back?')).toBeVisible(POLL);
-  await expect(pageB.getByTestId('inbox-unread-dot')).toHaveCount(0, POLL);
+  // The unread DM clears; the friend-request notification stays until the Notifications row is opened.
+  await expect(pageB.getByRole('link', { name: 'Social 1' })).toBeVisible(POLL);
 
   await pageB.getByLabel('Message').fill('yeah, $10 blitz');
   await pageB.getByLabel('Message').press('Enter');
-  await expect(pageA.getByText('yeah, $10 blitz')).toBeVisible(POLL);
+  await expect(threadA.getByText('yeah, $10 blitz')).toBeVisible(POLL);
 
   await pageA.context().close();
   await pageB.context().close();
