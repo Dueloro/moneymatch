@@ -16,6 +16,7 @@ from moneymatch_api.models.skill import MetricModel
 from moneymatch_api.models.user import User
 from moneymatch_api.models.wallet import Limit, Wallet
 from moneymatch_api.schemas.profile import FormatStat, ProfileSnapshot
+from moneymatch_api.services import fairness, skill_prior
 
 
 async def create_user(
@@ -80,6 +81,16 @@ def chess_profile(
         formats=[FormatStat(speed=speed, rating=rating, games=total_games)],
         primary_speed=speed,
     )
+
+
+def chess_moves_corrected(
+    mu: float, sigma: float, n: int, rating: float | None = 1500
+) -> tuple[float, float]:
+    """(mu, sigma) for `chess_moves` after the rating prior and spread floor."""
+    mu, sigma = skill_prior.shrink(
+        mu, sigma, n, skill_prior.prior_for("chess_moves", rating)
+    )
+    return mu, fairness.effective_sigma(sigma, 1.0)
 
 
 async def create_linked_account(

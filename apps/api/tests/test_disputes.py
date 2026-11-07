@@ -180,7 +180,7 @@ async def test_file_pool_dispute_participant_only(session, client):
         game=CHESS,
         metric="chess_moves",
         difficulty="medium",
-        room_bar=1.25,
+        room_bar=25.0,
         entry_cents=1000,
         rake_bps=1000,
         room_size=1,
@@ -198,7 +198,7 @@ async def test_file_pool_dispute_participant_only(session, client):
             user_id=a.id,
             linked_account_id=la.id,
             host_account_id=la.host_account_id,
-            personal_bar=1.25,
+            personal_bar=25.0,
             status="MISSED",
         )
     )

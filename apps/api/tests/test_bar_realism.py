@@ -31,6 +31,8 @@ from moneymatch_api.constants import (
 )
 from moneymatch_api.services import fairness, skill_prior
 
+from .factories import chess_moves_corrected
+
 pytestmark = pytest.mark.nodb
 
 MOVES_INC = METRIC_BAR_INCREMENT["chess_moves"]
@@ -53,13 +55,6 @@ def _bar(mu: float, sigma: float, difficulty: str) -> float:
     )
 
 
-def _corrected(mu: float, sigma: float, n: int, rating: float | None):
-    mu2, sigma2 = skill_prior.shrink(
-        mu, sigma, n, skill_prior.prior_for("chess_moves", rating)
-    )
-    return mu2, fairness.effective_sigma(sigma2, MOVES_INC)
-
-
 # --------------------------------------------------------------------------- #
 # The reported bug.
 # --------------------------------------------------------------------------- #
@@ -75,13 +70,13 @@ def test_the_screenshot_no_longer_quotes_a_negative_bar():
     old = fairness.round_to_increment(mu - OLD_HARD_K * sigma, MOVES_INC)
     assert old == -6.0  # exactly what shipped: "-6 moves or fewer"
 
-    new = _bar(*_corrected(mu, sigma, n, SCREENSHOT_RATING), "hard")
+    new = _bar(*chess_moves_corrected(mu, sigma, n, SCREENSHOT_RATING), "hard")
     assert new >= FLOOR
     assert 8 <= new <= 20, new
 
 
 def test_every_tier_is_a_playable_number_for_the_screenshot_player():
-    mu, sigma = _corrected(*SCREENSHOT, SCREENSHOT_RATING)
+    mu, sigma = chess_moves_corrected(*SCREENSHOT, SCREENSHOT_RATING)
     bars = [_bar(mu, sigma, d) for d in ("easy", "medium", "hard")]
     assert all(b >= FLOOR for b in bars), bars
     assert bars == sorted(bars, reverse=True)  # harder asks for fewer moves
@@ -112,7 +107,7 @@ def test_the_floor_alone_would_not_have_been_enough():
     clamped = fairness.personal_bar(mu, sigma, OLD_HARD_K, MOVES_INC, True, floor=FLOOR)
     assert clamped == FLOOR  # legal, and nobody has ever won a rated game in 2
 
-    honest = _bar(*_corrected(*SCREENSHOT, SCREENSHOT_RATING), "hard")
+    honest = _bar(*chess_moves_corrected(*SCREENSHOT, SCREENSHOT_RATING), "hard")
     assert honest > 4 * clamped
 
 
@@ -129,7 +124,7 @@ def test_a_rate_metric_is_untouched_by_the_change():
 
 @pytest.mark.parametrize("difficulty", list(POOL_DIFFICULTY_K))
 def test_the_advertised_rate_matches_the_bar_actually_quoted(difficulty):
-    mu, sigma = _corrected(*SCREENSHOT, SCREENSHOT_RATING)
+    mu, sigma = chess_moves_corrected(*SCREENSHOT, SCREENSHOT_RATING)
     k = POOL_DIFFICULTY_K[difficulty]
     bar = _bar(mu, sigma, difficulty)
     shown = fairness.clear_prob(bar, mu, sigma, True, positive=True)
@@ -145,7 +140,7 @@ def test_a_room_still_composes_under_the_lognormal(difficulty):
     implied clear probability outside the fair band, and the matcher rejects
     every group forever.
     """
-    mu, sigma = _corrected(*SCREENSHOT, SCREENSHOT_RATING)
+    mu, sigma = chess_moves_corrected(*SCREENSHOT, SCREENSHOT_RATING)
     k = POOL_DIFFICULTY_K[difficulty]
     bar = _bar(mu, sigma, difficulty)
     assert fairness.member_fair(
@@ -183,15 +178,15 @@ def test_a_stronger_player_is_expected_to_play_longer_games():
 
 
 def test_rating_moves_the_bar_in_the_same_direction():
-    beginner = _bar(*_corrected(30.0, 12.0, 5, 1000), "medium")
-    expert = _bar(*_corrected(30.0, 12.0, 5, 2200), "medium")
+    beginner = _bar(*chess_moves_corrected(30.0, 12.0, 5, 1000), "medium")
+    expert = _bar(*chess_moves_corrected(30.0, 12.0, 5, 2200), "medium")
     assert expert > beginner
 
 
 def test_an_unreadable_rating_still_produces_a_sane_bar():
     """A missing rating must degrade, not throw or quote nonsense."""
     assert skill_prior.prior_for("chess_moves", None) is not None
-    assert _bar(*_corrected(*SCREENSHOT, None), "hard") >= FLOOR
+    assert _bar(*chess_moves_corrected(*SCREENSHOT, None), "hard") >= FLOOR
 
 
 def test_a_metric_with_no_measured_prior_keeps_its_own_numbers():

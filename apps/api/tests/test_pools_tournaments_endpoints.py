@@ -7,10 +7,8 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import func, select, text
 
-from moneymatch_api.constants import POOL_DIFFICULTY_K
 from moneymatch_api.models.user import User
 from moneymatch_api.models.wallet import LedgerEntry, Wallet
-from moneymatch_api.services import fairness, skill_prior
 
 from .conftest import auth_headers, new_sessionmaker
 from .factories import chess_profile, create_linked_account, create_metric_model
@@ -85,13 +83,11 @@ async def test_pool_markets_quote_bars_from_own_baseline(client):
     moves = next(m for m in body["metrics"] if m["metric"] == MOVES)
     assert moves["provisional"] is False
     by_diff = {c["difficulty"]: c for c in moves["cards"]}
-    # The medium-tier bar from the rating-shrunk baseline, derived so a retune
-    # moves it too.
-    mu, sigma = skill_prior.shrink(34.0, 8.0, 15, skill_prior.prior_for(MOVES, 1500))
-    sigma = fairness.effective_sigma(sigma, 1.0)
-    assert by_diff["medium"]["bar"] == fairness.personal_bar(
-        mu, sigma, POOL_DIFFICULTY_K["medium"], 1.0, True, positive=True, floor=2.0
-    )
+    assert {d: c["bar"] for d, c in by_diff.items()} == {
+        "easy": 28.0,
+        "medium": 25.0,
+        "hard": 22.0,
+    }
     # Estimated multiplier is disclosed as an estimate, never an odds line.
     assert by_diff["medium"]["est_multiplier_bps"] > 0
 

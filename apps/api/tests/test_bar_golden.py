@@ -182,6 +182,21 @@ def test_numerics_version_is_recorded_and_unchanged():
     )
 
 
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("chess_moves_1000", {"easy": 21.0, "medium": 17.0, "hard": 14.0}),
+        ("chess_moves_2000", {"easy": 31.0, "medium": 27.0, "hard": 23.0}),
+        ("chess_moves_tight", {"easy": 25.0, "medium": 24.0, "hard": 23.0}),
+    ],
+)
+def test_known_bars(label: str, expected: dict[str, float]):
+    """Literal anchors, so a careless golden regeneration can't bless a regression."""
+    case = _snapshot_case(label, *next(rest for lbl, *rest in CORPUS if lbl == label))
+    actual = {d: case["difficulties"][d]["bar"] for d in expected}
+    assert actual == pytest.approx(expected)
+
+
 def test_n_eff_matches_published_values():
     """`n_eff` for known windows (MONEYMATCH_RESEARCH.md §2.6)."""
     assert ewma_n_eff(20, 10) == pytest.approx(17.3, abs=0.1)

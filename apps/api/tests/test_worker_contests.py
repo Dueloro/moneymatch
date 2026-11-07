@@ -76,6 +76,20 @@ async def _player(session, name, *, mu=35.0, fund=10_000, host=None):
     return user, host
 
 
+async def _form_pool(s, prefix):
+    """Four similar players forming a medium chess_moves room. Returns (users, pool)."""
+    users = []
+    for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
+        users.append(await _player(s, f"{prefix}{i}", mu=mu))
+    res = None
+    for u, _ in users:
+        res = await pool_engine.enqueue(
+            s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
+        )
+    assert res is not None and res.pool is not None, "room did not form"
+    return users, res.pool
+
+
 async def _bal(sm, user_id):
     async with sm() as s:
         w = await wallet_service.get_wallet(s, user_id)
@@ -91,24 +105,9 @@ async def test_pool_settles_from_server_telemetry(monkeypatch):
     sm = new_sessionmaker()
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())  # no sandbag history
     async with sm() as s:
-        users = []
-        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
-            u, host = await _player(s, f"p{i}", mu=mu)
-            users.append((u, host))
-        for u, _ in users[:3]:
-            await pool_engine.enqueue(
-                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
-            )
-        res = await pool_engine.enqueue(
-            s,
-            users[3][0],
-            game=CHESS,
-            metric=MOVES,
-            difficulty="medium",
-            entry_cents=1000,
-        )
-        pool_id = res.pool.id
-        room_bar = res.pool.room_bar
+        users, pool = await _form_pool(s, "p")
+        pool_id = pool.id
+        room_bar = pool.room_bar
         # Backdate the window so it's due, and place a graded match inside it.
         start = datetime.now(UTC) - timedelta(hours=2)
         end = datetime.now(UTC) - timedelta(hours=1)
@@ -149,23 +148,8 @@ async def test_pool_boundary_match_excluded_then_refunded(monkeypatch):
     sm = new_sessionmaker()
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
     async with sm() as s:
-        users = []
-        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
-            u, host = await _player(s, f"b{i}", mu=mu)
-            users.append((u, host))
-        for u, _ in users[:3]:
-            await pool_engine.enqueue(
-                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
-            )
-        res = await pool_engine.enqueue(
-            s,
-            users[3][0],
-            game=CHESS,
-            metric=MOVES,
-            difficulty="medium",
-            entry_cents=1000,
-        )
-        pool_id = res.pool.id
+        users, pool = await _form_pool(s, "b")
+        pool_id = pool.id
         start = datetime.now(UTC) - timedelta(hours=2)
         end = datetime.now(UTC) - timedelta(hours=1)
         await s.execute(
@@ -197,27 +181,12 @@ async def test_live_snapshot_written_for_inflight_pool(monkeypatch):
     sm = new_sessionmaker()
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())  # empty sandbag poll
     async with sm() as s:
-        users = []
-        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
-            u, host = await _player(s, f"L{i}", mu=mu)
-            users.append((u, host))
-        for u, _ in users[:3]:
-            await pool_engine.enqueue(
-                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
-            )
-        res = await pool_engine.enqueue(
-            s,
-            users[3][0],
-            game=CHESS,
-            metric=MOVES,
-            difficulty="medium",
-            entry_cents=1000,
-        )
-        pool_id = res.pool.id
-        room_bar = res.pool.room_bar
+        users, pool = await _form_pool(s, "L")
+        pool_id = pool.id
+        room_bar = pool.room_bar
         # The freshly-formed window is running (ends in the future) → not due,
         # so the worker only *refreshes live*, never settles it.
-        start = res.pool.window_starts_at
+        start = pool.window_starts_at
         await s.commit()
 
     mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
@@ -268,25 +237,10 @@ async def test_pool_settles_early_when_all_members_decided(monkeypatch):
     sm = new_sessionmaker()
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
     async with sm() as s:
-        users = []
-        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
-            u, host = await _player(s, f"E{i}", mu=mu)
-            users.append((u, host))
-        for u, _ in users[:3]:
-            await pool_engine.enqueue(
-                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
-            )
-        res = await pool_engine.enqueue(
-            s,
-            users[3][0],
-            game=CHESS,
-            metric=MOVES,
-            difficulty="medium",
-            entry_cents=1000,
-        )
-        pool_id = res.pool.id
-        room_bar = res.pool.room_bar
-        start = res.pool.window_starts_at  # window is open — ends in the future
+        users, pool = await _form_pool(s, "E")
+        pool_id = pool.id
+        room_bar = pool.room_bar
+        start = pool.window_starts_at  # window is open — ends in the future
         await s.commit()
 
     mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
@@ -328,25 +282,10 @@ async def test_pool_not_settled_early_while_a_member_is_still_playing(monkeypatc
     sm = new_sessionmaker()
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
     async with sm() as s:
-        users = []
-        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
-            u, host = await _player(s, f"W{i}", mu=mu)
-            users.append((u, host))
-        for u, _ in users[:3]:
-            await pool_engine.enqueue(
-                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
-            )
-        res = await pool_engine.enqueue(
-            s,
-            users[3][0],
-            game=CHESS,
-            metric=MOVES,
-            difficulty="medium",
-            entry_cents=1000,
-        )
-        pool_id = res.pool.id
-        room_bar = res.pool.room_bar
-        start = res.pool.window_starts_at
+        users, pool = await _form_pool(s, "W")
+        pool_id = pool.id
+        room_bar = pool.room_bar
+        start = pool.window_starts_at
         await s.commit()
 
     mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)

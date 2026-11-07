@@ -14,12 +14,12 @@ from moneymatch_api.services import (
     metric_models_service,
     pool_engine,
     reconciliation_service,
-    skill_prior,
     wallet_service,
 )
 from moneymatch_api.services.pool_engine import PoolError, PoolGrade
 
 from .factories import (
+    chess_moves_corrected,
     chess_profile,
     create_linked_account,
     create_metric_model,
@@ -75,12 +75,6 @@ async def enq(session, user, *, difficulty="medium", entry=1000):
     )
 
 
-def _corrected(mu, sigma, n, rating=1500):
-    """(mu, sigma) after the rating prior and spread floor, as the engine reads them."""
-    mu, sigma = skill_prior.shrink(mu, sigma, n, skill_prior.prior_for(METRIC, rating))
-    return mu, fairness.effective_sigma(sigma, 1.0)
-
-
 def _bar(mu, sigma, k):
     return fairness.personal_bar(mu, sigma, k, 1.0, True, positive=True, floor=2.0)
 
@@ -98,12 +92,9 @@ async def test_preview_quotes_bars_from_own_baseline(session):
     preview = await pool_engine.preview_bars(session, user, CHESS, METRIC)
     assert preview["provisional"] is False
     by_diff = {c["difficulty"]: c for c in preview["cards"]}
-    mu, sigma = _corrected(34.0, 8.0, 15)
-    # Derived from the tier constants, so retuning difficulty moves the
-    # expectation with it.
-    for difficulty, k in POOL_DIFFICULTY_K.items():
-        assert by_diff[difficulty]["bar"] == _bar(mu, sigma, k)
-    assert by_diff["easy"]["bar"] > by_diff["hard"]["bar"]  # harder asks for fewer
+    bars = {d: c["bar"] for d, c in by_diff.items()}
+    assert bars == {"easy": 28.0, "medium": 25.0, "hard": 22.0}  # harder asks fewer
+    mu, sigma = chess_moves_corrected(34.0, 8.0, 15)
 
     # Disclosed clear rates, not odds: the rate shown is the one implied by the
     # bar actually quoted (rounded to whole moves), not the nominal 1 − Φ(k).
@@ -212,8 +203,8 @@ async def test_composition_refuses_a_shark(session):
 
 async def test_baseline_frozen_against_model_refresh(session):
     u1, _ = await pool_player(session, "a", mu=34.0)
-    frozen = _bar(*_corrected(34.0, 8.0, 15), POOL_DIFFICULTY_K["medium"])
-    await enq(session, u1)  # freezes the bar at μ=34
+    await enq(session, u1)
+    frozen = (await pool_engine.get_waiting_ticket(session, u1.id)).personal_bar
     # Refresh the model to something wild after queueing.
     model = await metric_models_service.get_metric_model(session, u1.id, CHESS, METRIC)
     model.mu = 90.0
