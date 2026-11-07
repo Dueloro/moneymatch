@@ -509,5 +509,7 @@ Cost: API Starter (~$7) + Worker Starter (~$7) + Postgres basic-256mb (~$6) ≈ 
 
 ## Baseline
 
-_(filled in during Task 0.2)_
+2026-11-06 at tag `pre-chess-only`: API 1210 passed; web 40 files / 222 tests passed; web typecheck + lint clean. No pre-existing failures.
+
+Local env notes: run API tests as `cd apps/api && SUPABASE_URL=https://example.supabase.co uv run pytest -q` (repo `.env` can't be shell-sourced: line 72 `EMAIL_FROM` is unquoted). Test DB container `mm-test-db` on :5433, dev DB `moneymatch-db-1` on :5544.
 
