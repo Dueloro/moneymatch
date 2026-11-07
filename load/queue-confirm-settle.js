@@ -36,7 +36,7 @@ function authHeaders() {
   };
 }
 
-const GAME = 'cs2.faceit';
+const GAME = 'chess.lichess';
 
 export default function () {
   const auth = authHeaders();
@@ -46,7 +46,12 @@ export default function () {
 
   const queue = http.post(
     `${BASE_URL}/api/v1/play/queue`,
-    JSON.stringify({ game: GAME, market: 'kd_ratio', entry_preset_cents: 1000 }),
+    JSON.stringify({
+      game: GAME,
+      market: 'win_h2h',
+      speed: 'blitz',
+      entry_preset_cents: 1000,
+    }),
     auth,
   );
   const queued = check(queue, { 'queue accepted': (r) => r.status === 200 });

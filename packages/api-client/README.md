@@ -1,7 +1,7 @@
 # @moneymatch/api-client
 
-Typed TypeScript client generated from the FastAPI OpenAPI schema
-(00-README §2 "Type sharing"). **Never hand-write API types in `apps/web`** —
+Typed TypeScript client generated from the FastAPI OpenAPI schema.
+**Never hand-write API types in `apps/web`** —
 regenerate this instead.
 
 ## Regenerate

@@ -2,7 +2,7 @@
 
 Code and docs for titles we are not shipping yet. **Nothing in this folder is
 imported, run, linted, or tested.** It is a reference snapshot taken at tag
-`pre-chess-only` (2026-11-06), when Money Match went chess-only.
+`pre-chess-only` (commit `fa02ab7`, the last commit before the chess-only cut).
 
 | Folder | What it is |
 |---|---|
@@ -20,7 +20,7 @@ imported, run, linted, or tested.** It is a reference snapshot taken at tag
 3. If it uses `win_next` or `stat_race`, restore those kinds from
    `multi-game-core/` first. Chess only uses `win_h2h`.
 4. Move its tests back and get them green against current code. Expect drift:
-   this code stopped being maintained on 2026-11-06.
+   this code is not maintained.
 
 CS2 is intentionally absent. Its Game Coordinator sidecar approach was dropped.
 If CS2 returns, start from the FACEIT Data API instead; the old code is at tag
