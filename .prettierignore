@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 poc-reference/
+future-expansion/
 docs/
 pnpm-lock.yaml
 packages/api-client/src/generated/
