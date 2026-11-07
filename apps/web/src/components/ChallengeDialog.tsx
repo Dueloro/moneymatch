@@ -3,19 +3,14 @@ import { useState } from 'react';
 import { useCreateChallenge } from '../hooks/useChallenges';
 import { useMarkets, type MarketRow } from '../hooks/useMatchmaking';
 import { formatCurrency } from '../lib/format';
+import { CHESS } from '../lib/games';
 import { Card } from './ui/Card';
 import { RadioRow } from './ui/Field';
 import { PillButton } from './ui/PillButton';
 import { PresetSelector } from './ui/PresetSelector';
 
-const GAMES = [
-  { id: 'cs2.steam', label: 'CS2' },
-  { id: 'chess.lichess', label: 'Chess' },
-  { id: 'dota2.opendota', label: 'Dota 2' },
-];
-
 /**
- * Create a challenge (design p.3 "Invite friend"): pick game + market + entry,
+ * Create a challenge (design p.3 "Invite friend"): pick speed + entry,
  * then either challenge a specific friend or mint a shareable invite link. The
  * server owns entry cents and the friendly/pair-cap decision.
  */
@@ -28,14 +23,13 @@ export function ChallengeDialog({
   onClose: () => void;
   onSent?: () => void;
 }) {
-  const [game, setGame] = useState(GAMES[0].id);
   const [marketKey, setMarketKey] = useState<string | null>(null);
   const [speed, setSpeed] = useState<string | null>(null);
   const [entryCents, setEntryCents] = useState<number | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const { data: markets } = useMarkets(game);
+  const { data: markets } = useMarkets(CHESS);
   const create = useCreateChallenge();
 
   const market: MarketRow | null =
@@ -46,7 +40,7 @@ export function ChallengeDialog({
 
   function baseVars() {
     return {
-      game,
+      game: CHESS,
       market: market!.key,
       entry_preset_cents: entryCents!,
       ...(requiresSpeed && speed ? { speed } : {}),
@@ -94,48 +88,31 @@ export function ChallengeDialog({
           </PillButton>
         </div>
 
-        <div className="mb-4 flex gap-2">
-          {GAMES.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => {
-                setGame(g.id);
-                setMarketKey(null);
-                setSpeed(null);
-              }}
-              className={[
-                'rounded-pill px-3 py-1 text-xs font-semibold transition',
-                g.id === game
-                  ? 'bg-text text-black'
-                  : 'border border-hairline text-text-secondary hover:text-text',
-              ].join(' ')}
-            >
-              {g.label}
-            </button>
-          ))}
-        </div>
-
         {markets && !markets.linked ? (
           <p className="text-sm text-text-secondary">
-            Link your {GAMES.find((g) => g.id === game)?.label} account first (Profile).
+            Link your Lichess account first (Profile).
           </p>
         ) : (
           <>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Market
-            </p>
-            <div className="mb-4 max-h-40 overflow-y-auto">
-              {markets?.markets.map((m) => (
-                <RadioRow
-                  key={`${m.key}-${m.label}`}
-                  name="challenge-market"
-                  checked={m.key === (market?.key ?? '')}
-                  onSelect={() => setMarketKey(m.key)}
-                >
-                  {m.label}
-                </RadioRow>
-              ))}
-            </div>
+            {(markets?.markets.length ?? 0) > 1 && (
+              <>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                  Market
+                </p>
+                <div className="mb-4 max-h-40 overflow-y-auto">
+                  {markets?.markets.map((m) => (
+                    <RadioRow
+                      key={`${m.key}-${m.label}`}
+                      name="challenge-market"
+                      checked={m.key === (market?.key ?? '')}
+                      onSelect={() => setMarketKey(m.key)}
+                    >
+                      {m.label}
+                    </RadioRow>
+                  ))}
+                </div>
+              </>
+            )}
 
             {requiresSpeed && (
               <div className="mb-4 flex flex-wrap gap-2">

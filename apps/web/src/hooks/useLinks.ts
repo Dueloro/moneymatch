@@ -23,11 +23,7 @@ export interface ProfileSnapshot {
   formats: FormatStat[];
   primary_speed: string | null;
   rating: number | null;
-  rank_label: string | null;
-  kd: number | null;
   avatar_url: string | null;
-  /** Title-specific extras (CS2 lifetime kills, hours). Display only. */
-  extra?: Record<string, number>;
 }
 
 export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED' | 'COMING_SOON';
@@ -86,24 +82,6 @@ export function useCreateLink() {
       username: string;
     }): Promise<LinksResponse> => {
       const { data, error } = await api.POST('/api/v1/links', { body: vars });
-      if (error) throw new Error(messageOf(error, 'Could not link that account.'));
-      return data as LinksResponse;
-    },
-    onSuccess: invalidate,
-  });
-}
-
-/** Demo-only: swap the shared demo user's placeholder handle for a real one, per
- * game. The server soft-unbinds the old link and binds the new (live host verify
- * + real skill bootstrap). Only reachable when demo mode is on. */
-export function useDemoRelink() {
-  const invalidate = useLinksInvalidation();
-  return useMutation({
-    mutationFn: async (vars: {
-      game: string;
-      username: string;
-    }): Promise<LinksResponse> => {
-      const { data, error } = await api.POST('/api/v1/demo/relink', { body: vars });
       if (error) throw new Error(messageOf(error, 'Could not link that account.'));
       return data as LinksResponse;
     },

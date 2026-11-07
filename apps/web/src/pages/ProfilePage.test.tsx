@@ -23,8 +23,6 @@ vi.mock('../hooks/useLinks', async () => {
   };
 });
 
-vi.mock('../hooks/useResetDemo', () => ({ useResetDemo: vi.fn() }));
-
 import { useAuth } from '../auth/useAuth';
 import { useMe, useSelfExclude } from '../hooks/useMe';
 import {
@@ -33,11 +31,9 @@ import {
   useRefreshLink,
   type GameLink,
 } from '../hooks/useLinks';
-import { useResetDemo } from '../hooks/useResetDemo';
 
 const createMutate = vi.fn();
 const selfExcludeMutate = vi.fn();
-const resetMutate = vi.fn();
 const verifyCurrentPassword = vi.fn();
 const changePassword = vi.fn();
 
@@ -54,6 +50,14 @@ function gameLink(over: Partial<GameLink>): GameLink {
   };
 }
 
+function mockLinks(...games: GameLink[]) {
+  vi.mocked(useLinks).mockReturnValue({
+    isLoading: false,
+    isError: false,
+    data: { games },
+  } as unknown as ReturnType<typeof useLinks>);
+}
+
 describe('ProfilePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,7 +65,6 @@ describe('ProfilePage', () => {
     changePassword.mockResolvedValue(undefined);
     vi.mocked(useAuth).mockReturnValue({
       signOut: vi.fn(),
-      isDemo: false,
       verifyCurrentPassword,
       changePassword,
     } as unknown as ReturnType<typeof useAuth>);
@@ -76,9 +79,6 @@ describe('ProfilePage', () => {
           role: 'user',
           status: 'active',
           member_since: new Date().toISOString(),
-          // The play set gates the Games section; a user with these linked games
-          // has them active (as the backfill guarantees).
-          active_games: ['chess.lichess', 'cs2.steam', 'dota2.opendota'],
         },
         needs_onboarding: false,
         limits: {
@@ -104,68 +104,47 @@ describe('ProfilePage', () => {
       mutate: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof useRefreshLink>);
-    vi.mocked(useLinks).mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: {
-        games: [
-          gameLink({
-            game: 'cs2.steam',
-            display_name: 'CS2 — FACEIT',
-            status: 'LINKED',
-            host_username: 's1mple',
-            win_streak: 5,
-            profile: {
-              username: 's1mple',
-              display_name: 's1mple',
-              url: '',
-              link_method: 'username',
-              game: 'cs2.steam',
-              account_age_days: null,
-              win_rate: 0.6,
-              draw_rate: 0,
-              total_games: 100,
-              formats: [],
-              primary_speed: null,
-              rating: 3900,
-              rank_label: 'Level 10',
-              kd: 1.3,
-              avatar_url: null,
-            },
-          }),
-          gameLink({
-            game: 'dota2.opendota',
-            display_name: 'Dota 2 — OpenDota',
-            status: 'BLOCKED',
-          }),
-          gameLink({ status: 'UNLINKED' }),
-        ],
-      },
-    } as unknown as ReturnType<typeof useLinks>);
-    vi.mocked(useResetDemo).mockReturnValue({
-      mutate: resetMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useResetDemo>);
+    mockLinks(
+      gameLink({
+        status: 'LINKED',
+        host_username: 'magnus',
+        win_streak: 5,
+        profile: {
+          username: 'magnus',
+          display_name: 'magnus',
+          url: '',
+          link_method: 'username',
+          game: 'chess.lichess',
+          account_age_days: null,
+          win_rate: 0.6,
+          draw_rate: 0,
+          total_games: 100,
+          formats: [],
+          primary_speed: 'blitz',
+          rating: 2100,
+          avatar_url: null,
+        },
+      }),
+    );
   });
 
-  it('renders LINKED / BLOCKED, the skill badge + win streak, and editable limits', () => {
+  it('renders the linked account, rating + win streak, and editable limits', () => {
     renderWithProviders(<ProfilePage />);
     expect(screen.getByText('Linked')).toBeInTheDocument();
-    expect(screen.getByText('Blocked')).toBeInTheDocument();
-    expect(screen.getByText('s1mple · 100 games')).toBeInTheDocument();
-    expect(screen.getByText('Level 10')).toBeInTheDocument(); // skill badge
-    expect(screen.getByText('5 win streak')).toBeInTheDocument(); // win streak
+    expect(screen.getByText('magnus · 100 games')).toBeInTheDocument();
+    expect(screen.getByText('Rating 2100')).toBeInTheDocument();
+    expect(screen.getByText('5 win streak')).toBeInTheDocument();
     expect(screen.getByDisplayValue('200')).toBeInTheDocument(); // daily loss cap ($)
   });
 
-  it('renders the CS2 setup card (its one home — removed from Activity)', () => {
-    // active_games includes cs2.steam (see the shared mock), so the CS2
-    // share-code setup card belongs here on Profile.
+  it('shows a blocked account', () => {
+    mockLinks(gameLink({ status: 'BLOCKED' }));
     renderWithProviders(<ProfilePage />);
-    expect(screen.getByTestId('cs2-setup-card')).toBeInTheDocument();
+    expect(screen.getByText('Blocked')).toBeInTheDocument();
   });
 
-  it('runs the link flow for an unlinked game', () => {
+  it('runs the link flow for an unlinked account', () => {
+    mockLinks(gameLink({ status: 'UNLINKED' }));
     renderWithProviders(<ProfilePage />);
     fireEvent.click(screen.getByRole('button', { name: 'Link' }));
     fireEvent.change(screen.getByPlaceholderText('Your Lichess username'), {
@@ -221,41 +200,5 @@ describe('ProfilePage', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
     expect(changePassword).toHaveBeenCalledWith('newpass1');
-  });
-
-  it('hides the security section for a demo session', () => {
-    vi.mocked(useAuth).mockReturnValue({
-      signOut: vi.fn(),
-      isDemo: true,
-      verifyCurrentPassword,
-      changePassword,
-    } as unknown as ReturnType<typeof useAuth>);
-    renderWithProviders(<ProfilePage />);
-    expect(
-      screen.queryByRole('button', { name: 'Change password' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('offers a demo reset that confirms before resetting', () => {
-    vi.mocked(useAuth).mockReturnValue({
-      signOut: vi.fn(),
-      isDemo: true,
-      verifyCurrentPassword,
-      changePassword,
-    } as unknown as ReturnType<typeof useAuth>);
-    renderWithProviders(<ProfilePage />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset demo' }));
-    // Two-step: nothing resets until the second confirm.
-    expect(resetMutate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, reset the demo' }));
-    expect(resetMutate).toHaveBeenCalled();
-  });
-
-  it('hides the demo reset for real accounts', () => {
-    renderWithProviders(<ProfilePage />); // isDemo false by default
-    expect(
-      screen.queryByRole('button', { name: 'Reset demo' }),
-    ).not.toBeInTheDocument();
   });
 });

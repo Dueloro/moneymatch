@@ -11,14 +11,14 @@ vi.mock('../hooks/useWallet', async () => {
     ...actual,
     useWallet: vi.fn(),
     useWalletLedger: vi.fn(),
-    useDemoDeposit: vi.fn(),
-    useDemoWithdrawal: vi.fn(),
+    usePlayMoneyDeposit: vi.fn(),
+    usePlayMoneyWithdrawal: vi.fn(),
   };
 });
 
 import {
-  useDemoDeposit,
-  useDemoWithdrawal,
+  usePlayMoneyDeposit,
+  usePlayMoneyWithdrawal,
   useWallet,
   useWalletLedger,
 } from '../hooks/useWallet';
@@ -63,14 +63,14 @@ describe('WalletPage', () => {
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
     } as unknown as ReturnType<typeof useWalletLedger>);
-    vi.mocked(useDemoDeposit).mockReturnValue({
+    vi.mocked(usePlayMoneyDeposit).mockReturnValue({
       mutate: depositMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof useDemoDeposit>);
-    vi.mocked(useDemoWithdrawal).mockReturnValue({
+    } as unknown as ReturnType<typeof usePlayMoneyDeposit>);
+    vi.mocked(usePlayMoneyWithdrawal).mockReturnValue({
       mutate: withdrawMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof useDemoWithdrawal>);
+    } as unknown as ReturnType<typeof usePlayMoneyWithdrawal>);
   });
 
   it('leads with available balance, with escrow and lifetime as context', () => {

@@ -10,9 +10,9 @@ import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { formatCurrency, formatRelativeTime } from '../lib/format';
 import { humanizeIds } from '../lib/labels';
 import {
-  DEMO_DEPOSIT_PRESETS_CENTS,
-  useDemoDeposit,
-  useDemoWithdrawal,
+  DEPOSIT_PRESETS_CENTS,
+  usePlayMoneyDeposit,
+  usePlayMoneyWithdrawal,
   useWallet,
   useWalletLedger,
   type LedgerEntry,
@@ -52,8 +52,8 @@ export function WalletPage() {
   usePageTitle('Wallet');
   const { data: wallet, isLoading, isError, refetch } = useWallet();
   const ledger = useWalletLedger();
-  const deposit = useDemoDeposit();
-  const withdraw = useDemoWithdrawal();
+  const deposit = usePlayMoneyDeposit();
+  const withdraw = usePlayMoneyWithdrawal();
 
   const available = wallet?.available_cents ?? 0;
   const escrow = wallet?.escrow_cents ?? 0;
@@ -102,7 +102,7 @@ export function WalletPage() {
           <section className="mt-8">
             <SectionHeader level="sub">Add funds</SectionHeader>
             <PresetSelector
-              presetsCents={DEMO_DEPOSIT_PRESETS_CENTS}
+              presetsCents={DEPOSIT_PRESETS_CENTS}
               onSelect={(cents) => deposit.mutate(cents)}
               disabled={busy}
             />
@@ -116,7 +116,7 @@ export function WalletPage() {
               </p>
             ) : (
               <PresetSelector
-                presetsCents={DEMO_DEPOSIT_PRESETS_CENTS.filter((c) => c <= available)}
+                presetsCents={DEPOSIT_PRESETS_CENTS.filter((c) => c <= available)}
                 onSelect={(cents) => withdraw.mutate(cents)}
                 disabled={busy}
               />

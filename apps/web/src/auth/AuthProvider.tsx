@@ -1,15 +1,13 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { clearDemoToken, getDemoToken } from '../lib/demoAuth';
 import { decodeJwtClaims, getE2eToken } from '../lib/e2eAuth';
 import { env } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { identify, resetIdentity } from '../lib/telemetry';
 import { AuthContext, type AuthContextValue } from './authContext';
 
-/** Build a minimal Supabase-shaped session from an injected access token (demo
- * or e2e) so the app routes past RequireAuth without a live Supabase session. */
+/** Build a minimal Supabase-shaped session from an injected e2e access token so the app routes past RequireAuth without a live Supabase session. */
 function sessionFromToken(token: string): Session | null {
   const claims = decodeJwtClaims(token);
   if (!claims) return null;
@@ -26,19 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
-    // Demo bypass: adopt the demo token as the session, skip Supabase entirely.
-    // The token is only in localStorage after a successful /demo/login, and the
-    // backend only honours it while demo mode is on.
-    const demoToken = getDemoToken();
-    if (demoToken) {
-      const injected = sessionFromToken(demoToken);
-      if (injected) {
-        setSession(injected);
-        identify(injected.user.id);
-        setLoading(false);
-        return;
-      }
-    }
     // e2e bypass: adopt the injected token as the session, skip Supabase entirely.
     if (env.e2eAuth) {
       const token = getE2eToken();
@@ -90,7 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       loading,
-      isDemo: getDemoToken() != null,
       isPasswordRecovery: passwordRecovery,
       signUpWithEmail: async (email: string, password: string) => {
         const { data, error } = await supabase.auth.signUp({
@@ -161,16 +145,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       },
       signOut: async () => {
-        // A demo session isn't a Supabase session, so clear the token and reset
-        // locally; a real session signs out through Supabase as usual.
-        const wasDemo = getDemoToken() != null;
-        clearDemoToken();
         await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
         resetIdentity();
         setSession(null);
-        if (wasDemo) {
-          window.location.assign('/signin');
-        }
       },
     }),
     [session, loading, passwordRecovery],

@@ -4,8 +4,6 @@ import { createContext } from 'react';
 export interface AuthContextValue {
   session: Session | null;
   loading: boolean;
-  /** True when the session is the demo bypass (not a real Supabase account). */
-  isDemo: boolean;
   /** True after arriving via a password-reset link (Supabase PASSWORD_RECOVERY);
    * the sign-in screen shows the set-new-password step while this holds. */
   isPasswordRecovery: boolean;

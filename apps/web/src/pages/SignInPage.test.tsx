@@ -24,7 +24,6 @@ describe('SignInPage', () => {
     mockUseAuth.mockReturnValue({
       session: null,
       loading: false,
-      isDemo: false,
       isPasswordRecovery: false,
       signUpWithEmail: vi.fn(),
       signInWithEmail,
@@ -85,7 +84,7 @@ describe('SignInPage', () => {
   it('shows the reworded tagline', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
     expect(
-      screen.getByText(/skill-based contests on your favourite games/i),
+      screen.getByText(/skill-based chess contests, settled from lichess/i),
     ).toBeInTheDocument();
   });
 
@@ -106,7 +105,6 @@ describe('SignInPage', () => {
       ...mockUseAuth.mock.results[0]?.value,
       session: null,
       loading: false,
-      isDemo: false,
       isPasswordRecovery: false,
       signUpWithEmail,
       signInWithEmail,
@@ -133,7 +131,6 @@ describe('SignInPage', () => {
     mockUseAuth.mockReturnValue({
       session: null,
       loading: false,
-      isDemo: false,
       isPasswordRecovery: false,
       signUpWithEmail: vi.fn(),
       signInWithEmail,
@@ -159,7 +156,6 @@ describe('SignInPage', () => {
     mockUseAuth.mockReturnValue({
       session: { user: { id: 'u1' } } as never,
       loading: false,
-      isDemo: false,
       isPasswordRecovery: true,
       signUpWithEmail: vi.fn(),
       signInWithEmail,

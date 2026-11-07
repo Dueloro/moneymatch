@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '../auth/useAuth';
-import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
-import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Loader } from '../components/ui/Loader';
@@ -10,12 +8,11 @@ import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useResetDemo } from '../hooks/useResetDemo';
 import { formatCurrency } from '../lib/format';
 
 export function ProfilePage() {
   usePageTitle('Profile');
-  const { signOut, isDemo } = useAuth();
+  const { signOut } = useAuth();
   const me = useMe();
   const selfExclude = useSelfExclude();
   const [confirming, setConfirming] = useState(false);
@@ -23,7 +20,6 @@ export function ProfilePage() {
   const user = me.data?.user;
   const limits = me.data?.limits;
   const excluded = user?.status === 'self_excluded';
-  const showCs2 = (user?.active_games ?? []).includes('cs2.steam');
 
   if (me.isLoading) return <Loader />;
   if (me.isError || !user) {
@@ -57,32 +53,12 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <Section title="Games">
+      <Section title="Lichess account">
         <p className="mb-3 text-sm text-text-secondary">
-          Check the games you play to add them to your bar. Link an account when you're
-          ready to play for real.
+          Your matches settle from this account's games.
         </p>
-        <LinkGames context={isDemo ? 'demo' : 'production'} />
+        <LinkGames />
       </Section>
-
-      {showCs2 && (
-        <Section title="Counter-Strike 2">
-          <p className="mb-3 text-sm text-text-secondary">
-            Connect Steam and your matches settle your wagers automatically.
-          </p>
-          <Cs2SetupCard />
-        </Section>
-      )}
-
-      {isDemo && (
-        <Section title="Test with real accounts">
-          <p className="mb-3 text-sm text-text-secondary">
-            The demo is linked to placeholder handles. Swap in a real account per game
-            to pull its live profile and stats.
-          </p>
-          <DemoHandles />
-        </Section>
-      )}
 
       <Section title="Limits">
         {limits ? (
@@ -92,11 +68,9 @@ export function ProfilePage() {
         )}
       </Section>
 
-      {!isDemo && (
-        <Section title="Security">
-          <ChangePassword />
-        </Section>
-      )}
+      <Section title="Security">
+        <ChangePassword />
+      </Section>
 
       <div className="mt-10 flex flex-col items-start gap-4">
         <PillButton variant="outline" onClick={() => void signOut()}>
@@ -138,58 +112,6 @@ export function ProfilePage() {
           </button>
         )}
       </div>
-
-      {isDemo && <ResetDemo />}
-    </div>
-  );
-}
-
-/**
- * Reset the shared demo to its fresh-login state. This replaces the old per-room
- * "New pool" escape hatch: formed rooms are (correctly) uncancelable, so testers
- * get one deliberate "start over" here instead. Inline two-step confirm, matching
- * the page's other irreversible actions.
- */
-function ResetDemo() {
-  const reset = useResetDemo();
-  const [confirming, setConfirming] = useState(false);
-
-  return (
-    <div className="mt-10 border-t border-hairline pt-6">
-      <p className="text-sm font-medium text-text">Reset demo</p>
-      <p className="mt-1 max-w-read text-xs text-text-secondary">
-        Clear any in-flight contests, restore your $1,000 demo balance, and refresh the
-        sample activity. This resets the shared demo account for everyone.
-      </p>
-      {confirming ? (
-        <div className="mt-3 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              reset.mutate(undefined, { onSettled: () => setConfirming(false) })
-            }
-            disabled={reset.isPending}
-            className="text-sm font-semibold text-text hover:opacity-80 disabled:opacity-40"
-          >
-            {reset.isPending ? 'Resetting…' : 'Yes, reset the demo'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirming(false)}
-            className="text-sm text-text-secondary hover:text-text"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <PillButton
-          variant="outline"
-          className="mt-3"
-          onClick={() => setConfirming(true)}
-        >
-          Reset demo
-        </PillButton>
-      )}
     </div>
   );
 }

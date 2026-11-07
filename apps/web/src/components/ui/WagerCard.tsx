@@ -33,8 +33,6 @@ export function WagerCard({
   entryOptions,
   payoutFor,
   payoutLabel,
-  capacity,
-  filled,
   oneVsOne = false,
   feeNote,
   speedOptions,
@@ -71,11 +69,6 @@ export function WagerCard({
   /** Derived payout for the selected entry. */
   payoutFor: (entryCents: number) => number;
   payoutLabel: string;
-  capacity: number;
-  /** Synthetic "seats filled" count. Demo-only — omit it in authenticated
-   * production, where pools/tournaments form via matchmaking and there is no
-   * real roster to read, so no fabricated count is shown. */
-  filled?: number;
   oneVsOne?: boolean;
   /**
    * Optional pre-commit fee disclosure shown below the payout, computed from the
@@ -185,11 +178,7 @@ export function WagerCard({
             <p className="mt-0.5 text-xs text-text-secondary">{feeNote(selected)}</p>
           )}
         </div>
-        {(oneVsOne || filled != null) && (
-          <p className="text-xs text-text-tertiary">
-            {oneVsOne ? '1v1' : `${filled} of ${capacity} in`}
-          </p>
-        )}
+        {oneVsOne && <p className="text-xs text-text-tertiary">1v1</p>}
       </div>
 
       <div className="mt-4">

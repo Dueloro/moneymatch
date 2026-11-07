@@ -16,7 +16,6 @@ export interface Limits {
 
 /** First-match funnel progress — drives the getting-started checklist. */
 export interface GettingStarted {
-  picked_games: boolean;
   linked_game: boolean;
   placed_wager: boolean;
   complete: boolean;
@@ -33,9 +32,7 @@ export interface Me {
     role: string;
     status: string;
     member_since: string;
-    /** Catalog game ids the player has chosen to play (their "play set"). */
-    active_games: string[];
-    /** Catalog game ids whose Play-tab onboarding checklist was dismissed. */
+    /** Catalog game ids whose getting-started checklist was dismissed. */
     dismissed_checklists: string[];
   };
   needs_onboarding: boolean;
@@ -74,26 +71,7 @@ export function useSelfExclude() {
 }
 
 /**
- * Set the player's play set (the games shown in the switcher). Sends the full
- * list — the server dedupes and validates each id against the catalog. Refreshes
- * `/me` so the switcher and Profile update immediately.
- */
-export function useSetActiveGames() {
-  const qc = useQueryClient();
-  const { session } = useAuth();
-  return useMutation({
-    mutationFn: async (games: string[]): Promise<void> => {
-      const { error } = await api.PATCH('/api/v1/me', {
-        body: { active_games: games },
-      });
-      if (error) throw new Error('Could not save your games');
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['me', session?.user.id] }),
-  });
-}
-
-/**
- * Dismiss one game's Play-tab checklist. Server-side so the dismissal survives
+ * Dismiss a getting-started checklist. Server-side so the dismissal survives
  * reload and follows the player across devices (never localStorage).
  *
  * Two things make the X actually work, not just fire a request:

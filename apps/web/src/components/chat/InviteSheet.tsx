@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useGameSelection } from '../../hooks/useGameSelection';
 import { useSendMessage } from '../../hooks/useChat';
-import { gameMeta } from '../../lib/games';
+import { CHESS } from '../../lib/games';
 import { PillButton } from '../ui/PillButton';
 import { PresetSelector } from '../ui/PresetSelector';
 
@@ -30,8 +29,8 @@ const COPY = {
 } as const;
 
 /**
- * Compose a pool / tournament invite from inside a thread: pick a game and an
- * entry preset, and the card lands in the conversation. "Open <tab>" is the
+ * Compose a pool / tournament invite from inside a thread: pick an entry
+ * preset, and the card lands in the conversation. "Open <tab>" is the
  * escape hatch to the surface where rooms are actually joined.
  */
 export function InviteSheet({
@@ -46,12 +45,9 @@ export function InviteSheet({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const { games } = useGameSelection();
   const send = useSendMessage();
   const copy = COPY[kind];
 
-  const gameIds = games.length > 0 ? games.map((g) => g.game) : ['cs2.steam'];
-  const [game, setGame] = useState(gameIds[0]);
   const [entryCents, setEntryCents] = useState<number | null>(ENTRY_PRESETS[1]);
   const [difficulty, setDifficulty] = useState<string>('medium');
 
@@ -61,7 +57,7 @@ export function InviteSheet({
       conversationId,
       invite: {
         invite_kind: kind,
-        game,
+        game: CHESS,
         entry_preset_cents: entryCents,
         difficulty: kind === 'pool' ? difficulty : null,
       },
@@ -87,25 +83,6 @@ export function InviteSheet({
           </PillButton>
         </div>
         <p className="mb-6 text-xs leading-relaxed text-text-secondary">{copy.blurb}</p>
-
-        <p className="label-money mb-2.5">Game</p>
-        <div className="mb-6 flex flex-wrap gap-2">
-          {gameIds.map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setGame(id)}
-              className={[
-                'rounded-pill px-4 py-1.5 text-xs font-semibold transition',
-                id === game
-                  ? 'bg-text text-black'
-                  : 'border border-hairline text-text-secondary hover:text-text',
-              ].join(' ')}
-            >
-              {gameMeta(id).short}
-            </button>
-          ))}
-        </div>
 
         {kind === 'pool' && (
           <>

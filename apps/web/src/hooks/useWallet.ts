@@ -37,7 +37,7 @@ interface LedgerPage {
 
 // Server presets ($10/$25/$50/$100). The server re-validates; this only drives
 // which pills render (04-phase-1 · deposits are presets, never client amounts).
-export const DEMO_DEPOSIT_PRESETS_CENTS = [1000, 2500, 5000, 10000] as const;
+export const DEPOSIT_PRESETS_CENTS = [1000, 2500, 5000, 10000] as const;
 
 const walletKey = (userId?: string) => ['wallet', userId];
 
@@ -82,7 +82,7 @@ function useWalletInvalidation() {
   };
 }
 
-export function useDemoDeposit() {
+export function usePlayMoneyDeposit() {
   const invalidate = useWalletInvalidation();
   return useMutation({
     mutationFn: async (amountPresetCents: number): Promise<Wallet> => {
@@ -99,7 +99,7 @@ export function useDemoDeposit() {
   });
 }
 
-export function useDemoWithdrawal() {
+export function usePlayMoneyWithdrawal() {
   const invalidate = useWalletInvalidation();
   return useMutation({
     mutationFn: async (amountCents: number): Promise<Wallet> => {

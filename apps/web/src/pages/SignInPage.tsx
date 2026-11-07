@@ -3,17 +3,14 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
-import { GameSelectOverlay } from '../components/GameSelectOverlay';
 import { LinkGames } from '../components/LinkGames';
 import { TriangleMark } from '../components/ui/brand';
 import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
 import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
-import { useMe, useSetActiveGames } from '../hooks/useMe';
+import { useMe } from '../hooks/useMe';
 import { api } from '../lib/api';
-import { enterDemo as demoEnter } from '../lib/demoAuth';
-import { toast } from '../lib/toast';
 import { emailToUsername } from '../lib/usernameAuth';
 import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
@@ -22,12 +19,8 @@ const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 export function SignInPage() {
   const { session, loading, isPasswordRecovery } = useAuth();
   const me = useMe();
-  // After auth the user creates a profile, then picks their games, then links an
-  // account. `select` is the game-selection overlay; a fresh account also lands
-  // there via its empty `active_games`, so closing the app mid-overlay re-prompts
-  // on the next sign-in rather than skipping the pick.
-  const [postStep, setPostStep] = useState<'idle' | 'select' | 'link'>('idle');
-  const activeGames = me.data?.user.active_games ?? [];
+  // After auth the user creates a profile, then links Lichess.
+  const [postStep, setPostStep] = useState<'idle' | 'link'>('idle');
 
   if (loading || (session && me.isLoading && !me.isError)) {
     return <Loader />;
@@ -60,7 +53,7 @@ export function SignInPage() {
               ? 'Create account'
               : me.data?.needs_onboarding
                 ? 'Your profile'
-                : 'Link a game'}
+                : 'Link Lichess'}
           </p>
         </div>
 
@@ -69,14 +62,9 @@ export function SignInPage() {
         ) : !session ? (
           <AuthStep />
         ) : me.data?.needs_onboarding ? (
-          <OnboardingStep onDone={() => setPostStep('select')} />
+          <OnboardingStep onDone={() => setPostStep('link')} />
         ) : postStep === 'link' ? (
           <LinkGameStep />
-        ) : postStep === 'select' || activeGames.length === 0 ? (
-          <GameSelectStep
-            initialSelected={activeGames}
-            onDone={() => setPostStep('link')}
-          />
         ) : (
           <PostAuthRedirect />
         )}
@@ -97,7 +85,7 @@ function PostAuthRedirect() {
 }
 
 /** Browser had a session the API rejects (stale / wrong signing scheme). Clear
- * it and offer a clean sign-in / demo entry. */
+ * it and offer a clean sign-in. */
 function StaleSessionStep() {
   const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -107,34 +95,15 @@ function StaleSessionStep() {
     await signOut();
   }
 
-  async function enterDemo() {
-    setBusy(true);
-    try {
-      await demoEnter();
-    } catch (err) {
-      toast.error((err as Error)?.message || 'Could not enter the demo.');
-      setBusy(false);
-    }
-  }
-
   return (
     <div>
       <AuthHeading
         title="Session expired"
-        subtitle="Your saved sign-in is no longer valid. Sign in again or enter the demo."
+        subtitle="Your saved sign-in is no longer valid. Sign in again."
       />
       <div className="mt-6 flex flex-col gap-3">
         <PillButton
           type="button"
-          fullWidth
-          disabled={busy}
-          onClick={() => void enterDemo()}
-        >
-          Enter the demo
-        </PillButton>
-        <PillButton
-          type="button"
-          variant="outline"
           fullWidth
           disabled={busy}
           onClick={() => void clearAndStay()}
@@ -243,7 +212,7 @@ function CredentialsForm({
     <div>
       <AuthHeading
         title={mode === 'signin' ? 'Sign in' : 'Create your account'}
-        subtitle="Skill-based contests on your favourite games"
+        subtitle="Skill-based chess contests, settled from Lichess"
       />
 
       <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
@@ -594,37 +563,17 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Post-profile step: pick your games (the play set that gates the whole app).
- * Production context — only Chess is selectable until the other games launch. */
-function GameSelectStep({
-  initialSelected,
-  onDone,
-}: {
-  initialSelected: string[];
-  onDone: () => void;
-}) {
-  const setGames = useSetActiveGames();
-  return (
-    <GameSelectOverlay
-      context="production"
-      initialSelected={initialSelected}
-      busy={setGames.isPending}
-      onConfirm={(games) => setGames.mutate(games, { onSuccess: onDone })}
-    />
-  );
-}
-
-/** Onboarding step: link a game to start playing. */
+/** Onboarding step: link Lichess to start playing. */
 function LinkGameStep() {
   const navigate = useNavigate();
   return (
     <div>
       <AuthHeading
-        title="Link your games"
-        subtitle="Connect an account to start playing, or do it later from your profile."
+        title="Link your Lichess account"
+        subtitle="Your matches settle from its games. You can also do this later from your profile."
       />
       <div className="mt-6">
-        <LinkGames onlyActive context="production" />
+        <LinkGames />
       </div>
       <div className="mt-8">
         <PillButton variant="primary" fullWidth onClick={() => navigate('/play')}>
