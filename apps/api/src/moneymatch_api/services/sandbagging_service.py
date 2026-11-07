@@ -1,15 +1,6 @@
-"""Sandbagging detector v1 (07-phase-4 · deliverable 10).
-
-The personal-bar feature makes **tanking your own baseline** the attack that pays:
-a worse frozen μ gives you a trivially clearable bar. So this ships *with* the
-feature. When a player's recent form sits a z-score worse than their own older
-baseline, we write a `risk_flags` row and block metric wagers on that game/metric
-until an admin clears it (the review queue lands in Phase 6).
-
-The z-test is pure and unit-tested; the live evaluation fetches the account's
-recent history through the adapter. A host outage during evaluation **fails
-open** (skip detection, never block a legitimate player on infra) — persisted
-flags still block.
+"""Sandbagging detector v1. A host outage during evaluation **fails open** (skip
+detection, never block a legitimate player on infra) — persisted flags still
+block.
 """
 
 from __future__ import annotations
@@ -32,7 +23,6 @@ from ..services.hosts.errors import HostError
 
 log = structlog.get_logger(__name__)
 
-# Need at least this many older matches beyond the recent window to form a baseline.
 _MIN_BASELINE = 5
 
 
@@ -55,9 +45,9 @@ def sandbag_z(
     *,
     lower_is_better: bool = False,
 ) -> float | None:
-    """z-score of the recent-N mean vs. the older baseline, signed so negative
-    means worse form (a rise when lower is better). Below the threshold ⇒
-    suspicious tanking. `None` when there isn't enough history to judge."""
+    """z-score of the recent-N mean vs. the older baseline, signed so negative means
+    worse form (a rise when lower is better).
+    """
     if len(values_newest_first) < recent_n + _MIN_BASELINE:
         return None
     recent = values_newest_first[:recent_n]
@@ -74,10 +64,7 @@ def sandbag_z(
 async def is_flagged(
     session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
 ) -> bool:
-    """Whether an unresolved *sandbagging* flag exists for this user/game/metric.
-
-    Filtered to `kind='sandbagging'` so other risk kinds (e.g. the informational
-    `win_streak` detector) never block a wager."""
+    """Whether an unresolved *sandbagging* flag exists for this user/game/metric."""
     flag = await session.scalar(
         select(RiskFlag).where(
             RiskFlag.user_id == user_id,
@@ -99,7 +86,6 @@ async def evaluate(
         games = await adapter.poll_eligible_games(host_account_id, 0, GameFilters())
     except HostError:
         return None  # fail open — never block on a host outage
-    # Adapters return oldest-first; reverse for newest-first.
     values = [g.metrics[metric] for g in reversed(games) if metric in g.metrics]
     z = sandbag_z(values, SANDBAG_RECENT_N, lower_is_better=lower_is_better(metric))
     if z is None or z >= SANDBAG_Z_THRESHOLD:

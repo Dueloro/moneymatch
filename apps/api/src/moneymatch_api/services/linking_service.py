@@ -1,11 +1,4 @@
-"""Account linking — the one seam every link flows through (05-phase-2).
-
-`bind` verifies a host account via its adapter, persists the evidence, creates
-the immutable binding (DB-enforced uniqueness), and bootstraps the metric models
-— all in the caller's transaction. Username-claim linking ships at MVP; OAuth
-drops in later behind the same `bind(user, game, evidence)` seam (the
-`link_method` arg + column reserve it).
-"""
+"""Account linking — the one seam every link flows through."""
 
 from __future__ import annotations
 
@@ -55,8 +48,7 @@ async def _assert_game_enabled(session: AsyncSession, game: str) -> None:
 
 
 async def get_links(session: AsyncSession, user_id: uuid.UUID) -> list[LinkedAccount]:
-    """Every live linked account for a user (newest first). Soft-unbound rows are
-    excluded — they are retained only for history/audit, not as a binding."""
+    """Every live linked account for a user (newest first)."""
     rows = await session.scalars(
         select(LinkedAccount)
         .where(
@@ -68,27 +60,11 @@ async def get_links(session: AsyncSession, user_id: uuid.UUID) -> list[LinkedAcc
     return list(rows)
 
 
-#: Preference order when a user holds more than one live binding for a game.
-#: `active` outranks anything else that is merely not unbound (`pending`,
-#: `stale`), because an account we can currently read beats one we cannot.
 _LINK_RANK = case((LinkedAccount.status == "active", 0), else_=1)
 
 
 def live_links_for(user_id: uuid.UUID, game: str):
-    """The ordered SELECT behind `get_link`, for callers that need the query.
-
-    Ordering is the point. A user can accumulate several live rows for one
-    game: a seeded placeholder from a demo fixture, an older handle, then the
-    account they actually signed in and entered. Every call site filtered out
-    soft-unbound history but none of them ordered, so which row you got was
-    whatever the database happened to return first, and the answer could differ
-    between two calls in the same request. That decides which host account gets
-    polled for your results and graded for your money, so it cannot be
-    arbitrary.
-
-    Most recently linked wins, which is what "use the account I just entered"
-    means, with `active` preferred over any other live status.
-    """
+    """The ordered SELECT behind `get_link`, for callers that need the query."""
     return (
         select(LinkedAccount)
         .where(
@@ -103,24 +79,15 @@ def live_links_for(user_id: uuid.UUID, game: str):
 async def get_link(
     session: AsyncSession, user_id: uuid.UUID, game: str
 ) -> LinkedAccount | None:
-    """The user's live binding for a game (ignores soft-unbound history rows).
-
-    The single place this question is answered. See `live_links_for` for why
-    the ordering matters.
-    """
+    """The user's live binding for a game (ignores soft-unbound history rows)."""
     return await session.scalar(live_links_for(user_id, game))
 
 
 async def _fetch_profile(game: str, method: str, username: str) -> ProfileSnapshot:
-    """Resolve + verify a host account through its adapter, mapping host failures
-    to clean API errors (bad username → 404, host outage → 502)."""
     adapter = registry.get(game)
     try:
         return await adapter.link_account(method, username)
     except HostNotConfigured as exc:
-        # A deploy/config gap (missing API key) — NOT the player's fault. Logged
-        # loud so ops see the misconfig instead of a stream of "not found"s, and
-        # surfaced distinctly so the user isn't told their handle is wrong.
         log.error("link.host_not_configured", game=game, error=str(exc))
         raise LinkError(
             "host_not_configured",
@@ -134,9 +101,8 @@ async def _fetch_profile(game: str, method: str, username: str) -> ProfileSnapsh
             status_code=502,
         ) from exc
     except HostError as exc:
-        # Any other typed host failure (auth 401/403, rate-limit 429, bad request)
-        # — a real upstream problem, not a missing player. Don't let it fall
-        # through to the ValueError branch and masquerade as "account not found".
+        # Any other typed host failure (auth 401/403, rate-limit 429, bad request) — a
+        # real upstream problem, not a missing player.
         log.warning("link.host_error", game=game, error=str(exc))
         raise LinkError(
             "host_unavailable",
@@ -144,7 +110,6 @@ async def _fetch_profile(game: str, method: str, username: str) -> ProfileSnapsh
             status_code=502,
         ) from exc
     except ValueError as exc:
-        # Unknown username or an account the host won't expose.
         raise LinkError("host_account_unlinkable", str(exc), status_code=404) from exc
 
 
@@ -160,8 +125,6 @@ async def bind(
     await _assert_game_enabled(session, game)
 
     profile = await _fetch_profile(game, method, username)
-    # Casefold the host id so the (game, host_account_id) uniqueness catches
-    # case-variant claims of the same account; keep the display handle as typed.
     host_account_id = profile.username.strip().casefold()
 
     link = LinkedAccount(
@@ -179,8 +142,6 @@ async def bind(
         await session.rollback()
         raise _bind_conflict(exc, game) from exc
 
-    # Retain the linking evidence and bootstrap the skill models in the same
-    # transaction, so a link either lands fully set up or not at all.
     await raw_payload_service.persist(
         session, f"{game}:profile", profile.model_dump(), memo=f"link {username}"
     )
@@ -236,8 +197,7 @@ async def refresh(session: AsyncSession, user: User, game: str) -> LinkedAccount
 
 
 async def unlink(session: AsyncSession, user_id: uuid.UUID, game: str) -> None:
-    """Remove a binding. Admin-only in MVP (bindings are immutable to users);
-    unlinking while a contest is in flight is blocked once matches exist (Phase 3)."""
+    """Remove a binding."""
     link = await get_link(session, user_id, game)
     if link is None:
         raise LinkError("not_linked", f"No {game} account is linked.", status_code=404)

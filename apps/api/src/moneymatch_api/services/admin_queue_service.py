@@ -1,8 +1,4 @@
-"""Queue health for the admin surface (09-phase-6 · deliverable 2 · Queue).
-
-Depth per (game, market, tier) among currently-waiting tickets, the mean wait of
-those still waiting, and the lifetime expiry rate — all read straight off
-`queue_tickets`, the queue-health source (01-architecture §2 · events)."""
+"""Queue health for the admin surface."""
 
 from __future__ import annotations
 
@@ -40,7 +36,6 @@ async def queue_stats(
     now = now or datetime.now(UTC)
     stats = QueueStats()
 
-    # Global counts by state.
     by_state = await session.execute(
         select(QueueTicket.state, func.count()).group_by(QueueTicket.state)
     )
@@ -53,7 +48,6 @@ async def queue_stats(
     resolved = stats.matched + stats.expired
     stats.expiry_rate = (stats.expired / resolved) if resolved else 0.0
 
-    # Depth + mean wait per (game, market, tier) among still-waiting tickets.
     rows = await session.execute(
         select(
             QueueTicket.game,

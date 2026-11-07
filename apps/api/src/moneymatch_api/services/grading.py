@@ -1,8 +1,6 @@
-"""Result grading: the server-authoritative "who won" (zero self-reporting).
-
-Asks the game's adapter for the result of the brokered game between the two
-bound accounts; draw → PUSH, unfinished at the deadline → CANCEL + refund, host
-outage → PENDING(host_error) so the worker extends the window.
+"""Asks the game's adapter for the result of the brokered game between the two bound
+accounts; draw → PUSH, unfinished at the deadline → CANCEL + refund, host outage →
+PENDING(host_error) so the worker extends the window.
 """
 
 from __future__ import annotations
@@ -21,7 +19,6 @@ from .markets import get as get_market
 
 log = structlog.get_logger(__name__)
 
-# Grade statuses.
 WIN = "win"
 PUSH = "push"
 CANCEL = "cancel"
@@ -30,12 +27,10 @@ PENDING = "pending"
 
 @dataclass
 class GradeOutcome:
-    status: str  # WIN | PUSH | CANCEL | PENDING
+    status: str
     winner_user_id: uuid.UUID | None = None
     stat_lines: dict[uuid.UUID, dict[str, Any]] = field(default_factory=dict)
     detail: dict[str, Any] = field(default_factory=dict)
-    # PENDING only: a host outage caused it (worker extends the window, doesn't
-    # consume it). Absent ⇒ simply still waiting for a qualifying game.
     host_error: bool = False
 
 
@@ -46,17 +41,16 @@ def _deadline_passed(match: Match, now: datetime) -> bool:
 async def _grade_brokered(
     match: Match, seats: list[MatchPlayer], now: datetime
 ) -> GradeOutcome:
-    """Chess `win_h2h`: grade the specific brokered game between the two accounts."""
     if not match.host_game_id:
         return GradeOutcome(CANCEL, detail={"reason": "no_brokered_game"})
     adapter = registry.get(match.game)
     handles = [s.host_account_id for s in seats]
     winner_handle = await adapter.match_winner(match.host_game_id, handles)
-    if winner_handle is None:  # unfinished / unverifiable
+    if winner_handle is None:
         if _deadline_passed(match, now):
             return GradeOutcome(CANCEL, detail={"reason": "game_never_finished"})
         return GradeOutcome(PENDING)
-    if winner_handle == "":  # draw
+    if winner_handle == "":
         return GradeOutcome(PUSH, detail={"reason": "draw"})
     winner = next(
         (s for s in seats if s.host_account_id.lower() == winner_handle.lower()), None
@@ -75,7 +69,7 @@ async def grade(
     seats: list[MatchPlayer],
     now: datetime,
 ) -> GradeOutcome:
-    """Resolve a match to a `GradeOutcome`. Host outage → PENDING(host_error)."""
+    """Resolve a match to a `GradeOutcome`."""
     market = get_market(match.game, match.market)
     if market is None:
         return GradeOutcome(CANCEL, detail={"reason": "unknown_market"})

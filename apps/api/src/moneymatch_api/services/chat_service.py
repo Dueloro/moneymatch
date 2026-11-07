@@ -1,19 +1,4 @@
-"""Chat — friend DMs, the support thread, and invite cards inside a thread.
-
-The Inbox's messaging surface. Three things live here:
-
-- **Threads.** A DM is get-or-created per *accepted friend pair* (never with a
-  stranger — same rule the direct-challenge flow enforces); the support thread is
-  get-or-created per user and answered by the platform (`sender_id IS NULL`).
-- **Messages.** A typed line (`text`), a platform line (`system`), or an
-  **invite card** (`invite`) whose whole contract lives in `payload`.
-- **Invites.** A head-to-head invite wraps a real `challenges` row, so accepting
-  it in chat forms a PENDING match through the same lifecycle as the Inbox's
-  Respond pill. Pool/tournament invites are a nudge: accepting stamps the card
-  and hands the client the tab to open (the rooms themselves are joined there).
-
-Flushes, never commits — the caller owns the transaction boundary.
-"""
+"""Chat — friend DMs, the support thread, and invite cards inside a thread."""
 
 from __future__ import annotations
 
@@ -46,14 +31,11 @@ SUPPORT_GREETING = (
     "Hey — this is Dueloro Support. Ask us anything about a contest, a "
     "payout, or your account and we'll pick it up here."
 )
-# Support is staffed asynchronously; the auto-ack sets the expectation instead of
-# leaving a message sitting in silence.
 SUPPORT_AUTO_REPLY = (
     "Thanks — we've got your message. An agent picks this up within a few hours "
     "and replies right in this thread."
 )
 
-# Where each invite kind sends the client once it's accepted.
 _INVITE_REDIRECT = {
     "pool": "/pools",
     "tournament": "/tournament",
@@ -65,11 +47,6 @@ _MESSAGE_LIMIT = 200
 
 class ChatError(APIError):
     """A chat-flow failure (RFC-7807 via APIError)."""
-
-
-# --------------------------------------------------------------------------- #
-# Threads.
-# --------------------------------------------------------------------------- #
 
 
 async def _find_dm(
@@ -87,7 +64,6 @@ async def _find_dm(
 
 
 async def _open_dm(session: AsyncSession, a: uuid.UUID, b: uuid.UUID) -> Conversation:
-    """Get-or-create the DM between two users. Callers own authorization."""
     existing = await _find_dm(session, a, b)
     if existing is not None:
         return existing
@@ -108,8 +84,6 @@ async def _open_dm(session: AsyncSession, a: uuid.UUID, b: uuid.UUID) -> Convers
 async def open_dm(
     session: AsyncSession, user: User, other_id: uuid.UUID
 ) -> Conversation:
-    """Open the DM with a friend. Messaging follows friendship, exactly like the
-    direct-challenge rule — strangers can't start a thread."""
     if other_id == user.id:
         raise ChatError(
             "self_conversation", "You can't message yourself.", status_code=422
@@ -123,7 +97,6 @@ async def open_dm(
 
 
 async def open_support(session: AsyncSession, user: User) -> Conversation:
-    """Get-or-create this user's support thread, greeting included."""
     existing = await session.scalar(
         select(Conversation)
         .join(ConversationMember, ConversationMember.conversation_id == Conversation.id)
@@ -147,7 +120,6 @@ async def open_support(session: AsyncSession, user: User) -> Conversation:
 async def _peer_id(
     session: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID
 ) -> uuid.UUID | None:
-    """The other member of a DM (None for the support thread)."""
     return await session.scalar(
         select(ConversationMember.user_id).where(
             ConversationMember.conversation_id == conversation_id,
@@ -172,20 +144,9 @@ async def _membership(
     return member
 
 
-# --------------------------------------------------------------------------- #
-# Writes.
-# --------------------------------------------------------------------------- #
-
-
 async def _assert_writable(
     session: AsyncSession, user: User, conversation: Conversation
 ) -> uuid.UUID | None:
-    """Guard a write into a thread, returning the DM peer.
-
-    Messaging follows friendship for the life of the thread, not just at its
-    creation: removing or blocking someone closes the thread to new messages
-    from both sides. The transcript stays readable — only writes are gated.
-    """
     if conversation.kind != "dm":
         return None
     peer_id = await _peer_id(session, conversation.id, user.id)
@@ -208,11 +169,6 @@ async def _push_to_peer(
     sender: User,
     preview: str,
 ) -> None:
-    """Browser-push a DM to the recipient **only when they're not in the app**.
-
-    An online peer's Inbox polls every 15 s and badges on its own; pushing at
-    them as well is noise. Best-effort — a push failure must never fail a send.
-    """
     if conversation.kind != "dm" or peer_id is None:
         return
     try:
@@ -250,7 +206,6 @@ async def _append(
     )
     session.add(message)
     await session.flush()
-    # Denormalized so the conversation list sorts without touching `messages`.
     conversation.last_message_at = message.created_at
     await session.flush()
     return message
@@ -259,8 +214,7 @@ async def _append(
 async def send_text(
     session: AsyncSession, user: User, conversation_id: uuid.UUID, body: str
 ) -> Message:
-    """Post a typed line. A support thread auto-acks so the sender isn't left
-    staring at silence."""
+    """Post a typed line."""
     await _membership(session, user.id, conversation_id)
     text = body.strip()
     if not text:
@@ -272,7 +226,7 @@ async def send_text(
             status_code=422,
         )
     conversation = await session.get(Conversation, conversation_id)
-    assert conversation is not None  # membership implies the row exists
+    assert conversation is not None
     peer_id = await _assert_writable(session, user, conversation)
     message = await _append(
         session, conversation, sender_id=user.id, kind="text", body=text
@@ -318,11 +272,6 @@ async def send_invite(
     metric: str | None = None,
     difficulty: str | None = None,
 ) -> Message:
-    """Post a pool/tournament invite card into a thread.
-
-    Head-to-head invites aren't created here — those come from the challenge
-    flow, which posts its own card once the `challenges` row exists.
-    """
     await _membership(session, user.id, conversation_id)
     if invite_kind not in ("pool", "tournament"):
         raise ChatError(
@@ -389,13 +338,8 @@ async def post_challenge_invite(
     entry_cents: int,
     friendly: bool,
 ) -> Message | None:
-    """Mirror a direct head-to-head challenge into the pair's DM, so the invite
-    lands in the same place they talk (called from `challenge_service`).
-
-    Returns None when there's no thread to mirror into: a **rematch** may be
-    against someone who was never a friend, and chat doesn't open a channel that
-    the friendship rule wouldn't allow. Those players still get the notification
-    and the Inbox Respond pill.
+    """Mirror a direct head-to-head challenge into the pair's DM, so the invite lands
+    in the same place they talk (called from `challenge_service`).
     """
     conversation: Conversation | None
     if await friends_service.are_friends(session, challenger.id, challengee_id):
@@ -428,9 +372,6 @@ async def _stamp_challenge_card(
     status: str,
     match_id: uuid.UUID | None = None,
 ) -> Message | None:
-    """Flip the h2h card for a challenge that was resolved outside chat (the
-    Inbox Respond pill, a decline, or the expiry worker), so the thread never
-    shows a stale pending invite."""
     message = await session.scalar(
         select(Message).where(
             Message.kind == "invite",
@@ -455,7 +396,8 @@ async def note_challenge_resolved(
     match_id: uuid.UUID | None = None,
 ) -> None:
     """Public hook for `challenge_service`: keep the chat card in step with the
-    challenge row. Never raises — chat must not break the challenge flow."""
+    challenge row.
+    """
     try:
         await _stamp_challenge_card(
             session, challenge_id, status=status, match_id=match_id
@@ -469,8 +411,6 @@ async def note_challenge_resolved(
 async def respond_invite(
     session: AsyncSession, user: User, message_id: uuid.UUID, action: str
 ) -> tuple[Message, uuid.UUID | None]:
-    """Accept or decline an invite card. Returns the card and, for an accepted
-    head-to-head, the PENDING match it formed."""
     if action not in ("accept", "decline"):
         raise ChatError("invalid_action", "Accept or decline.", status_code=422)
     message = await session.get(Message, message_id)
@@ -488,7 +428,6 @@ async def respond_invite(
 
     match_id: uuid.UUID | None = None
     if message.payload.get("invite_kind") == "h2h":
-        # Late import: challenge_service posts cards here, so this would cycle.
         from . import challenge_service
 
         challenge_id = uuid.UUID(str(message.payload["challenge_id"]))
@@ -523,25 +462,14 @@ async def respond_invite(
 async def mark_read(
     session: AsyncSession, user: User, conversation_id: uuid.UUID
 ) -> int:
-    """Move this user's read cursor to now. Idempotent. Returns the new total.
-
-    Stamped from the **database** clock so it's directly comparable to
-    `messages.created_at` (also `clock_timestamp()`) — an app-server clock a few
-    hundred ms behind would leave just-read messages counted as unread."""
+    """Move this user's read cursor to now. Idempotent."""
     member = await _membership(session, user.id, conversation_id)
     member.last_read_at = func.clock_timestamp()
     await session.flush()
     return await unread_total(session, user.id)
 
 
-# --------------------------------------------------------------------------- #
-# Reads.
-# --------------------------------------------------------------------------- #
-
-
 def _unread_stmt(user_id: uuid.UUID):
-    """Per-conversation unread counts for one user: messages the user didn't
-    write that landed after their read cursor."""
     return (
         select(ConversationMember.conversation_id, func.count(Message.id))
         .select_from(ConversationMember)
@@ -603,7 +531,6 @@ async def list_conversations(
         await session.scalars(select(Conversation).where(Conversation.id.in_(ids)))
     )
 
-    # Peers (DMs only — the support thread has a single member).
     peers: dict[uuid.UUID, User] = {}
     peer_rows = await session.execute(
         select(ConversationMember.conversation_id, User)
@@ -616,7 +543,6 @@ async def list_conversations(
     for conversation_id, peer in peer_rows:
         peers[conversation_id] = peer
 
-    # Latest message per thread (DISTINCT ON is the cheap Postgres idiom here).
     latest: dict[uuid.UUID, Message] = {}
     for message in await session.scalars(
         select(Message)
@@ -640,7 +566,6 @@ async def list_conversations(
         )
         for c in conversations
     ]
-    # Newest activity first; a thread with no messages yet sorts by creation.
     rows.sort(
         key=lambda r: r.conversation.last_message_at or r.conversation.created_at,
         reverse=True,

@@ -1,12 +1,4 @@
-"""Metric-model bootstrap + refresh (05-phase-2 · deliverable 6).
-
-On link (and later on settlement / nightly) we pull the account's recent finished
-matches through its adapter and compute, per typed rate metric, a recency-weighted
-EWMA mean/std-dev and sample size `n` (half-life 10). Metrics are rate-based
-only — the adapters never surface raw totals.
-
-Pure math (`compute_ewma`) is separated from I/O so it is trivially testable.
-"""
+"""Metric-model bootstrap + refresh."""
 
 from __future__ import annotations
 
@@ -25,20 +17,13 @@ from ..constants import (
 )
 from ..models.skill import MetricModel
 
-# How far back to pull for the bootstrap (~last N finished matches; adapters cap
-# their own page sizes below this).
 _BOOTSTRAP_MATCH_LIMIT = 50
 
 
 async def get_metric_model(
     session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
 ) -> MetricModel | None:
-    """The user's model for one game+metric, or None if they have none yet.
-
-    The single reader for this row: matchmaking and pool formation both quote a
-    bar off it, so it lived as an identical private ``_metric_model`` in each.
-    One copy here keeps the two entry paths reading the model the same way.
-    """
+    """The user's model for one game+metric, or None if they have none yet."""
     return await session.scalar(
         select(MetricModel).where(
             MetricModel.user_id == user_id,
@@ -51,11 +36,7 @@ async def get_metric_model(
 def compute_ewma(
     values: list[float], half_life: int = METRIC_EWMA_HALF_LIFE
 ) -> tuple[float, float, int]:
-    """Recency-weighted (mean, std-dev, n) over ``values`` (oldest-first).
-
-    The most recent sample carries weight 1; each step older is halved every
-    ``half_life`` samples. `n` is the raw sample count (drives provisional-ness).
-    """
+    """Recency-weighted (mean, std-dev, n) over ``values`` (oldest-first)."""
     n = len(values)
     if n == 0:
         return 0.0, 0.0, 0
@@ -98,11 +79,7 @@ async def bootstrap(
     game: str,
     host_account_id: str,
 ) -> list[MetricModel]:
-    """Fetch recent history and (re)compute this account's metric models.
-
-    Returns the models written (empty for win-only games like chess, or when the
-    account has no readable rate metrics yet).
-    """
+    """Fetch recent history and (re)compute this account's metric models."""
     metrics = GAME_RATE_METRICS.get(game, ())
     if not metrics:
         return []
@@ -111,7 +88,6 @@ async def bootstrap(
     games: list[NormGame] = await adapter.poll_eligible_games(
         host_account_id,
         0,
-        # Same population settlement grades against.
         GameFilters(rated_only=rated_only_game(game)),
     )
     games = games[-_BOOTSTRAP_MATCH_LIMIT:]
@@ -122,9 +98,6 @@ async def bootstrap(
         mu, sigma, n = compute_ewma(values)
 
         if n == 0:
-            # An empty result set is not evidence: never overwrite an existing
-            # model with zeros (e.g. during a host outage). A fresh zero row for
-            # a never-seen account is fine.
             existing = await session.scalar(
                 select(MetricModel).where(
                     MetricModel.user_id == user_id,

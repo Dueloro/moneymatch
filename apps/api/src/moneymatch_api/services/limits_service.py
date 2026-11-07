@@ -1,13 +1,6 @@
-"""Server-side staking limits — enforced at escrow time, nowhere else.
-
-This is where the PoC's cosmetic `useWallet.canJoin` loss-cap tautology
-(migration-map §4.1) is buried: the client sends only an intent, and the server
-decides whether a stake is allowed against the available balance, the trailing
-24 h loss/entry totals, the concurrent-contest cap, and account status.
-
-Daily figures are trailing-24 h windows read from the immutable ledger, so they
-cannot be spoofed. Raising a protective cap is delayed 24 h (`pending_limits` +
-`pending_effective_at`, promoted lazily on read); lowering is instant.
+"""Server-side staking limits — enforced at escrow time, nowhere else. Daily figures
+are trailing-24 h windows read from the immutable ledger, so they cannot be
+spoofed.
 """
 
 from __future__ import annotations
@@ -39,9 +32,9 @@ class StakeBlockedError(APIError):
 
 @dataclass(frozen=True)
 class DailyUsage:
-    entry_cents: int  # staked in the trailing window
-    loss_cents: int  # realized net loss in the trailing window (≥ 0)
-    concurrent: int  # contests with escrow still held
+    entry_cents: int
+    loss_cents: int
+    concurrent: int
 
 
 async def get_or_create_limits(session: AsyncSession, user_id: uuid.UUID) -> Limit:
@@ -86,10 +79,8 @@ async def request_limit_change(
     timeout_until: datetime | None = None,
     now: datetime | None = None,
 ) -> Limit:
-    """Apply limit edits: lowering (more protective) is instant; raising a cap
-    is staged behind a 24 h cooldown (`pending_limits` + `pending_effective_at`).
-    A cool-off (`timeout_until`) is a protective break — applied instantly and
-    only ever extended, never shortened.
+    """Apply limit edits: lowering (more protective) is instant; raising a cap is
+    staged behind a 24 h cooldown (`pending_limits` + `pending_effective_at`).
     """
     now = now or datetime.now(UTC)
     limit = await get_or_create_limits(session, user_id)
@@ -112,10 +103,10 @@ async def request_limit_change(
         if value <= 0:
             raise APIError("invalid_limit", "Limit must be positive.", status_code=422)
         if value <= getattr(limit, field):
-            setattr(limit, field, value)  # lowering / equal — instant
+            setattr(limit, field, value)
             pending.pop(field, None)
         else:
-            pending[field] = value  # raising — defer
+            pending[field] = value
 
     if pending:
         limit.pending_limits = pending
@@ -141,7 +132,6 @@ async def daily_usage(
             LedgerEntry.created_at >= since,
         )
     )
-    # Realized play P&L in the window: prizes won minus stakes consumed.
     wins = await session.scalar(
         select(func.coalesce(func.sum(LedgerEntry.amount_cents), 0)).where(
             LedgerEntry.wallet_id == wallet.id,
@@ -158,7 +148,6 @@ async def daily_usage(
     )
     net_loss = max(0, int(stakes_lost or 0) - int(wins or 0))
 
-    # Contests still holding escrow for this wallet (any window).
     grouped = (
         select(LedgerEntry.ref_type, LedgerEntry.ref_id)
         .where(LedgerEntry.wallet_id == wallet.id, LedgerEntry.ref_id.isnot(None))
@@ -184,7 +173,8 @@ async def assert_can_deposit(
     now: datetime | None = None,
 ) -> None:
     """Raise `StakeBlockedError` if `amount_cents` would breach the trailing-24 h
-    deposit cap — the responsible-gaming guard on funding velocity."""
+    deposit cap — the responsible-gaming guard on funding velocity.
+    """
     now = now or datetime.now(UTC)
     if amount_cents <= 0:
         raise StakeBlockedError("invalid_amount", "Deposit must be positive.")
@@ -204,9 +194,6 @@ async def assert_can_deposit(
                 select(func.coalesce(func.sum(LedgerEntry.amount_cents), 0)).where(
                     LedgerEntry.wallet_id == wallet.id,
                     LedgerEntry.entry_type == "demo_deposit",
-                    # The signup grant is a platform gift, not the player's own
-                    # funding — exclude it from the deposit-velocity cap.
-                    # (IS DISTINCT FROM so NULL-memo deposits still count.)
                     LedgerEntry.memo.is_distinct_from(SIGNUP_GRANT_MEMO),
                     LedgerEntry.created_at >= now - WINDOW,
                 )
@@ -234,16 +221,10 @@ async def assert_can_stake(
     currency: str = "DEMO",
     now: datetime | None = None,
 ) -> None:
-    """Raise `StakeBlockedError` if `user` may not stake `amount_cents`.
-
-    Checks, in order: account active, available balance, daily entry cap, daily
-    loss cap (the full stake counts as potential loss), concurrent-contest cap.
-    """
+    """Raise `StakeBlockedError` if `user` may not stake `amount_cents`."""
     if amount_cents <= 0:
         raise StakeBlockedError("invalid_amount", "Stake must be positive.")
 
-    # Per-contest entry band (caps.py). Server presets always sit inside it; this
-    # is the boundary guarantee that survives a preset-table change.
     if amount_cents < CAPS.min_entry_cents:
         raise StakeBlockedError(
             "entry_below_min",
@@ -284,7 +265,6 @@ async def assert_can_stake(
     limit = await get_or_create_limits(session, user.id)
     promote_pending(limit, now=now)
 
-    # Self-imposed cool-off: staking is refused until the break ends.
     _now = now or datetime.now(UTC)
     if limit.timeout_until is not None and limit.timeout_until > _now:
         raise StakeBlockedError(
@@ -295,8 +275,8 @@ async def assert_can_stake(
 
     usage = await daily_usage(session, wallet, now=now)
 
-    # KYC threshold site (inert at MVP): a stake crossing the cumulative-entry
-    # threshold requires verification once kyc_live + a provider are wired.
+    # KYC threshold site (inert at MVP): a stake crossing the cumulative-entry threshold
+    # requires verification once kyc_live + a provider are wired.
     enforce_kyc(
         user,
         KycAction.STAKE,
@@ -343,8 +323,9 @@ async def can_stake(
     currency: str = "DEMO",
     now: datetime | None = None,
 ) -> bool:
-    """Non-raising `assert_can_stake` — used by room/field formation to decide
-    which candidates can be escrowed before committing to a group."""
+    """Non-raising `assert_can_stake` — used by room/field formation to decide which
+    candidates can be escrowed before committing to a group.
+    """
     try:
         await assert_can_stake(session, user, amount_cents, currency=currency, now=now)
         return True

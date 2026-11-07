@@ -1,28 +1,4 @@
-"""Geo-fence — server-side, read from `geo_config`, enforced before any escrow.
-
-The 14 excluded ("Any Chance") states live in the admin-flippable `geo_config`
-feature flag (seeded in migration 0001), **not** a code constant, so the list
-changes without a deploy (07-phase-4 · geo-fence test). `assert_can_enter` runs
-before a pool/tournament entry escrows a fee — a blocked resident is refused with
-a clean 403 and no ledger row is ever written.
-
-**This module fails closed, and that is load-bearing.** It previously did not:
-an unreadable database, a missing flag row, a missing key, or an empty list each
-returned an empty set, and an empty set excludes nobody — so on a fresh database
-every state was allowed while an inline comment claimed the opposite.
-
-The distinction the code now makes is between:
-
-- *"these states are excluded"* — a configured, non-empty list, and
-- *"we do not know which states are excluded"* — everything else.
-
-The second is not the same as "none are excluded". The only safe answer to
-"may this person stake money?" when the configuration is unreadable is **no**.
-An empty list is treated as unconfigured rather than as a deliberate "nowhere is
-excluded", because there is no legitimate reason to run a real-money product
-with the geo-fence deliberately empty, and the failure mode of guessing wrong is
-regulatory rather than cosmetic.
-"""
+"""Geo-fence — server-side, read from `geo_config`, enforced before any escrow."""
 
 from __future__ import annotations
 
@@ -40,13 +16,7 @@ log = structlog.get_logger(__name__)
 
 
 class GeoFenceMisconfigured(RuntimeError):
-    """The production geo-fence is absent or smaller than its required floor.
-
-    Raised at startup only. A refused boot is a failed deploy — loud, and cheap
-    to fix. Booting with a hole in the geo-fence is neither: nothing errors, and
-    the first symptom is a stake taken from someone who should have been
-    refused.
-    """
+    """The production geo-fence is absent or smaller than its required floor."""
 
 
 class RegionBlockedError(APIError):
@@ -62,23 +32,13 @@ class RegionBlockedError(APIError):
 
 
 async def load_excluded_states(session: AsyncSession) -> set[str] | None:
-    """The configured exclusions, or ``None`` when configuration is unavailable.
-
-    ``None`` is returned — and callers must treat it as "block" — when the flag
-    row is missing, the payload is null, the `excluded_states` key is absent,
-    the value is not a list, the list contains anything that is not a non-empty
-    string, or the list is empty. Also when the read itself fails.
-
-    Returning a set and returning ``None`` are different answers. Collapsing
-    them into "empty set" is precisely the bug this module used to have.
-    """
+    """The configured exclusions, or ``None`` when configuration is unavailable."""
     try:
         flag = await session.scalar(
             select(FeatureFlag).where(FeatureFlag.key == FLAG_GEO_CONFIG)
         )
     except SQLAlchemyError as exc:
-        # Fail closed. We cannot tell whether this player is permitted, so we
-        # must not let them stake.
+        # Fail closed.
         log.error("geo_config.read_failed", error=str(exc))
         return None
 
@@ -108,7 +68,6 @@ async def load_excluded_states(session: AsyncSession) -> set[str] | None:
         cleaned.add(code.strip().upper())
 
     if not cleaned:
-        # An empty list is "unconfigured", not "nowhere is excluded".
         log.error("geo_config.empty")
         return None
 
@@ -116,21 +75,11 @@ async def load_excluded_states(session: AsyncSession) -> set[str] | None:
 
 
 async def excluded_states(session: AsyncSession) -> set[str]:
-    """Read-only view of the exclusion list, for admin surfaces.
-
-    **An empty set from this function means "unconfigured", not "nothing is
-    excluded".** Never gate a stake on this — use `assert_can_enter`, which
-    distinguishes the two.
-    """
     return await load_excluded_states(session) or set()
 
 
 async def assert_can_enter(session: AsyncSession, state: str | None) -> None:
-    """Raise `RegionBlockedError` if `state` is geo-fenced (before any escrow).
-
-    Refuses when the state is unknown *or* when the exclusion list cannot be
-    established. Both are "we cannot prove this is allowed".
-    """
+    """Raise `RegionBlockedError` if `state` is geo-fenced (before any escrow)."""
     if state is None:
         raise RegionBlockedError(state)
 
@@ -146,30 +95,12 @@ async def assert_can_enter(session: AsyncSession, state: str | None) -> None:
 async def assert_configured_for_production(
     session: AsyncSession, *, enforce_floor: bool | None = None
 ) -> None:
-    """Refuse to boot a production deploy whose geo-fence is missing or holed.
-
-    Called from the app lifespan when `ENV=prod`. Not called otherwise: local
-    and dev databases are routinely reset, and failing their boot on a seed row
-    would be noise rather than signal.
-
-    Two checks, deliberately separate:
-
-    1. **The fence must be establishable at all.** Unconditional. An absent,
-       empty, malformed or unreadable config refuses the boot no matter how
-       anything is configured. This is the hole that was live in production and
-       it is not negotiable.
-    2. **The fence must cover the seeded floor.** Governed by
-       `geo_enforce_seeded_floor`, default `True`. Whether the list may ever be
-       narrowed is an open product/legal question (OPEN_QUESTIONS.md Q7), so it
-       is a setting rather than an architectural fact — but the default is the
-       strict one, so nothing changes without a deliberate act.
-    """
+    """Refuse to boot a production deploy whose geo-fence is missing or holed."""
     if enforce_floor is None:
         enforce_floor = get_settings().geo_enforce_seeded_floor
 
     configured = await load_excluded_states(session)
     if configured is None:
-        # Unconditional: not governed by the setting.
         raise GeoFenceMisconfigured(
             "geo_config is missing, empty, malformed or unreadable with ENV=prod. "
             "Seed the geo_config feature flag before deploying: migration 0001 "

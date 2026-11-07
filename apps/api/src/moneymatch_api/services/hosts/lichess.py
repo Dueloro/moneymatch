@@ -1,14 +1,4 @@
-"""Async client over the Lichess public API (no key required).
-
-Ported from `poc-reference/api/_lib/lichess_service.py` (11-migration-map §1):
-same endpoints and parsing, now going through the shared `request_json` helper
-so every call gets retries, typed host errors, and latency logging.
-
-The two calls that matter for linking + profiles:
-  * ``GET /api/user/{username}`` — public profile + per-format perfs + counts.
-  * ``GET /api/games/user/{username}`` (ndjson) — the user's games since a
-    timestamp, for the metric-model bootstrap (and Phase-3 settlement).
-"""
+"""Async client over the Lichess public API (no key required)."""
 
 from __future__ import annotations
 
@@ -36,12 +26,7 @@ def _parse_ndjson(text: str) -> list[dict]:
 
 
 async def get_user(username: str) -> dict | None:
-    """Fetch a public Lichess profile. ``None`` if not found/disabled/closed.
-
-    Raises `HostUnavailable` on a host outage — a "not found" (404, or a
-    disabled/closed account) is a real answer, not a failure, so it returns
-    ``None`` and the adapter turns that into a clean 404.
-    """
+    """Fetch a public Lichess profile."""
     try:
         response = await request_json(
             HOST, "GET", f"{LICHESS_BASE}/user/{username}", headers=HEADERS
@@ -61,15 +46,7 @@ async def get_user_games(
     max_games: int = 50,
     rated_only: bool = True,
 ) -> list[dict]:
-    """Fetch a user's games since ``since_ms`` (epoch ms), newest first.
-
-    ``rated_only`` (the default) asks Lichess for rated games only, so casual
-    and practice games never reach anything that builds a stat. Passing False
-    omits the filter entirely, which returns both.
-
-    ``moves=true`` so plies are countable. Fails soft (``[]``) on any host error
-    so a metric bootstrap / settlement poll degrades rather than crashes.
-    """
+    """Fetch a user's games since ``since_ms`` (epoch ms), newest first."""
     params = {
         "since": str(int(since_ms)),
         "max": str(max_games),
@@ -101,12 +78,7 @@ async def create_open_challenge(
     clock_limit: int, clock_increment: int = 0, *, users: list[str] | None = None
 ) -> dict | None:
     """Create a Lichess **open challenge** (no auth) so the platform can pair two
-    specific players into one game. ``None`` on error.
-
-    When ``users`` is given (the two linked handles), the challenge is restricted
-    so only those two accounts can take the seats (`users=a,b` — 01-architecture
-    §3.1). Used by Phase-3 chess brokering; kept here so the seam ports with the
-    client.
+    specific players into one game.
     """
     data = {
         "clock.limit": str(clock_limit),
@@ -157,14 +129,7 @@ async def get_game(game_id: str) -> dict | None:
 
 
 async def get_live_game(game_id: str) -> dict | None:
-    """Fetch a game **with its move list** for a live under-the-card view.
-
-    The game export works while a game is still in progress (`status:
-    "started"`), so this powers the Activity "moves played / whose turn"
-    line for a brokered head-to-head. ``moves=true`` returns space-separated
-    SAN; the caller counts plies. ``None`` on any host error (the card just
-    shows nothing rather than failing the feed).
-    """
+    """Fetch a game **with its move list** for a live under-the-card view."""
     params = {
         "moves": "true",
         "clocks": "false",

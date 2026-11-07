@@ -1,22 +1,4 @@
-"""Solo-pool engine — queue-matched rooms with personalized bars (07-phase-4).
-
-Ports the settlement invariant from `poc-reference/api/_lib/solo_challenge.py`
-(clearers split pool − rake; none clear → full refund, zero rake; unverifiable
-refunded off the top; floats → integer cents) and adds the new fairness layer:
-
-- **enqueue** freezes the player's baseline and `personal_bar = round(μ + k·σ)`
-  after the gates (geo-fence *before* anything, provisional metric, sandbagging).
-  No escrow while waiting (architecture §3.3) — escrow happens at room formation.
-- **room formation** (match-on-write, `FOR UPDATE SKIP LOCKED`) groups compatible
-  tickets, derives `room_bar = round(mean(personal_bars))`, and forms **only if
-  the composition predicate holds for every member** (a shark or a hopeless
-  outlier is refused) — then escrows the group.
-- **settle** grades each entry's first qualifying match vs. `room_bar` and splits
-  the pool; `reconciliation_service` is the money enforcer.
-
-No API surface accepts a bar, room bar, or payout — every number is derived here
-from stored inputs and re-derives byte-for-byte for audit.
-"""
+"""Solo-pool engine — queue-matched rooms with personalized bars."""
 
 from __future__ import annotations
 
@@ -73,7 +55,6 @@ from .feature_flags import get_boolean_flags
 
 
 def _pbar(ticket: QueueTicket) -> float:
-    """A pool ticket's frozen personal bar (always set on pool tickets)."""
     return float(ticket.personal_bar or 0.0)
 
 
@@ -88,7 +69,7 @@ class PoolError(APIError):
 
 @dataclass
 class PoolEnqueueResult:
-    status: str  # "searching" | "formed"
+    status: str
     pool: SoloPool | None = None
     ticket: QueueTicket | None = None
 
@@ -100,11 +81,6 @@ class PoolGrade:
     cleared: bool | None  # True/False, or None = unverifiable → refund
     telemetry: dict[str, Any] | None = None
     raw_payload_id: uuid.UUID | None = None
-
-
-# --------------------------------------------------------------------------- #
-# Eligibility + baselines.
-# --------------------------------------------------------------------------- #
 
 
 def _validate_bucket(game: str, metric: str, difficulty: str, entry_cents: int) -> None:
@@ -141,12 +117,6 @@ async def _require_link(
 
 
 def _shape(metric: str) -> dict[str, Any]:
-    """The bar-placement options for a metric, in one place.
-
-    Both `preview_bars` (the number on the card) and `_build_baseline` (the
-    number you are graded against) must place bars identically, or the card
-    advertises a bar the pool does not use.
-    """
     return {
         "increment": METRIC_BAR_INCREMENT.get(metric, 0.01),
         "lower_is_better": lower_is_better(metric),
@@ -158,14 +128,6 @@ def _shape(metric: str) -> dict[str, Any]:
 def _corrected(
     model: MetricModel, metric: str, link: LinkedAccount | None
 ) -> tuple[float, float]:
-    """The (mu, sigma) a bar is actually placed from: shrunk, then spread-floored.
-
-    A raw mean and spread off a handful of games are mostly noise, so they are
-    blended toward what the player's rating predicts (`skill_prior`). Whatever
-    comes out of here is what gets frozen into the ticket, so the bar, the
-    disclosed clear rate and the room composition check all read the same
-    numbers.
-    """
     rating = skill_prior.host_rating(link) if link is not None else None
     mu, sigma = skill_prior.shrink(
         float(model.mu),
@@ -180,15 +142,14 @@ async def preview_bars(
     session: AsyncSession, user: User, game: str, metric: str
 ) -> dict[str, Any]:
     """The three difficulty bars quoted from the viewer's own baseline + the
-    disclosed clear rates. Provisional metrics return no bars (can't duel)."""
+    disclosed clear rates.
+    """
     model = await metric_models_service.get_metric_model(session, user.id, game, metric)
     n = model.n if model else 0
     provisional = n < STAT_BASELINE_MIN_N
     shape = _shape(metric)
     cards: list[dict[str, Any]] = []
     if model is not None and not provisional:
-        # The same resolver `enqueue` uses, so the bar on the card is quoted
-        # from the account you will actually be graded on.
         link = await linking_service.get_link(session, user.id, game)
         mu, sigma = _corrected(model, metric, link)
         for difficulty, k in POOL_DIFFICULTY_K.items():
@@ -197,11 +158,7 @@ async def preview_bars(
                 {
                     "difficulty": difficulty,
                     "bar": bar,
-                    # From the bar actually quoted and the same (mu, sigma)
-                    # and distribution used to place it, so the number on the
-                    # card is the one the fairness check and settlement agree
-                    # with. Rounding to whole moves still shifts it off the
-                    # nominal rate.
+                    # Rounding to whole moves still shifts it off the nominal rate.
                     "clear_rate": round(
                         fairness.clear_prob(
                             bar,
@@ -225,7 +182,6 @@ async def _build_baseline(
     difficulty: str,
     link: LinkedAccount,
 ) -> tuple[dict[str, Any], float]:
-    """Freeze the metric model + host id, compute the personal bar for `difficulty`."""
     model = await metric_models_service.get_metric_model(session, user.id, game, metric)
     if model is None or model.n < STAT_BASELINE_MIN_N:
         raise PoolError(
@@ -242,19 +198,11 @@ async def _build_baseline(
         "linked_account_id": str(link.id),
         "host_account_id": link.host_account_id,
         "metric": metric,
-        # The corrected centre and spread, frozen: the room composition check
-        # reads these back, and they must be what the bar was placed with.
-        # Storing the raw sample here instead is what made rooms uncomposable.
         "mu": mu,
         "sigma": sigma_eff,
         "n": int(model.n),
     }
     return baseline, bar
-
-
-# --------------------------------------------------------------------------- #
-# Room composition (all fairness numbers derived from frozen ticket baselines).
-# --------------------------------------------------------------------------- #
 
 
 def _room_bar(tickets: list[QueueTicket], metric: str) -> float:
@@ -265,7 +213,6 @@ def _room_bar(tickets: list[QueueTicket], metric: str) -> float:
 def _composes(
     tickets: list[QueueTicket], difficulty: str, metric: str
 ) -> tuple[float, bool]:
-    """Return (room_bar, fair?) for a candidate group."""
     bars = [_pbar(t) for t in tickets]
     mus = [float(t.baseline_snapshot["mu"]) for t in tickets]
     sigmas = [float(t.baseline_snapshot["sigma"]) for t in tickets]
@@ -297,11 +244,6 @@ async def _all_pairs_pairable(
             ):
                 return False
     return True
-
-
-# --------------------------------------------------------------------------- #
-# Ticket + room formation.
-# --------------------------------------------------------------------------- #
 
 
 async def get_waiting_ticket(
@@ -382,7 +324,6 @@ async def _form_room(
     now: datetime,
     min_entrants: int = POOL_MIN_ROOM,
 ) -> SoloPool:
-    """Create the room, escrow every member, and retire their tickets."""
     pool = SoloPool(
         game=game,
         metric=metric,
@@ -468,7 +409,7 @@ async def _try_form_room(
 ) -> SoloPool | None:
     """Lock compatible waiting tickets and form a fair room if one exists."""
     if not await limits_service.can_stake(session, user, entry_cents):
-        return None  # the enqueuer can't stake yet — keep waiting
+        return None
 
     candidates = list(
         await session.scalars(
@@ -490,13 +431,11 @@ async def _try_form_room(
         )
     )
     users = await _users_by_id(session, [c.user_id for c in candidates])
-    # Only consider candidates who can currently be escrowed.
     stakeable = [
         c
         for c in candidates
         if await limits_service.can_stake(session, users[c.user_id], entry_cents)
     ]
-    # Nearest personal bars first (tightest room).
     stakeable.sort(key=lambda c: abs(_pbar(c) - _pbar(ticket)))
 
     age = max(0.0, (now - ticket.created_at).total_seconds())
@@ -518,11 +457,6 @@ async def _try_form_room(
     return None
 
 
-# --------------------------------------------------------------------------- #
-# Public API.
-# --------------------------------------------------------------------------- #
-
-
 async def enqueue(
     session: AsyncSession,
     user: User,
@@ -532,7 +466,6 @@ async def enqueue(
     difficulty: str,
     entry_cents: int,
 ) -> PoolEnqueueResult:
-    """Enter a pool (enqueue). Gates run in order; escrow waits for formation."""
     now = clock.now()
     _validate_bucket(game, metric, difficulty, entry_cents)
 
@@ -573,8 +506,9 @@ async def enqueue(
 
 
 async def poll_status(session: AsyncSession, user: User) -> PoolEnqueueResult:
-    """Where the viewer stands: in a formed room, still searching (retry a pass),
-    or idle."""
+    """Where the viewer stands: in a formed room, still searching (retry a pass), or
+    idle.
+    """
     now = clock.now()
     existing = await _current_pool_for_user(session, user.id)
     if existing is not None:
@@ -607,11 +541,6 @@ async def cancel(session: AsyncSession, user: User) -> bool:
     return False
 
 
-# --------------------------------------------------------------------------- #
-# Settlement (called by the worker with server-fetched grading).
-# --------------------------------------------------------------------------- #
-
-
 async def _entries(session: AsyncSession, pool_id: uuid.UUID) -> list[SoloEntry]:
     rows = await session.scalars(
         select(SoloEntry)
@@ -624,8 +553,9 @@ async def _entries(session: AsyncSession, pool_id: uuid.UUID) -> list[SoloEntry]
 async def settle_pool(
     session: AsyncSession, pool: SoloPool, grades: dict[uuid.UUID, PoolGrade]
 ) -> SoloPool:
-    """Grade + pay a pool. Clearers split pool − rake; unverifiable refunded off
-    the top; nobody clears → full refund, zero rake. Idempotent on terminal."""
+    """Grade + pay a pool. Clearers split pool − rake; unverifiable refunded off the
+    top; nobody clears → full refund, zero rake.
+    """
     if pool.state in ("SETTLED", "CANCELED"):
         return pool
     entries = await _entries(session, pool.id)

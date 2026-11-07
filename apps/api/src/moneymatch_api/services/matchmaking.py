@@ -1,18 +1,4 @@
-"""DB-backed matchmaking — the PoC's in-memory queue, moved onto Postgres.
-
-Ports `poc-reference/api/_lib/match_queue.py` (11-migration-map §1) with the
-substrate rewritten: in-memory dicts → `queue_tickets`/`matches` rows, floats →
-integer cents. Chess tickets pair inside an Elo band that widens with wait time.
-
-The load-bearing property is **match-on-write, race-safe**: a pairing pass locks
-candidate tickets with `FOR UPDATE SKIP LOCKED`, so two concurrent enqueues
-racing for one waiting ticket produce exactly one match (the loser simply keeps
-waiting). No escrow is taken while waiting — escrow happens at match confirm
-(`services/match_lifecycle.py`); a ticket past its TTL is expired by the worker.
-
-The **`can_pair` seam is the one anti-collusion chokepoint** (self-pair,
-same-host, 24 h repeat); keep every rejection here.
-"""
+"""Chess tickets pair inside an Elo band that widens with wait time."""
 
 from __future__ import annotations
 
@@ -68,18 +54,13 @@ class MatchmakingError(APIError):
 
 @dataclass
 class EnqueueResult:
-    status: str  # "matched" | "searching"
+    status: str
     match: Match | None = None
     ticket: QueueTicket | None = None
 
 
 def _age_seconds(ticket: QueueTicket, now: datetime) -> float:
     return max(0.0, (now - ticket.created_at).total_seconds())
-
-
-# --------------------------------------------------------------------------- #
-# Eligibility (who may queue this market at all).
-# --------------------------------------------------------------------------- #
 
 
 def _resolve_market(game: str, market_key: str, speed: str | None) -> MarketDef:
@@ -119,7 +100,6 @@ async def _require_link(
 
 
 async def _assert_eligible(session: AsyncSession, user: User, game: str) -> None:
-    """Account active and game enabled."""
     if user.status != "active":
         raise MatchmakingError(
             "account_not_active",
@@ -133,12 +113,6 @@ async def _assert_eligible(session: AsyncSession, user: User, game: str) -> None
         )
 
 
-# --------------------------------------------------------------------------- #
-# Baselines — frozen at enqueue so a later model refresh can't move an in-flight
-# pairing (06-phase-3 · baseline snapshots frozen).
-# --------------------------------------------------------------------------- #
-
-
 def _build_baseline(link: LinkedAccount, speed: str | None) -> dict:
     snapshot = link.profile_snapshot or {}
     baseline: dict = {
@@ -150,11 +124,6 @@ def _build_baseline(link: LinkedAccount, speed: str | None) -> dict:
         skill_rating.rating_for_speed(profile, speed) if profile else _DEFAULT_RATING
     )
     return baseline
-
-
-# --------------------------------------------------------------------------- #
-# can_pair — the anti-collusion seam (keep every rejection in one function).
-# --------------------------------------------------------------------------- #
 
 
 async def _recent_pair_exists(
@@ -182,10 +151,7 @@ async def can_pair(
     cand: QueueTicket,
     now: datetime,
 ) -> bool:
-    """Whether two waiting tickets may be paired (anti-collusion).
-
-    Rejects the same user, the same host account, and a re-pair within the cooldown.
-    """
+    """Whether two waiting tickets may be paired (anti-collusion)."""
     if me.user_id == cand.user_id:
         return False
     if me.baseline_snapshot.get("host_account_id") == cand.baseline_snapshot.get(
@@ -197,13 +163,7 @@ async def can_pair(
     return True
 
 
-# --------------------------------------------------------------------------- #
-# Elo-band eligibility + selection (pure, fed frozen baselines).
-# --------------------------------------------------------------------------- #
-
-
 def _chess_band(age_seconds: float) -> int:
-    """Elo half-band a ticket searches within at ``age_seconds``."""
     return int(
         min(CHESS_MAX_BAND, CHESS_BASE_BAND + age_seconds * CHESS_BAND_GROWTH_PER_SEC)
     )
@@ -237,11 +197,6 @@ def forecast_between(mine: dict, theirs: dict) -> Forecast:
     else:
         label = f"You're the underdog — model gives you {pct}%"
     return Forecast(you_win_prob=round(prob, 4), label=label)
-
-
-# --------------------------------------------------------------------------- #
-# Ticket + match formation.
-# --------------------------------------------------------------------------- #
 
 
 async def _current_match_for_user(
@@ -280,7 +235,6 @@ async def _get_or_create_ticket(
     link: LinkedAccount,
     now: datetime,
 ) -> QueueTicket:
-    """One waiting duel ticket per user; reuse the same bucket to preserve wait age."""
     existing = await get_waiting_ticket(session, user.id)
     if existing is not None:
         same = (
@@ -291,7 +245,7 @@ async def _get_or_create_ticket(
         )
         if same:
             return existing
-        existing.state = "canceled"  # switched buckets — retire the old ticket
+        existing.state = "canceled"
         await session.flush()
 
     ticket = QueueTicket(
@@ -315,7 +269,8 @@ async def _get_or_create_ticket(
 @dataclass
 class MatchSide:
     """One seat's frozen inputs — the shared shape the ticket-paired and the
-    challenge-formed paths both assemble a match from."""
+    challenge-formed paths both assemble a match from.
+    """
 
     user_id: uuid.UUID
     linked_account_id: uuid.UUID
@@ -334,11 +289,9 @@ async def _assemble_match(
     speed: str | None,
     friendly: bool = False,
 ) -> Match:
-    """Create a PENDING match + both seats from two frozen sides.
-
-    `sides[0]` takes white (chess), `sides[1]` black. A `friendly` match books
-    **zero rake** and refunds both entries on settle (the pair is past its
-    rake-bearing cap — 08-phase-5); the winner is still graded for the record.
+    """Create a PENDING match + both seats from two frozen sides. A `friendly` match
+    books **zero rake** and refunds both entries on settle; the winner is still
+    graded for the record.
     """
     pot = entry_cents * 2
     rake_bps = 0 if friendly else market.rake_bps
@@ -426,8 +379,6 @@ async def _form_match(
     opp: QueueTicket,
     now: datetime,
 ) -> Match:
-    """Create the PENDING match + both seats from two tickets and retire the tickets."""
-    # Chess assigns colors (the older waiting ticket = white, the newcomer = black).
     match = await _assemble_match(
         session,
         market,
@@ -455,13 +406,7 @@ async def create_challenge_match(
     speed: str | None,
     friendly: bool,
 ) -> Match:
-    """Form a PENDING match from an accepted challenge (no queue tickets).
-
-    Runs the same assembly as a paired match — same escrow-at-confirm lifecycle,
-    same server-owned economics — but the two sides come from a direct challenge
-    rather than the forecast matcher (fairness is by consent here, 08-phase-5).
-    The challenger takes seat 0 (white, for chess).
-    """
+    """Form a PENDING match from an accepted challenge (no queue tickets)."""
     now = clock.now()
     challenger_baseline = _build_baseline(challenger_link, speed)
     challengee_baseline = _build_baseline(challengee_link, speed)
@@ -494,10 +439,8 @@ async def _pair_ticket(
     *,
     only_ticket_id: uuid.UUID | None = None,
 ) -> Match | None:
-    """Lock compatible waiting candidates and form a match with the best eligible one.
-
-    `FOR UPDATE SKIP LOCKED` makes this race-safe: a candidate another pass is
-    already pairing is simply skipped, so no ticket is ever double-matched.
+    """Lock compatible waiting candidates and form a match with the best eligible
+    one.
     """
     conds = [
         QueueTicket.game == market.game,
@@ -536,11 +479,6 @@ async def _pair_ticket(
     return await _form_match(session, market, ticket, best[1], now)
 
 
-# --------------------------------------------------------------------------- #
-# Public API.
-# --------------------------------------------------------------------------- #
-
-
 async def enqueue(
     session: AsyncSession,
     user: User,
@@ -565,9 +503,8 @@ async def enqueue(
             "queue_paused", "Matchmaking is paused right now.", status_code=503
         )
 
-    # Geo-fence H2H the same as pools/tournaments — fail fast before we queue or
-    # pair anyone (the escrow gate at confirm is the backstop). A blocked resident
-    # never enters the queue.
+    # Geo-fence H2H the same as pools/tournaments — fail fast before we queue or pair
+    # anyone (the escrow gate at confirm is the backstop).
     await geo_service.assert_can_enter(session, user.residence_state)
 
     market = _resolve_market(game, market_key, speed)
@@ -600,10 +537,9 @@ async def enqueue(
 
 
 async def poll_status(session: AsyncSession, user: User) -> EnqueueResult:
-    """Where the user stands: in a live match, still searching (retry pairing), or idle.
-
-    Re-running the pairing pass here converges the two-both-waiting race (each
-    side's own enqueue may have missed the other under READ COMMITTED).
+    """Where the user stands: in a live match, still searching (retry pairing), or
+    idle. Re-running the pairing pass here converges the two-both-waiting race
+    (each side's own enqueue may have missed the other under READ COMMITTED).
     """
     now = clock.now()
     existing = await _current_match_for_user(session, user.id)
@@ -627,10 +563,8 @@ async def poll_status(session: AsyncSession, user: User) -> EnqueueResult:
 async def take_waiting(
     session: AsyncSession, user: User, ticket_id: uuid.UUID
 ) -> Match:
-    """Take the other side of a specific waiting ticket directly (design's Match pill).
-
-    Runs the identical pairing checks — a crafted request cannot bypass the
-    Elo band or `can_pair`.
+    """Take the other side of a specific waiting ticket directly (design's Match
+    pill).
     """
     now = clock.now()
     flags = await get_boolean_flags(session)
@@ -680,8 +614,6 @@ async def take_waiting(
 
 
 async def cancel(session: AsyncSession, user: User) -> bool:
-    """Leave the queue (cancel the waiting ticket). No escrow was held. Returns
-    whether a ticket was canceled."""
     ticket = await get_waiting_ticket(session, user.id)
     if ticket is None:
         return False
@@ -709,7 +641,7 @@ async def list_waiting(
 
 
 async def expire_tickets(session: AsyncSession, *, now: datetime | None = None) -> int:
-    """Worker: mark waiting tickets past their TTL as expired. Returns the count."""
+    """Worker: mark waiting tickets past their TTL as expired."""
     now = now or clock.now()
     tickets = list(
         await session.scalars(
@@ -727,8 +659,9 @@ async def expire_tickets(session: AsyncSession, *, now: datetime | None = None) 
 async def cancel_all_waiting(
     session: AsyncSession, *, now: datetime | None = None
 ) -> int:
-    """Kill switch: drain the whole waiting queue (queue_paused). No escrow was
-    held while waiting, so this is a clean cancel — nothing to refund."""
+    """Kill switch: drain the whole waiting queue (queue_paused). No escrow was held
+    while waiting, so this is a clean cancel — nothing to refund.
+    """
     tickets = list(
         await session.scalars(
             select(QueueTicket)

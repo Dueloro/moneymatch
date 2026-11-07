@@ -1,11 +1,4 @@
-"""Feature-flag reads and admin writes.
-
-Flags live in the `feature_flags` DB table (00-README §3.10) so admins can flip
-them without a deploy. The read path (`get_boolean_flags`) is per-request/cycle,
-so a flip takes effect on the very next call with no restart (09-phase-6 · the
-"flag flips take effect without restart" test). Writes go through `set_flag` /
-`set_flag_payload` from the admin surface; each is audited by its caller.
-"""
+"""Feature-flag reads and admin writes."""
 
 from __future__ import annotations
 
@@ -29,8 +22,6 @@ from ..models.feature_flag import FeatureFlag
 
 log = structlog.get_logger(__name__)
 
-# Fallback used before the table exists / when the DB is unreachable, so /health
-# stays a liveness probe rather than a DB dependency.
 DEFAULT_FLAGS: dict[str, bool] = {
     FLAG_QUEUE_PAUSED: False,
     FLAG_SETTLEMENT_PAUSED: False,
@@ -54,13 +45,8 @@ async def get_boolean_flags(session: AsyncSession) -> dict[str, bool]:
 
 
 async def list_flags(session: AsyncSession) -> list[FeatureFlag]:
-    """Every flag for the admin table: stored rows, plus any declared default
-    that has never been written.
-
-    A flag added in code has no row until someone toggles it, so listing only
-    stored rows made new flags invisible in the admin UI and therefore
-    impossible to turn on. The synthetic rows are detached (never added to the
-    session), so nothing is persisted until an actual toggle upserts them.
+    """Every flag for the admin table: stored rows, plus any declared default that
+    has never been written.
     """
     result = await session.execute(select(FeatureFlag).order_by(FeatureFlag.key))
     rows = list(result.scalars().all())
@@ -83,12 +69,6 @@ async def set_flag(
     enabled: bool | None = None,
     payload: dict[str, Any] | None = None,
 ) -> FeatureFlag:
-    """Upsert a flag's `enabled` and/or `payload`. Flushes, never commits.
-
-    Upsert (not update) so a flag the first migration didn't seed (a new
-    per-game key, `worker_heartbeat`) can still be set by admin without a
-    migration. Read is per-request, so the change is live immediately.
-    """
     values: dict[str, Any] = {"key": key}
     if enabled is not None:
         values["enabled"] = enabled

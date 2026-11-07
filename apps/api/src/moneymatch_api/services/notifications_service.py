@@ -1,11 +1,4 @@
-"""Notifications — the consolidated fan-out (writes) + the Inbox reads.
-
-Every lifecycle event appends a row inside the transition that causes it
-(`match_found`, `settled`, `refund`, `challenge_received`, `challenge_accepted`,
-`friend_request`, `room_filled`, `system` — 08-phase-5 · deliverable 7); the
-Inbox (`GET /notifications`) consumes them and marks them read. Flushes, never
-commits — the caller owns the transaction boundary.
-"""
+"""Notifications — the consolidated fan-out (writes) + the Inbox reads."""
 
 from __future__ import annotations
 
@@ -25,14 +18,9 @@ log = structlog.get_logger(__name__)
 
 _DEFAULT_LIMIT = 50
 
-# Postgres LISTEN/NOTIFY channel the SSE stream (`routers/events.py`) subscribes
-# to. Every emit publishes here so a connected client refreshes the instant the
-# event's transaction commits — the notify is queued now and delivered by
-# Postgres on COMMIT, so a rolled-back transition never pushes a phantom event.
 _EVENTS_CHANNEL = "moneymatch_events"
 
-# Copy for the browser push, per kind → (title, body, deep-link). Kinds absent
-# here (refund / system) stay in-app only.
+# Kinds absent here (refund / system) stay in-app only.
 _PUSH_COPY: dict[str, tuple[str, str, str]] = {
     "match_found": (
         "Match found",
@@ -63,11 +51,6 @@ _PUSH_COPY: dict[str, tuple[str, str, str]] = {
     "friend_request": ("Friend request", "You have a new friend request.", "/social"),
 }
 
-# A deliberately small subset of kinds also gets a transactional email — the
-# high-value, non-time-critical nudges worth reaching an inbox for. (subject,
-# body); the deep link reuses the matching `_PUSH_COPY` path. Anything absent
-# here stays in-app + push only, so email never becomes a firehose. Only real
-# addresses receive it — see `email_service` (username accounts are skipped).
 _EMAIL_COPY: dict[str, tuple[str, str]] = {
     "match_found": (
         "Your match is ready",
@@ -95,9 +78,8 @@ async def emit(
     session.add(row)
     await session.flush()
 
-    # Publish a lightweight event on the LISTEN/NOTIFY channel (delivered at
-    # commit). The client only needs "something changed for you" to refetch, so
-    # the payload is just the recipient + kind — never money, never PII.
+    # The client only needs "something changed for you" to refetch, so the payload is
+    # just the recipient + kind — never money, never PII.
     await session.execute(
         text("SELECT pg_notify(:channel, :payload)"),
         {
@@ -142,7 +124,6 @@ async def list_for_user(
 
 
 async def unread_count(session: AsyncSession, user_id: uuid.UUID) -> int:
-    """Unread notifications for the sidebar bell dot."""
     return int(
         await session.scalar(
             select(func.count())
@@ -159,8 +140,9 @@ async def mark_read(
     *,
     ids: list[uuid.UUID] | None = None,
 ) -> int:
-    """Mark the given notifications (or all) read. Idempotent: only unread rows
-    are stamped, so a second call is a no-op. Returns the resulting unread count."""
+    """Mark the given notifications (or all) read. Idempotent: only unread rows are
+    stamped, so a second call is a no-op.
+    """
     conds = [Notification.user_id == user_id, Notification.read_at.is_(None)]
     if ids is not None:
         conds.append(Notification.id.in_(ids))

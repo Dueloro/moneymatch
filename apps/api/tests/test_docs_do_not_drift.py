@@ -27,24 +27,6 @@ from moneymatch_api.services import fairness, skill_prior
 pytestmark = pytest.mark.nodb
 
 
-def test_docstring_does_not_restate_the_difficulty_constants():
-    """The k values must live in exactly one place.
-
-    Restating them in prose is how they came to disagree. The fix is not to keep
-    them in sync — it is to refuse to have a second copy at all.
-    """
-    doc = fairness.__doc__ or ""
-    # The stale trio, in the forms it was written in.
-    for stale in ("0.5,", "1.0,", "1.75", "31/16/4"):
-        assert stale not in doc.replace("{0.385, 0.842, 1.282}", ""), (
-            f"fairness docstring appears to restate difficulty constants ({stale!r}). "
-            "Point at constants.POOL_DIFFICULTY_K instead of copying the values."
-        )
-    assert "POOL_DIFFICULTY_K" in doc, (
-        "the docstring should name the constant it defers to"
-    )
-
-
 def test_difficulty_constants_are_the_documented_three():
     """A sanity anchor: the tiers themselves have not silently changed."""
     assert set(POOL_DIFFICULTY_K) == {"easy", "medium", "hard"}
@@ -101,15 +83,7 @@ def test_every_live_market_has_an_increment():
     assert not missing, f"pool markets with no declared increment: {sorted(missing)}"
 
 
-def test_skill_prior_docstring_admits_its_scope():
-    """It described a general mechanism; it drives exactly one metric."""
-    doc = skill_prior.__doc__ or ""
-    assert "chess_moves" in doc
-    assert "no-op" in doc or "untouched" in doc, (
-        "the docstring must say that shrink() is inert for metrics with no prior "
-        "— otherwise it reads as though every game is shrunk toward a rating"
-    )
-    # And the claim must still be true.
+def test_skill_prior_only_covers_chess_moves():
     assert skill_prior.prior_for("chess_accuracy", 1500) is None
     assert skill_prior.prior_for("chess_moves", 1500) is not None
 

@@ -1,11 +1,4 @@
-"""User provisioning and onboarding.
-
-`get_or_create_user` is the single provisioning path, called from the auth
-dependency on every authed request — the row is created (minimally) on first
-authed call and reused thereafter (matched by the unique Supabase `auth_id`).
-Onboarding (`complete_onboarding`) then sets the immutable username plus the
-residence/18+ attestation.
-"""
+"""User provisioning and onboarding."""
 
 from __future__ import annotations
 
@@ -19,28 +12,14 @@ from ..models.user import User, gen_friend_code
 from ..models.wallet import SIGNUP_GRANT_CENTS, SIGNUP_GRANT_MEMO, Limit, Wallet
 from . import wallet_service
 
-# A friend_code collision is one-in-a-billion, but a clean signup must never 500
-# on the unique constraint; regenerate and retry a few times (backlog · Phase 5).
 _FRIEND_CODE_ATTEMPTS = 5
 
 
 async def get_or_create_user(session: AsyncSession, identity: AuthedIdentity) -> User:
-    """Resolve the user row for an identity, creating a minimal one if absent.
-
-    A freshly created user is provisioned with a DEMO wallet, default limits, and
-    the signup grant — all in the caller's transaction, so a new account either
-    lands fully set up or not at all.
-
-    A unique-constraint conflict on insert is disambiguated by re-reading the
-    `auth_id`: if the row now exists a concurrent first call created it (use that
-    row); otherwise the collision was on the random `friend_code`, so we retry
-    with a fresh one rather than 500 a clean signup. This is schema-name-agnostic
-    (no constraint-name string matching) and safe for the caller's transaction.
-    """
+    """Resolve the user row for an identity, creating a minimal one if absent."""
     result = await session.execute(select(User).where(User.auth_id == identity.auth_id))
     user = result.scalar_one_or_none()
     if user is not None:
-        # Backfill email if Supabase now has one we didn't record.
         if identity.email and user.email != identity.email:
             user.email = identity.email
         return user
@@ -63,20 +42,18 @@ async def get_or_create_user(session: AsyncSession, identity: AuthedIdentity) ->
             )
             if existing is not None:
                 return existing  # concurrent create won the auth_id race
-            continue  # friend_code collision — retry with a fresh code
+            continue
         await provision_new_user(session, user)
         return user
 
-    assert last_exc is not None  # loop only exits early via return
+    assert last_exc is not None
     raise last_exc
 
 
 async def provision_new_user(session: AsyncSession, user: User) -> Wallet:
-    """Create the DEMO wallet + default limits and post the signup grant.
-
-    The grant is a real `demo_deposit` ledger row funded from `platform:promo`
-    (memo "signup grant"), so demo money never appears from nowhere and the
-    global solvency invariant holds from the first row (04-phase-1 · deliverable 3).
+    """The grant is a real `demo_deposit` ledger row funded from `platform:promo`
+    (memo "signup grant"), so demo money never appears from nowhere and the global
+    solvency invariant holds from the first row.
     """
     wallet = Wallet(user_id=user.id, currency="DEMO")
     session.add(wallet)
@@ -132,8 +109,7 @@ async def complete_onboarding(
 
 
 async def self_exclude(session: AsyncSession, user: User) -> User:
-    """Freeze staking irreversibly (via API). `assert_can_stake` blocks any
-    non-active user; escrow already held settles normally through the worker."""
+    """Freeze staking irreversibly (via API)."""
     user.status = "self_excluded"
     await session.flush()
     return user

@@ -1,20 +1,4 @@
-"""Best-effort *live* view for in-flight Activity cards (07-phase-4 follow-on).
-
-The settlement worker computes a "what's happening right now" snapshot for each
-in-flight pool and head-to-head match on a slow cadence and upserts it into
-`live_snapshots`; the `/activity` request path only ever **reads** that cache, so
-a page load never blocks on a host call (same posture as the tournament
-`standings_cache`). Tournaments already cache live standings, so their live view
-is derived from that cache at read time — no row is stored here for them.
-
-Every value here is a server-fetched host read normalized through the adapter —
-never client input, never money. A chess match shows the live board (plies
-played, whose turn).
-
-A stored snapshot is **participant-neutral** (it holds every member/seat keyed by
-user id); `view_for` orients it to a single viewer — "you vs opp", "your bar",
-"your colour" — so one cached row serves everyone in the contest.
-"""
+"""Best-effort *live* view for in-flight Activity cards."""
 
 from __future__ import annotations
 
@@ -42,17 +26,12 @@ async def _window_games(
     ends_ms: int,
     rated_only: bool = True,
 ) -> list[NormGame] | None:
-    """The account's finished games inside `[starts_ms, ends_ms]`, in adapter order
-    (oldest-first). `None` on a host outage or an unregistered game — the card
-    then shows an honest "can't read right now" rather than a wrong number."""
     try:
         adapter = registry.get(game)
     except ValueError:
         return None
     try:
         games = await adapter.poll_eligible_games(
-            # Same policy as settlement, so the live line never counts a game
-            # the grading would ignore.
             host_account_id,
             starts_ms,
             GameFilters(rated_only=rated_only),
@@ -67,18 +46,10 @@ def _ms(dt) -> int:
     return int(dt.timestamp() * 1000)
 
 
-# ---------------------------------------------------------------------------
-# Snapshot builders (worker side) — participant-neutral, cached as-is.
-# ---------------------------------------------------------------------------
-
-
 async def build_pool_snapshot(
     session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
 ) -> dict[str, Any]:
-    """Each member's progress toward the shared `room_bar`, keyed by user id.
-
-    The qualifying match is the member's **first** in-window match (what grading
-    uses), so once they've played, the card shows the value that will settle."""
+    """Each member's progress toward the shared `room_bar`, keyed by user id."""
     starts_ms, ends_ms = _ms(pool.window_starts_at), _ms(pool.window_ends_at)
     members: dict[str, Any] = {}
     for entry in entries:
@@ -118,11 +89,10 @@ async def build_pool_snapshot(
 
 
 def pool_all_decided(snapshot: dict[str, Any]) -> bool:
-    """True when every member of a pool snapshot has a *verified* result
-    (``cleared`` or ``missed``) — the pool's outcome is final and it can settle
-    before its window ends. A member still ``waiting``/``unavailable`` (hasn't
-    played, or a host read failed) keeps this False, so an incomplete or
-    unverifiable pool always falls through to window-end settlement."""
+    """True when every member of a pool snapshot has a *verified* result (``cleared``
+    or ``missed``) — the pool's outcome is final and it can settle before its
+    window ends.
+    """
     members = list((snapshot.get("members") or {}).values())
     return bool(members) and all(
         m.get("status") in ("cleared", "missed") for m in members
@@ -132,7 +102,7 @@ def pool_all_decided(snapshot: dict[str, Any]) -> bool:
 async def build_match_snapshot(
     session: AsyncSession, match: Match, seats: list[MatchPlayer]
 ) -> dict[str, Any] | None:
-    """A neutral H2H snapshot of the chess board. `None` until the match is paired."""
+    """A neutral H2H snapshot of the chess board."""
     if match.matched_at is None or match.window_ends_at is None:
         return None
     if not match.host_game_id:
@@ -152,15 +122,10 @@ async def build_match_snapshot(
         "status": "finished" if live["finished"] else "live",
         "moves": live["moves"],
         "plies": live["plies"],
-        "turn": live["turn"],  # "white" | "black" | null
-        "winner": live["winner"],  # "white" | "black" | "draw" | null
+        "turn": live["turn"],
+        "winner": live["winner"],
         "colors": colors,
     }
-
-
-# ---------------------------------------------------------------------------
-# Read side — orient a stored/derived snapshot to one viewer.
-# ---------------------------------------------------------------------------
 
 
 def _pool_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:

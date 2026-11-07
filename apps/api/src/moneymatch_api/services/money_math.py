@@ -1,17 +1,10 @@
-"""Pure integer-cent money math — no floats, no DB.
-
-The PoC's `_round2` float math is a known flaw (migration-map §4.3); every split
-here is exact integer arithmetic. The load-bearing rule (00-README §3.3): on
-every distribution `sum(payouts) + rake == pot`, and any remainder cents from
-integer division land in the **rake**, never minted or lost.
-"""
+"""Pure integer-cent money math — no floats, no DB."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Default platform rake, in basis points. 1000 bps = 10% → H2H multiplier
-# 2·(1 − 0.10) = ×1.80 (02-design-system §4). Rake is config, never an odds line.
+# Default platform rake, in basis points. 1000 bps = 10% → H2H multiplier 2· = ×1.80.
 DEFAULT_RAKE_BPS = 1000
 
 BPS_DENOMINATOR = 10_000
@@ -19,10 +12,7 @@ BPS_DENOMINATOR = 10_000
 
 @dataclass(frozen=True)
 class Split:
-    """Result of distributing a pot: one payout per winner plus the rake.
-
-    Invariant (asserted in `__post_init__`): ``sum(payouts) + rake == pot``.
-    """
+    """Result of distributing a pot: one payout per winner plus the rake."""
 
     pot_cents: int
     rake_cents: int
@@ -36,8 +26,7 @@ class Split:
 
 
 def rake_for(pot_cents: int, rake_bps: int = DEFAULT_RAKE_BPS) -> int:
-    """Floor rake on a pot, in cents. Floor keeps rake ≤ the true percentage;
-    the leftover from flooring is returned to players via `split_pot`."""
+    """Floor rake on a pot, in cents."""
     if pot_cents < 0:
         raise ValueError("pot must be non-negative")
     if not 0 <= rake_bps <= BPS_DENOMINATOR:
@@ -48,13 +37,7 @@ def rake_for(pot_cents: int, rake_bps: int = DEFAULT_RAKE_BPS) -> int:
 def split_pot(
     pot_cents: int, num_winners: int, rake_bps: int = DEFAULT_RAKE_BPS
 ) -> Split:
-    """Split `pot_cents` equally among `num_winners`, taking `rake_bps` rake.
-
-    Remainder cents from the equal division are added to the rake so the books
-    reconcile exactly (00-README §3.3). With `num_winners == 0` the whole pot is
-    rake (caller decides whether that means refund — a no-winner contest refunds
-    and takes zero rake; that path never calls this).
-    """
+    """Split `pot_cents` equally among `num_winners`, taking `rake_bps` rake."""
     if pot_cents < 0:
         raise ValueError("pot must be non-negative")
     if num_winners < 0:
@@ -76,8 +59,7 @@ def split_pot(
 
 
 def h2h_multiplier_bps(rake_bps: int = DEFAULT_RAKE_BPS) -> int:
-    """Derived H2H display multiplier in basis points: 2·(1 − rake). This is the
-    `×1.80` on market cards — computed, never configured (02-design-system §4)."""
+    """Derived H2H display multiplier in basis points: 2·(1 − rake)."""
     return 2 * (BPS_DENOMINATOR - rake_bps)
 
 
@@ -86,25 +68,10 @@ def pool_multiplier_estimate_bps(
     room_size: int,
     rake_bps: int = DEFAULT_RAKE_BPS,
 ) -> int:
-    """Estimated pool tier multiplier, in basis points, on your own entry.
-
-    The share model is `(1 − rake) / p_target`: if a `p_target` fraction of the
-    room clears, the clearers divide the pot, so each takes roughly their entry
-    over the clear rate, less rake.
-
-    **Capped at the pot.** A pool is peer funded, so the most anyone can take
-    home is every entry minus rake, i.e. `room_size · (1 − rake)`. Without the
-    cap a low clear rate divides by a vanishing number: a 0.04% tier quoted a
-    multiplier of 22,500x and the card advertised $225,000 on a $25 entry, which
-    is not a payout the pool could ever fund.
-
-    Still an estimate for display only (02-design-system §4); the real payout is
-    the entrant's share of the actual pot. Never a house-banked multiplier.
-    """
+    """Estimated pool tier multiplier, in basis points, on your own entry."""
     take_home_bps = BPS_DENOMINATOR - rake_bps
     cap_bps = max(0, room_size) * take_home_bps
     if p_target <= 0:
-        # Nobody is expected to clear, so anyone who does takes the whole pot.
         return cap_bps
     return min(round(take_home_bps / p_target), cap_bps)
 
@@ -112,17 +79,9 @@ def pool_multiplier_estimate_bps(
 def split_weighted(
     pot_cents: int, weights: tuple[int, ...], rake_bps: int = DEFAULT_RAKE_BPS
 ) -> Split:
-    """Split `pot_cents` among prize places by integer `weights` (e.g. 50/30/20).
-
-    Takes `rake_bps` off the pot, then floors each place's share of the
+    """Takes `rake_bps` off the pot, then floors each place's share of the
     distributable by weight; any flooring remainder lands in the **rake** so the
-    books reconcile exactly (00-README §3.3). The returned `payouts_cents` are one
-    slice **per weight**, best place first — the tournament engine maps them to
-    ranks and re-divides tied places itself (tie remainder goes to the earlier
-    enqueue, not the rake, so the invariant still holds exactly).
-
-    Pass only the weights for the places that are actually filled (renormalize by
-    truncating `weights` when fewer entrants ranked than there are places).
+    books reconcile exactly.
     """
     if pot_cents < 0:
         raise ValueError("pot must be non-negative")
@@ -133,8 +92,8 @@ def split_weighted(
     distributable = pot_cents - rake
     wsum = sum(weights)
     if wsum == 0:
-        # No places to pay (no ranked finishers) — whole pot is rake; the caller
-        # decides whether that path means refund (it does — and never calls here).
+        # No places to pay (no ranked finishers) — whole pot is rake; the caller decides
+        # whether that path means refund (it does — and never calls here).
         return Split(pot_cents=pot_cents, rake_cents=pot_cents, payouts_cents=())
 
     slices = tuple(distributable * w // wsum for w in weights)

@@ -1,16 +1,4 @@
-"""Risk monitoring for the admin surface (09-phase-6 · deliverable 2 · Risk view).
-
-Two halves, both read-only analytics over settled contests + the durable
-`risk_flags` trail:
-
-- **Rate drift** — per (game, market/difficulty): offered/accepted/settled counts,
-  rake accrued, and for pools **actual vs. expected** clear rate against the
-  difficulty `p_target`. A row past the drift threshold is flagged `alert`.
-- **Flag queue** — unresolved `risk_flags` (the Phase-4 sandbagging detector),
-  each actionable with freeze (the user) / clear (the flag). Per the launch-plan
-  rule kept verbatim: risk responses adjust **future** formation, never an
-  accepted in-flight contest.
-"""
+"""Risk monitoring for the admin surface."""
 
 from __future__ import annotations
 
@@ -27,8 +15,6 @@ from ..models.user import User
 from ..models.wallet import PlatformLedgerEntry
 from . import fairness
 
-# Only alert with enough settled samples for the rate to mean anything, and only
-# when it drifts past this absolute band (tune with data).
 RISK_MIN_SAMPLES = 10
 RISK_RATE_ALERT_DELTA = 0.20
 
@@ -108,7 +94,7 @@ async def _match_rates(session: AsyncSession) -> list[RateRow]:
                 offered=int(offered or 0),
                 accepted=int(accepted or 0),
                 settled=len(settled_ids),
-                expected_rate=None,  # H2H has no expected rate to drift from
+                expected_rate=None,
                 actual_rate=None,
                 rake_cents=int(rake or 0),
                 dispute_count=0,

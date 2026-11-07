@@ -1,8 +1,5 @@
-"""Admin operator actions on users (09-phase-6 · deliverable 2).
-
-Each mutation here is paired with an `admin_audit` row by its caller (the
-`/admin/*` routers, or `scripts/grant_admin.py`). Functions flush, never commit —
-the caller owns the transaction so the action and its audit row are atomic.
+"""Admin operator actions on users. Functions flush, never commit — the caller owns
+the transaction so the action and its audit row are atomic.
 """
 
 from __future__ import annotations
@@ -53,7 +50,6 @@ async def get_user_by_username(session: AsyncSession, username: str) -> User | N
 
 
 async def set_role(session: AsyncSession, user: User, role: str) -> User:
-    """Set a user's role (`user` | `admin`). Grants are audited by the caller."""
     if role not in USER_ROLES:
         raise AdminActionError(
             "invalid_role",
@@ -77,7 +73,6 @@ async def search_users(
             User.email.ilike(f"%{needle}%"),
             User.friend_code.ilike(f"%{needle}%"),
         ]
-        # Exact id match too (operators paste a UUID from another view).
         try:
             clauses.append(User.id == uuid.UUID(needle))
         except ValueError:
@@ -87,8 +82,6 @@ async def search_users(
 
 
 async def freeze(session: AsyncSession, user: User) -> User:
-    """Freeze staking (status → frozen). `assert_can_stake` blocks any non-active
-    user; escrow already held still settles normally through the worker."""
     if user.status == "self_excluded":
         raise AdminActionError(
             "self_excluded",
@@ -101,7 +94,7 @@ async def freeze(session: AsyncSession, user: User) -> User:
 
 
 async def unfreeze(session: AsyncSession, user: User) -> User:
-    """Lift a freeze (frozen → active). Self-exclusion is irreversible here."""
+    """Lift a freeze (frozen → active)."""
     if user.status == "self_excluded":
         raise AdminActionError(
             "self_excluded",
@@ -116,12 +109,7 @@ async def unfreeze(session: AsyncSession, user: User) -> User:
 async def force_unbind(
     session: AsyncSession, linked_account_id: uuid.UUID
 ) -> LinkedAccount:
-    """Soft-unbind a host-account binding so it can be re-linked (rebind = admin
-    action, audited — 01-architecture §2). The row is retained with
-    `status='unbound'` — its contest history (match_players / queue_tickets FKs)
-    stays intact — while the partial-unique slots free up for a fresh bind. This
-    replaces the old hard-delete, which FK RESTRICT blocked for played accounts
-    (backlog · soft-unbind with contest history)."""
+    """Soft-unbind a host-account binding so it can be re-linked."""
     link = await session.get(LinkedAccount, linked_account_id)
     if link is None:
         raise AdminActionError(
@@ -215,11 +203,7 @@ async def adjust(
     reason: str,
     admin_id: uuid.UUID,
 ) -> LedgerEntry:
-    """Manual ledger adjustment (reason required; ledger `adjustment` type).
-
-    Positive credits, negative debits — both promo-funded so global solvency
-    holds. The `created_by` is the admin's id for the audit trail.
-    """
+    """Manual ledger adjustment (reason required; ledger `adjustment` type)."""
     if amount_cents == 0:
         raise AdminActionError(
             "invalid_amount", "Adjustment must be non-zero.", status_code=422

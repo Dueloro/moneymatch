@@ -1,19 +1,4 @@
-"""Match lifecycle — one transition per function, each transactional (00-README §3.4).
-
-Every state change routes through here and through `wallet_service` for money, so
-the invariant `sum(payouts) + rake == sum(entries)` holds on every path and a
-tampered client can never move a number (it only sends ids):
-
-- `confirm` — escrow the entry (server-owned amount) after the limit checks;
-  when both seats confirm, `activate`.
-- `activate` — brokers a Lichess open challenge restricted to the two linked
-  handles, stores the graded game id, stamps `matched_at` and the window.
-- `cancel_pending` — decline / PENDING-expiry → refund whoever escrowed, no rake.
-- `settle` — WIN (winner payout + rake) · PUSH / CANCEL (refund both, zero rake);
-  post-settle reconciliation is fail-closed (a breach raises → worker pauses).
-
-Callers own the transaction boundary; these functions flush, never commit.
-"""
+"""Match lifecycle — one transition per function, each transactional."""
 
 from __future__ import annotations
 
@@ -53,7 +38,7 @@ class LifecycleError(APIError):
 
 
 class ReconciliationError(APIError):
-    """Post-settle conservation breach — fail closed (00-README §3.3)."""
+    """Post-settle conservation breach — fail closed."""
 
     def __init__(self, match_id: uuid.UUID, violations: list[str]) -> None:
         super().__init__(
@@ -64,7 +49,6 @@ class ReconciliationError(APIError):
         )
 
 
-# Outcome kinds the worker hands to `settle`.
 WIN = "win"
 PUSH = "push"
 CANCEL = "cancel"
@@ -76,7 +60,7 @@ _KIND_TO_STATE = {WIN: SETTLED, PUSH: PUSHED, CANCEL: CANCELED}
 class SettlementResult:
     """What the worker's grading pass concluded for a match."""
 
-    kind: str  # WIN | PUSH | CANCEL
+    kind: str
     winner_user_id: uuid.UUID | None = None
     stat_lines: dict[uuid.UUID, dict[str, Any]] = field(default_factory=dict)
     outcome_detail: dict[str, Any] | None = None
@@ -101,11 +85,6 @@ def _seat(seats: list[MatchPlayer], user_id: uuid.UUID) -> MatchPlayer:
     raise LifecycleError("not_a_player", "You are not in this match.", status_code=403)
 
 
-# --------------------------------------------------------------------------- #
-# Confirm → escrow → activate.
-# --------------------------------------------------------------------------- #
-
-
 async def confirm(session: AsyncSession, match: Match, user: User) -> Match:
     """Confirm a seat: escrow the entry now; when both confirm, activate the match."""
     seats = await players(session, match.id)
@@ -119,12 +98,10 @@ async def confirm(session: AsyncSession, match: Match, user: User) -> Match:
             status_code=409,
         )
 
-    # Geo-fence before money moves: a resident who became geo-blocked (or a match
-    # formed via a challenge that skipped the queue) is refused at the escrow gate,
-    # leaving the match PENDING with no ledger row.
+    # Geo-fence before money moves: a resident who became geo-blocked (or a match formed
+    # via a challenge that skipped the queue) is refused at the escrow gate, leaving the
+    # match PENDING with no ledger row.
     await geo_service.assert_can_enter(session, user.residence_state)
-    # Server-side gate (balance, daily caps, concurrency) — the PoC's `canJoin`
-    # tautology dies here. Raises cleanly and leaves the match PENDING.
     await limits_service.assert_can_stake(session, user, match.entry_cents)
     await wallet_service.escrow_hold(
         session,
@@ -145,7 +122,6 @@ async def confirm(session: AsyncSession, match: Match, user: User) -> Match:
 async def _activate(
     session: AsyncSession, match: Match, seats: list[MatchPlayer]
 ) -> None:
-    """Both confirmed → go ACTIVE. Brokers chess; stamps a server-owned `matched_at`."""
     match_states.assert_transition(match.state, ACTIVE)
     now = clock.now()
 
@@ -182,9 +158,7 @@ async def _activate(
     )
 
 
-# --------------------------------------------------------------------------- #
 # Cancel / decline / expiry (PENDING) — refund whoever escrowed, no rake.
-# --------------------------------------------------------------------------- #
 
 
 async def cancel_pending(session: AsyncSession, match: Match, *, reason: str) -> Match:
@@ -225,25 +199,20 @@ async def cancel_pending(session: AsyncSession, match: Match, *, reason: str) ->
     return match
 
 
-# --------------------------------------------------------------------------- #
-# Settle — WIN / PUSH / CANCEL from an ACTIVE (both-escrowed) match.
-# --------------------------------------------------------------------------- #
-
-
 async def settle(
     session: AsyncSession, match: Match, result: SettlementResult
 ) -> Match:
     """Apply a graded outcome. Winner-take-all with rake, or refund both on a
-    push/cancel. Idempotent: a second call on a terminal match is a no-op."""
+    push/cancel.
+    """
     if match_states.is_terminal(match.state):
         return match
     target = _KIND_TO_STATE[result.kind]
     match_states.assert_transition(match.state, target)
     seats = await players(session, match.id)
 
-    # A friendly is zero-rake and refunds both entries regardless of who won —
-    # only the record is kept (08-phase-5 · collusion posture). We still stamp the
-    # graded winner + stat lines, but the money flow is neutralized to refunds.
+    # A friendly is zero-rake and refunds both entries regardless of who won — only the
+    # record is kept.
     if match.friendly and result.kind == WIN:
         match.winner_user_id = result.winner_user_id
         for seat in seats:

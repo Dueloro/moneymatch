@@ -1,8 +1,4 @@
-"""Market definitions: the fixed list of what you can wager on.
-
-Chess offers one market, `win_h2h`: a Lichess game between the two bound
-accounts, graded by game id; draw → push. No props, no odds.
-"""
+"""Market definitions: the fixed list of what you can wager on."""
 
 from __future__ import annotations
 
@@ -17,10 +13,10 @@ KIND_WIN_H2H = "win_h2h"
 @dataclass(frozen=True)
 class MarketDef:
     game: str
-    key: str  # the market id used in requests
+    key: str
     label: str
     kind: str
-    requires_speed: bool = False  # chess needs a time control
+    requires_speed: bool = False
     rake_bps: int = money_math.DEFAULT_RAKE_BPS
 
     @property
@@ -48,5 +44,4 @@ def get(game: str, key: str) -> MarketDef | None:
 
 
 def for_game(game: str) -> list[MarketDef]:
-    """Every market offered for a game."""
     return [m for m in MARKETS if m.game == game]

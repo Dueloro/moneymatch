@@ -1,19 +1,4 @@
-"""Server-fetched telemetry grading for pools & tournaments (07-phase-4 · 5).
-
-At window end the worker asks each entrant's adapter for the matches they played
-**inside the window** (`poll_eligible_games` bounded to `[window_starts,
-window_ends]`), persists the normalized evidence to `raw_payloads`, and turns it
-into a grade. Zero self-report anywhere — the player supplies nothing.
-
-Watchdog rules (architecture §3.4):
-- a host outage (adapter raises) → the entry is **unverifiable** → refunded
-  (never a loss on infra);
-- a pool entrant with no qualifying match → unverifiable → refunded;
-- a tournament entrant with a readable history but no in-window match → an empty
-  score list → **forfeit** (ranked last, paid nothing).
-
-Window-boundary matches are excluded (strict `[starts, ends]` containment).
-"""
+"""Server-fetched telemetry grading for pools & tournaments."""
 
 from __future__ import annotations
 
@@ -44,17 +29,14 @@ log = structlog.get_logger(__name__)
 async def _window_games(
     game: str, host_account_id: str, starts, ends, rated_only: bool = True
 ) -> list[NormGame] | None:
-    """The entrant's finished matches inside `[starts, ends]`, oldest-first.
-
-    `None` signals a host outage (adapter raised) — the caller refunds; an empty
-    list means the account was readable but played nothing in the window.
+    """The entrant's finished matches inside `[starts, ends]`, oldest-first. `None`
+    signals a host outage (adapter raised) — the caller refunds; an empty list
+    means the account was readable but played nothing in the window.
     """
     starts_ms = int(starts.timestamp() * 1000)
     ends_ms = int(ends.timestamp() * 1000)
     adapter = registry.get(game)
     try:
-        # A casual game must never move a pool bar or tournament score; a
-        # brokered duel is itself casual, so it can't feed its own stats.
         games = await adapter.poll_eligible_games(
             host_account_id, starts_ms, GameFilters(rated_only=rated_only)
         )
@@ -98,13 +80,6 @@ async def grade_pool(
             grades[entry.user_id] = PoolGrade(cleared=None)  # unverifiable → refund
             continue
 
-        # The first match that produces a value is the graded attempt, not the
-        # first match played: for a win-required metric a loss carries no value,
-        # so grading `games[0]` would let one early loss forfeit a later win
-        # that clears the bar. Taking the *first* qualifying game (not the best)
-        # keeps it a single priced attempt, so the advertised clear rate holds.
-        # A value below the metric floor is physically impossible and dropped as
-        # bad evidence rather than allowed to clear beneath the floor.
         floor = metric_floor(pool.metric)
         graded = next(
             (
@@ -124,13 +99,8 @@ async def grade_pool(
             memo=f"pool {pool.metric}",
         )
         if value is None:
-            # No value on a match that was actually played. For a win-required
-            # metric that means no win in the window, which is a definite
-            # **miss**: they had their attempts and did not make it.
-            # Refunding here would turn entering and losing into a free option,
-            # and would hand a loss the same outcome as never playing at all.
-            # Any other metric keeps the old reading: we could not measure it,
-            # so we cannot claim they failed.
+            # Refunding here would turn entering and losing into a free option, and
+            # would hand a loss the same outcome as never playing at all.
             grades[entry.user_id] = PoolGrade(
                 cleared=False if requires_win(pool.metric) else None,
                 telemetry={pool.metric: None, "won": graded.won},
@@ -169,9 +139,6 @@ async def grade_tournament(
         if games is None:
             grades[entry.id] = TournamentGrade(values=None)  # host outage → refund
             continue
-        # Scored over the whole window: total wins, longest streak, fastest
-        # win. `None` ⇒ no qualifying result, which the engine treats as a
-        # forfeit.
         score = spec.score(games)
         payload = await raw_payload_service.persist(
             session,
@@ -215,7 +182,6 @@ async def live_standings(
                 "matches": spec.counted(games or []),
             }
         )
-    # Fastest-win ranks smallest-first; everything else biggest-first.
     sign = 1.0 if aggregate_metrics.higher_is_better(metric) else -1.0
     rows.sort(key=lambda r: (r["score"] is None, -sign * (r["score"] or 0.0)))
     for i, row in enumerate(rows):

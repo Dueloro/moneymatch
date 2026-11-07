@@ -1,20 +1,4 @@
-"""Tournament engine — matchmade single-metric fields (07-phase-4).
-
-Ports the leaderboard settlement invariant from
-`poc-reference/api/_lib/tournament.py` (top-N split by weight, renormalize when
-fewer ranked than places, unverifiable refunded off the top, floats → integer
-cents; the single-elim bracket is **cut**) and adds:
-
-- **field formation** under a **μ-dispersion cap** `max(μ) − min(μ) ≤ cap·σ_pooled`
-  (match-on-write, escrow at formation, no escrow while waiting).
-- **aggregate scoring**: total wins, longest streak or fastest win over the
-  window, read from the host record (`services/aggregate_metrics.py`).
-- **tie handling**: tied scores split their combined prize slices, remainder cents
-  to the earlier enqueue (deterministic, disclosed); zero-match entrants forfeit
-  (ranked last, paid nothing); fewer than `min_ranked` play → CANCELED + refund.
-
-Every number is server-derived; no API surface accepts a score, rank, or payout.
-"""
+"""Tournament engine — matchmade single-metric fields."""
 
 from __future__ import annotations
 
@@ -75,19 +59,16 @@ class TournamentError(APIError):
 
 @dataclass
 class TournamentEnqueueResult:
-    status: str  # "searching" | "formed"
+    status: str
     tournament: Tournament | None = None
     ticket: QueueTicket | None = None
 
 
 @dataclass
 class TournamentGrade:
-    """The worker's per-entry grading input.
-
-    `values` is `None` when unverifiable (host couldn't fetch) → refund, and `[]`
-    when the entrant has no qualifying result → forfeit (ranked last, paid
-    nothing). `score` is the aggregate result over the window (total wins,
-    streak, fastest win), used verbatim.
+    """The worker's per-entry grading input. `values` is `None` when unverifiable
+    (host couldn't fetch) → refund, and `[]` when the entrant has no qualifying
+    result → forfeit (ranked last, paid nothing).
     """
 
     values: list[float] | None
@@ -99,11 +80,6 @@ class TournamentGrade:
 
 def _mu(ticket: QueueTicket) -> float:
     return float(ticket.baseline_snapshot["mu"])
-
-
-# --------------------------------------------------------------------------- #
-# Eligibility + baseline.
-# --------------------------------------------------------------------------- #
 
 
 def _validate_bucket(game: str, metric: str, entry_cents: int) -> None:
@@ -140,18 +116,10 @@ async def _require_link(
 
 
 def host_rating(link: LinkedAccount) -> float | None:
-    """The linked account's rating on its primary speed.
-
-    Aggregate contests (wins, streak, fastest win) have no per-match rate model
-    to take a mean and spread from, so the field forms on the host's own rating
-    instead. Shared with `skill_prior`, which uses the same rating to seed a
-    pool baseline, so the two can never drift apart.
-    """
     return skill_prior.host_rating(link)
 
 
 def _build_baseline(metric: str, link: LinkedAccount) -> dict[str, Any]:
-    """Freeze the host rating: every tournament metric is an aggregate contest."""
     rating = host_rating(link)
     if rating is None:
         raise TournamentError(
@@ -169,11 +137,6 @@ def _build_baseline(metric: str, link: LinkedAccount) -> dict[str, Any]:
         "sigma": aggregate_metrics.ELO_SIGMA,
         "n": 1,
     }
-
-
-# --------------------------------------------------------------------------- #
-# Field formation.
-# --------------------------------------------------------------------------- #
 
 
 def _field_ok(tickets: list[QueueTicket]) -> bool:
@@ -390,11 +353,6 @@ async def _try_form_field(
     return None
 
 
-# --------------------------------------------------------------------------- #
-# Public API.
-# --------------------------------------------------------------------------- #
-
-
 async def enqueue(
     session: AsyncSession,
     user: User,
@@ -403,7 +361,6 @@ async def enqueue(
     metric: str,
     entry_cents: int,
 ) -> TournamentEnqueueResult:
-    """Enter a tournament (enqueue). Gates in order; escrow at field formation."""
     now = clock.now()
     _validate_bucket(game, metric, entry_cents)
 
@@ -469,11 +426,6 @@ async def cancel(session: AsyncSession, user: User) -> bool:
     return True
 
 
-# --------------------------------------------------------------------------- #
-# Scoring + settlement.
-# --------------------------------------------------------------------------- #
-
-
 async def _entries(
     session: AsyncSession, tournament_id: uuid.UUID
 ) -> list[TournamentEntry]:
@@ -491,12 +443,7 @@ def compute_standings(
     *,
     higher_is_better: bool = True,
 ) -> list[tuple[TournamentEntry, int]]:
-    """Rank scored entries; ties share a rank; forfeits rank last.
-
-    `higher_is_better=False` ranks smallest-first, which is what "fastest win"
-    (fewest moves) needs. Returns (entry, rank) best-first, with a deterministic
-    tie order by `enqueued_at`.
-    """
+    """Rank scored entries; ties share a rank; forfeits rank last."""
     sign = 1.0 if higher_is_better else -1.0
     ranked = [e for e in entries if scores.get(e.id) is not None]
     ranked.sort(key=lambda e: (-sign * scores[e.id], e.enqueued_at))  # type: ignore[operator]
@@ -507,7 +454,7 @@ def compute_standings(
         while j < len(ranked) and scores[ranked[j].id] == scores[ranked[i].id]:
             j += 1
         for e in ranked[i:j]:
-            out.append((e, i + 1))  # tied share the group's starting rank
+            out.append((e, i + 1))
         i = j
     return out
 
@@ -518,7 +465,8 @@ def _assign_prizes(
     scores: dict[uuid.UUID, float | None],
 ) -> dict[uuid.UUID, int]:
     """Map best-first ranked entries to prize slices, splitting tied places and
-    sending any tie remainder to the earlier enqueue (invariant-exact)."""
+    sending any tie remainder to the earlier enqueue (invariant-exact).
+    """
     places = len(slices)
     payouts: dict[uuid.UUID, int] = {}
     pos = 0
@@ -548,8 +496,9 @@ async def settle_tournament(
     tournament: Tournament,
     grades: dict[uuid.UUID, TournamentGrade],
 ) -> Tournament:
-    """Score, rank, and pay top places. Unverifiable refunded
-    off the top; fewer than `min_ranked` scored → CANCELED, full refund."""
+    """Score, rank, and pay top places. Unverifiable refunded off the top; fewer than
+    `min_ranked` scored → CANCELED, full refund.
+    """
     if tournament.state in ("SETTLED", "CANCELED"):
         return tournament
     entries = await _entries(session, tournament.id)
@@ -575,12 +524,7 @@ async def settle_tournament(
         higher_is_better=aggregate_metrics.higher_is_better(tournament.ranking_metric),
     )
 
-    # A real contest needs enough genuine participants (readable account, window
-    # elapsed) and at least one scorer to hand the pool to. Forfeits — played
-    # and lost, or never played — count as participants but rank last and are
-    # paid nothing, so a field of one winner and many forfeits still settles and
-    # pays the winner instead of cancelling. Unverifiable (host outage) entries
-    # are refunded off the top and never count.
+    # Unverifiable (host outage) entries are refunded off the top and never count.
     unverifiable_ids = {e.id for e in unverifiable}
     participants = [e for e in entries if e.id not in unverifiable_ids]
     if len(participants) < tournament.min_ranked or not ranked:
@@ -636,7 +580,6 @@ async def settle_tournament(
             e.payout_cents = 0
         await _notify(session, e.user_id, tournament, "settled", e.payout_cents)
 
-    # Forfeits (played nothing) — ranked below all who played, paid nothing.
     for e in non_refunded:
         if scores.get(e.id) is None:
             e.status = "OUT"
