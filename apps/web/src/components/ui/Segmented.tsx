@@ -18,12 +18,16 @@ export function Segmented<T extends string | number>({
   options: SegmentOption<T>[];
   value: T;
   onChange: (value: T) => void;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   ariaLabel?: string;
   renderBadge?: (badge: number) => ReactNode;
 }) {
-  const pad = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm';
+  const pad = {
+    sm: 'px-2.5 py-1 text-xs',
+    md: 'px-3.5 py-1.5 text-sm',
+    lg: 'min-h-11 px-2 py-2 text-sm sm:px-4',
+  }[size];
   return (
     <div
       role="tablist"

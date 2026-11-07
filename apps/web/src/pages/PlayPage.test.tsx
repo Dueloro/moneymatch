@@ -4,12 +4,44 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders, pts } from '../test/testUtils';
 import { PlayPage } from './PlayPage';
 
+const store = new Map<string, string>();
+Object.defineProperty(window, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  },
+});
+
 vi.mock('../auth/useAuth', () => ({
   useAuth: () => ({ session: null }),
 }));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
+  }),
+}));
+vi.mock('../hooks/useLinks', () => ({
+  useLinks: () => ({
+    data: {
+      games: [
+        {
+          game: 'chess.lichess',
+          status: 'LINKED',
+          host_username: 'ana',
+          profile: {
+            username: 'ana',
+            rating: 1712,
+            formats: [
+              { speed: 'blitz', rating: 1712, games: 900, provisional: false },
+              { speed: 'rapid', rating: 1790, games: 40, provisional: true },
+            ],
+          },
+        },
+      ],
+    },
   }),
 }));
 vi.mock('../hooks/useMatchmaking', async () => {
@@ -52,7 +84,7 @@ const H2H_MARKET = {
   label: 'Win the game',
   kind: 'win_h2h' as const,
   requires_speed: true,
-  speeds: ['bullet', 'blitz', 'rapid'],
+  speeds: ['bullet', 'blitz', 'rapid', 'classical'],
   multiplier_bps: 18000,
   queue_depth: 0,
   resolution_note: 'Win the game · draw = push.',
@@ -86,6 +118,7 @@ function mockStatus(status: unknown) {
 describe('PlayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     vi.mocked(useMarkets).mockReturnValue({
       data: {
         game: 'chess.lichess',
@@ -123,21 +156,81 @@ describe('PlayPage', () => {
     } as unknown as ReturnType<typeof useLeaveQueue>);
   });
 
-  it('renders one 1v1 card per market with the derived payout inside it', () => {
+  it('sets the desk with defaults: blitz, the middle stake, payout and fee', () => {
     renderWithProviders(<PlayPage />);
-    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
+    expect(screen.getByRole('tab', { name: /Blitz/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId('desk-rating')).toHaveTextContent('1712');
+    expect(screen.getByText('Matched with someone at your skill level')).toBeVisible();
     expect(screen.getByText(pts('1,800 pts'))).toBeInTheDocument();
-  });
-
-  it('joining a card finds a match with the entry selected inside it', () => {
-    renderWithProviders(<PlayPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Find match' }));
+    expect(screen.getByText(/Fee/)).toHaveTextContent('Fee 200 pts');
+    fireEvent.click(screen.getByRole('button', { name: 'Find match · 1,000 pts' }));
     expect(joinMutate).toHaveBeenCalledWith({
       game: 'chess.lichess',
       market: 'win_h2h',
       speed: 'blitz',
       entry_preset_cents: 1000,
     });
+  });
+
+  it('time control and stake change the rating, payout and the join', () => {
+    renderWithProviders(<PlayPage />);
+    fireEvent.click(screen.getByRole('tab', { name: /Rapid/ }));
+    expect(screen.getByTestId('desk-rating')).toHaveTextContent('1790?');
+    fireEvent.click(screen.getByRole('tab', { name: '2,500 pts' }));
+    expect(screen.getByText(pts('4,500 pts'))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Find match · 2,500 pts' }));
+    expect(joinMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ speed: 'rapid', entry_preset_cents: 2500 }),
+    );
+  });
+
+  it('says where the rating comes from when there are no games at that speed', () => {
+    renderWithProviders(<PlayPage />);
+    fireEvent.click(screen.getByRole('tab', { name: /Classical/ }));
+    expect(screen.getByTestId('desk-rating')).toHaveTextContent('1712From blitz');
+  });
+
+  it('degrades to a Link Lichess prompt when unlinked', () => {
+    vi.mocked(useMarkets).mockReturnValue({
+      data: {
+        game: 'chess.lichess',
+        linked: false,
+        entry_presets_cents: [500, 1000, 2500],
+        markets: [H2H_MARKET],
+      },
+    } as unknown as ReturnType<typeof useMarkets>);
+    renderWithProviders(<PlayPage />);
+    expect(screen.queryByTestId('match-desk')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Link Lichess' })).toHaveAttribute(
+      'href',
+      '/profile',
+    );
+  });
+
+  it('lists open seats with rating and time control', () => {
+    vi.mocked(useWaiting).mockReturnValue({
+      data: {
+        waiting: [
+          {
+            ticket_id: 't1',
+            game: 'chess.lichess',
+            market: 'win_h2h',
+            market_label: 'Win the game',
+            speed: 'blitz',
+            entry_cents: 1000,
+            username: 'dana',
+            rating: 1689,
+            waited_seconds: 40,
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useWaiting>);
+    renderWithProviders(<PlayPage />);
+    expect(screen.getByText('1689')).toBeInTheDocument();
+    expect(screen.getByText('Blitz 5+0 · 1,000 pts')).toBeInTheDocument();
   });
 
   it('shows the searching state with a cancel affordance', () => {

@@ -46,7 +46,7 @@ export function VersusCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="label-money">You&apos;d win</div>
+          <div className="label-money">Winner takes</div>
           <div className="text-lg font-semibold">
             <AmountText cents={prizeCents} signed={false} money />
           </div>

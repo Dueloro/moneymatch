@@ -23,9 +23,6 @@ export function WagerCard({
   payoutLabel,
   oneVsOne = false,
   feeNote,
-  speedOptions,
-  selectedSpeed,
-  onSpeedChange,
   buttonLabel,
   onJoin,
   disabled = false,
@@ -49,9 +46,6 @@ export function WagerCard({
    * The rake must always be visible before commit on every joinable surface.
    */
   feeNote?: (entryCents: number) => string;
-  speedOptions?: string[];
-  selectedSpeed?: string;
-  onSpeedChange?: (speed: string) => void;
   buttonLabel: string;
   onJoin: (entryCents: number) => void;
   disabled?: boolean;
@@ -97,29 +91,6 @@ export function WagerCard({
         </div>
       ) : (
         subtitle && <p className="mt-3 text-sm text-text-secondary">{subtitle}</p>
-      )}
-
-      {speedOptions && speedOptions.length > 1 && selectedSpeed && onSpeedChange && (
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-xs text-text-secondary">Speed</span>
-          <div className="flex flex-wrap gap-1">
-            {speedOptions.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => onSpeedChange(s)}
-                className={[
-                  'rounded-pill px-2 py-0.5 text-xs font-medium capitalize transition',
-                  selectedSpeed === s
-                    ? 'bg-action text-bg'
-                    : 'bg-panel-raised text-text-secondary hover:text-text',
-                ].join(' ')}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
       )}
 
       <div className="mt-5">

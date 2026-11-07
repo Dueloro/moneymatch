@@ -1,40 +1,28 @@
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 
 import { PlayHeader } from '../components/PlayHeader';
+import { LinkLichessDesk, MatchDesk } from '../components/play/MatchDesk';
 import { PlaySlip } from '../components/play/PlaySlip';
-import { CardGrid } from '../components/ui/CardGrid';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { Skeleton } from '../components/ui/Skeleton';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { SkeletonList } from '../components/ui/Skeleton';
-import { WagerCard } from '../components/ui/WagerCard';
-import { dashless, formatPoints } from '../lib/format';
-import { CHESS, gameMeta } from '../lib/games';
-import { platformFeeNote } from '../lib/rake';
+import { useLinks } from '../hooks/useLinks';
+import { formatPoints } from '../lib/format';
+import { CHESS } from '../lib/games';
+import { timeControlLabel } from '../lib/timeControl';
 import {
-  prizeForEntry,
   useJoinQueue,
   useMarkets,
   useMatch,
   useQueueStatus,
   useTakeWaiting,
   useWaiting,
-  type MarketRow,
   type QueueStatus,
 } from '../hooks/useMatchmaking';
-
-function marketHeadline(market: MarketRow): string {
-  return dashless(market.resolution_note).split('·')[0]?.trim() ?? '';
-}
-
-function defaultSpeed(market: MarketRow): string | undefined {
-  if (!market.requires_speed) return undefined;
-  return market.speeds[1] ?? market.speeds[0] ?? undefined;
-}
 
 const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
@@ -46,6 +34,8 @@ export function PlayPage() {
     isError: marketsError,
     refetch: refetchMarkets,
   } = useMarkets(CHESS);
+  const { data: links } = useLinks();
+  const chessLink = links?.games.find((g) => g.game === CHESS);
 
   const [searchParams] = useSearchParams();
   const deepLinkMatchId = searchParams.get('match') ?? undefined;
@@ -66,29 +56,22 @@ export function PlayPage() {
   const join = useJoinQueue();
   const take = useTakeWaiting();
 
-  const [speedByMarket, setSpeedByMarket] = useState<Record<string, string>>({});
-
   const linked = markets?.linked ?? false;
-  const gameName = gameMeta(CHESS).name;
   const presets = markets?.entry_presets_cents ?? [];
   const inFlight = status?.status === 'searching' || status?.status === 'matched';
-
-  const openMarkets = markets?.markets ?? [];
-  const hasResults = openMarkets.length > 0 && presets.length > 0;
-
-  const header = (
-    <PlayHeader
-      id="play"
-      how="One Lichess game against a player at your level. Winner takes the pot, draws are refunded."
-    />
-  );
+  const market =
+    markets?.markets.find((m) => m.kind === 'win_h2h') ?? markets?.markets[0];
+  const open = waiting.data?.waiting ?? [];
 
   return (
-    <div>
-      {header}
+    <div className="mx-auto w-full max-w-3xl">
+      <PlayHeader
+        id="play"
+        how="One Lichess game against a player at your level. Winner takes the pot, draws are refunded."
+      />
 
       {marketsLoading ? (
-        <SkeletonList rows={3} />
+        <Skeleton className="h-80 w-full rounded-card" />
       ) : marketsError ? (
         <ErrorState
           title="Could not load markets"
@@ -96,112 +79,76 @@ export function PlayPage() {
           onRetry={() => refetchMarkets()}
         />
       ) : !linked ? (
-        <EmptyState
-          title="Link your Lichess account"
-          subline="Head to head settles from your Lichess games, so we need to know which account is yours."
-          action={
-            <Link to="/profile">
-              <PillButton>Link Lichess</PillButton>
-            </Link>
+        <LinkLichessDesk />
+      ) : inFlight ? (
+        <PlaySlip status={status} />
+      ) : market && presets.length > 0 ? (
+        <MatchDesk
+          market={market}
+          presets={presets}
+          profile={chessLink?.profile}
+          username={chessLink?.host_username}
+          joining={join.isPending}
+          onFind={({ speed, entry }) =>
+            join.mutate({
+              game: CHESS,
+              market: market.key,
+              speed,
+              entry_preset_cents: entry,
+            })
           }
         />
       ) : (
-        <>
-          {inFlight && (
-            <div className="mb-8">
-              <PlaySlip status={status} />
-            </div>
-          )}
+        <EmptyState
+          title="Head to head is paused"
+          subline="Check back shortly."
+          action={
+            <PillButton variant="secondary" onClick={() => refetchMarkets()}>
+              Refresh
+            </PillButton>
+          }
+        />
+      )}
 
-          {!inFlight && (
-            <>
-              <SectionHeader level="page">Head to head</SectionHeader>
-
-              {hasResults ? (
-                <CardGrid count={openMarkets.length}>
-                  {openMarkets.map((m) => {
-                    const speed = speedByMarket[m.key] ?? defaultSpeed(m);
-                    const key = `${m.key}:${speed ?? ''}`;
-                    return (
-                      <WagerCard
-                        key={key}
-                        meta={gameName}
-                        tag={speed?.toUpperCase()}
-                        title={m.label}
-                        subtitle={marketHeadline(m)}
-                        speedOptions={m.requires_speed ? m.speeds : undefined}
-                        selectedSpeed={speed}
-                        onSpeedChange={
-                          m.requires_speed
-                            ? (s) =>
-                                setSpeedByMarket((prev) => ({ ...prev, [m.key]: s }))
-                            : undefined
-                        }
-                        entryOptions={presets}
-                        payoutFor={(entry) => prizeForEntry(entry, m.multiplier_bps)}
-                        payoutLabel="You win"
-                        feeNote={(entry) =>
-                          platformFeeNote(
-                            entry * 2 - prizeForEntry(entry, m.multiplier_bps),
-                          )
-                        }
-                        oneVsOne
-                        buttonLabel="Find match"
-                        joining={join.isPending}
-                        onJoin={(entry) =>
-                          join.mutate({
-                            game: CHESS,
-                            market: m.key,
-                            speed,
-                            entry_preset_cents: entry,
-                          })
-                        }
-                      />
-                    );
-                  })}
-                </CardGrid>
-              ) : (
-                <EmptyState
-                  title="No head to head markets right now"
-                  subline="Check back shortly."
+      {linked && !inFlight && open.length > 0 && (
+        <section className="mt-10" aria-label="Waiting to play">
+          <SectionHeader level="sub" hint="Take a seat and skip the queue.">
+            Waiting to play
+          </SectionHeader>
+          {open.map((w) => (
+            <ListRow
+              key={w.ticket_id}
+              left={
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-live"
                 />
-              )}
-            </>
-          )}
-
-          {waiting.data && waiting.data.waiting.length > 0 && (
-            <section className="mt-10">
-              <SectionHeader
-                level="section"
-                hint="Take one of these and you skip the queue."
-              >
-                Waiting to play
-              </SectionHeader>
-              {waiting.data.waiting.map((w) => (
-                <ListRow
-                  key={w.ticket_id}
-                  left={
-                    <span
-                      aria-hidden
-                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-live"
-                    />
-                  }
-                  title={w.username ?? 'Player'}
-                  subline={`${w.market_label} · ${formatPoints(w.entry_cents)}`}
-                  right={
-                    <PillButton
-                      variant="secondary"
-                      onClick={() => take.mutate(w.ticket_id)}
-                      disabled={take.isPending || inFlight}
-                    >
-                      Match
-                    </PillButton>
-                  }
-                />
-              ))}
-            </section>
-          )}
-        </>
+              }
+              title={
+                <>
+                  {w.username ?? 'Player'}
+                  {w.rating != null && (
+                    <span className="num ml-2 text-xs font-normal text-text-tertiary">
+                      {w.rating}
+                    </span>
+                  )}
+                </>
+              }
+              subline={[timeControlLabel(w.speed), formatPoints(w.entry_cents)]
+                .filter(Boolean)
+                .join(' · ')}
+              right={
+                <PillButton
+                  variant="secondary"
+                  onClick={() => take.mutate(w.ticket_id)}
+                  disabled={take.isPending}
+                >
+                  Match
+                </PillButton>
+              }
+            />
+          ))}
+        </section>
       )}
     </div>
   );

@@ -152,7 +152,7 @@ primitive rather than a one-off.
 - **`Segmented`** — the one "pick one of a few" control (mode switcher, entry
   amount, sub-tabs). Recessed `panel` track + hairline, 4px padding; the selected
   option is a `panel-raised` pill with an inset `line-strong` ring. Renders as a
-  real tablist.
+  real tablist. `lg` (44px min) is for primary choices on a desk.
 - **`WagerCard`** — the joinable contest, and the most important layout in the
   product (§6). One card per **bar**, never one per stake.
 - **`ClearBar`** — the signature object (§7).
@@ -164,6 +164,14 @@ primitive rather than a one-off.
   explainer once, inline under the switcher (`HowItWorksNote`, "Got it"), on
   the first play page they open; it never covers content. Explainers are at most
   two short sentences.
+- **`MatchDesk`** — head to head on `/play`: one card in a `max-w-3xl` column
+  (the page, switcher included, shares that width). Top strip: you, the promise
+  "Matched with someone at your skill level", and your Lichess rating for the
+  chosen time control (mono, white, never lime; "From blitz" when that speed has
+  no games). Then time control and stake as `lg` `Segmented`, then `WINNER
+  TAKES` in lime with the fee figure in red, and "Find match · 1,000 pts". The
+  last choice is remembered per browser. Unlinked, the same frame holds one
+  "Link Lichess" action. Searching, matched and confirm replace it in place.
 - **`ExpandableCard`** / **`ListRow`** — the expandable and flat row primitives.
 - **`FilterBar`** — pill toggle with a hamburger, "Filters", and a paper
   active-count badge; opens a `Card` of chip rows.

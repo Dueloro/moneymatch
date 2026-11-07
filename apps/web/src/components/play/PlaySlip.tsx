@@ -1,6 +1,7 @@
 import { PillButton } from '../ui/PillButton';
 import { VersusCard } from './VersusCard';
-import { formatPoints } from '../../lib/format';
+import { dashless, formatPoints } from '../../lib/format';
+import { timeControlLabel } from '../../lib/timeControl';
 import {
   prizeForEntry,
   useConfirmMatch,
@@ -23,7 +24,7 @@ export function PlaySlip({ status }: { status: QueueStatus | undefined }) {
 function SlipShell({ children }: { children: React.ReactNode }) {
   return (
     <aside
-      className="w-full shrink-0 rounded-card border border-hairline bg-panel p-6 md:w-[354px]"
+      className="w-full rounded-card border border-hairline bg-panel p-5 md:p-6"
       data-testid="play-slip"
     >
       {children}
@@ -91,7 +92,7 @@ function MatchedSlip({ match }: { match: MatchView }) {
   return (
     <SlipShell>
       <VersusCard
-        marketLabel={match.market_label}
+        marketLabel={timeControlLabel(match.speed) || match.market_label}
         status={active ? 'Match on' : 'Opponent found'}
         you={{ name: you?.username ?? 'You', rating: you?.rating }}
         opponent={{ name: opponent?.username ?? 'Opponent', rating: opponent?.rating }}
@@ -101,7 +102,7 @@ function MatchedSlip({ match }: { match: MatchView }) {
 
       {match.forecast && (
         <p className="mt-3 text-xs text-text-secondary" data-testid="forecast">
-          {match.forecast.label}
+          {dashless(match.forecast.label)}
         </p>
       )}
 
