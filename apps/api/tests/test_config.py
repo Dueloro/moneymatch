@@ -70,3 +70,14 @@ def test_cors_origins_split():
         web_origin="http://a.com, http://b.com",
     )
     assert s.cors_origins == ["http://a.com", "http://b.com"]
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_blank_email_from_falls_back_to_default(blank: str):
+    s = _settings(
+        database_url="postgresql+asyncpg://u:p@h/db",
+        supabase_url="https://x.supabase.co",
+        supabase_jwt_secret="s",
+        email_from=blank,
+    )
+    assert s.email_from == "Money Match <noreply@send.dueloro.com>"

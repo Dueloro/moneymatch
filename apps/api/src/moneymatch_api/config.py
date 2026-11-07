@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # live Supabase project.
     e2e_auth_enabled: bool = Field(default=False)
 
+    @field_validator("email_from")
+    @classmethod
+    def _blank_email_from_uses_default(cls, v: str) -> str:
+        return v.strip() or "Money Match <noreply@send.dueloro.com>"
+
     @field_validator("database_url")
     @classmethod
     def _require_async_driver(cls, v: str) -> str:
