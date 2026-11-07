@@ -5,13 +5,13 @@ databases:
   - name: moneymatch-postgres
     plan: 0.1c-256mb # paid, 256 MB / 0.1 CPU
     postgresMajorVersion: '16'
-    region: ohio # match the Supabase project's region
+    region: oregon # same region as Supabase (us-west-2)
 
 services:
   - type: web
     name: moneymatch-api
     runtime: docker
-    region: ohio # match the Supabase project's region
+    region: oregon # same region as Supabase (us-west-2)
     plan: 0.5c-512mb
     branch: main
     autoDeployTrigger: commit
@@ -53,7 +53,7 @@ services:
   - type: worker
     name: moneymatch-worker
     runtime: docker
-    region: ohio # match the Supabase project's region
+    region: oregon # same region as Supabase (us-west-2)
     plan: 0.5c-512mb
     branch: main
     autoDeployTrigger: commit

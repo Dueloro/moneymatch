@@ -48,7 +48,7 @@ origin; the API refuses to boot in prod if it is localhost.
    - Blank `SUPABASE_JWT_SECRET` means verify via JWKS. Blank `SENTRY_DSN`,
      `POSTHOG_API_KEY` or `VAPID_*` just disables that feature.
 3. Region: every service and the database must be in the same region as the
-   Supabase project (`ohio` in `render.yaml`). Change all of them together.
+   Supabase project (`oregon` in `render.yaml`, matching Supabase `us-west-2`). Change all of them together.
 
 ### 3. Custom domain
 
