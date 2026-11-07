@@ -7,7 +7,7 @@ describe('AmountText', () => {
   it('sets money in the numeric face', () => {
     render(<AmountText cents={1800} testId="amt" />);
     expect(screen.getByTestId('amt')).toHaveClass('num');
-    expect(screen.getByTestId('amt')).toHaveTextContent('+$18.00');
+    expect(screen.getByTestId('amt')).toHaveTextContent('+1,800 pts');
   });
 
   it('is lime for a win, grey for a loss, and always lime for a money figure', () => {
@@ -21,6 +21,6 @@ describe('AmountText', () => {
     expect(screen.getByTestId('win')).toHaveClass('text-green');
     expect(screen.getByTestId('loss')).toHaveClass('text-text-secondary');
     expect(screen.getByTestId('bal')).toHaveClass('text-green');
-    expect(screen.getByTestId('bal')).toHaveTextContent('$0.00');
+    expect(screen.getByTestId('bal')).toHaveTextContent('0 pts');
   });
 });

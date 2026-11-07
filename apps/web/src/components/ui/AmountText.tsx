@@ -1,7 +1,7 @@
-import { formatCurrency, formatSignedCurrency } from '../../lib/format';
+import { formatPoints, formatSignedPoints } from '../../lib/format';
 
 /**
- * Every money figure goes through here (or AnimatedBalance) so it gets the
+ * Every points figure goes through here (or AnimatedBalance) so it gets the
  * numeric face. `signed` shows an explicit + on positives (ledger rows); off
  * for plain balances. `money` is always lime (a balance, a payout to come).
  */
@@ -26,7 +26,7 @@ export function AmountText({
       : cents < 0
         ? 'text-text-secondary'
         : 'text-text';
-  const text = signed ? formatSignedCurrency(cents) : formatCurrency(cents);
+  const text = signed ? formatSignedPoints(cents) : formatPoints(cents);
   return (
     <span className={`num ${color} ${className}`} data-testid={testId}>
       {text}

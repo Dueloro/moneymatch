@@ -1,6 +1,6 @@
 import { usePool, type PoolMember } from '../../hooks/usePools';
 import { useTournament } from '../../hooks/useTournaments';
-import { formatCurrency, formatStat as stat } from '../../lib/format';
+import { formatPoints, formatStat as stat } from '../../lib/format';
 import { isLowerBetter } from '../../lib/metrics';
 import { AmountText } from '../ui/AmountText';
 import { ListRow } from '../ui/ListRow';
@@ -27,7 +27,7 @@ export function PoolDetail({ poolId }: { poolId: string }) {
       <Line>
         {pool.metric_label} · {pool.difficulty} · room bar{' '}
         <span className="text-text">{stat(pool.room_bar)}</span> ·{' '}
-        {formatCurrency(pool.entry_cents)} each
+        {formatPoints(pool.entry_cents)} each
       </Line>
 
       <div className="mt-2">
@@ -60,7 +60,7 @@ export function PoolDetail({ poolId }: { poolId: string }) {
       {!settled && (
         <Line>
           Everyone is playing their own bar. Clear yours to take a share of{' '}
-          {formatCurrency(pool.pot_cents)}.
+          {formatPoints(pool.pot_cents)}.
         </Line>
       )}
     </div>
@@ -113,8 +113,8 @@ export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
   return (
     <div>
       <Line>
-        {t.metric_label} · {t.standings.length} entrants ·{' '}
-        {formatCurrency(t.entry_cents)} each · {settled ? 'final' : 'live'} standings
+        {t.metric_label} · {t.standings.length} entrants · {formatPoints(t.entry_cents)}{' '}
+        each · {settled ? 'final' : 'live'} standings
       </Line>
 
       <div className="mt-2 tabular-nums">
@@ -145,7 +145,7 @@ export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
 
       {!settled && (
         <Line>
-          Prizes are paid when the window closes. Pot {formatCurrency(t.pot_cents)}.
+          Prizes are paid when the window closes. Pot {formatPoints(t.pot_cents)}.
         </Line>
       )}
     </div>

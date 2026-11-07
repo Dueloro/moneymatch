@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import { AmountText } from './AmountText';
 import { Card } from './Card';
 import { ClearRate } from './ClearBar';
@@ -126,7 +126,7 @@ export function WagerCard({
           ariaLabel={`Entry for ${title}`}
           options={entryOptions.map((cents) => ({
             value: cents,
-            label: <span className="num">{formatCurrency(cents)}</span>,
+            label: <span className="num">{formatPoints(cents)}</span>,
           }))}
           value={selected}
           onChange={setEntry}
@@ -159,7 +159,7 @@ export function WagerCard({
                 setArmed(false);
               }}
             >
-              {joining ? 'Joining…' : `Confirm · ${formatCurrency(selected)}`}
+              {joining ? 'Joining…' : `Confirm · ${formatPoints(selected)}`}
             </PillButton>
             <PillButton
               fullWidth

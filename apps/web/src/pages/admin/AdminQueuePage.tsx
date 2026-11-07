@@ -1,4 +1,4 @@
-import { formatCurrency, formatPct } from '../../lib/format';
+import { formatPoints, formatPct } from '../../lib/format';
 import { useAdminQueue } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
 
@@ -46,7 +46,7 @@ export function AdminQueuePage() {
               <tr key={i}>
                 <td style={styles.td}>{row.game}</td>
                 <td style={styles.td}>{row.market}</td>
-                <td style={styles.td}>{formatCurrency(row.entry_cents)}</td>
+                <td style={styles.td}>{formatPoints(row.entry_cents)}</td>
                 <td style={styles.td}>{row.waiting}</td>
                 <td style={styles.td}>{Math.round(row.avg_wait_seconds)}s</td>
               </tr>

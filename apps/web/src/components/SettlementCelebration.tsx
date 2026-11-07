@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useCountUp } from '../hooks/useCountUp';
 import { useSettlement } from '../hooks/useSettlement';
 import type { SettlementOutcome } from '../hooks/useSettlementCelebration';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { AmountText } from './ui/AmountText';
 
 const HOLD_MS = 1_900;
@@ -53,7 +53,7 @@ export function SettlementCelebration() {
 
   const headline = win ? 'You won' : 'You lost…';
   const announced = win
-    ? `You won ${formatCurrency(show.netCents)} on ${show.title}`
+    ? `You won ${formatPoints(show.netCents, { long: true })} on ${show.title}`
     : `You lost on ${show.title}`;
 
   return (

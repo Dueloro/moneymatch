@@ -123,7 +123,7 @@ describe('PlayPage', () => {
   it('renders one 1v1 card per market with the derived payout inside it', () => {
     renderWithProviders(<PlayPage />);
     expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
-    expect(screen.getByText('$18.00')).toBeInTheDocument();
+    expect(screen.getByText('1,800 pts')).toBeInTheDocument();
   });
 
   it('joining a card finds a match with the entry selected inside it', () => {

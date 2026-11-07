@@ -1,16 +1,21 @@
 // No odds anywhere: we show entries, pots, prizes, and rake.
 
-export function formatCurrency(cents: number): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(Math.trunc(cents));
-  const dollars = Math.floor(abs / 100).toLocaleString('en-US');
-  const remainder = String(abs % 100).padStart(2, '0');
-  return `${sign}$${dollars}.${remainder}`;
+/** 1 point = 1 internal cent unit. Points are whole numbers, no cash value. */
+export function formatPointsValue(cents: number): string {
+  const n = Math.trunc(cents);
+  const abs = Math.abs(n).toLocaleString('en-US');
+  return n < 0 ? `-${abs}` : abs;
 }
 
-export function formatSignedCurrency(cents: number): string {
-  if (cents > 0) return `+${formatCurrency(cents)}`;
-  return formatCurrency(cents);
+/** "1,000 pts" in compact UI; `long` gives "1,000 points" for sentences. */
+export function formatPoints(cents: number, { long = false } = {}): string {
+  const unit = long ? (Math.abs(Math.trunc(cents)) === 1 ? 'point' : 'points') : 'pts';
+  return `${formatPointsValue(cents)} ${unit}`;
+}
+
+export function formatSignedPoints(cents: number): string {
+  if (cents > 0) return `+${formatPoints(cents)}`;
+  return formatPoints(cents);
 }
 
 export function dashless(text: string): string {

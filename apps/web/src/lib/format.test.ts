@@ -1,30 +1,35 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  formatCurrency,
   formatPct,
   formatRelativeTime,
-  formatSignedCurrency,
+  formatPoints,
+  formatSignedPoints,
 } from './format';
 
-describe('formatCurrency', () => {
-  it('formats cents exactly with thousands separators', () => {
-    expect(formatCurrency(102394)).toBe('$1,023.94');
-    expect(formatCurrency(0)).toBe('$0.00');
-    expect(formatCurrency(5)).toBe('$0.05');
-    expect(formatCurrency(100000)).toBe('$1,000.00');
+describe('formatPoints', () => {
+  it('shows whole points with thousands separators', () => {
+    expect(formatPoints(100000)).toBe('100,000 pts');
+    expect(formatPoints(1000)).toBe('1,000 pts');
+    expect(formatPoints(0)).toBe('0 pts');
+    expect(formatPoints(5)).toBe('5 pts');
+  });
+
+  it('spells the unit out in sentences', () => {
+    expect(formatPoints(1800, { long: true })).toBe('1,800 points');
+    expect(formatPoints(1, { long: true })).toBe('1 point');
   });
 
   it('carries a leading minus on negatives', () => {
-    expect(formatCurrency(-500)).toBe('-$5.00');
+    expect(formatPoints(-500)).toBe('-500 pts');
   });
 });
 
-describe('formatSignedCurrency', () => {
+describe('formatSignedPoints', () => {
   it('shows an explicit + on positives', () => {
-    expect(formatSignedCurrency(1800)).toBe('+$18.00');
-    expect(formatSignedCurrency(-1800)).toBe('-$18.00');
-    expect(formatSignedCurrency(0)).toBe('$0.00');
+    expect(formatSignedPoints(1800)).toBe('+1,800 pts');
+    expect(formatSignedPoints(-1800)).toBe('-1,800 pts');
+    expect(formatSignedPoints(0)).toBe('0 pts');
   });
 });
 

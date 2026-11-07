@@ -7,7 +7,7 @@ import {
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { toast } from '../lib/toast';
 
 export interface LedgerEntry {
@@ -85,12 +85,12 @@ export function usePlayMoneyDeposit() {
       const { data, error } = await api.POST('/api/v1/wallet/demo-deposit', {
         body: { amount_preset_cents: amountPresetCents },
       });
-      if (error) throw new Error('Deposit failed');
+      if (error) throw new Error('Could not add points');
       return data as Wallet;
     },
     onSuccess: (_data, amountPresetCents) => {
       invalidate();
-      toast.success(`Added ${formatCurrency(amountPresetCents)}`);
+      toast.success(`Added ${formatPoints(amountPresetCents, { long: true })}`);
     },
   });
 }
@@ -107,7 +107,7 @@ export function usePlayMoneyWithdrawal() {
     },
     onSuccess: (_data, amountCents) => {
       invalidate();
-      toast.success(`Cashed out ${formatCurrency(amountCents)}`);
+      toast.success(`Cashed out ${formatPoints(amountCents)}`);
     },
   });
 }

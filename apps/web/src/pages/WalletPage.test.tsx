@@ -76,10 +76,10 @@ describe('WalletPage', () => {
   it('leads with available balance, with escrow and lifetime as context', () => {
     renderWithProviders(<WalletPage />);
     expect(screen.getByText('Available')).toBeInTheDocument();
-    expect(screen.getByText('$1,000.00')).toBeInTheDocument();
+    expect(screen.getByText('100,000 pts')).toBeInTheDocument();
     // Escrow and lifetime now read as one supporting line under the hero.
-    expect(screen.getByText(/\$26\.00 in play/)).toBeInTheDocument();
-    expect(screen.getByText('+$68.94')).toBeInTheDocument();
+    expect(screen.getByText(/2,600 pts in play/)).toBeInTheDocument();
+    expect(screen.getByText('+6,894 pts')).toBeInTheDocument();
   });
 
   it('shows the signup grant ledger row', () => {
@@ -89,7 +89,7 @@ describe('WalletPage', () => {
 
   it('fires a preset deposit on click', () => {
     renderWithProviders(<WalletPage />);
-    fireEvent.click(screen.getAllByRole('button', { name: '$25.00' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '2,500 pts' })[0]);
     expect(depositMutate).toHaveBeenCalledWith(2500);
   });
 });

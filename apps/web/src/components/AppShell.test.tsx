@@ -67,7 +67,7 @@ describe('AppShell', () => {
 
   it('shows the balance in the sidebar footer', () => {
     renderShell();
-    expect(screen.getAllByText('$1,008.00').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('sidebar-balance')).toHaveTextContent('100,800 pts');
   });
 
   it('shows a role-gated Admin link for admins', () => {

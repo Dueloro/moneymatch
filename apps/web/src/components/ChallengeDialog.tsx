@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { useCreateChallenge } from '../hooks/useChallenges';
 import { useMarkets, type MarketRow } from '../hooks/useMatchmaking';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { CHESS } from '../lib/games';
 import { Card } from './ui/Card';
 import { RadioRow } from './ui/Field';
@@ -180,8 +180,8 @@ export function ChallengeDialog({
 
             {ready && market && (
               <p className="mt-3 text-xs text-text-secondary">
-                Both stake {formatCurrency(entryCents!)} · winner takes the pot minus
-                the platform fee.
+                Both stake {formatPoints(entryCents!)} · winner takes the pot minus the
+                platform fee.
               </p>
             )}
           </>

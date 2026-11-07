@@ -1,4 +1,4 @@
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import { useWaiting } from '../../hooks/useMatchmaking';
 
 export function Ticker() {
@@ -11,7 +11,7 @@ export function Ticker() {
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-live" aria-hidden />
       <span className="font-medium text-text">{w.username ?? 'A player'}</span>
       <span className="text-text-secondary">wants {w.market_label}</span>
-      <span className="font-medium text-text">{formatCurrency(w.entry_cents)}</span>
+      <span className="font-medium text-text">{formatPoints(w.entry_cents)}</span>
     </span>
   );
 

@@ -1,4 +1,4 @@
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import { useReconciliation } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
 
@@ -40,9 +40,9 @@ export function AdminReconciliationPage() {
         {d.solvency_ok ? 'solvent' : 'BREACH'}
       </p>
       <ul>
-        <li>user total: {formatCurrency(d.totals.user_total ?? 0)}</li>
-        <li>promo funding: {formatCurrency(d.totals.promo_funding ?? 0)}</li>
-        <li>rake: {formatCurrency(d.totals.rake ?? 0)}</li>
+        <li>user total: {formatPoints(d.totals.user_total ?? 0)}</li>
+        <li>promo funding: {formatPoints(d.totals.promo_funding ?? 0)}</li>
+        <li>rake: {formatPoints(d.totals.rake ?? 0)}</li>
       </ul>
       {d.solvency_violations.length > 0 && (
         <pre style={styles.pre}>{d.solvency_violations.join('\n')}</pre>

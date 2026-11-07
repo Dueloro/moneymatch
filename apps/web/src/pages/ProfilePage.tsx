@@ -8,7 +8,7 @@ import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { formatCurrency } from '../lib/format';
+import { formatPoints, formatPointsValue } from '../lib/format';
 
 export function ProfilePage() {
   usePageTitle('Profile');
@@ -257,9 +257,9 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setLoss(dollars(limits.daily_loss_cap_cents));
-    setEntry(dollars(limits.daily_entry_cap_cents));
-    setDeposit(dollars(limits.daily_deposit_cap_cents));
+    setLoss(formatPointsValue(limits.daily_loss_cap_cents));
+    setEntry(formatPointsValue(limits.daily_entry_cap_cents));
+    setDeposit(formatPointsValue(limits.daily_deposit_cap_cents));
   }, [
     limits.daily_loss_cap_cents,
     limits.daily_entry_cap_cents,
@@ -305,15 +305,15 @@ function LimitsEditor({ limits }: { limits: Limits }) {
         effect after 24 hours.
       </p>
       <div className="flex flex-col gap-4">
-        <DollarField label="Daily loss cap" value={loss} onChange={setLoss} />
+        <PointsField label="Daily loss cap" value={loss} onChange={setLoss} />
         {pending?.daily_loss_cap_cents != null && effectiveAt && (
           <PendingNote cents={pending.daily_loss_cap_cents} at={effectiveAt} />
         )}
-        <DollarField label="Daily entries cap" value={entry} onChange={setEntry} />
+        <PointsField label="Daily entries cap" value={entry} onChange={setEntry} />
         {pending?.daily_entry_cap_cents != null && effectiveAt && (
           <PendingNote cents={pending.daily_entry_cap_cents} at={effectiveAt} />
         )}
-        <DollarField label="Daily deposit cap" value={deposit} onChange={setDeposit} />
+        <PointsField label="Daily top-up cap" value={deposit} onChange={setDeposit} />
         {pending?.daily_deposit_cap_cents != null && effectiveAt && (
           <PendingNote cents={pending.daily_deposit_cap_cents} at={effectiveAt} />
         )}
@@ -399,7 +399,7 @@ function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
   );
 }
 
-function DollarField({
+function PointsField({
   label,
   value,
   onChange,
@@ -411,14 +411,14 @@ function DollarField({
   return (
     <label className="flex items-center justify-between gap-4 text-sm">
       <span className="text-text-secondary">{label}</span>
-      <span className="flex items-center gap-1">
-        <span className="text-text-secondary">$</span>
+      <span className="flex items-center gap-2">
         <input
-          inputMode="decimal"
+          inputMode="numeric"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-24 rounded-pill border border-hairline bg-panel-raised px-4 py-1.5 text-right text-sm text-text transition-colors hover:border-line-strong"
+          className="num w-28 rounded-pill border border-hairline bg-panel-raised px-4 py-1.5 text-right text-sm text-text transition-colors hover:border-line-strong"
         />
+        <span className="text-xs text-text-tertiary">pts</span>
       </span>
     </label>
   );
@@ -427,19 +427,15 @@ function DollarField({
 function PendingNote({ cents, at }: { cents: number; at: string }) {
   return (
     <p className="-mt-2 text-xs text-text-secondary">
-      Raise to {formatCurrency(cents)} takes effect {at}.
+      Raise to {formatPoints(cents, { long: true })} takes effect {at}.
     </p>
   );
 }
 
-function dollars(cents: number): string {
-  return (cents / 100).toFixed(2).replace(/\.00$/, '');
-}
-
 function toCents(value: string): number | null {
-  const n = Number(value.trim());
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 100);
+  const n = Number(value.trim().replace(/,/g, ''));
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return n;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useCountUp } from '../../hooks/useCountUp';
-import { formatCurrency } from '../../lib/format';
+import { formatPoints, formatPointsValue } from '../../lib/format';
 import { Skeleton } from './Skeleton';
 
 const DELTA_MS = 2200;
@@ -81,7 +81,10 @@ function LoadedBalance({
         className={`num transition-colors duration-300 ${tint}`}
         data-direction={delta === null ? 'none' : up ? 'up' : 'down'}
       >
-        {formatCurrency(shown)}
+        {formatPointsValue(shown)}{' '}
+        <span className="font-sans text-[max(0.45em,0.6875rem)] font-medium tracking-normal opacity-60">
+          pts
+        </span>
       </span>
 
       {delta !== null && (
@@ -93,7 +96,7 @@ function LoadedBalance({
           }`}
         >
           {up ? '+' : '−'}
-          {formatCurrency(Math.abs(delta))}
+          {formatPoints(Math.abs(delta))}
         </span>
       )}
     </span>

@@ -139,7 +139,7 @@ export function ConversationList({
           title="Dueloro Support"
           subline={
             support?.last_message_preview ??
-            (supportPending ? 'Opening…' : 'Questions about a contest or payout')
+            (supportPending ? 'Opening…' : 'Questions about a contest or winnings')
           }
           meta={
             support?.last_message_at

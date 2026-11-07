@@ -7,7 +7,7 @@ import { PresetSelector } from '../components/ui/PresetSelector';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
-import { formatCurrency, formatRelativeTime } from '../lib/format';
+import { formatPoints, formatRelativeTime } from '../lib/format';
 import { humanizeIds } from '../lib/labels';
 import {
   DEPOSIT_PRESETS_CENTS,
@@ -87,7 +87,7 @@ export function WalletPage() {
               <AmountText cents={available} signed={false} money />
             </p>
             <p className="mt-2 text-xs text-text-secondary">
-              {formatCurrency(escrow)} in play ·{' '}
+              {formatPoints(escrow)} in play ·{' '}
               <AmountText cents={lifetime} win={lifetime > 0} /> all time
             </p>
           </Card>

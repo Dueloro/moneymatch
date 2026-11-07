@@ -1,6 +1,6 @@
 import { PillButton } from '../ui/PillButton';
 import { VersusCard } from './VersusCard';
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import {
   prizeForEntry,
   useConfirmMatch,
@@ -42,8 +42,8 @@ function RakeLine({
   const fee = entryCents * 2 - prize;
   return (
     <p className="mt-3 text-xs text-text-secondary">
-      Both stake {formatCurrency(entryCents)} · winner takes {formatCurrency(prize)} ·{' '}
-      {formatCurrency(fee)} platform fee
+      Both stake {formatPoints(entryCents)} · winner takes {formatPoints(prize)} · fee{' '}
+      {formatPoints(fee)}
     </p>
   );
 }
@@ -121,7 +121,7 @@ function MatchedSlip({ match }: { match: MatchView }) {
               onClick={() => confirm.mutate(match.id)}
               disabled={confirm.isPending}
             >
-              Confirm &amp; stake {formatCurrency(match.entry_cents)}
+              Confirm &amp; stake {formatPoints(match.entry_cents)}
             </PillButton>
           )}
           <PillButton

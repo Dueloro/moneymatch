@@ -15,7 +15,7 @@ import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { tournamentRule } from '../lib/metrics';
 import { platformFeeNote, rakeOnPot } from '../lib/rake';
 import {
@@ -264,7 +264,7 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
         ))}
       </div>
       <p className="mt-3 text-xs text-text-secondary">
-        Pot {formatCurrency(tournament.pot_cents)} · the window closes automatically.
+        Pot {formatPoints(tournament.pot_cents)} · the window closes automatically.
       </p>
     </Card>
   );

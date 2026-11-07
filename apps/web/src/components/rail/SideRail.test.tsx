@@ -73,7 +73,7 @@ describe('SideRail', () => {
     expect(card).toHaveTextContent('medium Moves to win');
     expect(card).toHaveTextContent('Room bar 32');
     expect(card).toHaveTextContent('need −2');
-    expect(card).toHaveTextContent('4 players · pot $40.00');
+    expect(card).toHaveTextContent('4 players · pot 4,000 pts');
     expect(screen.getByTestId('rail-room-play-cue')).toHaveTextContent(
       /play your next game on lichess/i,
     );

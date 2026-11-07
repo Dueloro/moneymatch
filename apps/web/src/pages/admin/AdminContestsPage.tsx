@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import {
   useAdminContests,
   useContestDetail,
@@ -55,7 +55,7 @@ export function AdminContestsPage() {
                 <td style={styles.td}>{c.game}</td>
                 <td style={styles.td}>{c.market}</td>
                 <td style={styles.td}>{c.state}</td>
-                <td style={styles.td}>{formatCurrency(c.pot_cents)}</td>
+                <td style={styles.td}>{formatPoints(c.pot_cents)}</td>
                 <td style={styles.td}>{c.participants}</td>
                 <td style={styles.td}>
                   <button
@@ -147,14 +147,14 @@ function ContestDetail({ type, id }: { type: string; id: string }) {
               <tr key={r.id}>
                 <td style={styles.td}>{r.username ?? '—'}</td>
                 <td style={styles.td}>{r.entry_type}</td>
-                <td style={styles.td}>{formatCurrency(r.amount_cents)}</td>
+                <td style={styles.td}>{formatPoints(r.amount_cents)}</td>
               </tr>
             ))}
             {d.platform_ledger.map((p, i) => (
               <tr key={`p${i}`}>
                 <td style={styles.td}>{p.account}</td>
                 <td style={styles.td}>platform</td>
-                <td style={styles.td}>{formatCurrency(p.amount_cents)}</td>
+                <td style={styles.td}>{formatPoints(p.amount_cents)}</td>
               </tr>
             ))}
           </tbody>

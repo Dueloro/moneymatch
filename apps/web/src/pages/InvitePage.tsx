@@ -6,7 +6,7 @@ import { TriangleMark } from '../components/ui/brand';
 import { PillButton } from '../components/ui/PillButton';
 import { useAcceptInvite, useInvitePreview } from '../hooks/useChallenges';
 import { useMe } from '../hooks/useMe';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { setReturnTo } from '../lib/returnTo';
 import { track } from '../lib/telemetry';
 
@@ -58,7 +58,7 @@ export function InvitePage() {
             </h1>
             <p className="mt-2 text-sm text-text-secondary">
               {preview.market_label} for{' '}
-              <span className="text-green">{formatCurrency(preview.entry_cents)}</span>
+              <span className="text-green">{formatPoints(preview.entry_cents)}</span>
             </p>
 
             {!preview.valid ? (

@@ -129,7 +129,7 @@ describe('TournamentPage', () => {
       screen.getAllByText('Most wins across your games in the window ranks first.')
         .length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText(/Pot \$100.00/)).toBeInTheDocument();
+    expect(screen.getByText(/Pot 10,000 pts/)).toBeInTheDocument();
   });
 
   it('the filter menu is collapsed until the hamburger toggle is clicked', () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { toast } from '../../lib/toast';
-import { formatCurrency, formatRelativeTime } from '../../lib/format';
+import { formatPoints, formatRelativeTime } from '../../lib/format';
 import {
   statValue,
   type ActivityDetail,
@@ -142,9 +142,9 @@ function DetailBody({ item }: { item: ActivityItem }) {
         </div>
         <StatCompare detail={d} />
         <div className="mt-3 flex flex-wrap gap-2">
-          <Fact label="Entry" value={formatCurrency(d.entry_cents ?? 0)} />
+          <Fact label="Entry" value={formatPoints(d.entry_cents ?? 0)} />
           {d.prize_cents ? (
-            <Fact label="Prize" value={formatCurrency(d.prize_cents)} />
+            <Fact label="Prize" value={formatPoints(d.prize_cents)} />
           ) : null}
           {d.host_game_id ? (
             <Fact
@@ -167,8 +167,8 @@ function DetailBody({ item }: { item: ActivityItem }) {
   if (d.your_score != null) facts.push(['Your score', fmt(d.your_score)]);
   if (d.field_size != null) facts.push(['Field', `${d.field_size} players`]);
   if (d.room_size != null) facts.push(['Room', `${d.room_size} players`]);
-  if (d.entry_cents != null) facts.push(['Entry', formatCurrency(d.entry_cents)]);
-  if (d.prize_cents) facts.push(['Prize pool', formatCurrency(d.prize_cents)]);
+  if (d.entry_cents != null) facts.push(['Entry', formatPoints(d.entry_cents)]);
+  if (d.prize_cents) facts.push(['Prize pool', formatPoints(d.prize_cents)]);
   return (
     <div className="flex flex-wrap gap-2">
       {facts.map(([label, value]) => (
@@ -310,7 +310,7 @@ export function ActivityCard({
           <AmountText cents={item.net_cents} win={item.net_cents > 0} />
         ) : (
           <span className="text-xs text-text-secondary">
-            {formatCurrency(item.entry_cents)} in play
+            {formatPoints(item.entry_cents)} in play
           </span>
         )
       }

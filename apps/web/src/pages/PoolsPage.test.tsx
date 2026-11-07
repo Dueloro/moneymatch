@@ -88,7 +88,7 @@ describe('PoolsPage', () => {
       screen.getAllByText('Wins only. A loss or a draw does not count.'),
     ).toHaveLength(3);
     expect(screen.getByText('20%')).toBeInTheDocument();
-    expect(screen.getAllByText('$36.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('3,600 pts').length).toBeGreaterThan(0);
   });
 
   it('confirms in the card before joining, using the selected entry', () => {
@@ -99,7 +99,7 @@ describe('PoolsPage', () => {
     fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
     expect(enterMutate).not.toHaveBeenCalled();
 
-    fireEvent.click(wc.getByRole('button', { name: 'Confirm · $10.00' }));
+    fireEvent.click(wc.getByRole('button', { name: 'Confirm · 1,000 pts' }));
     expect(enterMutate).toHaveBeenCalledWith({
       game: 'chess.lichess',
       metric: 'chess_moves',
@@ -107,9 +107,9 @@ describe('PoolsPage', () => {
       entry_preset_cents: 1000,
     });
 
-    fireEvent.click(wc.getByRole('tab', { name: '$25.00' }));
+    fireEvent.click(wc.getByRole('tab', { name: '2,500 pts' }));
     fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
-    fireEvent.click(wc.getByRole('button', { name: 'Confirm · $25.00' }));
+    fireEvent.click(wc.getByRole('button', { name: 'Confirm · 2,500 pts' }));
     expect(enterMutate).toHaveBeenLastCalledWith({
       game: 'chess.lichess',
       metric: 'chess_moves',
@@ -148,7 +148,7 @@ describe('PoolsPage', () => {
     expect(screen.getByText(/Win in 30 moves or fewer/)).toBeInTheDocument();
     expect(screen.getByTestId('room-card')).toHaveTextContent('your bar 28');
     expect(screen.getByText('2 under')).toBeInTheDocument();
-    expect(screen.getByText(/4 players · pot \$40.00/)).toBeInTheDocument();
+    expect(screen.getByText(/4 players · pot 4,000 pts/)).toBeInTheDocument();
     expect(screen.getByTestId('room-play-cue')).toHaveTextContent(
       /play your next game on lichess and win in 30 moves or fewer/i,
     );

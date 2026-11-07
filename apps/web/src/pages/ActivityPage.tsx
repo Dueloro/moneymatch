@@ -9,7 +9,7 @@ import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { toast } from '../lib/toast';
 import { useActivity, type ActivityItem } from '../hooks/useActivity';
 
@@ -20,8 +20,9 @@ function toastFor(item: ActivityItem): string {
       : (item.title ?? item.market_label);
   const net = item.net_cents ?? 0;
   if (item.state === 'SETTLED') {
-    if (net > 0) return `You won ${formatCurrency(net)} ${what}`;
-    if (net < 0) return `You lost ${formatCurrency(Math.abs(net))} ${what}`;
+    if (net > 0) return `You won ${formatPoints(net, { long: true })} ${what}`;
+    if (net < 0)
+      return `You lost ${formatPoints(Math.abs(net), { long: true })} ${what}`;
     return `Settled · ${what}`;
   }
   if (item.state === 'PUSHED') return `Push ${what} · entry refunded`;

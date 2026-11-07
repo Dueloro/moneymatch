@@ -1,4 +1,4 @@
-import { formatCurrency } from './format';
+import { formatPoints } from './format';
 
 // Display-only mirror of the server's rake (apps/api services/money_math.py:
 // DEFAULT_RAKE_BPS).
@@ -17,5 +17,5 @@ export function feeOnNetWinnings(netCents: number): number {
 }
 
 export function platformFeeNote(feeCents: number): string {
-  return `${formatCurrency(feeCents)} platform fee`;
+  return `Fee ${formatPoints(feeCents)}`;
 }

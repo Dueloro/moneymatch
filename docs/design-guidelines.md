@@ -44,7 +44,7 @@ sitting *on* the page rather than floating.
 
 | Token | Hex | Reads as | Its only job |
 | --- | --- | --- | --- |
-| `green` | `#c6f440` | Acid lime | **Money.** Currency, balances, payouts, winnings, ROI. If a number is not currency, it is not lime |
+| `green` | `#c6f440` | Acid lime | **Points** (balances, stakes, winnings). If a number is not points, it is not lime |
 | `action` | `#f2f5ef` | Near-white | **The primary action.** Filled buttons, send button, your own chat bubble, checked boxes, unread badges |
 | `live` | `#4fd1e0` | Cyan (the only cool hue) | **Happening now.** Presence/searching dots, in-progress states, the queue, "Linked" |
 | `red` | `#ff5f48` | Orange-red | Loss, error, destructive, the platform fee |
@@ -166,7 +166,7 @@ primitive rather than a one-off.
   **`ErrorState`** is the same with a red-tinted dashed border + "Try again".
 - **`AmountText`** / **`AnimatedBalance`** — every money figure. Numeric face,
   tabular; `win` is lime when positive, `money` is always lime (a balance, a
-  payout to come). Don't hand-format a hero figure with `formatCurrency`.
+  payout to come). Don't hand-format a hero figure with `formatPoints`.
 - **`Skeleton`** / **`SkeletonList`** — `panel-raised` pulses at 8px radius. The
   only loading treatment in the app (`inline` for a figure inside text, e.g. the
   loading balance; never a dash).
@@ -252,9 +252,11 @@ allowed to be this loud; everything around it stays quiet.
   `Joining…` → toast `Joined the pool`.
 - **`≈` is gone.** An estimate says `est.` once, next to a properly-formatted
   number.
-- **Money is always formatted from integer cents**, never a raw float.
-- **The rake is always visible pre-commit** ("winner takes $18.00 · $2.00
-  platform fee").
+- **Points, not currency.** 1 point = 1 internal cent; always `formatPoints`
+  ("1,000 pts" in UI, "1,000 points" in sentences). No `$`, no cash wording;
+  points have no cash value.
+- **The rake is always visible pre-commit** ("winner takes 1,800 pts · fee
+  200 pts").
 - **Empty states end in a button, not an apology.**
 
 ---

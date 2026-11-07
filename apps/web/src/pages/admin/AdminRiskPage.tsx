@@ -1,4 +1,4 @@
-import { formatCurrency, formatPct } from '../../lib/format';
+import { formatPoints, formatPct } from '../../lib/format';
 import { useClearFlag, useRisk } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
 
@@ -64,7 +64,7 @@ export function AdminRiskPage() {
                 <td style={styles.td}>
                   {r.actual_rate == null ? '—' : formatPct(r.actual_rate)}
                 </td>
-                <td style={styles.td}>{formatCurrency(r.rake_cents)}</td>
+                <td style={styles.td}>{formatPoints(r.rake_cents)}</td>
               </tr>
             ))}
           </tbody>

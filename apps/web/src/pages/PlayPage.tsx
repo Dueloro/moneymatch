@@ -13,7 +13,7 @@ import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
-import { dashless, formatCurrency } from '../lib/format';
+import { dashless, formatPoints } from '../lib/format';
 import { CHESS, gameMeta } from '../lib/games';
 import { platformFeeNote } from '../lib/rake';
 import {
@@ -196,7 +196,7 @@ export function PlayPage() {
                     />
                   }
                   title={w.username ?? 'Player'}
-                  subline={`${w.market_label} · ${formatCurrency(w.entry_cents)}`}
+                  subline={`${w.market_label} · ${formatPoints(w.entry_cents)}`}
                   right={
                     <PillButton
                       variant="secondary"

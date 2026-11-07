@@ -46,7 +46,7 @@ describe('WagerCard fee disclosure (rake always visible pre-commit)', () => {
         feeNote={(entry) => `${(entry / 100).toFixed(2)} platform fee`}
       />,
     );
-    await user.click(screen.getByRole('tab', { name: '$50.00' }));
+    await user.click(screen.getByRole('tab', { name: '5,000 pts' }));
     expect(screen.getByText('50.00 platform fee')).toBeInTheDocument();
     expect(screen.queryByText('25.00 platform fee')).not.toBeInTheDocument();
   });

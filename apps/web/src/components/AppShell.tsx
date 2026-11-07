@@ -52,8 +52,8 @@ function EligibilityBanner() {
   return (
     <Card className="mb-6 px-4 py-3">
       <p className="text-sm text-text-secondary">
-        Cash play is not available in {stateName(state)} yet. You can play every match
-        for free until it is.
+        Staked matches aren't available in {stateName(state)} yet. You can play every
+        match for free until it is.
       </p>
     </Card>
   );

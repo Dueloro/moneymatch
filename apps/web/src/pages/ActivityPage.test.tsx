@@ -60,7 +60,7 @@ describe('ActivityPage', () => {
     renderWithProviders(<ActivityPage />);
     expect(screen.getByText('vs kvem_ · Win the game')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
-    expect(screen.getByText('+$8.00')).toBeInTheDocument();
+    expect(screen.getByText('+800 pts')).toBeInTheDocument();
   });
 
   it('renders a settled pool row from its title, not an opponent', () => {
@@ -78,7 +78,7 @@ describe('ActivityPage', () => {
     renderWithProviders(<ActivityPage />);
     expect(screen.getByText('Moves to win · Medium pool')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
-    expect(screen.getByText('+$8.00')).toBeInTheDocument();
+    expect(screen.getByText('+800 pts')).toBeInTheDocument();
   });
 
   it('labels a push as refunded and an in-flight match as in play', () => {
@@ -94,7 +94,7 @@ describe('ActivityPage', () => {
     renderWithProviders(<ActivityPage />);
     expect(screen.getByText(/Push · refunded/)).toBeInTheDocument();
     expect(screen.getByText(/In progress/)).toBeInTheDocument();
-    expect(screen.getByText('$10.00 in play')).toBeInTheDocument();
+    expect(screen.getByText('1,000 pts in play')).toBeInTheDocument();
   });
 
   it('shows a live chess line with move count and whose turn', () => {
@@ -167,6 +167,6 @@ describe('ActivityPage', () => {
       }),
     ]);
     rerender(view());
-    expect(screen.getByText('You won $8.00 vs kvem_')).toBeInTheDocument();
+    expect(screen.getByText('You won 800 points vs kvem_')).toBeInTheDocument();
   });
 });

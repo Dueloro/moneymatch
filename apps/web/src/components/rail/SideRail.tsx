@@ -5,7 +5,7 @@ import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
 import { useLeaveTournament, useTournamentStatus } from '../../hooks/useTournaments';
 import { useWallet } from '../../hooks/useWallet';
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import { barPhrase, isLowerBetter } from '../../lib/metrics';
 import { LiveLine } from '../activity/LiveLine';
 import { AnimatedBalance } from '../ui/AnimatedBalance';
@@ -67,7 +67,7 @@ function InPlayCard({ item }: { item: ActivityItem }) {
       <div className="flex items-baseline justify-between gap-2">
         <p className="truncate text-sm font-medium text-text">{title(item)}</p>
         <p className="shrink-0 text-xs tabular-nums text-text-tertiary">
-          {formatCurrency(item.entry_cents)}
+          {formatPoints(item.entry_cents)}
         </p>
       </div>
       <p className="mt-0.5 truncate text-xs text-text-secondary">{item.market_label}</p>
@@ -143,7 +143,7 @@ function RoomFormed() {
       </div>
       <p className="mt-0.5 text-xs text-text-secondary">
         {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
-        {formatCurrency(pool.pot_cents)}
+        {formatPoints(pool.pot_cents)}
       </p>
       <div className="mt-3">
         <ClearBar
@@ -178,7 +178,7 @@ function RoomFormed() {
         </p>
       ) : (
         <p className="mt-3 text-xs text-text" data-testid="rail-room-play-cue">
-          Your {formatCurrency(pool.entry_cents)} is in escrow. Play your next game on
+          Your {formatPoints(pool.entry_cents)} is in escrow. Play your next game on
           Lichess.
         </p>
       )}
@@ -218,14 +218,14 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
           </p>
           {inPlayCents > 0 && (
             <p className="mt-1 text-xs text-text-secondary">
-              {formatCurrency(inPlayCents)} in play
+              {formatPoints(inPlayCents)} in play
             </p>
           )}
           <Link
             to="/wallet"
             className="mt-3 inline-block text-xs font-semibold text-text-secondary transition-colors hover:text-text"
           >
-            Add funds
+            Add points
           </Link>
         </Card>
       )}

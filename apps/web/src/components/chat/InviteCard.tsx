@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useRespondInvite, type ChatMessage } from '../../hooks/useChat';
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import { gameMeta } from '../../lib/games';
 import { PillButton } from '../ui/PillButton';
 import { SwordsIcon, TrophyIcon, UsersIcon } from './icons';
@@ -102,7 +102,7 @@ export function InviteCard({ message }: { message: ChatMessage }) {
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {p.entry_cents != null && (
-            <Chip highlight>{formatCurrency(p.entry_cents)} entry</Chip>
+            <Chip highlight>{formatPoints(p.entry_cents)} entry</Chip>
           )}
           {p.friendly && <Chip>friendly · no rake</Chip>}
         </div>

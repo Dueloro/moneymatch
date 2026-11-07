@@ -129,7 +129,7 @@ describe('SettlementCelebration', () => {
 
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
     expect(screen.getByText('You won')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/You won \$90\.00/);
+    expect(screen.getByRole('status')).toHaveTextContent(/You won 9,000 points/);
   });
 
   it('announces a loss without dressing it up as anything else', () => {
@@ -143,7 +143,7 @@ describe('SettlementCelebration', () => {
 
     expect(screen.getByText('You lost…')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(/You lost/);
-    expect(screen.getByRole('status')).not.toHaveTextContent('$25.00');
+    expect(screen.getByRole('status')).not.toHaveTextContent('2,500 pts');
     expect(screen.queryByTestId('settlement-amount')).not.toBeInTheDocument();
   });
 
@@ -303,7 +303,7 @@ describe('SettlementCelebration', () => {
 
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-live', 'polite');
-    expect(status).toHaveTextContent(/You won \$90\.00/);
+    expect(status).toHaveTextContent(/You won 9,000 points/);
   });
 
   it('takes the screen, and gives it back within two seconds', () => {

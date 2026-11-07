@@ -15,7 +15,7 @@ import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import {
   barPhrase,
   barTitle,
@@ -295,7 +295,7 @@ function RoomBanner({ pool }: { pool: PoolView }) {
           </h2>
           <p className="mt-1 text-xs text-text-secondary">
             {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
-            {formatCurrency(pool.pot_cents)}
+            {formatPoints(pool.pot_cents)}
           </p>
         </div>
         <div className="w-full max-w-xs">
@@ -308,7 +308,7 @@ function RoomBanner({ pool }: { pool: PoolView }) {
         </div>
       </div>
       <p className="mt-4 text-sm text-text" data-testid="room-play-cue">
-        Your {formatCurrency(pool.entry_cents)} is in escrow. Play your next game on
+        Your {formatPoints(pool.entry_cents)} is in escrow. Play your next game on
         Lichess and {barPhrase(pool.metric, pool.room_bar)} to take your share.
       </p>
     </Card>

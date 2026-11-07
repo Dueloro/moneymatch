@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import {
   useAdjustUser,
   useAdminUser,
@@ -47,8 +47,8 @@ export function AdminUsersPage() {
                     {u.status}
                   </span>
                 </td>
-                <td style={styles.td}>{formatCurrency(u.available_cents)}</td>
-                <td style={styles.td}>{formatCurrency(u.escrow_cents)}</td>
+                <td style={styles.td}>{formatPoints(u.available_cents)}</td>
+                <td style={styles.td}>{formatPoints(u.escrow_cents)}</td>
                 <td style={styles.td}>
                   <button style={styles.button} onClick={() => setSelected(u.id)}>
                     Open
@@ -110,9 +110,8 @@ function UserDetail({ userId }: { userId: string }) {
         {d.username ?? userId} — {d.status}
       </h1>
       <p>
-        available {formatCurrency(d.available_cents)} · escrow{' '}
-        {formatCurrency(d.escrow_cents)} · lifetime{' '}
-        {formatCurrency(d.lifetime_net_cents)}
+        available {formatPoints(d.available_cents)} · escrow{' '}
+        {formatPoints(d.escrow_cents)} · lifetime {formatPoints(d.lifetime_net_cents)}
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
         <button
@@ -179,7 +178,7 @@ function UserDetail({ userId }: { userId: string }) {
                 <td style={styles.td}>{c.ref_type}</td>
                 <td style={styles.td}>{c.market}</td>
                 <td style={styles.td}>{c.state}</td>
-                <td style={styles.td}>{formatCurrency(c.payout_cents)}</td>
+                <td style={styles.td}>{formatPoints(c.payout_cents)}</td>
               </tr>
             ))}
           </tbody>
@@ -200,7 +199,7 @@ function UserDetail({ userId }: { userId: string }) {
             {d.recent_ledger.map((r) => (
               <tr key={r.id}>
                 <td style={styles.td}>{r.entry_type}</td>
-                <td style={styles.td}>{formatCurrency(r.amount_cents)}</td>
+                <td style={styles.td}>{formatPoints(r.amount_cents)}</td>
                 <td style={styles.td}>{r.memo ?? ''}</td>
               </tr>
             ))}

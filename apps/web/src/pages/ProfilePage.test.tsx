@@ -134,7 +134,7 @@ describe('ProfilePage', () => {
     expect(screen.getByText('magnus · 100 games')).toBeInTheDocument();
     expect(screen.getByText('Rating 2100')).toBeInTheDocument();
     expect(screen.getByText('5 win streak')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('200')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('20,000')).toBeInTheDocument();
   });
 
   it('shows a blocked account', () => {

@@ -1,5 +1,5 @@
 import { AnimatedBalance } from './ui/AnimatedBalance';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { useDisplayBalance } from '../hooks/useDisplayBalance';
 import { useWallet } from '../hooks/useWallet';
 
@@ -19,7 +19,7 @@ export function BalanceHeader() {
       </span>
       {inPlay > 0 && (
         <span className="ml-2 align-middle text-xs text-text-secondary">
-          · {formatCurrency(inPlay)} in play
+          · {formatPoints(inPlay)} in play
         </span>
       )}
     </div>

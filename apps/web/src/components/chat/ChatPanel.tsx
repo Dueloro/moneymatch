@@ -71,7 +71,7 @@ export function ChatPanel() {
     ? 'Loading…'
     : unreadNotifications > 0
       ? `${unreadNotifications} new`
-      : 'Match, challenge, and payout updates';
+      : 'Match, challenge, and winnings updates';
 
   return (
     <div

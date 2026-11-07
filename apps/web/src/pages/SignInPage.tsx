@@ -521,7 +521,7 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
           label="Residence state"
           hint={
             isExcludedState(state)
-              ? `Cash play is not available in ${stateName(state)} yet. You can still sign up and play every match for free.`
+              ? `Staked matches aren't available in ${stateName(state)} yet. You can still sign up and play every match for free.`
               : undefined
           }
         >
@@ -619,6 +619,7 @@ function LegalFooter() {
       <LegalLink href="https://www.dueloro.com/responsible-gaming">
         Responsible Gaming
       </LegalLink>
+      <span className="mt-1 block">Points have no cash value.</span>
     </p>
   );
 }

@@ -29,20 +29,20 @@ describe('AnimatedBalance', () => {
     const { rerender } = render(<AnimatedBalance cents={undefined} testId="bal" />);
     act(() => rerender(<AnimatedBalance cents={101_000} testId="bal" />));
     expect(screen.queryByTestId('bal-delta')).not.toBeInTheDocument();
-    expect(screen.getByTestId('bal')).toHaveTextContent('$1,010.00');
+    expect(screen.getByTestId('bal')).toHaveTextContent('101,000 pts');
   });
 
   it('shows what was won when the balance rises', () => {
     const { rerender } = render(<AnimatedBalance cents={10_000} testId="bal" />);
     act(() => rerender(<AnimatedBalance cents={14_500} testId="bal" />));
-    expect(screen.getByTestId('bal-delta')).toHaveTextContent('+$45.00');
+    expect(screen.getByTestId('bal-delta')).toHaveTextContent('+4,500 pts');
   });
 
   it('shows what was lost when it falls, and marks the direction', () => {
     const { rerender } = render(<AnimatedBalance cents={10_000} testId="bal" />);
     act(() => rerender(<AnimatedBalance cents={7_500} testId="bal" />));
     const delta = screen.getByTestId('bal-delta');
-    expect(delta).toHaveTextContent('$25.00');
+    expect(delta).toHaveTextContent('2,500 pts');
     expect(delta).not.toHaveTextContent('+');
   });
 

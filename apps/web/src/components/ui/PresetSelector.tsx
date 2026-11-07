@@ -1,4 +1,4 @@
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 
 export function PresetSelector({
   presetsCents,
@@ -30,7 +30,7 @@ export function PresetSelector({
                 : 'border-hairline text-text-secondary hover:border-line-strong hover:text-text',
             ].join(' ')}
           >
-            {formatCurrency(cents)}
+            {formatPoints(cents)}
           </button>
         );
       })}
