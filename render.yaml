@@ -1,5 +1,5 @@
 # Render Blueprint. The web app is on Vercel (apps/web/vercel.json).
-# Secrets live in the `moneymatch-shared` group; fill them in when the Blueprint is created.
+# `sync: false` values are entered per service at Blueprint creation; edit them later in each service's Environment tab.
 
 databases:
   - name: moneymatch-postgres
@@ -12,7 +12,7 @@ services:
     name: moneymatch-api
     runtime: docker
     region: ohio # match the Supabase project's region
-    plan: starter
+    plan: 0.5c-512mb
     branch: main
     autoDeployTrigger: commit
     dockerfilePath: apps/api/Dockerfile
@@ -29,13 +29,32 @@ services:
         fromDatabase:
           name: moneymatch-postgres
           property: connectionString
-      - fromGroup: moneymatch-shared
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET # leave empty to verify via the project's JWKS
+        sync: false
+      - key: WEB_ORIGIN # exact Vercel origin, no trailing slash
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: POSTHOG_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
 
   - type: worker
     name: moneymatch-worker
     runtime: docker
     region: ohio # match the Supabase project's region
-    plan: starter
+    plan: 0.5c-512mb
     branch: main
     autoDeployTrigger: commit
     dockerfilePath: apps/api/Dockerfile
@@ -48,11 +67,6 @@ services:
         fromDatabase:
           name: moneymatch-postgres
           property: connectionString
-      - fromGroup: moneymatch-shared
-
-envVarGroups:
-  - name: moneymatch-shared
-    envVars:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_JWT_SECRET # leave empty to verify via the project's JWKS
