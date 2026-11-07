@@ -1,25 +1,5 @@
-"""Measure how long a chess game runs, by rating band.
-
-This produces the numbers hard-coded in
-`apps/api/src/moneymatch_api/services/skill_prior.py`. Run it to refresh them,
-or to check they still hold:
-
-    python scripts/research/lichess_game_length.py
-
-Why sample arena tournaments rather than individual players: an arena puts a
-wide rating spread into one place, already finished, and exposes every game
-through a single public endpoint. Sampling players instead means choosing
-players, and any such choice is a bias you then have to argue about.
-
-Only standard chess counts. Variants (three-check, atomic, crazyhouse) have
-different game lengths and are not what we quote a bar on.
-
-Draws are excluded. `chess_moves` only counts matches you won, so the quantity
-being modelled is the length of a game somebody won, and every decisive game is
-a win for exactly one of its two players.
-
-No authentication needed. Lichess asks for a descriptive User-Agent, which is
-set below. Be considerate about how often this runs.
+"""Measure how long a chess game runs, by rating band. Variants (three-check, atomic,
+crazyhouse) have different game lengths and are not what we quote a bar on.
 """
 
 from __future__ import annotations
@@ -73,14 +53,12 @@ def collect() -> list[tuple[int, int]]:
             if plies < 2:
                 continue
             if game.get("winner") not in ("white", "black"):
-                continue  # a draw is nobody's win
+                continue
             try:
                 players = game["players"]
                 rating = (players["white"]["rating"] + players["black"]["rating"]) // 2
             except (KeyError, TypeError):
                 continue
-            # A "move" is White and Black together, which is how move counts are
-            # quoted in chess and how the adapter records `chess_moves`.
             rows.append((rating, (plies + 1) // 2))
     return rows
 
@@ -118,7 +96,6 @@ def report(rows: list[tuple[int, int]]) -> None:
         print("\nnot enough data to fit")
         return
 
-    # Weighted least squares of mean moves on rating.
     weight = sum(n for _, _, n, _ in usable)
     mean_x = sum(b * n for b, _, n, _ in usable) / weight
     mean_y = sum(m * n for _, m, n, _ in usable) / weight
@@ -135,7 +112,6 @@ def report(rows: list[tuple[int, int]]) -> None:
     print(f"\n  i.e. {intercept + slope * 1000:.0f} moves at 1000 Elo, ")
     print(f"       {intercept + slope * 2000:.0f} moves at 2000 Elo")
 
-    # The bar sits in the left tail, so that is the fit worth checking.
     print("\nlow-tail check (predicted vs observed quantile):")
     print(f"{'band':>6} {'rate':>6} {'observed':>9} {'lognormal':>10} {'normal':>8}")
     for band, mean, _, sd in usable:

@@ -1,5 +1,5 @@
 # One image for the API (default CMD) and the settlement worker (command override).
-# Migrations are not run here: Render's preDeployCommand and compose's `migrate` service run them.
+# Migrations run elsewhere (compose `migrate` service, deploy command).
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

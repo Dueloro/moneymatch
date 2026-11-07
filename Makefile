@@ -4,8 +4,7 @@
 .PHONY: help install db down migrate api web dev test test-api test-web \
         lint typecheck gen-api worker e2e
 
-# Source the repo-root .env into a recipe (api/migrate need DATABASE_URL etc).
-# $(CURDIR) anchors to the Makefile dir so it works after `cd apps/api`.
+# Source the repo-root .env into a recipe; $(CURDIR) keeps it valid after `cd apps/api`.
 LOADENV := set -a; [ -f $(CURDIR)/.env ] && . $(CURDIR)/.env; set +a;
 
 help: ## Show this help

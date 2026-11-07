@@ -1,21 +1,5 @@
-// MoneyMatch load sanity (10-phase-7 §2).
-//
-// Drives ~50 concurrent users through the money path — markets → queue →
-// confirm — against a staging deployment, asserting p95 API latency < 300 ms
-// and zero non-2xx/3xx write failures. The settlement half is host-verified and
-// asynchronous (the worker settles once a real host game lands), so this script
-// exercises the synchronous request path; a companion reconciliation check
-// (`GET /api/v1/admin/reconciliation`, admin token) confirms
-// `sum(payouts) + rake == sum(entries)` held under load with no violations.
-//
-// Auth: every virtual user needs a Supabase JWT. Mint tokens out of band (or
-// via the dev e2e token route on a non-prod stack) and pass them as a JSON array:
-//
-//   BASE_URL=https://staging.api.moneymatch... \
-//   TOKENS='["<jwt1>","<jwt2>", ...]' \
-//   k6 run load/queue-confirm-settle.js
-//
-// VUs pair off, so provide at least as many tokens as VUs (50).
+// k6 sanity for markets -> queue -> confirm: p95 < 300 ms, no write failures.
+// Usage: BASE_URL=https://... TOKENS='["<jwt>", ...]' k6 run load/queue-confirm-settle.js
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -39,7 +23,7 @@ export const options = {
     },
   },
   thresholds: {
-    http_req_duration: ['p(95)<300'], // §2 load-sanity bar
+    http_req_duration: ['p(95)<300'],
     write_errors: ['rate==0'], // no invariant-touching write may fail
     checks: ['rate>0.99'],
   },
@@ -68,7 +52,6 @@ export default function () {
   const queued = check(queue, { 'queue accepted': (r) => r.status === 200 });
   writeErrors.add(!queued);
 
-  // Poll for a pairing, then confirm if matched (best-effort under load).
   for (let i = 0; i < 3; i++) {
     const status = http.get(`${BASE_URL}/api/v1/play/queue/status`, auth);
     if (status.status === 200 && status.json('status') === 'matched') {
