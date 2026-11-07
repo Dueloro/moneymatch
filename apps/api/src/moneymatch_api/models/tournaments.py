@@ -63,7 +63,6 @@ class Tournament(Base, TimestampMixin):
     min_field: Mapped[int] = mapped_column(Integer, nullable=False)
     # Fewer than this many entrants producing a score → CANCELED + refund.
     min_ranked: Mapped[int] = mapped_column(Integer, nullable=False)
-    score_matches: Mapped[int] = mapped_column(Integer, nullable=False)  # first-N
     pot_cents: Mapped[int] = mapped_column(
         BigInteger, default=0, server_default="0", nullable=False
     )

@@ -229,7 +229,6 @@ def tournament_view(
         "rank": me.get("rank"),
         "matches": me.get("matches", 0),
         "field": len(rows),
-        "score_matches": tournament.score_matches,
     }
 
 

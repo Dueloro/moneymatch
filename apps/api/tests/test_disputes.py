@@ -239,7 +239,6 @@ async def test_file_tournament_dispute(session, client):
         field_size=4,
         min_field=2,
         min_ranked=1,
-        score_matches=3,
         pot_cents=4000,
         prize_cents=3600,
         rake_cents=400,

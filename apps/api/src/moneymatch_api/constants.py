@@ -270,7 +270,6 @@ POOL_WINDOW_SECONDS = 24 * 3600
 TOURNAMENT_FIELD_SIZE = 10
 TOURNAMENT_MIN_FIELD = 6
 TOURNAMENT_MIN_RANKED = 4
-TOURNAMENT_SCORE_N = 3
 TOURNAMENT_PRIZE_SPLIT: tuple[int, ...] = (50, 30, 20)  # relative weights
 # max(μ) − min(μ) ≤ dispersion_cap · σ_pooled (start tight, tune with data).
 TOURNAMENT_DISPERSION_CAP = 1.0

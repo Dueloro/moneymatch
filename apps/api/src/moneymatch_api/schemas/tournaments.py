@@ -21,7 +21,6 @@ class TournamentMarketsResponse(BaseModel):
     entry_presets_cents: list[int]
     prize_split: list[int]  # relative weights, e.g. [50, 30, 20]
     field_size: int
-    score_matches: int
     metrics: list[TournamentMetric]
 
 
@@ -52,7 +51,6 @@ class TournamentView(BaseModel):
     rake_cents: int
     prize_split: list[int]
     field_size: int
-    score_matches: int
     state: str
     window_starts_at: datetime
     window_ends_at: datetime

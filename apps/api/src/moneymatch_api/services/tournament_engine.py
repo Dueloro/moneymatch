@@ -41,7 +41,6 @@ from ..constants import (
     TOURNAMENT_MIN_FIELD,
     TOURNAMENT_MIN_RANKED,
     TOURNAMENT_PRIZE_SPLIT,
-    TOURNAMENT_SCORE_N,
     TOURNAMENT_WINDOW_SECONDS,
     game_flag_key,
 )
@@ -151,9 +150,7 @@ def host_rating(link: LinkedAccount) -> float | None:
     return skill_prior.host_rating(link)
 
 
-async def _build_baseline(
-    session: AsyncSession, user: User, game: str, metric: str, link: LinkedAccount
-) -> dict[str, Any]:
+def _build_baseline(metric: str, link: LinkedAccount) -> dict[str, Any]:
     """Freeze the host rating: every tournament metric is an aggregate contest."""
     rating = host_rating(link)
     if rating is None:
@@ -287,7 +284,6 @@ async def _form_field(
         field_size=len(tickets),
         min_field=TOURNAMENT_MIN_FIELD,
         min_ranked=TOURNAMENT_MIN_RANKED,
-        score_matches=TOURNAMENT_SCORE_N,
         pot_cents=entry_cents * len(tickets),
         state="LOCKED",
         window_starts_at=now,
@@ -435,7 +431,7 @@ async def enqueue(
     if existing is not None:
         return TournamentEnqueueResult(status="formed", tournament=existing)
 
-    baseline = await _build_baseline(session, user, game, metric, link)
+    baseline = _build_baseline(metric, link)
     ticket = await _get_or_create_ticket(
         session, user, game, metric, entry_cents, baseline, link, now
     )

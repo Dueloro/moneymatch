@@ -20,7 +20,6 @@ from ..constants import (
     TOURNAMENT_GAMES,
     TOURNAMENT_METRICS,
     TOURNAMENT_PRIZE_SPLIT,
-    TOURNAMENT_SCORE_N,
     metric_label,
 )
 from ..db.session import get_session
@@ -126,7 +125,6 @@ async def _view(
         rake_cents=tournament.rake_cents,
         prize_split=list(tournament.prize_split),
         field_size=tournament.field_size,
-        score_matches=tournament.score_matches,
         state=tournament.state,
         window_starts_at=tournament.window_starts_at,
         window_ends_at=tournament.window_ends_at,
@@ -187,7 +185,6 @@ async def get_markets(
         entry_presets_cents=list(ENTRY_PRESETS_CENTS),
         prize_split=list(TOURNAMENT_PRIZE_SPLIT),
         field_size=TOURNAMENT_FIELD_SIZE,
-        score_matches=TOURNAMENT_SCORE_N,
         metrics=metrics,
     )
 
