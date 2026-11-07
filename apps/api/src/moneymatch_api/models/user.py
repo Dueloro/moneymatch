@@ -93,18 +93,7 @@ class User(Base, TimestampMixin):
     member_since: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    # The player's "play set": catalog game ids they've chosen to play. Drives
-    # which games show in the switcher; decoupled from linking, so a game can be
-    # selected (and shown) before its account is linked, and a coming-soon game
-    # can be added ahead of its adapter. Empty means "not chosen yet" — the
-    # client falls back to showing every registered game.
-    active_games: Mapped[list[str]] = mapped_column(
-        JSONB, default=list, server_default="[]", nullable=False
-    )
-    # Catalog game ids whose Play-tab onboarding checklist the player has
-    # dismissed. Kept as a subset of `active_games`: removing a game from the
-    # play set drops its dismissal, so re-adding the game shows the checklist
-    # again (removing + re-adding reads as "starting over").
+    # Catalog game ids whose Play-tab onboarding checklist the player dismissed.
     dismissed_checklists: Mapped[list[str]] = mapped_column(
         JSONB, default=list, server_default="[]", nullable=False
     )

@@ -44,14 +44,12 @@ async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
         .where(Wallet.user_id == user.id, LedgerEntry.entry_type == "escrow_hold")
         .limit(1)
     )
-    picked = bool(user.active_games)
     linked_game = linked is not None
     placed_wager = wagered is not None
     return GettingStarted(
-        picked_games=picked,
         linked_game=linked_game,
         placed_wager=placed_wager,
-        complete=picked and linked_game and placed_wager,
+        complete=linked_game and placed_wager,
     )
 
 
@@ -140,16 +138,6 @@ async def update_me(
             daily_deposit_cap_cents=body.daily_deposit_cap_cents,
             timeout_until=timeout_until,
         )
-
-    if body.active_games is not None:
-        user.active_games = body.active_games
-        # Keep dismissals a subset of the play set: a removed game forgets its
-        # dismissal, so re-adding it shows the checklist again (starting over).
-        active = set(body.active_games)
-        user.dismissed_checklists = [
-            g for g in user.dismissed_checklists if g in active
-        ]
-        await session.flush()
 
     if body.dismissed_checklists is not None:
         user.dismissed_checklists = body.dismissed_checklists

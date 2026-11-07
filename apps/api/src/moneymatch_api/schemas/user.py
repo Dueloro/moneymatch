@@ -25,7 +25,6 @@ class UserResponse(BaseModel):
     role: str
     status: str
     member_since: datetime
-    active_games: list[str]
     dismissed_checklists: list[str]
 
 
@@ -45,7 +44,6 @@ class GettingStarted(BaseModel):
     """First-match funnel progress — drives the "getting started" checklist that
     nudges a new player from signup to their first wager."""
 
-    picked_games: bool  # chose games to play (active_games non-empty)
     linked_game: bool  # linked at least one host account
     placed_wager: bool  # entered at least one contest (any escrow held)
     complete: bool
@@ -78,15 +76,12 @@ class UpdateMeRequest(BaseModel):
     daily_deposit_cap_cents: int | None = Field(default=None, gt=0)
     # Start a self-imposed cool-off of N days (protective; extend-only).
     cooloff_days: int | None = Field(default=None, gt=0, le=365)
-    active_games: list[str] | None = Field(
-        default=None, description="Catalog game ids the player has chosen to play"
-    )
     dismissed_checklists: list[str] | None = Field(
         default=None,
         description="Catalog game ids whose Play-tab checklist the player dismissed",
     )
 
-    @field_validator("active_games", "dismissed_checklists")
+    @field_validator("dismissed_checklists")
     @classmethod
     def _validate_catalog_games(cls, v: list[str] | None) -> list[str] | None:
         if v is None:
