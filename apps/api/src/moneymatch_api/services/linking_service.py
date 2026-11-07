@@ -145,7 +145,7 @@ async def _fetch_profile(game: str, method: str, username: str) -> ProfileSnapsh
             status_code=502,
         ) from exc
     except ValueError as exc:
-        # Unknown username, private/CS:GO-only account, or Dota expose-data off.
+        # Unknown username or an account the host won't expose.
         raise LinkError("host_account_unlinkable", str(exc), status_code=404) from exc
 
 
@@ -187,8 +187,7 @@ async def bind(
     )
     adapter = registry.get(game)
     if adapter.defer_bootstrap:
-        # Expensive host (PUBG ~10 req/min): the worker bootstraps out-of-band so
-        # linking stays fast and never trips the rate limit. Left NULL = owed.
+        # Rate-limited host: the worker bootstraps out-of-band. NULL = owed.
         link.models_bootstrapped_at = None
     else:
         await metric_models_service.bootstrap(session, user.id, game, host_account_id)

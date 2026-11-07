@@ -23,12 +23,12 @@ from dataclasses import dataclass, field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.play import Match, MatchPlayer, QueueTicket
+from ..models.play import Match, QueueTicket
 from ..models.pools import SoloEntry, SoloPool
 from ..models.risk import RiskFlag
 from ..models.user import User
 from ..models.wallet import PlatformLedgerEntry
-from . import fairness, markets
+from . import fairness
 
 # Only alert with enough settled samples for the rate to mean anything, and only
 # when it drifts past this absolute band (tune with data).
@@ -104,7 +104,9 @@ async def _match_rates(session: AsyncSession) -> list[RateRow]:
                 PlatformLedgerEntry.ref_id.in_(settled_ids),
             )
         )
-        expected, actual = await _favorite_win_rate(session, game, market)
+        # H2H chess has no stat-forecast expectation to drift from.
+        expected: float | None = None
+        actual: float | None = None
         rows.append(
             RateRow(
                 game=game,
@@ -120,47 +122,6 @@ async def _match_rates(session: AsyncSession) -> list[RateRow]:
             )
         )
     return rows
-
-
-async def _favorite_win_rate(
-    session: AsyncSession, game: str, market: str
-) -> tuple[float | None, float | None]:
-    """For a stat duel: expected 0.5, actual = share of decisive matches the
-    higher-μ seat won (fair pairing keeps this near 50%). None for non-stat markets."""
-    market_def = markets.get(game, market)
-    if market_def is None or market_def.kind != markets.KIND_STAT_RACE:
-        return None, None
-    metric = market_def.metric
-    if metric is None:
-        return None, None
-    decisive = 0
-    favorite_wins = 0
-    matches = await session.scalars(
-        select(Match).where(
-            Match.game == game, Match.market == market, Match.state == "SETTLED"
-        )
-    )
-    for match in matches:
-        if match.winner_user_id is None:
-            continue
-        seats = list(
-            await session.scalars(
-                select(MatchPlayer).where(MatchPlayer.match_id == match.id)
-            )
-        )
-        mus = {
-            s.user_id: (s.baseline_snapshot or {}).get(metric, {}).get("mu")
-            for s in seats
-        }
-        if any(v is None for v in mus.values()) or len(seats) != 2:
-            continue
-        decisive += 1
-        favorite = max(mus, key=lambda uid: mus[uid])
-        if match.winner_user_id == favorite:
-            favorite_wins += 1
-    if decisive == 0:
-        return 0.5, None
-    return 0.5, favorite_wins / decisive
 
 
 async def _pool_rates(session: AsyncSession) -> list[RateRow]:

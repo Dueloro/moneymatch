@@ -94,7 +94,7 @@ class QueueTicket(Base, TimestampMixin):
         String(16), default="duel", server_default="duel", nullable=False
     )
     market: Mapped[str] = mapped_column(String(32), nullable=False)
-    # Chess time control; null for CS2/Dota.
+    # Chess time control.
     speed: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # Pools only (Phase 4); reserved here.
     difficulty: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -228,7 +228,7 @@ class MatchPlayer(Base, TimestampMixin):
     )
     # The host account id bound to this seat (the settlement poll / verify key).
     host_account_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    # Chess color (white/black); null for coordinated CS2/Dota.
+    # Chess color (white/black).
     color: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # Brokered game link shown on "Go play" (chess); null otherwise.
     play_url: Mapped[str | None] = mapped_column(String(256), nullable=True)

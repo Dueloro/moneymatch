@@ -51,7 +51,6 @@ from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..services import (
     challenge_service,
-    demo_mode,
     grading,
     live_activity_service,
     match_lifecycle,
@@ -139,14 +138,7 @@ async def resolve_match(session: AsyncSession, match: Match, now: datetime) -> s
 async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> str:
     """Grade + settle (or extend/expire) one claimed ACTIVE/AWAITING_RESULT match."""
     seats = await match_lifecycle.players(session, match.id)
-    # A demo-account duel grades casual games too; a real one never does.
-    rated_only = all(
-        [
-            await demo_mode.rated_only_for(session, seat.user_id, match.game)
-            for seat in seats
-        ]
-    )
-    outcome = await grading.grade(match, seats, now, rated_only)
+    outcome = await grading.grade(match, seats, now)
 
     if outcome.status == grading.PENDING:
         # Hard ceiling from matched_at → CANCEL + refund (outage can't strand money).
@@ -705,7 +697,7 @@ async def _bootstrap_pending_models(
     sm: async_sessionmaker[AsyncSession], now: datetime | None = None
 ) -> int:
     """Bootstrap metric models for freshly-linked accounts on deferred hosts
-    (PUBG) that left `models_bootstrapped_at` NULL. One account per call keeps
+    that left `models_bootstrapped_at` NULL. One account per call keeps
     host calls under the rate limit; the account is stamped so it's done once. If
     the account already has models (seeded/demo), just stamp — never clobber.
 

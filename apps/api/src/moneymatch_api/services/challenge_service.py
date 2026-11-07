@@ -47,10 +47,9 @@ from . import (
     linking_service,
     matchmaking,
     notifications_service,
-    sandbagging_service,
 )
 from .feature_flags import get_boolean_flags
-from .markets import KIND_STAT_RACE, MarketDef
+from .markets import MarketDef
 from .markets import get as get_market
 from .match_states import CANCELED
 
@@ -406,15 +405,6 @@ async def _accept(
     # had no challengee at creation; direct challenges may have crossed the cap
     # since). The accept-time value governs the match economics.
     friendly = await pair_over_cap(session, challenge.challenger_id, challengee.id)
-
-    # A rake-bearing stat duel honors an existing sandbagging flag for either
-    # party (backlog · Phase B — friend stat-duel gap). Friendlies consent to
-    # skill gaps with disclosure and skip this, as they do the fairness gates.
-    if market.kind == KIND_STAT_RACE and market.metric is not None and not friendly:
-        for uid in (challenge.challenger_id, challengee.id):
-            await sandbagging_service.assert_not_flagged(
-                session, uid, market.game, market.metric
-            )
 
     match = await matchmaking.create_challenge_match(
         session,

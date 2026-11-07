@@ -6,9 +6,8 @@ tampered client can never move a number (it only sends ids):
 
 - `confirm` — escrow the entry (server-owned amount) after the limit checks;
   when both seats confirm, `activate`.
-- `activate` — chess brokers a Lichess open challenge restricted to the two
-  linked handles and stores the graded game id; CS2/Dota go coordinated with a
-  **server-stamped `matched_at`**. Sets the settlement window.
+- `activate` — brokers a Lichess open challenge restricted to the two linked
+  handles, stores the graded game id, stamps `matched_at` and the window.
 - `cancel_pending` — decline / PENDING-expiry → refund whoever escrowed, no rake.
 - `settle` — WIN (winner payout + rake) · PUSH / CANCEL (refund both, zero rake);
   post-settle reconciliation is fail-closed (a breach raises → worker pauses).
@@ -150,27 +149,26 @@ async def _activate(
     match_states.assert_transition(match.state, ACTIVE)
     now = clock.now()
 
-    if match.brokered:
-        adapter = registry.get(match.game)
-        handles = [s.host_account_id for s in seats]
-        try:
-            broker = await adapter.create_match(match.speed or "blitz", handles)
-        except HostUnavailable as exc:
-            raise LifecycleError(
-                "broker_unavailable",
-                "Couldn't create the game right now — try confirming again shortly.",
-                status_code=502,
-            ) from exc
-        if not broker or not broker.get("game_id"):
-            raise LifecycleError(
-                "broker_failed",
-                "Couldn't create the game right now — try confirming again shortly.",
-                status_code=502,
-            )
-        match.host_game_id = broker["game_id"]
-        urls = broker.get("urls") or {}
-        for seat in seats:
-            seat.play_url = urls.get(seat.color or "")
+    adapter = registry.get(match.game)
+    handles = [s.host_account_id for s in seats]
+    try:
+        broker = await adapter.create_match(match.speed or "blitz", handles)
+    except HostUnavailable as exc:
+        raise LifecycleError(
+            "broker_unavailable",
+            "Couldn't create the game right now — try confirming again shortly.",
+            status_code=502,
+        ) from exc
+    if not broker or not broker.get("game_id"):
+        raise LifecycleError(
+            "broker_failed",
+            "Couldn't create the game right now — try confirming again shortly.",
+            status_code=502,
+        )
+    match.host_game_id = broker["game_id"]
+    urls = broker.get("urls") or {}
+    for seat in seats:
+        seat.play_url = urls.get(seat.color or "")
 
     match.matched_at = now
     match.window_ends_at = now + timedelta(seconds=MATCH_SETTLE_WINDOW_SECONDS)

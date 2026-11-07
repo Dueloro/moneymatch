@@ -52,10 +52,9 @@ class ProfileSnapshot(BaseModel):
     formats: list[FormatStat] = []
     primary_speed: Speed | None = None
     # Generic skill descriptors usable by any title.
-    rating: int | None = None  # elo / mmr / faceit_elo
+    rating: int | None = None  # elo
     rank_label: str | None = None  # e.g. "Level 10", "Divine"
     kd: float | None = None  # average kill/death ratio (FPS)
     avatar_url: str | None = None
-    #: Title-specific extras a generic field cannot hold (CS2 lifetime kills,
-    #: hours played). Display only: nothing settles on these.
+    #: Title-specific extras a generic field cannot hold. Display only.
     extra: dict[str, float] = {}

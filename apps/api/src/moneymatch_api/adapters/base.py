@@ -30,7 +30,7 @@ class NormGame:
     moves: int  # full moves played (chess)
     won: bool | None  # True/False for the linked user; None if unknown/draw
     drawn: bool
-    metrics: dict[str, float] = field(default_factory=dict)  # rate stats (CS2/Dota)
+    metrics: dict[str, float] = field(default_factory=dict)  # per-match rate stats
 
 
 @dataclass
@@ -44,7 +44,7 @@ class GameFilters:
 class TelemetrySample:
     """Server-fetched per-match telemetry for solo/pool grading (Phase 4).
 
-    Rate metrics only (K/D, ADR, HS%, KDA, GPM); never raw totals or self-report.
+    Rate metrics only; never raw totals or self-report.
     """
 
     game: str

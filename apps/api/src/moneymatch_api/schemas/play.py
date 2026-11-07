@@ -43,15 +43,15 @@ class MarketRow(BaseModel):
 
     key: str
     label: str
-    kind: str  # win_h2h | win_next | stat_race
-    metric: str | None
+    kind: str  # win_h2h
+    metric: str | None = None
     requires_speed: bool
-    speeds: list[str]  # chess time controls (empty for other games)
+    speeds: list[str]  # chess time controls
     # Derived pot multiplier in basis points (2·(1 − rake)); NEVER an odds line.
     multiplier_bps: int
     queue_depth: int  # players currently waiting on this market
-    provisional: bool  # the viewer can't duel this stat yet (n below the floor)
-    resolution_note: str  # honest one-liner on how it settles (+ forfeit rule)
+    provisional: bool = False
+    resolution_note: str  # honest one-liner on how it settles
 
 
 class MarketsResponse(BaseModel):

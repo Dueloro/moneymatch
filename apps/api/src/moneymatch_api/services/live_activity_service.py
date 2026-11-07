@@ -8,10 +8,8 @@ a page load never blocks on a host call (same posture as the tournament
 is derived from that cache at read time — no row is stored here for them.
 
 Every value here is a server-fetched host read normalized through the adapter —
-never client input, never money. Fidelity is whatever the host API allows: a
-brokered chess game is genuinely live (plies played, whose turn); the stat-race
-titles (CS2/Dota/PUBG) surface the latest in-window match, which is the same
-evidence settlement will grade.
+never client input, never money. A chess match shows the live board (plies
+played, whose turn).
 
 A stored snapshot is **participant-neutral** (it holds every member/seat keyed by
 user id); `view_for` orients it to a single viewer — "you vs opp", "your bar",
@@ -33,7 +31,7 @@ from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
-from . import demo_mode, markets, test_opponents
+from . import demo_mode, test_opponents
 
 log = structlog.get_logger(__name__)
 
@@ -148,73 +146,29 @@ def pool_all_decided(snapshot: dict[str, Any]) -> bool:
 async def build_match_snapshot(
     session: AsyncSession, match: Match, seats: list[MatchPlayer]
 ) -> dict[str, Any] | None:
-    """A neutral H2H snapshot: chess board state, or both seats' stat/result.
-
-    `None` while the match has no live window yet (not paired). Chess is truly
-    live; the coordinated titles surface each seat's first in-window match."""
+    """A neutral H2H snapshot of the chess board. `None` until the match is paired."""
     if match.matched_at is None or match.window_ends_at is None:
         return None
-    market = markets.get(match.game, match.market)
-    kind = market.kind if market else ""
-    label = metric_label(market.metric) if (market and market.metric) else match.market
-
-    # Brokered chess: a single live board covers both seats.
-    if match.brokered and match.host_game_id:
-        adapter = registry.get(match.game)
-        handles = [s.host_account_id for s in seats]
-        try:
-            live = await adapter.live_match(match.host_game_id, handles)
-        except HostError:
-            live = None
-        if not live:
-            return {"kind": "match", "format": "chess", "status": "waiting"}
-        colors = {str(s.user_id): (s.color or "") for s in seats}
-        return {
-            "kind": "match",
-            "format": "chess",
-            "status": "finished" if live["finished"] else "live",
-            "moves": live["moves"],
-            "plies": live["plies"],
-            "turn": live["turn"],  # "white" | "black" | null
-            "winner": live["winner"],  # "white" | "black" | "draw" | null
-            "colors": colors,
-        }
-
-    # Coordinated titles: each seat's first in-window match (what grading reads).
-    starts_ms, ends_ms = _ms(match.matched_at), _ms(match.window_ends_at)
-    metric = market.metric if market else None
-    seat_views: dict[str, Any] = {}
-    any_data = False
-    for seat in seats:
-        rated_only = await demo_mode.rated_only_for(session, seat.user_id, match.game)
-        games = await _window_games(
-            match.game, seat.host_account_id, starts_ms, ends_ms, rated_only
-        )
-        if games is None:
-            seat_views[str(seat.user_id)] = {"status": "unavailable"}
-            continue
-        first = games[0] if games else None
-        if first is not None:
-            any_data = True
-        value = first.metrics.get(metric) if (first and metric) else None
-        result = None
-        if first is not None:
-            if first.won:
-                result = "won"
-            else:
-                result = "pending" if first.won is None else "lost"
-        seat_views[str(seat.user_id)] = {
-            "matches": len(games),
-            "value": round(value, 2) if value is not None else None,
-            "result": result,
-        }
-    fmt = "stat_race" if kind == "stat_race" else "win_next"
+    if not match.host_game_id:
+        return {"kind": "match", "format": "chess", "status": "waiting"}
+    adapter = registry.get(match.game)
+    handles = [s.host_account_id for s in seats]
+    try:
+        live = await adapter.live_match(match.host_game_id, handles)
+    except HostError:
+        live = None
+    if not live:
+        return {"kind": "match", "format": "chess", "status": "waiting"}
+    colors = {str(s.user_id): (s.color or "") for s in seats}
     return {
         "kind": "match",
-        "format": fmt,
-        "label": label,
-        "status": "live" if any_data else "waiting",
-        "seats": seat_views,
+        "format": "chess",
+        "status": "finished" if live["finished"] else "live",
+        "moves": live["moves"],
+        "plies": live["plies"],
+        "turn": live["turn"],  # "white" | "black" | null
+        "winner": live["winner"],  # "white" | "black" | "draw" | null
+        "colors": colors,
     }
 
 
@@ -239,53 +193,29 @@ def _pool_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | 
 
 
 def _match_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:
-    fmt = snapshot.get("format")
-    vid = str(viewer)
-    if fmt == "chess":
-        if snapshot.get("status") == "waiting":
-            return {"kind": "match", "format": "chess", "status": "waiting"}
-        colors = snapshot.get("colors") or {}
-        your_color = colors.get(vid)
-        turn = snapshot.get("turn")
-        winner = snapshot.get("winner")
-        result = None
-        if winner == "draw":
-            result = "draw"
-        elif winner:
-            result = "you" if winner == your_color else "opp"
-        if turn is None:
-            your_turn = None
-        else:
-            your_turn = "you" if turn == your_color else "opp"
-        return {
-            "kind": "match",
-            "format": "chess",
-            "status": snapshot.get("status"),
-            "moves": snapshot.get("moves"),
-            "your_color": your_color,
-            "turn": your_turn,
-            "result": result,
-        }
-
-    # stat_race / win_next
-    seats = snapshot.get("seats") or {}
-    you = seats.get(vid) or {}
-    opp: dict[str, Any] = next((v for k, v in seats.items() if k != vid), {}) or {}
-    view: dict[str, Any] = {
+    if snapshot.get("format") != "chess":
+        return None
+    if snapshot.get("status") == "waiting":
+        return {"kind": "match", "format": "chess", "status": "waiting"}
+    colors = snapshot.get("colors") or {}
+    your_color = colors.get(str(viewer))
+    turn = snapshot.get("turn")
+    winner = snapshot.get("winner")
+    result = None
+    if winner == "draw":
+        result = "draw"
+    elif winner:
+        result = "you" if winner == your_color else "opp"
+    your_turn = None if turn is None else ("you" if turn == your_color else "opp")
+    return {
         "kind": "match",
-        "format": fmt,
-        "label": snapshot.get("label"),
-        "status": snapshot.get("status", "waiting"),
+        "format": "chess",
+        "status": snapshot.get("status"),
+        "moves": snapshot.get("moves"),
+        "your_color": your_color,
+        "turn": your_turn,
+        "result": result,
     }
-    if fmt == "stat_race":
-        yv, ov = you.get("value"), opp.get("value")
-        leader = None
-        if yv is not None and ov is not None:
-            leader = "you" if yv > ov else ("opp" if ov > yv else "tie")
-        view.update({"you": yv, "opp": ov, "leader": leader})
-    else:  # win_next
-        view.update({"you": you.get("result"), "opp": opp.get("result")})
-    return view
 
 
 def tournament_view(

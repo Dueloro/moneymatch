@@ -1,6 +1,6 @@
 """Contest disputes — file (participant) and resolve (admin).
 
-The trust valve on settlement: a participant who thinks a settled contest graded
+The trust check on settlement: a participant who thinks a settled contest graded
 wrong files a dispute with a reason; an admin resolves or rejects it and the
 outcome is pushed back to the user as a notification. Money movement (a manual
 regrade/refund) stays an explicit admin action — resolving a dispute records the

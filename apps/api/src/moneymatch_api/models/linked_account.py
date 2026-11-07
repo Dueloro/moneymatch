@@ -1,6 +1,6 @@
 """Linked host-game accounts (01-architecture §2 · Identity).
 
-A `linked_accounts` row binds one host account (Lichess/FaceIt/OpenDota) to one
+A `linked_accounts` row binds one host account (e.g. Lichess) to one
 platform user. Two DB-enforced uniqueness rules make the binding immutable and
 non-shareable (05-phase-2 · deliverable 2):
 
@@ -90,8 +90,8 @@ class LinkedAccount(Base, TimestampMixin):
         String(16), default="active", server_default="active", nullable=False
     )
     # When this account's metric models were bootstrapped. NULL = "bootstrap
-    # still owed": deferred-host links (PUBG) leave it NULL for the worker to
-    # claim; cheap hosts bootstrap inline at link and stamp it immediately.
+    # still owed": deferred-host links leave it NULL for the worker to claim;
+    # cheap hosts bootstrap inline at link and stamp it immediately.
     models_bootstrapped_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )

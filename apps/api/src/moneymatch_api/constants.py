@@ -7,23 +7,12 @@ Game ids are the canonical `<game>.<host>` identifiers used everywhere
 from __future__ import annotations
 
 GAME_CHESS_LICHESS = "chess.lichess"
-GAME_CS2_STEAM = "cs2.steam"
-GAME_DOTA2_OPENDOTA = "dota2.opendota"
-GAME_PUBG_STEAM = "pubg.steam"
 
-# Games with a verification adapter + skill model — the fully playable set. All
-# matchmaking / skill / linking code keys off this tuple, so a game only belongs
-# here once its adapter and metrics exist.
-REGISTERED_GAMES: tuple[str, ...] = (
-    GAME_CHESS_LICHESS,
-    GAME_CS2_STEAM,
-    GAME_DOTA2_OPENDOTA,
-    GAME_PUBG_STEAM,
-)
+# Games with a verification adapter + skill model. A game belongs here only once
+# its adapter and metrics exist.
+REGISTERED_GAMES: tuple[str, ...] = (GAME_CHESS_LICHESS,)
 
-# Announced games with no adapter yet: selectable in the catalog but not linkable
-# or playable — the UI shows "coming soon". Empty now that PUBG is live; keep the
-# seam so the next announced-but-unbuilt game can slot in here.
+# Announced games with no adapter yet (the UI shows "coming soon").
 COMING_SOON_GAMES: tuple[str, ...] = ()
 
 # The full selectable catalog surfaced by /links and the games bar.
@@ -31,10 +20,7 @@ CATALOG_GAMES: tuple[str, ...] = REGISTERED_GAMES + COMING_SOON_GAMES
 
 # Human labels for the Profile "Games" rows (design PDF p.12).
 GAME_DISPLAY_NAMES: dict[str, str] = {
-    GAME_CS2_STEAM: "Counter-Strike 2 (Steam)",
     GAME_CHESS_LICHESS: "Chess — Lichess",
-    GAME_DOTA2_OPENDOTA: "Dota 2 — OpenDota",
-    GAME_PUBG_STEAM: "PUBG: Battlegrounds",
 }
 
 
@@ -119,50 +105,9 @@ def game_flag_key(game_id: str) -> str:
 # totals, never anything outside the player's control — 01-architecture §2).
 # --------------------------------------------------------------------------- #
 
-# Rate metrics we build EWMA skill models for, per game. Chess settles on `win`
-# only, so it models no per-metric skill here.
-# Metrics we build EWMA skill models for from host history (bootstrap polls
-# these on link). Chess models `chess_moves`, read straight off each game record
-# Lichess already returns. `chess_accuracy` is retained only because demo
-# fixtures seed it; it has no live source and is no longer offered for pools.
-# --------------------------------------------------------------------------- #
-# CS2 over Steam.
-#
-# Everything below comes from the Game Coordinator scoreboard, which a share
-# code resolves to. Deliberately absent: `cs2_adr`. ADR needs a parsed demo,
-# and a market that cannot be graded is worse than three that can.
-#
-# All three are rates where a bigger number is better, so a harder tier asks
-# for more. The opposite of chess `moves`.
-# --------------------------------------------------------------------------- #
-CS2_STEAM_METRICS: tuple[str, ...] = (
-    "cs2_kd_ratio",
-    "cs2_headshot_pct",
-    "cs2_kills",
-)
-
-# A real Premier/Competitive match runs at least 16 rounds; 13-3 is the
-# shortest legitimate scoreline. Wingman is first to 9. Below the floor the
-# match was surrendered or abandoned, and grading it would let a three-round
-# forfeit stand in for a real result.
-CS2_MIN_ROUNDS_STANDARD = 16
-CS2_MIN_ROUNDS_WINGMAN = 9
-#: Wingman is 2v2, so the roster size is how the mode is told apart.
-CS2_WINGMAN_MAX_PLAYERS = 4
-
-
-def cs2_min_rounds(player_count: int) -> int:
-    """The round floor for the mode implied by the roster size."""
-    if player_count and player_count <= CS2_WINGMAN_MAX_PLAYERS:
-        return CS2_MIN_ROUNDS_WINGMAN
-    return CS2_MIN_ROUNDS_STANDARD
-
-
+# Metrics we build EWMA skill models for from host history, per game.
 GAME_RATE_METRICS: dict[str, tuple[str, ...]] = {
-    GAME_CS2_STEAM: CS2_STEAM_METRICS,
     GAME_CHESS_LICHESS: ("chess_moves",),
-    GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
-    GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
 
 # EWMA recency weighting expressed as a half-life in matches.
@@ -181,28 +126,8 @@ STAT_BASELINE_MIN_N = 1
 # Per-game finished-history floor. An account below it gets H2H `win` markets
 # only (no stat duels), regardless of any single metric's n.
 GAME_HISTORY_FLOOR: dict[str, int] = {
-    # A Steam user starts with no history in our system; the prior comes from
-    # their Steam lifetime stats instead, so nothing is gated on match count.
-    GAME_CS2_STEAM: 0,
     GAME_CHESS_LICHESS: 20,  # rated games
-    GAME_DOTA2_OPENDOTA: 25,  # matches
-    GAME_PUBG_STEAM: 20,  # matches
 }
-
-# PUBG per-poll match fan-out cap. Bootstrap needs ≥ METRIC_PROVISIONAL_MIN_N
-# graded samples to lift a stat duel out of "provisional"; 15 clears 10 even
-# after custom/event matches are filtered out. Settlement stays cheap via the
-# poll's newest-first early-exit + the finished-match cache.
-PUBG_MATCH_FANOUT = 15
-
-# Official PUBG modes eligible to settle money. Everything else — custom games,
-# arcade, war/zombie, event, training — is excluded so only standard
-# battle-royale play grades a duel.
-PUBG_OFFICIAL_GAME_MODES: frozenset[str] = frozenset(
-    {"solo", "solo-fpp", "duo", "duo-fpp", "squad", "squad-fpp"}
-)
-PUBG_OFFICIAL_MATCH_TYPES: frozenset[str] = frozenset({"official", "competitive"})
-
 
 # --------------------------------------------------------------------------- #
 # Head-to-head play config (06-phase-3). All timing/entry knobs live here, not
@@ -224,11 +149,6 @@ MATCH_CONFIRM_TTL_SECONDS = 24 * 3600
 # Once ACTIVE, the settlement window: each player's qualifying match must land
 # inside it. Host outage extends it, never past this ceiling from `matched_at`.
 MATCH_SETTLE_WINDOW_SECONDS = 24 * 3600
-
-# One-sided stat-duel forfeit: the player who produced a qualifying match wins,
-# but only after the full window PLUS this disclosed grace period (printed on the
-# slip pre-entry — Phase 3 deliverable 4 · forfeit rule).
-FORFEIT_GRACE_SECONDS = 2 * 3600
 
 # --- Duel-forecast pairing (launch-plan §4.5(d)) --------------------------- #
 # Stat-duel eligibility band half-width `w`: pair only if the forecast
@@ -268,39 +188,23 @@ GRADING_ENGINE_VERSION = "h2h-1"
 # 01-architecture §3.4 · "24 h hard ceiling").
 MATCH_MAX_LIFETIME_SECONDS = MATCH_SETTLE_WINDOW_SECONDS + 24 * 3600
 
-# Clock-skew tolerance when deciding a host match landed "after" `matched_at`.
-GRADE_MATCH_SKEW_MS = 60_000
-
 # The settlement worker's poll cadence (01-architecture §3.3 · "every ~15 s").
 WORKER_POLL_INTERVAL_SECONDS = 15
 
 
 # --------------------------------------------------------------------------- #
-# Solo pools & tournaments config (07-phase-4). CS2 only at MVP — the one
-# adapter with rich server-fetchable telemetry. All fairness constants live
-# here, never inline in the engines ("all constants in config").
+# Solo pools & tournaments config. All fairness constants live here.
 # --------------------------------------------------------------------------- #
 
-# Which games offer pools/tournaments (config, not code — the engine is
-# game-agnostic; chess/dota wait for richer/validated telemetry).
-# Solo pools & tournaments run on every playable game's rate metrics.
 POOL_GAMES: tuple[str, ...] = REGISTERED_GAMES
 TOURNAMENT_GAMES: tuple[str, ...] = REGISTERED_GAMES
 
 # Metrics offered for pools/tournaments per game (rate-based allowlist only).
 POOL_METRICS: dict[str, tuple[str, ...]] = {
-    GAME_CS2_STEAM: CS2_STEAM_METRICS,
     GAME_CHESS_LICHESS: ("chess_moves",),
-    GAME_DOTA2_OPENDOTA: ("dota2_kda_ratio", "dota2_gpm"),
-    GAME_PUBG_STEAM: ("pubg_kills", "pubg_damage", "pubg_headshot_pct"),
 }
-# Tournaments are no longer just "pools with a bigger field". Chess runs the
-# three aggregate contests the Lichess record actually supports (see
-# `services/aggregate_metrics.py`); every other game still scores its rate
-# metrics as a first-N mean.
+# Chess tournaments run aggregate contests (see `services/aggregate_metrics.py`).
 TOURNAMENT_METRICS: dict[str, tuple[str, ...]] = {
-    GAME_CS2_STEAM: CS2_STEAM_METRICS,
-    **POOL_METRICS,
     GAME_CHESS_LICHESS: ("chess_win_streak", "chess_wins", "chess_fastest_win"),
 }
 
@@ -374,9 +278,8 @@ def lower_is_better(metric: str) -> bool:
     return metric in METRIC_LOWER_IS_BETTER
 
 
-# Games settled from rated matches only. Chess needs it — a casual or
-# vs-computer game is trivial to farm, and a brokered chess duel is itself
-# casual — while other hosts count casual games as they always have.
+# Games settled from rated matches only (casual/vs-computer games are trivial
+# to farm).
 RATED_ONLY_GAMES: frozenset[str] = frozenset({GAME_CHESS_LICHESS})
 
 
@@ -390,18 +293,6 @@ def rated_only_game(game: str) -> bool:
 METRIC_BAR_INCREMENT: dict[str, float] = {
     "chess_accuracy": 1.0,
     "chess_moves": 1.0,
-    "cs2_kd_ratio": 0.05,
-    # `cs2_adr` was removed here when migration 0024 retired the FACEIT adapter.
-    # ADR needs a parsed demo file, which the Game Coordinator scoreboard does
-    # not carry, so there is no market to quote an increment for. An increment
-    # for a market that cannot be graded is a trap for whoever adds the next one.
-    "cs2_headshot_pct": 1.0,
-    "cs2_kills": 1.0,
-    "dota2_kda_ratio": 0.1,
-    "dota2_gpm": 10.0,
-    "pubg_kills": 1.0,
-    "pubg_damage": 10.0,
-    "pubg_headshot_pct": 1.0,
 }
 
 # Room formation. A full room is `POOL_ROOM_SIZE`; at ladder end we form down to
@@ -451,16 +342,6 @@ METRIC_LABELS: dict[str, str] = {
     "chess_win_streak": "Longest win streak",
     "chess_wins": "Total wins",
     "chess_fastest_win": "Fastest win",
-    "cs2_kd_ratio": "K/D ratio",
-    # `cs2_adr` intentionally absent — retired with the FACEIT adapter (migration
-    # 0024); ADR needs a parsed demo the Game Coordinator scoreboard lacks.
-    "cs2_headshot_pct": "Headshot %",
-    "cs2_kills": "Kills",
-    "dota2_kda_ratio": "KDA ratio",
-    "dota2_gpm": "GPM",
-    "pubg_kills": "Kills",
-    "pubg_damage": "Damage",
-    "pubg_headshot_pct": "Headshot %",
 }
 
 

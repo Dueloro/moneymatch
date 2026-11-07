@@ -1,6 +1,6 @@
 """Contest dispute — a participant contests how a settled contest was graded.
 
-The user-facing trust valve for the settlement engine: when a result looks
+The user-facing trust check on the settlement engine: when a result looks
 wrong (host outage, disconnect, ambiguous tie), the player files a dispute that
 an admin reviews. One dispute per (contest, user); resolution is admin-only.
 

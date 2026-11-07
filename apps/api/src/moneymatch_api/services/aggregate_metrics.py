@@ -1,7 +1,7 @@
 """Aggregate tournament metrics: scored over a whole window, not per match.
 
 The tournament engine's original scoring is "mean of your first N qualifying
-matches" of a **rate** metric (K/D, ADR, moves per game). Some contests are not
+matches" of a **rate** metric (e.g. moves per game). Some contests are not
 shaped like that: "most wins this window" and "longest win streak" are functions
 of the *sequence* of results, and "fastest win" is a minimum rather than a mean.
 

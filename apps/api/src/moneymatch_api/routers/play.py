@@ -15,13 +15,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import clock
-from ..constants import ENTRY_PRESETS_CENTS, METRIC_PROVISIONAL_MIN_N
+from ..constants import ENTRY_PRESETS_CENTS
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
 from ..models.play import Match, MatchPlayer, QueueTicket
-from ..models.skill import MetricModel
 from ..models.user import User
 from ..schemas.play import (
     DisputeView,
@@ -37,12 +36,6 @@ from ..schemas.play import (
     WaitingRow,
 )
 from ..services import dispute_service, matchmaking, money_math, test_opponents
-from ..services.markets import (
-    KIND_STAT_RACE,
-    KIND_WIN_H2H,
-    KIND_WIN_NEXT,
-    MarketDef,
-)
 from ..services.markets import for_game as markets_for_game
 from ..services.markets import get as get_market
 from ..services.match_lifecycle import cancel_pending, confirm, players
@@ -56,16 +49,7 @@ _CHESS_SPEEDS = ["bullet", "blitz", "rapid", "classical"]
 # --------------------------------------------------------------------------- #
 
 
-def _resolution_note(market: MarketDef) -> str:
-    if market.kind == KIND_WIN_H2H:
-        return "Brokered game between you both · draw = push, entries refunded."
-    if market.kind == KIND_WIN_NEXT:
-        return "Win beats loss · tie = push. Your next finished match after matchup."
-    return (
-        f"Higher {market.label} wins · equal = push. Graded from your next "
-        "finished match; if your opponent never plays, you win by forfeit after "
-        "the window plus a short grace period."
-    )
+_RESOLUTION_NOTE = "Brokered game between you both · draw = push, entries refunded."
 
 
 async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
@@ -185,33 +169,19 @@ async def get_markets(
     )
     depths = {market: int(count) for market, count in depth_rows}
 
-    # Which stat metrics is the viewer still provisional on?
-    model_rows = await session.execute(
-        select(MetricModel.metric, MetricModel.n).where(
-            MetricModel.user_id == user.id, MetricModel.game == game
+    rows = [
+        MarketRow(
+            key=market.key,
+            label=market.label,
+            kind=market.kind,
+            requires_speed=market.requires_speed,
+            speeds=_CHESS_SPEEDS if market.requires_speed else [],
+            multiplier_bps=market.multiplier_bps,
+            queue_depth=depths.get(market.key, 0),
+            resolution_note=_RESOLUTION_NOTE,
         )
-    )
-    n_by_metric = {metric: n for metric, n in model_rows}
-
-    rows: list[MarketRow] = []
-    for market in defs:
-        provisional = False
-        if market.kind == KIND_STAT_RACE and market.metric is not None:
-            provisional = n_by_metric.get(market.metric, 0) < METRIC_PROVISIONAL_MIN_N
-        rows.append(
-            MarketRow(
-                key=market.key,
-                label=market.label,
-                kind=market.kind,
-                metric=market.metric,
-                requires_speed=market.requires_speed,
-                speeds=_CHESS_SPEEDS if market.requires_speed else [],
-                multiplier_bps=market.multiplier_bps,
-                queue_depth=depths.get(market.key, 0),
-                provisional=provisional,
-                resolution_note=_resolution_note(market),
-            )
-        )
+        for market in defs
+    ]
 
     return MarketsResponse(
         game=game,
@@ -330,7 +300,7 @@ async def get_match_grading(
         settled=match.state in ("SETTLED", "PUSHED"),
         result=result,
         market_label=market.label if market else match.market,
-        rule=_resolution_note(market) if market else "",
+        rule=_RESOLUTION_NOTE if market else "",
         engine_version=match.engine_version,
         resolved_at=match.resolved_at,
         winner_username=(

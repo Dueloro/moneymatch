@@ -137,22 +137,9 @@ async def bootstrap(
         mu, sigma, n = compute_ewma(values)
 
         if n == 0:
-            # An empty result set is not evidence, and evidence is the only
-            # thing allowed to overwrite a model.
-            #
-            # Writing (0, 0, 0) here reads as provisional, and a provisional
-            # metric is offered no pools at all. That destroyed two different
-            # things:
-            #
-            #   - the prior `cs2_prior.seed()` writes when a Steam account is
-            #     linked (the account has no *stored* matches yet, so every
-            #     later refresh zeroed the bar the player had just been quoted);
-            #   - an established baseline whenever the host API happened to be
-            #     unavailable during a refresh — fifty matches of real history
-            #     replaced by zeros because Steam was down.
-            #
-            # Creating a fresh zero row is still correct: an account we have
-            # never seen genuinely is provisional. Only *overwriting* is refused.
+            # An empty result set is not evidence: never overwrite an existing
+            # model with zeros (e.g. during a host outage). A fresh zero row for
+            # a never-seen account is fine.
             existing = await session.scalar(
                 select(MetricModel).where(
                     MetricModel.user_id == user_id,

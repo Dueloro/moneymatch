@@ -51,7 +51,7 @@ class MetricModel(Base, TimestampMixin):
         index=True,
     )
     game: Mapped[str] = mapped_column(String(32), nullable=False)
-    # A typed rate metric key, e.g. "cs2_kd_ratio", "dota2_gpm".
+    # A typed rate metric key, e.g. "chess_moves".
     metric: Mapped[str] = mapped_column(String(48), nullable=False)
     mu: Mapped[float] = mapped_column(
         Float, default=0.0, server_default="0", nullable=False
@@ -71,7 +71,7 @@ class RawPayload(Base):
     __tablename__ = "raw_payloads"
 
     id = uuid_pk()
-    # Where it came from, e.g. "lichess:user", "faceit:match_stats".
+    # Where it came from, e.g. "lichess:user".
     source: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     # sha256 of the canonical payload bytes — dedupe + tamper-evidence.

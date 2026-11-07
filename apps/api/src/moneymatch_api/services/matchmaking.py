@@ -45,20 +45,14 @@ from . import (
     analytics,
     geo_service,
     linking_service,
-    metric_models_service,
     money_math,
     notifications_service,
     pairing,
-    sandbagging_service,
     skill_rating,
     test_opponents,
 )
 from .feature_flags import get_boolean_flags
-from .markets import (
-    KIND_STAT_RACE,
-    KIND_WIN_H2H,
-    MarketDef,
-)
+from .markets import MarketDef
 from .markets import (
     get as get_market,
 )
@@ -134,7 +128,7 @@ async def _assert_eligible(
     market: MarketDef,
     link: LinkedAccount,
 ) -> None:
-    """Account active, game enabled, and (stat races) non-provisional on the metric."""
+    """Account active and game enabled."""
     if user.status != "active":
         raise MatchmakingError(
             "account_not_active",
@@ -145,25 +139,6 @@ async def _assert_eligible(
     if not flags.get(game_flag_key(game), True):
         raise MatchmakingError(
             "game_disabled", "This game is currently disabled.", status_code=409
-        )
-    if market.kind == KIND_STAT_RACE and market.metric is not None:
-        model = await metric_models_service.get_metric_model(
-            session, user.id, game, market.metric
-        )
-        n = model.n if model else 0
-        if n < METRIC_PROVISIONAL_MIN_N:
-            raise MatchmakingError(
-                "metric_provisional",
-                "Not enough recent matches to duel on this stat yet — "
-                "play a few more and check back.",
-                status_code=409,
-                detail={"metric": market.metric, "n": n},
-            )
-        # Cheap sandbagging gate for H2H stat duels: honor an existing flag from
-        # the nightly sweep without a per-enqueue host call (backlog · Phase B —
-        # "extend the sandbagging block to H2H stat duels" + "cache the eval").
-        await sandbagging_service.assert_not_flagged(
-            session, user.id, game, market.metric
         )
 
 
@@ -185,21 +160,10 @@ async def _build_baseline(
         "linked_account_id": str(link.id),
         "host_account_id": link.host_account_id,
     }
-    if market.kind == KIND_WIN_H2H:  # chess — Elo band
-        profile = ProfileSnapshot(**snapshot) if snapshot else None
-        baseline["rating"] = (
-            skill_rating.rating_for_speed(profile, speed) if profile else 1500
-        )
-    else:
-        baseline["rating"] = snapshot.get("rating")  # faceit elo / mmr (may be None)
-    if market.kind == KIND_STAT_RACE and market.metric is not None:
-        model = await metric_models_service.get_metric_model(
-            session, user.id, market.game, market.metric
-        )
-        baseline["metric"] = market.metric
-        baseline["mu"] = float(model.mu) if model else 0.0
-        baseline["sigma"] = float(model.sigma) if model else 0.0
-        baseline["n"] = int(model.n) if model else 0
+    profile = ProfileSnapshot(**snapshot) if snapshot else None
+    baseline["rating"] = (
+        skill_rating.rating_for_speed(profile, speed) if profile else 1500
+    )
     return baseline
 
 
@@ -276,56 +240,23 @@ async def can_pair(
 def _is_eligible(
     market: MarketDef, me: QueueTicket, cand: QueueTicket, now: datetime
 ) -> bool:
-    age_a, age_b = _age_seconds(me, now), _age_seconds(cand, now)
-    if market.kind == KIND_WIN_H2H:
-        band = pairing.effective_chess_band(age_a, age_b)
-        ra = me.baseline_snapshot.get("rating") or 1500
-        rb = cand.baseline_snapshot.get("rating") or 1500
-        return pairing.is_chess_eligible(int(ra), int(rb), band)
-    if market.kind == KIND_STAT_RACE:
-        prob = pairing.forecast_prob(
-            me.baseline_snapshot.get("mu", 0.0),
-            me.baseline_snapshot.get("sigma", 0.0),
-            cand.baseline_snapshot.get("mu", 0.0),
-            cand.baseline_snapshot.get("sigma", 0.0),
-        )
-        w = pairing.effective_w(age_a, age_b)
-        return pairing.is_forecast_eligible(prob, w)
-    return True  # win_next — compatibility-only
+    band = pairing.effective_chess_band(_age_seconds(me, now), _age_seconds(cand, now))
+    ra = me.baseline_snapshot.get("rating") or 1500
+    rb = cand.baseline_snapshot.get("rating") or 1500
+    return pairing.is_chess_eligible(int(ra), int(rb), band)
 
 
 def _selection_score(market: MarketDef, me: QueueTicket, cand: QueueTicket) -> float:
-    if market.kind == KIND_WIN_H2H:
-        ra = me.baseline_snapshot.get("rating") or 1500
-        rb = cand.baseline_snapshot.get("rating") or 1500
-        return abs(int(ra) - int(rb))
-    ra = me.baseline_snapshot.get("rating")
-    rb = cand.baseline_snapshot.get("rating")
-    return pairing.composite_score(
-        me.baseline_snapshot.get("mu", 0.0),
-        me.baseline_snapshot.get("sigma", 0.0),
-        cand.baseline_snapshot.get("mu", 0.0),
-        cand.baseline_snapshot.get("sigma", 0.0),
-        rating_a=int(ra) if ra is not None else None,
-        rating_b=int(rb) if rb is not None else None,
-    )
+    ra = me.baseline_snapshot.get("rating") or 1500
+    rb = cand.baseline_snapshot.get("rating") or 1500
+    return abs(int(ra) - int(rb))
 
 
 def forecast_between(market: MarketDef, mine: dict, theirs: dict) -> Forecast:
     """The honest matched-card disclosure: P(you beat opponent) + a one-liner."""
-    if market.kind == KIND_STAT_RACE:
-        prob = pairing.forecast_prob(
-            mine.get("mu", 0.0),
-            mine.get("sigma", 0.0),
-            theirs.get("mu", 0.0),
-            theirs.get("sigma", 0.0),
-        )
-    elif market.kind == KIND_WIN_H2H:
-        prob = skill_rating.win_expectancy(
-            int(mine.get("rating") or 1500), int(theirs.get("rating") or 1500)
-        )
-    else:
-        prob = 0.5  # win_next has no skill forecast — an even coin by construction
+    prob = skill_rating.win_expectancy(
+        int(mine.get("rating") or 1500), int(theirs.get("rating") or 1500)
+    )
     pct = round(prob * 100)
     if 0.45 <= prob <= 0.55:
         label = f"Even duel — model gives you {pct}%"
@@ -451,14 +382,14 @@ async def _assemble_match(
         prize_cents=split.payouts_cents[0],
         rake_cents=split.rake_cents,
         state=PENDING,
-        brokered=market.brokered,
+        brokered=True,
         friendly=friendly,
         window_ends_at=now + timedelta(seconds=MATCH_CONFIRM_TTL_SECONDS),
     )
     session.add(match)
     await session.flush()
 
-    colors = ["white", "black"] if market.brokered else [None, None]
+    colors = ["white", "black"]
     for side, color in zip(sides, colors, strict=True):
         session.add(
             MatchPlayer(
