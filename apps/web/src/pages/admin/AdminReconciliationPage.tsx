@@ -52,24 +52,26 @@ export function AdminReconciliationPage() {
       {d.contest_violations.length === 0 ? (
         <p style={styles.ok}>No contest breaches.</p>
       ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Ref</th>
-              <th style={styles.th}>Violations</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.contest_violations.map((v) => (
-              <tr key={v.ref_id}>
-                <td style={{ ...styles.td, ...styles.alert }}>
-                  {v.ref_type} {v.ref_id.slice(0, 8)}
-                </td>
-                <td style={styles.td}>{v.violations.join('; ')}</td>
+        <div style={styles.scroll}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Ref</th>
+                <th style={styles.th}>Violations</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {d.contest_violations.map((v) => (
+                <tr key={v.ref_id}>
+                  <td style={{ ...styles.td, ...styles.alert }}>
+                    {v.ref_type} {v.ref_id.slice(0, 8)}
+                  </td>
+                  <td style={styles.td}>{v.violations.join('; ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -18,38 +18,40 @@ export function AdminFlagsPage() {
   return (
     <div style={styles.page}>
       <h1 style={styles.h1}>Feature flags &amp; kill switches</h1>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Key</th>
-            <th style={styles.th}>Enabled</th>
-            <th style={styles.th}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows
-            .filter((f) => f.key !== 'geo_config')
-            .map((f) => (
-              <tr key={f.key}>
-                <td style={styles.td}>{f.key}</td>
-                <td style={styles.td}>
-                  <span style={f.enabled ? styles.ok : styles.alert}>
-                    {String(f.enabled)}
-                  </span>
-                </td>
-                <td style={styles.td}>
-                  <button
-                    style={styles.button}
-                    disabled={update.isPending}
-                    onClick={() => update.mutate({ key: f.key, enabled: !f.enabled })}
-                  >
-                    {f.enabled ? 'Disable' : 'Enable'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-        </tbody>
-      </table>
+      <div style={styles.scroll}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Key</th>
+              <th style={styles.th}>Enabled</th>
+              <th style={styles.th}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows
+              .filter((f) => f.key !== 'geo_config')
+              .map((f) => (
+                <tr key={f.key}>
+                  <td style={styles.td}>{f.key}</td>
+                  <td style={styles.td}>
+                    <span style={f.enabled ? styles.ok : styles.alert}>
+                      {String(f.enabled)}
+                    </span>
+                  </td>
+                  <td style={styles.td}>
+                    <button
+                      style={styles.button}
+                      disabled={update.isPending}
+                      onClick={() => update.mutate({ key: f.key, enabled: !f.enabled })}
+                    >
+                      {f.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
 
       <h1 style={{ ...styles.h1, marginTop: 24 }}>geo_config excluded states</h1>
       <p>Comma-separated 2-letter codes. Blocked from staking server-side.</p>

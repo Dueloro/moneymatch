@@ -249,3 +249,8 @@ monospace, bordered tables, square buttons, green `#080` for OK and red `#b00`
 for anything wrong. It should keep looking like one. Do not apply the consumer
 design system to it.
 
+It is self-contained: `AdminLayout` sets its own white background, `#111` ink and
+`color-scheme: light`, and every colour in `adminStyles.ts` is explicit, so nothing
+inherits from the dark app body. Tables sit in `styles.scroll` (horizontal scroll
+at 390px) and the nav wraps.
+

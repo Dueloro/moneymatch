@@ -23,47 +23,49 @@ export function AdminUsersPage() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
-      <table style={{ ...styles.table, marginTop: 12 }}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Username</th>
-            <th style={styles.th}>Email</th>
-            <th style={styles.th}>Role</th>
-            <th style={styles.th}>Status</th>
-            <th style={styles.th}>Available</th>
-            <th style={styles.th}>Escrow</th>
-            <th style={styles.th}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(users.data ?? []).map((u) => (
-            <tr key={u.id}>
-              <td style={styles.td}>{u.username ?? '—'}</td>
-              <td style={styles.td}>{u.email ?? '—'}</td>
-              <td style={styles.td}>{u.role}</td>
-              <td style={styles.td}>
-                <span style={u.status === 'active' ? styles.ok : styles.alert}>
-                  {u.status}
-                </span>
-              </td>
-              <td style={styles.td}>{formatCurrency(u.available_cents)}</td>
-              <td style={styles.td}>{formatCurrency(u.escrow_cents)}</td>
-              <td style={styles.td}>
-                <button style={styles.button} onClick={() => setSelected(u.id)}>
-                  Open
-                </button>
-              </td>
-            </tr>
-          ))}
-          {users.data?.length === 0 && (
+      <div style={styles.scroll}>
+        <table style={{ ...styles.table, marginTop: 12 }}>
+          <thead>
             <tr>
-              <td style={styles.td} colSpan={7}>
-                No users.
-              </td>
+              <th style={styles.th}>Username</th>
+              <th style={styles.th}>Email</th>
+              <th style={styles.th}>Role</th>
+              <th style={styles.th}>Status</th>
+              <th style={styles.th}>Available</th>
+              <th style={styles.th}>Escrow</th>
+              <th style={styles.th}></th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {(users.data ?? []).map((u) => (
+              <tr key={u.id}>
+                <td style={styles.td}>{u.username ?? '—'}</td>
+                <td style={styles.td}>{u.email ?? '—'}</td>
+                <td style={styles.td}>{u.role}</td>
+                <td style={styles.td}>
+                  <span style={u.status === 'active' ? styles.ok : styles.alert}>
+                    {u.status}
+                  </span>
+                </td>
+                <td style={styles.td}>{formatCurrency(u.available_cents)}</td>
+                <td style={styles.td}>{formatCurrency(u.escrow_cents)}</td>
+                <td style={styles.td}>
+                  <button style={styles.button} onClick={() => setSelected(u.id)}>
+                    Open
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {users.data?.length === 0 && (
+              <tr>
+                <td style={styles.td} colSpan={7}>
+                  No users.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
       {selected && <UserDetail userId={selected} />}
     </div>
   );
@@ -112,7 +114,7 @@ function UserDetail({ userId }: { userId: string }) {
         {formatCurrency(d.escrow_cents)} · lifetime{' '}
         {formatCurrency(d.lifetime_net_cents)}
       </p>
-      <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
         <button
           style={styles.button}
           onClick={() => freeze.mutate(d.status === 'active')}
@@ -161,46 +163,50 @@ function UserDetail({ userId }: { userId: string }) {
       </ul>
 
       <h1 style={{ ...styles.h1, marginTop: 12 }}>Contests</h1>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Type</th>
-            <th style={styles.th}>Market</th>
-            <th style={styles.th}>State</th>
-            <th style={styles.th}>Payout</th>
-          </tr>
-        </thead>
-        <tbody>
-          {d.contests.map((c) => (
-            <tr key={c.ref_id}>
-              <td style={styles.td}>{c.ref_type}</td>
-              <td style={styles.td}>{c.market}</td>
-              <td style={styles.td}>{c.state}</td>
-              <td style={styles.td}>{formatCurrency(c.payout_cents)}</td>
+      <div style={styles.scroll}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Type</th>
+              <th style={styles.th}>Market</th>
+              <th style={styles.th}>State</th>
+              <th style={styles.th}>Payout</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {d.contests.map((c) => (
+              <tr key={c.ref_id}>
+                <td style={styles.td}>{c.ref_type}</td>
+                <td style={styles.td}>{c.market}</td>
+                <td style={styles.td}>{c.state}</td>
+                <td style={styles.td}>{formatCurrency(c.payout_cents)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <h1 style={{ ...styles.h1, marginTop: 12 }}>Recent ledger</h1>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Type</th>
-            <th style={styles.th}>Amount</th>
-            <th style={styles.th}>Memo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {d.recent_ledger.map((r) => (
-            <tr key={r.id}>
-              <td style={styles.td}>{r.entry_type}</td>
-              <td style={styles.td}>{formatCurrency(r.amount_cents)}</td>
-              <td style={styles.td}>{r.memo ?? ''}</td>
+      <div style={styles.scroll}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Type</th>
+              <th style={styles.th}>Amount</th>
+              <th style={styles.th}>Memo</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {d.recent_ledger.map((r) => (
+              <tr key={r.id}>
+                <td style={styles.td}>{r.entry_type}</td>
+                <td style={styles.td}>{formatCurrency(r.amount_cents)}</td>
+                <td style={styles.td}>{r.memo ?? ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
