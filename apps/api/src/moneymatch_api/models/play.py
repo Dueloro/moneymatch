@@ -6,8 +6,8 @@ state survives a restart and pairing is race-safe under `FOR UPDATE SKIP LOCKED`
 
 - `queue_tickets` — a player waiting to be paired. Escrow is **not** taken while
   waiting (escrow happens at match confirm); a ticket past `expires_at` is
-  expired by the worker. `baseline_snapshot` freezes the metric-model values used
-  for pairing so a later refresh can't alter an in-flight decision.
+  expired by the worker. `baseline_snapshot` freezes the pairing inputs so a later
+  refresh can't alter an in-flight decision.
 - `matches` — a paired contest with its frozen economics (`entry`/`pot`/`prize`/
   `rake`, all integer cents; `rake_bps` not a float `rake_pct`). `outcome_detail`
   + `engine_version` + `raw_payload_id` make every settlement replayable from
@@ -101,16 +101,12 @@ class QueueTicket(Base, TimestampMixin):
     entry_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
     # Rating used for the chess Elo band.
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Frozen metric-model values used for pairing (μ/σ/n per metric + rating).
+    # Frozen pairing inputs (duel: rating; pool/tournament: μ/σ).
     baseline_snapshot: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=dict, server_default="{}", nullable=False
     )
     # Pools only (Phase 4).
     personal_bar: Mapped[float | None] = mapped_column(nullable=True)
-    # Widening-ladder stage the ticket has reached (0-based); drives the band `w`.
-    tolerance_stage: Mapped[int] = mapped_column(
-        Integer, default=0, server_default="0", nullable=False
-    )
     state: Mapped[str] = mapped_column(
         String(16), default="waiting", server_default="waiting", nullable=False
     )
@@ -229,7 +225,7 @@ class MatchPlayer(Base, TimestampMixin):
     play_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
     # Rating frozen at pairing (chess band + display).
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Metric-model values frozen at pairing (audit + dispute replay).
+    # Pairing inputs frozen at match time (audit + dispute replay).
     baseline_snapshot: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=dict, server_default="{}", nullable=False
     )

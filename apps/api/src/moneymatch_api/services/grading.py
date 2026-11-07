@@ -17,7 +17,6 @@ import structlog
 from ..adapters import registry
 from ..models.play import Match, MatchPlayer
 from ..services.hosts.errors import HostUnavailable
-from .markets import KIND_WIN_H2H
 from .markets import get as get_market
 
 log = structlog.get_logger(__name__)
@@ -80,8 +79,6 @@ async def grade(
     market = get_market(match.game, match.market)
     if market is None:
         return GradeOutcome(CANCEL, detail={"reason": "unknown_market"})
-    if market.kind != KIND_WIN_H2H:
-        return GradeOutcome(CANCEL, detail={"reason": "ungradeable_market"})
     try:
         return await _grade_brokered(match, seats, now)
     except HostUnavailable:

@@ -152,12 +152,11 @@ class DisputeView(BaseModel):
 
 
 class QueueStatusResponse(BaseModel):
-    """Where the viewer stands: idle, searching (band + wait), or matched."""
+    """Where the viewer stands: idle, searching (with wait), or matched."""
 
     status: str  # idle | searching | matched
     match: MatchView | None = None
     waited_seconds: int | None = None
-    tolerance_stage: int | None = None
     can_cancel: bool = True
 
 

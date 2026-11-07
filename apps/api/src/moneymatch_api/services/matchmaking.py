@@ -11,7 +11,7 @@ waiting). No escrow is taken while waiting — escrow happens at match confirm
 (`services/match_lifecycle.py`); a ticket past its TTL is expired by the worker.
 
 The **`can_pair` seam is the one anti-collusion chokepoint** (self-pair,
-same-host, 24 h repeat, provisional metrics); keep every rejection here.
+same-host, 24 h repeat); keep every rejection here.
 """
 
 from __future__ import annotations
@@ -59,6 +59,8 @@ from .match_states import PENDING
 
 log = structlog.get_logger(__name__)
 
+_DEFAULT_RATING = 1500
+
 
 class MatchmakingError(APIError):
     """A queue/pairing failure (RFC-7807 via APIError)."""
@@ -78,10 +80,6 @@ def _age_seconds(ticket: QueueTicket, now: datetime) -> float:
 # --------------------------------------------------------------------------- #
 # Eligibility (who may queue this market at all).
 # --------------------------------------------------------------------------- #
-
-
-async def _flags(session: AsyncSession) -> dict[str, bool]:
-    return await get_boolean_flags(session)
 
 
 def _resolve_market(game: str, market_key: str, speed: str | None) -> MarketDef:
@@ -128,7 +126,7 @@ async def _assert_eligible(session: AsyncSession, user: User, game: str) -> None
             f"Account is {user.status}; play is disabled.",
             status_code=409,
         )
-    flags = await _flags(session)
+    flags = await get_boolean_flags(session)
     if not flags.get(game_flag_key(game), True):
         raise MatchmakingError(
             "game_disabled", "This game is currently disabled.", status_code=409
@@ -149,7 +147,7 @@ def _build_baseline(link: LinkedAccount, speed: str | None) -> dict:
     }
     profile = ProfileSnapshot(**snapshot) if snapshot else None
     baseline["rating"] = (
-        skill_rating.rating_for_speed(profile, speed) if profile else 1500
+        skill_rating.rating_for_speed(profile, speed) if profile else _DEFAULT_RATING
     )
     return baseline
 
@@ -211,8 +209,12 @@ def _chess_band(age_seconds: float) -> int:
     )
 
 
+def _baseline_rating(snapshot: dict) -> int:
+    return int(snapshot.get("rating") or _DEFAULT_RATING)
+
+
 def _rating(ticket: QueueTicket) -> int:
-    return int(ticket.baseline_snapshot.get("rating") or 1500)
+    return _baseline_rating(ticket.baseline_snapshot)
 
 
 def _is_eligible(me: QueueTicket, cand: QueueTicket, now: datetime) -> bool:
@@ -226,9 +228,7 @@ def _selection_score(me: QueueTicket, cand: QueueTicket) -> float:
 
 def forecast_between(mine: dict, theirs: dict) -> Forecast:
     """The honest matched-card disclosure: P(you beat opponent) + a one-liner."""
-    prob = skill_rating.win_expectancy(
-        int(mine.get("rating") or 1500), int(theirs.get("rating") or 1500)
-    )
+    prob = skill_rating.win_expectancy(_baseline_rating(mine), _baseline_rating(theirs))
     pct = round(prob * 100)
     if 0.45 <= prob <= 0.55:
         label = f"Even duel — model gives you {pct}%"
@@ -304,7 +304,6 @@ async def _get_or_create_ticket(
         entry_cents=entry_cents,
         rating=baseline.get("rating"),
         baseline_snapshot=baseline,
-        tolerance_stage=0,
         state="waiting",
         expires_at=now + timedelta(seconds=QUEUE_TICKET_TTL_SECONDS),
     )
@@ -560,7 +559,7 @@ async def enqueue(
             status_code=422,
             detail={"allowed": list(ENTRY_PRESETS_CENTS)},
         )
-    flags = await _flags(session)
+    flags = await get_boolean_flags(session)
     if flags.get(FLAG_QUEUE_PAUSED, False):
         raise MatchmakingError(
             "queue_paused", "Matchmaking is paused right now.", status_code=503
@@ -631,10 +630,10 @@ async def take_waiting(
     """Take the other side of a specific waiting ticket directly (design's Match pill).
 
     Runs the identical pairing checks — a crafted request cannot bypass the
-    forecast window or `can_pair`.
+    Elo band or `can_pair`.
     """
     now = clock.now()
-    flags = await _flags(session)
+    flags = await get_boolean_flags(session)
     if flags.get(FLAG_QUEUE_PAUSED, False):
         raise MatchmakingError(
             "queue_paused", "Matchmaking is paused right now.", status_code=503

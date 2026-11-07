@@ -127,7 +127,6 @@ async def _status_view(
         return QueueStatusResponse(
             status="searching",
             waited_seconds=waited,
-            tolerance_stage=result.ticket.tolerance_stage,
         )
     return QueueStatusResponse(status="idle", can_cancel=False)
 
