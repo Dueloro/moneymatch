@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     resend_api_key: str | None = None
     # RFC 5322 From header for outbound mail; the domain must be verified in
     # Resend (SPF/DKIM) or delivery is rejected.
-    email_from: str = Field(default="Money Match <noreply@moneymatch.app>")
+    email_from: str = Field(default="Money Match <noreply@send.dueloro.com>")
 
     # Payments/KYC readiness (10-phase-7 §1). These are the *only* switches for
     # real rails, and they are guarded in code: turning either on with no live

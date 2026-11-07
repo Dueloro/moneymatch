@@ -702,8 +702,11 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
 def main() -> None:
     from ..config import get_settings
     from ..logging import configure_logging
+    from ..observability import init_sentry
 
-    configure_logging(get_settings())
+    settings = get_settings()
+    configure_logging(settings)
+    init_sentry(settings)
     asyncio.run(run_forever())
 
 

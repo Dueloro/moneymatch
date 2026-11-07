@@ -18,6 +18,7 @@ from .db.session import dispose_engine
 from .errors import register_error_handlers
 from .logging import configure_logging
 from .middleware import ExceptionEnvelopeMiddleware, RequestLogMiddleware
+from .observability import init_sentry
 from .routers import (
     activity,
     admin,
@@ -47,22 +48,6 @@ log = structlog.get_logger(__name__)
 API_V1_PREFIX = "/api/v1"
 
 
-def _init_sentry(settings: Settings) -> None:
-    if not settings.sentry_dsn:
-        return
-    import os
-
-    import sentry_sdk
-
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        environment=settings.env,
-        release=os.getenv("RENDER_GIT_COMMIT") or settings.release,
-        traces_sample_rate=0.0,
-        send_default_pii=True,
-    )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("api.startup")
@@ -90,7 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
-    _init_sentry(settings)
+    init_sentry(settings)
 
     app = FastAPI(
         title="MoneyMatch API",
