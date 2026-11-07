@@ -299,13 +299,3 @@ async def test_settle_unverifiable_refunded_off_the_top(session):
     assert pool.rake_cents == 300
     recon = await reconciliation_service.check(session, "solo_pool", pool.id)
     assert recon.ok
-
-
-async def test_cancel_pool_refunds_all(session):
-    pool, users = await _form_room(session, [1.50, 1.50, 1.52, 1.48])
-    await pool_engine.cancel_pool(session, pool, reason="test")
-    assert pool.state == "CANCELED" and pool.rake_cents == 0
-    for u in users:
-        assert (await _bal(session, u)) == (10000, 0)
-    recon = await reconciliation_service.check(session, "solo_pool", pool.id)
-    assert recon.ok

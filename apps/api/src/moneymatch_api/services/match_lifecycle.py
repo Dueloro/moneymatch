@@ -178,7 +178,6 @@ async def _activate(
         "match.activated",
         match_id=str(match.id),
         game=match.game,
-        brokered=match.brokered,
         host_game_id=match.host_game_id,
     )
 

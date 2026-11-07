@@ -4,11 +4,8 @@ Two halves, both read-only analytics over settled contests + the durable
 `risk_flags` trail:
 
 - **Rate drift** — per (game, market/difficulty): offered/accepted/settled counts,
-  rake accrued, and **actual vs. expected** rates. Duels should sit near 50%
-  (the favorite — higher frozen μ — winning far more often means the pairing or a
-  metric `k` is mispriced, or someone is exploiting it; the two look identical
-  from here). Pools should track their difficulty `p_target`. A row past the drift
-  threshold is flagged `alert`.
+  rake accrued, and for pools **actual vs. expected** clear rate against the
+  difficulty `p_target`. A row past the drift threshold is flagged `alert`.
 - **Flag queue** — unresolved `risk_flags` (the Phase-4 sandbagging detector),
   each actionable with freeze (the user) / clear (the flag). Per the launch-plan
   rule kept verbatim: risk responses adjust **future** formation, never an
@@ -104,9 +101,6 @@ async def _match_rates(session: AsyncSession) -> list[RateRow]:
                 PlatformLedgerEntry.ref_id.in_(settled_ids),
             )
         )
-        # H2H chess has no stat-forecast expectation to drift from.
-        expected: float | None = None
-        actual: float | None = None
         rows.append(
             RateRow(
                 game=game,
@@ -114,11 +108,11 @@ async def _match_rates(session: AsyncSession) -> list[RateRow]:
                 offered=int(offered or 0),
                 accepted=int(accepted or 0),
                 settled=len(settled_ids),
-                expected_rate=expected,
-                actual_rate=actual,
+                expected_rate=None,  # H2H has no expected rate to drift from
+                actual_rate=None,
                 rake_cents=int(rake or 0),
                 dispute_count=0,
-                alert=_drift_alert(expected, actual, len(settled_ids)),
+                alert=False,
             )
         )
     return rows

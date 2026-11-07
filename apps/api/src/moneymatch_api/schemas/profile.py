@@ -33,8 +33,6 @@ class FormatStat(BaseModel):
 class ProfileSnapshot(BaseModel):
     """Verified skill profile for one linked host account.
 
-    Chess populates the per-format / `primary_speed` fields; other titles leave
-    those empty and use the generic `rating` / `rank_label` / `kd` descriptors.
     `game` is the adapter id.
     """
 
@@ -53,8 +51,4 @@ class ProfileSnapshot(BaseModel):
     primary_speed: Speed | None = None
     # Generic skill descriptors usable by any title.
     rating: int | None = None  # elo
-    rank_label: str | None = None  # e.g. "Level 10", "Divine"
-    kd: float | None = None  # average kill/death ratio (FPS)
     avatar_url: str | None = None
-    #: Title-specific extras a generic field cannot hold. Display only.
-    extra: dict[str, float] = {}

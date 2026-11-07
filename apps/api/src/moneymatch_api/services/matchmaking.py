@@ -2,8 +2,7 @@
 
 Ports `poc-reference/api/_lib/match_queue.py` (11-migration-map §1) with the
 substrate rewritten: in-memory dicts → `queue_tickets`/`matches` rows, floats →
-integer cents, and pairing upgraded to the launch-plan §4.5(d) **duel-forecast**
-model (the pure math lives in `services/pairing.py`).
+integer cents. Chess tickets pair inside an Elo band that widens with wait time.
 
 The load-bearing property is **match-on-write, race-safe**: a pairing pass locks
 candidate tickets with `FOR UPDATE SKIP LOCKED`, so two concurrent enqueues
@@ -27,10 +26,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import clock
 from ..constants import (
+    CHESS_BAND_GROWTH_PER_SEC,
+    CHESS_BASE_BAND,
+    CHESS_MAX_BAND,
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
     MATCH_CONFIRM_TTL_SECONDS,
-    METRIC_PROVISIONAL_MIN_N,
     QUEUE_TICKET_TTL_SECONDS,
     REPAIR_COOLDOWN_SECONDS,
     game_flag_key,
@@ -47,7 +48,6 @@ from . import (
     linking_service,
     money_math,
     notifications_service,
-    pairing,
     skill_rating,
 )
 from .feature_flags import get_boolean_flags
@@ -120,13 +120,7 @@ async def _require_link(
     return link
 
 
-async def _assert_eligible(
-    session: AsyncSession,
-    user: User,
-    game: str,
-    market: MarketDef,
-    link: LinkedAccount,
-) -> None:
+async def _assert_eligible(session: AsyncSession, user: User, game: str) -> None:
     """Account active and game enabled."""
     if user.status != "active":
         raise MatchmakingError(
@@ -147,13 +141,7 @@ async def _assert_eligible(
 # --------------------------------------------------------------------------- #
 
 
-async def _build_baseline(
-    session: AsyncSession,
-    user: User,
-    market: MarketDef,
-    link: LinkedAccount,
-    speed: str | None,
-) -> dict:
+def _build_baseline(link: LinkedAccount, speed: str | None) -> dict:
     snapshot = link.profile_snapshot or {}
     baseline: dict = {
         "linked_account_id": str(link.id),
@@ -195,22 +183,10 @@ async def can_pair(
     me: QueueTicket,
     cand: QueueTicket,
     now: datetime,
-    *,
-    require_established_metric: bool = True,
 ) -> bool:
-    """Whether two waiting tickets are allowed to be paired (anti-collusion).
+    """Whether two waiting tickets may be paired (anti-collusion).
 
-    Rejects: the same platform user, the same linked host account, a re-pair of
-    the same two accounts within the cooldown, and (metric baselines) a
-    provisional metric on either side.
-
-    `require_established_metric` is the head-to-head rule: a duel is settled by
-    comparing two stat lines, so a barely-sampled baseline cannot back one.
-    Pools and tournaments are played against a bar quoted from your own history
-    rather than against another player's stat, and they set their own entry
-    floor (`STAT_BASELINE_MIN_N`), so they pass False. Leaving it on there meant
-    anyone with fewer than `METRIC_PROVISIONAL_MIN_N` samples could join a pool
-    queue and never be matched into a room.
+    Rejects the same user, the same host account, and a re-pair within the cooldown.
     """
     if me.user_id == cand.user_id:
         return False
@@ -218,40 +194,37 @@ async def can_pair(
         "host_account_id"
     ):
         return False
-    if require_established_metric and (
-        "metric" in me.baseline_snapshot or "metric" in cand.baseline_snapshot
-    ):
-        if (
-            me.baseline_snapshot.get("n", 0) < METRIC_PROVISIONAL_MIN_N
-            or cand.baseline_snapshot.get("n", 0) < METRIC_PROVISIONAL_MIN_N
-        ):
-            return False
     if await _recent_pair_exists(session, me.user_id, cand.user_id, now):
         return False
     return True
 
 
 # --------------------------------------------------------------------------- #
-# Forecast eligibility + composite selection (pure math, fed frozen baselines).
+# Elo-band eligibility + selection (pure, fed frozen baselines).
 # --------------------------------------------------------------------------- #
 
 
-def _is_eligible(
-    market: MarketDef, me: QueueTicket, cand: QueueTicket, now: datetime
-) -> bool:
-    band = pairing.effective_chess_band(_age_seconds(me, now), _age_seconds(cand, now))
-    ra = me.baseline_snapshot.get("rating") or 1500
-    rb = cand.baseline_snapshot.get("rating") or 1500
-    return pairing.is_chess_eligible(int(ra), int(rb), band)
+def _chess_band(age_seconds: float) -> int:
+    """Elo half-band a ticket searches within at ``age_seconds``."""
+    return int(
+        min(CHESS_MAX_BAND, CHESS_BASE_BAND + age_seconds * CHESS_BAND_GROWTH_PER_SEC)
+    )
 
 
-def _selection_score(market: MarketDef, me: QueueTicket, cand: QueueTicket) -> float:
-    ra = me.baseline_snapshot.get("rating") or 1500
-    rb = cand.baseline_snapshot.get("rating") or 1500
-    return abs(int(ra) - int(rb))
+def _rating(ticket: QueueTicket) -> int:
+    return int(ticket.baseline_snapshot.get("rating") or 1500)
 
 
-def forecast_between(market: MarketDef, mine: dict, theirs: dict) -> Forecast:
+def _is_eligible(me: QueueTicket, cand: QueueTicket, now: datetime) -> bool:
+    band = max(_chess_band(_age_seconds(me, now)), _chess_band(_age_seconds(cand, now)))
+    return abs(_rating(me) - _rating(cand)) <= band
+
+
+def _selection_score(me: QueueTicket, cand: QueueTicket) -> float:
+    return abs(_rating(me) - _rating(cand))
+
+
+def forecast_between(mine: dict, theirs: dict) -> Forecast:
     """The honest matched-card disclosure: P(you beat opponent) + a one-liner."""
     prob = skill_rating.win_expectancy(
         int(mine.get("rating") or 1500), int(theirs.get("rating") or 1500)
@@ -381,7 +354,6 @@ async def _assemble_match(
         prize_cents=split.payouts_cents[0],
         rake_cents=split.rake_cents,
         state=PENDING,
-        brokered=True,
         friendly=friendly,
         window_ends_at=now + timedelta(seconds=MATCH_CONFIRM_TTL_SECONDS),
     )
@@ -492,12 +464,8 @@ async def create_challenge_match(
     The challenger takes seat 0 (white, for chess).
     """
     now = clock.now()
-    challenger_baseline = await _build_baseline(
-        session, challenger, market, challenger_link, speed
-    )
-    challengee_baseline = await _build_baseline(
-        session, challengee, market, challengee_link, speed
-    )
+    challenger_baseline = _build_baseline(challenger_link, speed)
+    challengee_baseline = _build_baseline(challengee_link, speed)
     sides = [
         MatchSide(
             user_id=challenger.id,
@@ -558,9 +526,9 @@ async def _pair_ticket(
     for cand in candidates:
         if not await can_pair(session, ticket, cand, now):
             continue
-        if not _is_eligible(market, ticket, cand, now):
+        if not _is_eligible(ticket, cand, now):
             continue
-        score = _selection_score(market, ticket, cand)
+        score = _selection_score(ticket, cand)
         if best is None or score < best[0]:
             best = (score, cand)
 
@@ -605,13 +573,13 @@ async def enqueue(
 
     market = _resolve_market(game, market_key, speed)
     link = await _require_link(session, user.id, game)
-    await _assert_eligible(session, user, game, market, link)
+    await _assert_eligible(session, user, game)
 
     existing = await _current_match_for_user(session, user.id)
     if existing is not None:
         return EnqueueResult(status="matched", match=existing)
 
-    baseline = await _build_baseline(session, user, market, link, speed)
+    baseline = _build_baseline(link, speed)
     ticket = await _get_or_create_ticket(
         session, user, market, entry_cents, speed, baseline, link, now
     )
@@ -688,7 +656,7 @@ async def take_waiting(
 
     market = _resolve_market(target.game, target.market, target.speed)
     link = await _require_link(session, user.id, target.game)
-    await _assert_eligible(session, user, target.game, market, link)
+    await _assert_eligible(session, user, target.game)
 
     existing = await _current_match_for_user(session, user.id)
     if existing is not None:
@@ -698,7 +666,7 @@ async def take_waiting(
             status_code=409,
         )
 
-    baseline = await _build_baseline(session, user, market, link, target.speed)
+    baseline = _build_baseline(link, target.speed)
     ticket = await _get_or_create_ticket(
         session, user, market, target.entry_cents, target.speed, baseline, link, now
     )

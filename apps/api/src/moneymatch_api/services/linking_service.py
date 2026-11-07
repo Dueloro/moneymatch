@@ -10,7 +10,6 @@ drops in later behind the same `bind(user, game, evidence)` seam (the
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import case, select
@@ -185,13 +184,7 @@ async def bind(
     await raw_payload_service.persist(
         session, f"{game}:profile", profile.model_dump(), memo=f"link {username}"
     )
-    adapter = registry.get(game)
-    if adapter.defer_bootstrap:
-        # Rate-limited host: the worker bootstraps out-of-band. NULL = owed.
-        link.models_bootstrapped_at = None
-    else:
-        await metric_models_service.bootstrap(session, user.id, game, host_account_id)
-        link.models_bootstrapped_at = datetime.now(UTC)
+    await metric_models_service.bootstrap(session, user.id, game, host_account_id)
 
     log.info(
         "link.bound", user_id=str(user.id), game=game, host_account_id=host_account_id
@@ -238,13 +231,7 @@ async def refresh(session: AsyncSession, user: User, game: str) -> LinkedAccount
     await raw_payload_service.persist(
         session, f"{game}:profile", profile.model_dump(), memo=f"refresh {game}"
     )
-    if adapter.defer_bootstrap:
-        link.models_bootstrapped_at = None  # worker re-bootstraps out-of-band
-    else:
-        await metric_models_service.bootstrap(
-            session, user.id, game, link.host_account_id
-        )
-        link.models_bootstrapped_at = datetime.now(UTC)
+    await metric_models_service.bootstrap(session, user.id, game, link.host_account_id)
     return link
 
 

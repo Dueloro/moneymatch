@@ -85,17 +85,6 @@ async def is_flagged(
     return flag is not None
 
 
-async def assert_not_flagged(
-    session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
-) -> None:
-    """Cheap hot-path guard: block a metric wager on an *existing* sandbagging flag
-    without a host call. Proactive detection runs in the nightly sweep (backlog ·
-    "cache the sandbagging evaluation"); this keeps only the DB check on the hot
-    path so H2H and friend stat-duels are gated without a per-enqueue round-trip."""
-    if await is_flagged(session, user_id, game, metric):
-        raise SandbaggingBlockedError(game, metric)
-
-
 async def evaluate(
     session: AsyncSession, user: User, game: str, metric: str, host_account_id: str
 ) -> RiskFlag | None:

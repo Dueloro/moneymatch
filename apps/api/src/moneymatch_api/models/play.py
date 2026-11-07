@@ -161,11 +161,6 @@ class Match(Base, TimestampMixin):
         nullable=False,
         index=True,  # worker scans due matches by state → ix_matches_state
     )
-    # True ⇒ the platform brokered the game (chess open challenge); the graded
-    # host game id lands in `host_game_id`.
-    brokered: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default="false", nullable=False
-    )
     # True ⇒ a zero-rake friendly (a friend challenge past the pair rake-cap):
     # both entries are refunded on settle and it's excluded from the leaderboard.
     # The winner is still graded/recorded; only the money flow is neutralized

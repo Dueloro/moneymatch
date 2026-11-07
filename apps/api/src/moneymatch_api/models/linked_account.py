@@ -16,10 +16,9 @@ independently of the per-game feature flag; either one renders BLOCKED on Profil
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -88,10 +87,4 @@ class LinkedAccount(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(
         String(16), default="active", server_default="active", nullable=False
-    )
-    # When this account's metric models were bootstrapped. NULL = "bootstrap
-    # still owed": deferred-host links leave it NULL for the worker to claim;
-    # cheap hosts bootstrap inline at link and stamp it immediately.
-    models_bootstrapped_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
     )

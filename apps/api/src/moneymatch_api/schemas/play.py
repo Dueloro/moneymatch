@@ -25,7 +25,7 @@ class Bracket(BaseModel):
 
 
 class Forecast(BaseModel):
-    """The duel-forecast disclosure for a stat/chess pairing.
+    """The Elo-forecast disclosure for a chess pairing.
 
     `you_win_prob` is `P(you beat opponent)` from the model (held near 0.50 by
     the eligibility window); `label` is the honest one-liner for the matched card.
@@ -44,13 +44,11 @@ class MarketRow(BaseModel):
     key: str
     label: str
     kind: str  # win_h2h
-    metric: str | None = None
     requires_speed: bool
     speeds: list[str]  # chess time controls
     # Derived pot multiplier in basis points (2·(1 − rake)); NEVER an odds line.
     multiplier_bps: int
     queue_depth: int  # players currently waiting on this market
-    provisional: bool = False
     resolution_note: str  # honest one-liner on how it settles
 
 
@@ -99,7 +97,6 @@ class MatchView(BaseModel):
     rake_cents: int
     multiplier_bps: int
     state: str
-    brokered: bool
     host_game_id: str | None
     matched_at: datetime | None
     window_ends_at: datetime | None

@@ -89,7 +89,7 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
     forecast = None
     if market is not None and your_seat is not None and opp_seat is not None:
         forecast = matchmaking.forecast_between(
-            market, your_seat.baseline_snapshot, opp_seat.baseline_snapshot
+            your_seat.baseline_snapshot, opp_seat.baseline_snapshot
         )
 
     return MatchView(
@@ -105,7 +105,6 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
         rake_cents=match.rake_cents,
         multiplier_bps=money_math.h2h_multiplier_bps(match.rake_bps),
         state=match.state,
-        brokered=match.brokered,
         host_game_id=match.host_game_id,
         matched_at=match.matched_at,
         window_ends_at=match.window_ends_at,

@@ -31,6 +31,7 @@ from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
+    FORMATION_WIDEN_AFTER_SECONDS,
     QUEUE_TICKET_TTL_SECONDS,
     STAT_BASELINE_MIN_N,
     TOURNAMENT_DISPERSION_CAP,
@@ -60,7 +61,6 @@ from . import (
     metric_models_service,
     money_math,
     notifications_service,
-    pairing,
     sandbagging_service,
     skill_prior,
     wallet_service,
@@ -216,10 +216,6 @@ async def _all_pairs_pairable(
                 tickets[i],
                 tickets[j],
                 now,
-                # A bar is quoted from your own history, not compared against
-                # another player's stat line, so the head-to-head sample floor
-                # does not apply here. This surface has its own.
-                require_established_metric=False,
             ):
                 return False
     return True
@@ -404,7 +400,7 @@ async def _try_form_field(
 
     age = max(0.0, (now - ticket.created_at).total_seconds())
     sizes = [TOURNAMENT_FIELD_SIZE]
-    if pairing.is_widening_exhausted(age):
+    if age > FORMATION_WIDEN_AFTER_SECONDS:
         sizes.append(TOURNAMENT_MIN_FIELD)
 
     for size in sizes:

@@ -33,6 +33,7 @@ from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
+    FORMATION_WIDEN_AFTER_SECONDS,
     METRIC_BAR_INCREMENT,
     POOL_BAR_SPREAD_CAP_SIGMA,
     POOL_DIFFICULTY_K,
@@ -64,7 +65,6 @@ from . import (
     metric_models_service,
     money_math,
     notifications_service,
-    pairing,
     sandbagging_service,
     skill_prior,
     wallet_service,
@@ -294,10 +294,6 @@ async def _all_pairs_pairable(
                 tickets[i],
                 tickets[j],
                 now,
-                # A bar is quoted from your own history, not compared against
-                # another player's stat line, so the head-to-head sample floor
-                # does not apply here. This surface has its own.
-                require_established_metric=False,
             ):
                 return False
     return True
@@ -505,7 +501,7 @@ async def _try_form_room(
 
     age = max(0.0, (now - ticket.created_at).total_seconds())
     sizes = [POOL_ROOM_SIZE]
-    if pairing.is_widening_exhausted(age):
+    if age > FORMATION_WIDEN_AFTER_SECONDS:
         sizes.append(POOL_MIN_ROOM)
 
     for size in sizes:
@@ -730,34 +726,6 @@ async def settle_pool(
         missers=len(missers),
         refunded=len(unverifiable) if clearers else len(entries),
     )
-    return pool
-
-
-async def cancel_pool(
-    session: AsyncSession, pool: SoloPool, *, reason: str
-) -> SoloPool:
-    """Under-min / kill-switch cancel: refund every entry, zero rake."""
-    if pool.state in ("SETTLED", "CANCELED"):
-        return pool
-    for e in await _entries(session, pool.id):
-        await wallet_service.refund(
-            session,
-            e.user_id,
-            pool.entry_cents,
-            ref_type=REF_POOL,
-            ref_id=pool.id,
-            memo=f"pool refund ({reason})",
-        )
-        e.status = "REFUNDED"
-        e.payout_cents = pool.entry_cents
-        await _notify(session, e.user_id, pool, "refund", pool.entry_cents)
-    pool.prize_cents = 0
-    pool.rake_cents = 0
-    pool.state = "CANCELED"
-    pool.outcome_detail = {"reason": reason}
-    pool.resolved_at = clock.now()
-    await session.flush()
-    await _assert_reconciled(session, pool)
     return pool
 
 

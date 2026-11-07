@@ -30,7 +30,11 @@ from __future__ import annotations
 import math
 
 from ..constants import POOL_DIFFICULTY_K
-from .pairing import normal_cdf
+
+
+def normal_cdf(z: float) -> float:
+    """Φ(z): standard-normal CDF via the error function."""
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
 
 def round_to_increment(value: float, increment: float) -> float:

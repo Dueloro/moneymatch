@@ -2,8 +2,7 @@
 
 - `metric_models` — per `(user_id, game, metric)`, an EWMA `mu`/`sigma` and a
   sample size `n` over the account's recent finished matches (half-life 10).
-  Computed at link time, refreshed on settlement (Phase 3) and nightly. `n` below
-  a floor makes the metric **provisional** (no stat duels/pools on it). Mutable —
+  Computed at link time, refreshed on settlement and nightly. Mutable —
   refreshed in place, so no append-only trigger here.
 - `raw_payloads` — every host-API response used in a grading/profile decision,
   kept with a content hash so a derived record can reference its exact proof.

@@ -40,7 +40,6 @@ def _move_count(moves: str | None) -> int:
 
 class ChessLichessAdapter(GameAdapter):
     id = "chess.lichess"
-    brokered = True  # the platform creates the game via a Lichess open challenge
 
     async def link_account(self, method: str, identifier: str) -> ProfileSnapshot:
         # OAuth is the production path; MVP uses the public username path. Both

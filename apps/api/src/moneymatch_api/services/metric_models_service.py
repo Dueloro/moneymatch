@@ -2,9 +2,8 @@
 
 On link (and later on settlement / nightly) we pull the account's recent finished
 matches through its adapter and compute, per typed rate metric, a recency-weighted
-EWMA mean/std-dev and sample size `n` (half-life 10). `n` below the config floor
-marks the metric **provisional** (no stat duels/pools on it). Metrics are
-rate-based only — the adapters never surface raw totals.
+EWMA mean/std-dev and sample size `n` (half-life 10). Metrics are rate-based
+only — the adapters never surface raw totals.
 
 Pure math (`compute_ewma`) is separated from I/O so it is trivially testable.
 """
@@ -20,10 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
 from ..constants import (
-    GAME_HISTORY_FLOOR,
     GAME_RATE_METRICS,
     METRIC_EWMA_HALF_LIFE,
-    METRIC_PROVISIONAL_MIN_N,
     rated_only_game,
 )
 from ..models.skill import MetricModel
@@ -67,16 +64,6 @@ def compute_ewma(
     mu = sum(w * x for w, x in zip(weights, values, strict=True)) / total_w
     var = sum(w * (x - mu) ** 2 for w, x in zip(weights, values, strict=True)) / total_w
     return mu, math.sqrt(var), n
-
-
-def is_provisional(model: MetricModel) -> bool:
-    """A metric with too few samples can't back a stat duel/pool."""
-    return model.n < METRIC_PROVISIONAL_MIN_N
-
-
-def meets_history_floor(game: str, total_finished: int) -> bool:
-    """Whether an account clears the per-game history floor (else win-only)."""
-    return total_finished >= GAME_HISTORY_FLOOR.get(game, 0)
 
 
 async def _upsert(
