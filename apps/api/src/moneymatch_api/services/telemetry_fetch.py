@@ -154,9 +154,9 @@ async def grade_tournament(
     tournament: Tournament,
     entries: list[TournamentEntry],
 ) -> dict[uuid.UUID, TournamentGrade]:
-    """Build each entry's first-N in-window metric values (keyed by entry id)."""
+    """Score each entry's in-window aggregate result (keyed by entry id)."""
     metric = tournament.ranking_metric
-    n = tournament.score_matches
+    spec = aggregate_metrics.REGISTRY[metric]
     grades: dict[uuid.UUID, TournamentGrade] = {}
     for entry in entries:
         games = await _window_games(
@@ -169,38 +169,21 @@ async def grade_tournament(
         if games is None:
             grades[entry.id] = TournamentGrade(values=None)  # host outage → refund
             continue
-        spec = aggregate_metrics.get(metric)
-        if spec is not None:
-            # Scored over the whole window rather than a first-N mean: total
-            # wins, longest streak, fastest win. `None` ⇒ no qualifying result,
-            # which the engine already treats as a forfeit.
-            score = spec.score(games)
-            payload = await raw_payload_service.persist(
-                session,
-                f"grade:{tournament.game}",
-                _evidence(entry.id, metric, games),
-                memo=f"tournament {metric}",
-            )
-            grades[entry.id] = TournamentGrade(
-                values=[] if score is None else [score],
-                score=score,
-                counted=spec.counted(games),
-                telemetry={metric: score, "games": len(games)},
-                raw_payload_id=payload.id,
-            )
-            continue
-
-        scored = [g for g in games if metric in g.metrics][:n]
-        values = [g.metrics[metric] for g in scored]
+        # Scored over the whole window: total wins, longest streak, fastest
+        # win. `None` ⇒ no qualifying result, which the engine treats as a
+        # forfeit.
+        score = spec.score(games)
         payload = await raw_payload_service.persist(
             session,
             f"grade:{tournament.game}",
-            _evidence(entry.id, metric, scored),
+            _evidence(entry.id, metric, games),
             memo=f"tournament {metric}",
         )
         grades[entry.id] = TournamentGrade(
-            values=values,  # [] ⇒ forfeit; non-empty ⇒ scored
-            telemetry={metric: values},
+            values=[] if score is None else [score],
+            score=score,
+            counted=spec.counted(games),
+            telemetry={metric: score, "games": len(games)},
             raw_payload_id=payload.id,
         )
     return grades
@@ -214,9 +197,7 @@ async def live_standings(
 ) -> list[dict[str, Any]]:
     """Compute current standings mid-window (cheap host reads; cached by caller)."""
     metric = tournament.ranking_metric
-    n = tournament.score_matches
-    from . import fairness
-
+    spec = aggregate_metrics.REGISTRY[metric]
     rows: list[dict[str, Any]] = []
     for entry in entries:
         games = await _window_games(
@@ -226,23 +207,12 @@ async def live_standings(
             tournament.window_ends_at,
             rated_only_game(tournament.game),
         )
-        spec = aggregate_metrics.get(metric)
-        if spec is not None:
-            avg = spec.score(games or [])
-            count = spec.counted(games or [])
-        else:
-            values = (
-                [g.metrics[metric] for g in games if metric in g.metrics][:n]
-                if games
-                else []
-            )
-            avg, count = fairness.first_n_average(values, n)
         rows.append(
             {
                 "user_id": str(entry.user_id),
                 "username": usernames.get(entry.user_id),
-                "score": avg,
-                "matches": count,
+                "score": spec.score(games or []),
+                "matches": spec.counted(games or []),
             }
         )
     # Fastest-win ranks smallest-first; everything else biggest-first.

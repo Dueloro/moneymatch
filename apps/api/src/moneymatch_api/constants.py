@@ -265,8 +265,8 @@ POOL_MIN_ROOM = 3
 POOL_BAR_SPREAD_CAP_SIGMA = 1.5
 # The pool settlement window: your first qualifying match must land inside it.
 POOL_WINDOW_SECONDS = 24 * 3600
-# Tournament field. Formed under a μ-dispersion cap; scored on the mean of the
-# first-N qualifying matches; top places split per `TOURNAMENT_PRIZE_SPLIT`.
+# Tournament field. Formed under a μ-dispersion cap; scored on an aggregate
+# metric over the window; top places split per `TOURNAMENT_PRIZE_SPLIT`.
 TOURNAMENT_FIELD_SIZE = 10
 TOURNAMENT_MIN_FIELD = 6
 TOURNAMENT_MIN_RANKED = 4

@@ -7,8 +7,8 @@ cents; the single-elim bracket is **cut**) and adds:
 
 - **field formation** under a **μ-dispersion cap** `max(μ) − min(μ) ≤ cap·σ_pooled`
   (match-on-write, escrow at formation, no escrow while waiting).
-- **first-N-average scoring**: the mean of the metric over the first N qualifying
-  matches in the window (first-N, not best-of — extra games buy zero chances).
+- **aggregate scoring**: total wins, longest streak or fastest win over the
+  window, read from the host record (`services/aggregate_metrics.py`).
 - **tie handling**: tied scores split their combined prize slices, remainder cents
   to the earlier enqueue (deterministic, disclosed); zero-match entrants forfeit
   (ranked last, paid nothing); fewer than `min_ranked` play → CANCELED + refund.
@@ -33,7 +33,6 @@ from ..constants import (
     FLAG_QUEUE_PAUSED,
     FORMATION_WIDEN_AFTER_SECONDS,
     QUEUE_TICKET_TTL_SECONDS,
-    STAT_BASELINE_MIN_N,
     TOURNAMENT_DISPERSION_CAP,
     TOURNAMENT_ENGINE_VERSION,
     TOURNAMENT_FIELD_SIZE,
@@ -58,7 +57,6 @@ from . import (
     limits_service,
     linking_service,
     matchmaking,
-    metric_models_service,
     money_math,
     notifications_service,
     sandbagging_service,
@@ -87,15 +85,13 @@ class TournamentEnqueueResult:
 class TournamentGrade:
     """The worker's per-entry grading input.
 
-    `values` is the metric from the entrant's first-N qualifying matches (in
-    order); `None` = unverifiable (host couldn't fetch) → refund; `[]` = played no
-    qualifying match → forfeit (ranked last, paid nothing).
+    `values` is `None` when unverifiable (host couldn't fetch) → refund, and `[]`
+    when the entrant has no qualifying result → forfeit (ranked last, paid
+    nothing). `score` is the aggregate result over the window (total wins,
+    streak, fastest win), used verbatim.
     """
 
     values: list[float] | None
-    #: Set for aggregate metrics (total wins, streak, fastest win), which are
-    #: scored over the whole window instead of averaged across first-N matches.
-    #: When present it is used verbatim as the entry's score.
     score: float | None = None
     counted: int | None = None
     telemetry: dict[str, Any] | None = None
@@ -158,40 +154,23 @@ def host_rating(link: LinkedAccount) -> float | None:
 async def _build_baseline(
     session: AsyncSession, user: User, game: str, metric: str, link: LinkedAccount
 ) -> dict[str, Any]:
-    if aggregate_metrics.is_aggregate(metric):
-        rating = host_rating(link)
-        if rating is None:
-            raise TournamentError(
-                "no_stat_baseline",
-                "We could not read your rating from the host. "
-                "Refresh the game on your profile and try again.",
-                status_code=409,
-                detail={"metric": metric},
-            )
-        return {
-            "linked_account_id": str(link.id),
-            "host_account_id": link.host_account_id,
-            "metric": metric,
-            "mu": rating,
-            "sigma": aggregate_metrics.ELO_SIGMA,
-            "n": 1,
-        }
-
-    model = await metric_models_service.get_metric_model(session, user.id, game, metric)
-    if model is None or model.n < STAT_BASELINE_MIN_N:
+    """Freeze the host rating: every tournament metric is an aggregate contest."""
+    rating = host_rating(link)
+    if rating is None:
         raise TournamentError(
             "no_stat_baseline",
-            "Play a match on this stat first — tournaments score from your results.",
+            "We could not read your rating from the host. "
+            "Refresh the game on your profile and try again.",
             status_code=409,
-            detail={"metric": metric, "n": model.n if model else 0},
+            detail={"metric": metric},
         )
     return {
         "linked_account_id": str(link.id),
         "host_account_id": link.host_account_id,
         "metric": metric,
-        "mu": float(model.mu),
-        "sigma": float(model.sigma),
-        "n": int(model.n),
+        "mu": rating,
+        "sigma": aggregate_metrics.ELO_SIGMA,
+        "n": 1,
     }
 
 
@@ -573,7 +552,7 @@ async def settle_tournament(
     tournament: Tournament,
     grades: dict[uuid.UUID, TournamentGrade],
 ) -> Tournament:
-    """Score (first-N average), rank, and pay top places. Unverifiable refunded
+    """Score, rank, and pay top places. Unverifiable refunded
     off the top; fewer than `min_ranked` scored → CANCELED, full refund."""
     if tournament.state in ("SETTLED", "CANCELED"):
         return tournament
@@ -590,13 +569,9 @@ async def settle_tournament(
             unverifiable.append(e)
             scores[e.id] = None
             continue
-        if aggregate_metrics.is_aggregate(tournament.ranking_metric):
-            avg, count = g.score, (g.counted or 0)
-        else:
-            avg, count = fairness.first_n_average(g.values, tournament.score_matches)
-        e.score = avg
-        e.matches_counted = count
-        scores[e.id] = avg
+        e.score = g.score
+        e.matches_counted = g.counted or 0
+        scores[e.id] = g.score
 
     ranked = compute_standings(
         entries,

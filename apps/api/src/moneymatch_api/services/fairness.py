@@ -235,18 +235,6 @@ def dispersion_ok(mus: list[float], sigmas: list[float], cap: float) -> bool:
     return (max(mus) - min(mus)) <= cap * scale
 
 
-def first_n_average(values: list[float], n: int) -> tuple[float | None, int]:
-    """Mean of the first `n` values (chronological). Returns (avg, count_used).
-
-    First-N, not best-of: extra games buy zero extra chances. `(None, 0)` when
-    there are no qualifying values (a zero-match entrant forfeits, ranked last).
-    """
-    used = values[:n]
-    if not used:
-        return None, 0
-    return sum(used) / len(used), len(used)
-
-
 def k_for_difficulty(difficulty: str) -> float:
     """The `k` multiplier for a pool difficulty (easy/medium/hard)."""
     return POOL_DIFFICULTY_K[difficulty]

@@ -1,8 +1,7 @@
 """Aggregate tournament metrics: total wins, longest streak, fastest win.
 
-These score a whole window rather than averaging a rate over first-N matches,
-and "fastest win" ranks the other way round, so both the scoring and the
-ranking direction are worth pinning down. Pure functions, no DB.
+These score a whole window, and "fastest win" ranks the other way round, so both
+the scoring and the ranking direction are worth pinning down. Pure functions, no DB.
 """
 
 from __future__ import annotations

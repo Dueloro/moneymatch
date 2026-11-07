@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import clock
 from ..constants import (
     ENTRY_PRESETS_CENTS,
-    STAT_BASELINE_MIN_N,
     TOURNAMENT_FIELD_SIZE,
     TOURNAMENT_GAMES,
     TOURNAMENT_METRICS,
@@ -27,7 +26,6 @@ from ..constants import (
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
-from ..models.skill import MetricModel
 from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from ..schemas.tournaments import (
@@ -40,7 +38,6 @@ from ..schemas.tournaments import (
     TournamentView,
 )
 from ..services import (
-    aggregate_metrics,
     linking_service,
     tournament_engine,
 )
@@ -174,23 +171,9 @@ async def get_markets(
     linked = await linking_service.get_link(session, user.id, game)
     metrics = []
     for metric in TOURNAMENT_METRICS[game]:
-        if aggregate_metrics.is_aggregate(metric):
-            # Total wins / streak / fastest win are scored straight off the host
-            # record over the window, so there is no per-match rate model to
-            # gate on. The field forms on the host rating instead, which is what
-            # `tournament_engine._build_baseline` requires, so mirror that here.
-            provisional = (
-                linked is None or tournament_engine.host_rating(linked) is None
-            )
-        else:
-            model = await session.scalar(
-                select(MetricModel).where(
-                    MetricModel.user_id == user.id,
-                    MetricModel.game == game,
-                    MetricModel.metric == metric,
-                )
-            )
-            provisional = (model.n if model else 0) < STAT_BASELINE_MIN_N
+        # Every tournament metric is scored off the host record, and the field
+        # forms on the host rating (`tournament_engine._build_baseline`).
+        provisional = linked is None or tournament_engine.host_rating(linked) is None
         metrics.append(
             TournamentMetric(
                 metric=metric,

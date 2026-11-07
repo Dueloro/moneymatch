@@ -1,5 +1,5 @@
 """Pool/tournament fairness math (pure). Personal bars, room composition,
-dispersion caps, and first-N scoring — no DB, no I/O."""
+and dispersion caps — no DB, no I/O."""
 
 from __future__ import annotations
 
@@ -61,17 +61,6 @@ def test_dispersion_cap_rejects_a_lopsided_field():
     assert fairness.dispersion_ok([1.42, 1.50, 1.58], sigmas, 1.0)
     # Spread 1.0 far exceeds the cap → refused.
     assert not fairness.dispersion_ok([1.00, 1.50, 2.00], sigmas, 1.0)
-
-
-def test_first_n_average_uses_earliest_not_best_or_latest():
-    avg, count = fairness.first_n_average([1.2, 1.4, 1.6, 1.8], 3)
-    assert count == 3
-    # mean of the first three (1.2,1.4,1.6) = 1.4 — not best-of, not latest.
-    assert avg == pytest.approx(1.4)
-
-
-def test_first_n_average_none_when_no_matches():
-    assert fairness.first_n_average([], 3) == (None, 0)
 
 
 def test_member_fair_bounds():
