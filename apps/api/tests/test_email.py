@@ -97,7 +97,7 @@ async def test_send_swallows_provider_error(session, monkeypatch):
 async def test_html_uses_hybrid_brand(session, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "resend_api_key", "re_test_key")
-    monkeypatch.setattr(settings, "web_origin", "https://moneymatch-beta.vercel.app")
+    monkeypatch.setattr(settings, "web_origin", "https://app.dueloro.com,https://other.example")
     user = await _make_user(session, email="real@example.com")
     with respx.mock:
         route = respx.post(email_service._RESEND_ENDPOINT).mock(
@@ -111,6 +111,6 @@ async def test_html_uses_hybrid_brand(session, monkeypatch):
             link_path="/activity",
         )
     html = json.loads(route.calls.last.request.content)["html"]
-    assert "/email/logo.png" in html
+    assert 'src="https://app.dueloro.com/email/logo.png"' in html
     assert "Open Money Match" in html
     assert "Dueloro" in html

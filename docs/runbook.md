@@ -20,8 +20,11 @@ token. The `/admin` web pages call the same endpoints.
 ## First-time setup
 
 Order: Vercel project, Render Blueprint, custom domain, first admin. `WEB_ORIGIN`
-is entered at Blueprint creation and must be the exact Vercel production
-origin; the API refuses to boot in prod if it is localhost.
+is entered at Blueprint creation and must be the exact production origin,
+`https://app.dueloro.com`, on both Render services; the API refuses to boot in
+prod if it is localhost. The marketing site and the app are separate Vercel
+projects under one domain: apex/`www` = marketing, `app.` = this app. The
+marketing site's CTAs point to `https://app.dueloro.com`.
 
 ### 1. Vercel project
 
@@ -33,6 +36,9 @@ origin; the API refuses to boot in prod if it is localhost.
 - The CSP in `apps/web/vercel.json` hardcodes `https://api.dueloro.com` and the
   Supabase project `bxjzxvujyveucyfvmmto`. If your Supabase project differs,
   update `connect-src` first or auth calls are blocked.
+- Domains: add `app.dueloro.com` to this project (CNAME `app` to the target
+  Vercel shows, or automatic if dueloro.com DNS is on Vercel). `vercel.json`
+  permanently redirects the old beta host to it.
 
 ### 2. Render Blueprint
 
@@ -67,7 +73,8 @@ connections). Rewrite the scheme to `postgresql+asyncpg://` and add
 ### Google sign-in
 
 The web offers Google via Supabase. Create a Google OAuth client with
-authorized redirect `https://<supabase-ref>.supabase.co/auth/v1/callback`.
+authorized redirect `https://<supabase-ref>.supabase.co/auth/v1/callback` and
+`https://app.dueloro.com` under Authorized JavaScript origins.
 In Supabase enable Auth → Providers → Google with its client ID and secret,
 and add the web origin under Auth → URL Configuration (Site URL and Redirect
 URLs).
@@ -81,8 +88,8 @@ Resend. An unverified domain makes every auth email fail.
    user `resend`, password a Resend API key, sender `Money Match`
    `<noreply@send.dueloro.com>`.
 2. Auth → Providers → Email: enable Confirm email; keep email OTP on.
-3. Auth → URL Configuration: Site URL = the web origin; add
-   `<web origin>/**` and `http://localhost:5173/**` to Redirect URLs.
+3. Auth → URL Configuration: Site URL = `https://app.dueloro.com`; add
+   `https://app.dueloro.com/**` and `http://localhost:5173/**` to Redirect URLs.
 4. Auth → Email Templates: paste `supabase/email-templates/confirm-signup.html`,
    `magic-link.html` (must keep `{{ .Token }}`), `reset-password.html`.
 5. Sign up with a real address and check the verify, code and reset emails.

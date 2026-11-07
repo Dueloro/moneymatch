@@ -15,7 +15,6 @@ log = structlog.get_logger(__name__)
 
 _RESEND_ENDPOINT = "https://api.resend.com/emails"
 
-_LOGO_URL = "https://moneymatch-beta.vercel.app/email/logo.png"
 
 _SYNTHETIC_EMAIL_DOMAIN = "users.moneymatch.app"
 
@@ -32,6 +31,10 @@ def is_deliverable(email: str | None) -> bool:
     return not email.lower().endswith(f"@{_SYNTHETIC_EMAIL_DOMAIN}")
 
 
+def _web_origin() -> str:
+    return get_settings().web_origin.split(",")[0].strip().rstrip("/")
+
+
 def _app_url(link_path: str | None) -> str | None:
     """Absolute app link from a relative path, using the first configured origin.
     WEB_ORIGIN is a comma-separated CORS list; the first entry is the canonical
@@ -39,11 +42,11 @@ def _app_url(link_path: str | None) -> str | None:
     """
     if not link_path:
         return None
-    origin = get_settings().web_origin.split(",")[0].strip().rstrip("/")
-    return f"{origin}{link_path}"
+    return f"{_web_origin()}{link_path}"
 
 
 def _render_html(body: str, url: str | None) -> str:
+    logo_url = f"{_web_origin()}/email/logo.png"
     button = (
         f'<tr><td style="padding:8px 0 4px"><a href="{url}" '
         'style="display:inline-block;background:#C6F440;color:#0B0B0C;'
@@ -65,7 +68,7 @@ def _render_html(body: str, url: str | None) -> str:
         'style="max-width:600px;margin:0 auto;background:#ffffff;'
         'border-radius:16px;overflow:hidden">'
         '<tr><td style="background:#0B0B0C;padding:20px 28px">'
-        f'<img src="{_LOGO_URL}" width="28" height="28" alt="Money Match" '
+        f'<img src="{logo_url}" width="28" height="28" alt="Money Match" '
         'style="vertical-align:middle;border-radius:8px">'
         '<span style="color:#ffffff;font-weight:600;font-size:15px;'
         'vertical-align:middle;margin-left:10px">Money Match</span>'
