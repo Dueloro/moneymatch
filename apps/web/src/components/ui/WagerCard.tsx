@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { formatPoints } from '../../lib/format';
+import { formatMetricNumber } from '../../lib/metrics';
 import { AmountText, PointsFigure } from './AmountText';
 import { Card } from './Card';
 import { ClearRate } from './ClearBar';
@@ -8,7 +9,7 @@ import { PillButton } from './PillButton';
 import { Segmented } from './Segmented';
 
 export function WagerCard({
-  gameName,
+  meta,
   tag,
   title,
   subtitle,
@@ -31,7 +32,7 @@ export function WagerCard({
   joining = false,
   requireConfirm = false,
 }: {
-  gameName: string;
+  meta?: string;
   tag?: string;
   title: string;
   subtitle?: string;
@@ -65,22 +66,24 @@ export function WagerCard({
 
   return (
     <Card className="flex flex-col p-4" interactive>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-text-secondary">{gameName}</span>
-        {tag && (
-          <span className="rounded-pill bg-panel-raised px-2 py-0.5 text-micro font-semibold capitalize text-text-secondary">
-            {tag}
-          </span>
-        )}
-      </div>
+      {(meta || tag) && (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-text-secondary">{meta}</span>
+          {tag && (
+            <span className="rounded-pill bg-panel-raised px-2 py-0.5 text-micro font-semibold capitalize text-text-secondary">
+              {tag}
+            </span>
+          )}
+        </div>
+      )}
 
-      <h3 className="mt-3 text-lg font-semibold leading-tight text-text">{title}</h3>
+      <h3 className="text-lg font-semibold leading-tight text-text">{title}</h3>
 
       {target != null ? (
         <div className="mt-4">
           <div className="mb-2 flex items-baseline gap-2">
             <span className="num text-3xl font-semibold text-text">
-              {Number.isInteger(target) ? target : target.toFixed(2)}
+              {formatMetricNumber(target)}
             </span>
             <span className="text-xs text-text-secondary">
               {targetUnit ? `${targetUnit} ` : ''}

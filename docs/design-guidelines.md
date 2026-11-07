@@ -212,13 +212,15 @@ sit outside it.
 The card is self-evident by design, so browse pages don't need an explainer
 paragraph (the "How it works" prose lives in a disclosure instead).
 
-1. Metric / field size in 12px grey (left) + optional `panel-raised` tag pill
-   (right): difficulty, "top 3 paid", "BLITZ".
-2. Title at 18px semibold.
-3. **The headline number**: the bar target at 30px semibold with "or fewer" (or
-   "or better") beside it. Tournaments and 1v1 have no bar, so they omit it.
+1. Optional `meta` line in 12px grey (left) + optional `panel-raised` tag pill
+   (right), e.g. "16 players · top 3 paid". Pool cards omit it.
+2. Title at 18px semibold. On a pool card it is the difficulty plus the rule
+   ("Hard · wins only"), never the bar.
+3. **The headline number**: the bar target at 30px semibold with its unit and
+   "or fewer" (or "or better") beside it. This is the only place the card states
+   the bar. Tournaments and 1v1 have no bar, so they omit it.
 4. **The clear-rate meter:** a 6px track with a grey fill proportional to how
-   often you clear that bar, over "16% of your recent matches clear it".
+   often you clear that bar, over "16% of your recent games clear it".
 5. `ENTRY` mono caption, then a **segmented control of dollar amounts** (default
    middle preset).
 6. The payout caption over the payout at 18px **in lime**, the fee note under
@@ -237,7 +239,9 @@ The product's one loud element, and the thing a stranger should remember. A
 horizontal track showing **your number** against **the number to beat**, gap
 shaded: a full-height white tick for the target, a filled bar for ground covered,
 the remaining distance washed in cyan at 25%. Underneath, one 12px line: your
-number, then either "need −N" (grey) or "clear" / "N under" (lime). For
+number, then either "need −N" (grey) or "clear" / "N under" (lime). Every number
+carries its unit via `format` (`formatMetric`: "31 moves", "4 wins", "3 in a
+row"). For
 `chess_moves` lower is better. The target sits at ~78% of the track so an
 overshoot reads as an overshoot.
 

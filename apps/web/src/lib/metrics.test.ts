@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { barPhrase, barTitle, formatMetric, tournamentRule } from './metrics';
+import { barPhrase, formatMetric, poolCardTitle, tournamentRule } from './metrics';
 
-describe('barPhrase / barTitle', () => {
+describe('barPhrase', () => {
   it('words moves-to-win as a win in that many moves or fewer', () => {
     expect(barPhrase('chess_moves', 28)).toBe('win in 28 moves or fewer');
-    expect(barTitle('chess_moves', 28)).toBe('Win in 28 moves or fewer');
   });
 
   it('words a higher-is-better stat as a number to clear', () => {
     expect(barPhrase('chess_accuracy', 85)).toBe('clear 85');
-    expect(barTitle('chess_accuracy', 85)).toBe('Clear 85');
   });
 });
 
@@ -46,5 +44,12 @@ describe('formatMetric', () => {
     expect(formatMetric('chess_moves', 23.0)).toBe('23 moves');
     expect(formatMetric('unknown_metric', 12)).toBe('12');
     expect(formatMetric('chess_moves', null)).toBe('-');
+  });
+});
+
+describe('poolCardTitle', () => {
+  it('pairs the difficulty with the rule instead of restating the bar', () => {
+    expect(poolCardTitle('chess_moves', 'hard')).toBe('Hard · wins only');
+    expect(poolCardTitle('chess_accuracy', 'easy')).toBe('Easy');
   });
 });

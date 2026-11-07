@@ -51,9 +51,10 @@ export function barPhrase(metric: string, bar: number): string {
   return requiresWin(metric) ? `win with ${n} or more` : `clear ${n}`;
 }
 
-export function barTitle(metric: string, bar: number): string {
-  const phrase = barPhrase(metric, bar);
-  return phrase.charAt(0).toUpperCase() + phrase.slice(1);
+/** A pool card's title: difficulty, plus the rule the big figure can't carry. */
+export function poolCardTitle(metric: string, difficulty: string): string {
+  const d = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+  return requiresWin(metric) ? `${d} · wins only` : d;
 }
 
 const TOURNAMENT_RULES: Record<string, string> = {

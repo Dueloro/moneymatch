@@ -5,8 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WagerCard } from './WagerCard';
 
 const base = {
-  gameName: 'Moves to win',
-  title: 'Win in 28 moves or fewer',
+  title: 'Medium · wins only',
   entryOptions: [1000, 2500, 5000],
   payoutFor: (cents: number) => cents * 3,
   payoutLabel: 'Pot if full',

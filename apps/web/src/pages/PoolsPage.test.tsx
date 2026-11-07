@@ -81,19 +81,20 @@ describe('PoolsPage', () => {
   it('renders one card per bar, with entry as a control inside it', () => {
     renderWithProviders(<PoolsPage />);
     expect(screen.getAllByRole('button', { name: 'Join pool' })).toHaveLength(3);
-    expect(screen.getAllByText('Moves to win').length).toBeGreaterThan(0);
-    expect(screen.getByText('28')).toBeInTheDocument();
-    expect(screen.getByText('Win in 28 moves or fewer')).toBeInTheDocument();
+    const card = screen.getByText('Medium · wins only').closest('.rounded-card')!;
+    // The big figure is the one statement of the bar.
+    expect(card).toHaveTextContent('28moves or fewer');
     expect(
-      screen.getAllByText('Wins only. A loss or a draw does not count.'),
-    ).toHaveLength(3);
+      within(card as HTMLElement).queryByText(/win in 28/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Moves to win')).not.toBeInTheDocument();
     expect(screen.getByText('20%')).toBeInTheDocument();
     expect(screen.getAllByText(pts('3,600 pts')).length).toBeGreaterThan(0);
   });
 
   it('confirms in the card before joining, using the selected entry', () => {
     renderWithProviders(<PoolsPage />);
-    const card = screen.getByText('Win in 28 moves or fewer').closest('.rounded-card')!;
+    const card = screen.getByText('Medium · wins only').closest('.rounded-card')!;
     const wc = within(card as HTMLElement);
 
     fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
@@ -145,12 +146,14 @@ describe('PoolsPage', () => {
     });
     renderWithProviders(<PoolsPage />);
     expect(screen.getByTestId('room-card')).toBeInTheDocument();
-    expect(screen.getByText(/Win in 30 moves or fewer/)).toBeInTheDocument();
-    expect(screen.getByTestId('room-card')).toHaveTextContent('your bar 28');
-    expect(screen.getByText('2 under')).toBeInTheDocument();
-    expect(screen.getByText(/4 players · pot 4,000 pts/)).toBeInTheDocument();
+    const room = screen.getByTestId('room-card');
+    expect(room).toHaveTextContent('Medium · wins only');
+    expect(room).toHaveTextContent('30moves or fewer');
+    expect(room).toHaveTextContent('your bar 28 moves');
+    expect(screen.getByText('2 moves under')).toBeInTheDocument();
+    expect(room).toHaveTextContent('4 players · pot 4,000 pts');
     expect(screen.getByTestId('room-play-cue')).toHaveTextContent(
-      /play your next game on lichess and win in 30 moves or fewer/i,
+      /play your next game on lichess/i,
     );
   });
 

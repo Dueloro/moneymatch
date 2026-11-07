@@ -147,8 +147,7 @@ export function TournamentPage() {
                 return (
                   <WagerCard
                     key={key}
-                    gameName={`${fieldSize} players`}
-                    tag={`top ${places} paid`}
+                    meta={`${fieldSize} players · top ${places} paid`}
                     title={m.label}
                     subtitle={tournamentRule(m.metric, m.label)}
                     entryOptions={presets}

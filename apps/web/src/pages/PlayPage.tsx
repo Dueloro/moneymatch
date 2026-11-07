@@ -125,7 +125,7 @@ export function PlayPage() {
                     return (
                       <WagerCard
                         key={key}
-                        gameName={gameName}
+                        meta={gameName}
                         tag={speed?.toUpperCase()}
                         title={m.label}
                         subtitle={marketHeadline(m)}

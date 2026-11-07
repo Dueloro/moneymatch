@@ -16,11 +16,11 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatPoints } from '../lib/format';
 import {
-  barPhrase,
-  barTitle,
+  formatMetric,
+  formatMetricNumber,
   isLowerBetter,
   metricUnit,
-  requiresWin,
+  poolCardTitle,
 } from '../lib/metrics';
 import { feeOnNetWinnings, platformFeeNote } from '../lib/rake';
 import {
@@ -187,18 +187,11 @@ export function PoolsPage() {
                     return (
                       <WagerCard
                         key={key}
-                        gameName={m.label}
-                        tag={c.difficulty}
-                        title={barTitle(m.metric, c.bar)}
+                        title={poolCardTitle(m.metric, c.difficulty)}
                         target={c.bar}
                         clearRate={c.clear_rate}
                         lowerIsBetter={isLowerBetter(m.metric)}
                         targetUnit={metricUnit(m.metric)}
-                        targetNote={
-                          requiresWin(m.metric)
-                            ? 'Wins only. A loss or a draw does not count.'
-                            : undefined
-                        }
                         entryOptions={presets}
                         payoutFor={(entry) => estPrize(entry, c.est_multiplier_bps)}
                         payoutLabel="Est. win"
@@ -269,37 +262,44 @@ function PoolStatusBanner({
 }
 
 function RoomBanner({ pool }: { pool: PoolView }) {
+  const lower = isLowerBetter(pool.metric);
+  const unit = metricUnit(pool.metric);
   return (
     <Card className="mb-6 p-5" data-testid="room-card">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-live" aria-hidden />
-            <p className="text-xs font-semibold uppercase tracking-wide text-live">
-              Room formed
-            </p>
-          </div>
-          <h2 className="mt-2 text-xl font-semibold text-text">
-            <span className="capitalize">{pool.difficulty}</span> ·{' '}
-            {barTitle(pool.metric, pool.room_bar)}
-          </h2>
-          <p className="mt-1 text-xs text-text-secondary">
-            {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
-            {formatPoints(pool.pot_cents)}
-          </p>
-        </div>
-        <div className="w-full max-w-xs">
-          <ClearBar
-            current={pool.your_bar}
-            target={pool.room_bar}
-            label="your bar"
-            lowerIsBetter={isLowerBetter(pool.metric)}
-          />
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <p className="flex items-center gap-2 text-sm font-medium text-text">
+          <span className="h-2 w-2 rounded-full bg-live" aria-hidden />
+          Room formed
+        </p>
+        <p className="text-xs text-text-secondary">
+          {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
+          <span className="text-green">{formatPoints(pool.pot_cents)}</span>
+        </p>
+      </div>
+      <p className="mt-4 text-xs text-text-secondary">
+        {poolCardTitle(pool.metric, pool.difficulty)}
+      </p>
+      <h2 className="mt-1 flex items-baseline gap-2">
+        <span className="num text-3xl font-semibold text-text">
+          {formatMetricNumber(pool.room_bar)}
+        </span>
+        <span className="text-sm text-text-secondary">
+          {unit ? `${unit} ` : ''}
+          {lower ? 'or fewer' : 'or better'}
+        </span>
+      </h2>
+      <div className="mt-4">
+        <ClearBar
+          current={pool.your_bar}
+          target={pool.room_bar}
+          label="your bar"
+          lowerIsBetter={lower}
+          format={(n) => formatMetric(pool.metric, n)}
+        />
       </div>
       <p className="mt-4 text-sm text-text" data-testid="room-play-cue">
         Your {formatPoints(pool.entry_cents)} is in escrow. Play your next game on
-        Lichess and {barPhrase(pool.metric, pool.room_bar)} to take your share.
+        Lichess.
       </p>
     </Card>
   );

@@ -68,7 +68,7 @@ describe('TournamentPage', () => {
   it('renders one card per metric and joins with the entry chosen inside it', () => {
     renderWithProviders(<TournamentPage />);
     expect(screen.getAllByRole('button', { name: 'Join tournament' })).toHaveLength(1);
-    expect(screen.getByText('top 3 paid')).toBeInTheDocument();
+    expect(screen.getByText('10 players · top 3 paid')).toBeInTheDocument();
     // 10 x 1,000 pot, minus the 10% fee, times the 50/100 first-place share.
     expect(screen.getByText('1st place if full')).toBeInTheDocument();
     expect(screen.getByText(pts('4,500 pts'))).toBeInTheDocument();
