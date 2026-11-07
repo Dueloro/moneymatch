@@ -1,8 +1,8 @@
 """/links endpoints — link/refresh/unlink flow, conflicts, and flag blocking.
 
 Host APIs are respx-mocked (no live network). Covers the phase's required
-linking tests: unknown → 404, already-bound host → 409, second game independent,
-snapshot refresh, disabled-flag BLOCKED, and admin-only unlink.
+linking tests: unknown → 404, already-bound host → 409, snapshot refresh,
+disabled-flag BLOCKED, and admin-only unlink.
 """
 
 from __future__ import annotations
@@ -11,16 +11,10 @@ import httpx
 import respx
 from sqlalchemy import text
 
-from moneymatch_api.config import get_settings
-
 from .conftest import auth_headers
 
 CHESS = "chess.lichess"
-DOTA = "dota2.opendota"
-PUBG = "pubg.steam"
 LI = "https://lichess.org/api/user"
-OD = "https://api.opendota.com/api"
-PUBG_PLAYERS = "https://api.pubg.com/shards/steam/players"
 
 
 def _lichess_user(username="magnus", rating=2800):
@@ -46,35 +40,6 @@ def _lichess_games(ndjson: str = "") -> None:
     )
 
 
-def _mock_dota(account_id="70388657"):
-    respx.get(f"{OD}/players/{account_id}").mock(
-        return_value=httpx.Response(
-            200, json={"profile": {"personaname": "hero"}, "rank_tier": 55}
-        )
-    )
-    respx.get(f"{OD}/players/{account_id}/wl").mock(
-        return_value=httpx.Response(200, json={"win": 30, "lose": 20})
-    )
-    respx.get(f"{OD}/players/{account_id}/recentMatches").mock(
-        return_value=httpx.Response(
-            200,
-            json=[
-                {
-                    "match_id": i,
-                    "player_slot": 1,
-                    "radiant_win": True,
-                    "start_time": 1_700_000_000 + i,
-                    "kills": 10,
-                    "deaths": 4,
-                    "assists": 8,
-                    "gold_per_min": 500 + i,
-                }
-                for i in range(3)
-            ],
-        )
-    )
-
-
 def _game(resp, game):
     return next(g for g in resp["games"] if g["game"] == game)
 
@@ -94,7 +59,7 @@ async def test_link_lichess_success(client):
     chess = _game(r.json(), CHESS)
     assert chess["status"] == "LINKED"
     assert chess["host_username"] == "magnus"
-    # Chess ratings live per time-control in `formats` (generic `rating` is FPS).
+    # Chess ratings live per time-control in `formats`.
     assert chess["profile"]["primary_speed"] == "blitz"
     assert chess["profile"]["formats"][0]["rating"] == 2800
 
@@ -114,34 +79,6 @@ async def test_unknown_username_is_404(client):
     )
     assert r.status_code == 404
     assert r.json()["code"] == "host_account_unlinkable"
-
-
-async def test_pubg_link_without_key_is_503_not_configured(client, monkeypatch):
-    # The production bug: a missing PUBG_API_KEY made every link say "player not
-    # found". It must now be a distinct, actionable 503 — not a 404 about the
-    # player. No respx mock: the guard trips before any host call is made.
-    monkeypatch.setattr(get_settings(), "pubg_api_key", None)
-    r = await client.post(
-        "/api/v1/links",
-        json={"game": PUBG, "username": "C99R"},
-        headers=auth_headers("u-pubg-nokey"),
-    )
-    assert r.status_code == 503, r.text
-    assert r.json()["code"] == "host_not_configured"
-
-
-@respx.mock
-async def test_pubg_link_host_outage_is_502(client, monkeypatch):
-    # Key present but PUBG is down (5xx): a real outage → 502, never "not found".
-    monkeypatch.setattr(get_settings(), "pubg_api_key", "test-key")
-    respx.get(PUBG_PLAYERS).mock(return_value=httpx.Response(503))
-    r = await client.post(
-        "/api/v1/links",
-        json={"game": PUBG, "username": "C99R"},
-        headers=auth_headers("u-pubg-down"),
-    )
-    assert r.status_code == 502, r.text
-    assert r.json()["code"] == "host_unavailable"
 
 
 @respx.mock
@@ -186,29 +123,6 @@ async def test_relinking_same_game_conflicts(client):
         headers=auth_headers("dup"),
     )
     assert r.status_code == 409 and r.json()["code"] == "already_linked"
-
-
-@respx.mock
-async def test_second_game_links_independently(client):
-    respx.get(f"{LI}/magnus").mock(
-        return_value=httpx.Response(200, json=_lichess_user())
-    )
-    _lichess_games()
-    _mock_dota()
-    await client.post(
-        "/api/v1/links",
-        json={"game": CHESS, "username": "magnus"},
-        headers=auth_headers("multi"),
-    )
-    r = await client.post(
-        "/api/v1/links",
-        json={"game": DOTA, "username": "70388657"},
-        headers=auth_headers("multi"),
-    )
-    assert r.status_code == 200
-    body = r.json()
-    assert _game(body, CHESS)["status"] == "LINKED"
-    assert _game(body, DOTA)["status"] == "LINKED"
 
 
 @respx.mock

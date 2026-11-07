@@ -11,7 +11,7 @@ import httpx
 import pytest
 import respx
 
-from moneymatch_api.services.hosts import lichess, opendota
+from moneymatch_api.services.hosts import lichess
 from moneymatch_api.services.hosts._client import request_json
 from moneymatch_api.services.hosts.errors import (
     HostError,
@@ -124,27 +124,3 @@ async def test_lichess_games_fail_soft_on_outage():
         return_value=httpx.Response(500)
     )
     assert await lichess.get_user_games("magnus", 0) == []
-
-
-# --------------------------------------------------------------------------- #
-# FaceIt
-# --------------------------------------------------------------------------- #
-
-
-# --------------------------------------------------------------------------- #
-# OpenDota
-# --------------------------------------------------------------------------- #
-
-
-@respx.mock
-async def test_opendota_private_profile_is_none():
-    respx.get("https://api.opendota.com/api/players/123").mock(
-        return_value=httpx.Response(200, json={"profile": None})
-    )
-    assert await opendota.get_player("123") is None
-
-
-@respx.mock
-async def test_opendota_recent_matches_fail_soft():
-    respx.get(url__regex=r".*/recentMatches").mock(return_value=httpx.Response(500))
-    assert await opendota.get_recent_matches("123") == []

@@ -17,14 +17,14 @@ async def test_dismiss_persists_on_me(client):
     await client.get(f"{V1}/me", headers=auth_headers(auth))
     r = await client.patch(
         f"{V1}/me",
-        json={"dismissed_checklists": ["cs2.steam"]},
+        json={"dismissed_checklists": ["chess.lichess"]},
         headers=auth_headers(auth),
     )
     assert r.status_code == 200
-    assert r.json()["user"]["dismissed_checklists"] == ["cs2.steam"]
+    assert r.json()["user"]["dismissed_checklists"] == ["chess.lichess"]
     # Survives a fresh read (server-side, not client state).
     again = await client.get(f"{V1}/me", headers=auth_headers(auth))
-    assert again.json()["user"]["dismissed_checklists"] == ["cs2.steam"]
+    assert again.json()["user"]["dismissed_checklists"] == ["chess.lichess"]
 
 
 async def test_rejects_unknown_game_id(client):
@@ -36,34 +36,3 @@ async def test_rejects_unknown_game_id(client):
         headers=auth_headers(auth),
     )
     assert r.status_code == 422
-
-
-async def test_removing_active_game_clears_its_dismissal(client):
-    """Remove + re-add a game → its checklist comes back (dismissal pruned)."""
-    auth = "auth_dc_prune"
-    await client.get(f"{V1}/me", headers=auth_headers(auth))
-    await client.patch(
-        f"{V1}/me",
-        json={"active_games": ["chess.lichess", "cs2.steam"]},
-        headers=auth_headers(auth),
-    )
-    await client.patch(
-        f"{V1}/me",
-        json={"dismissed_checklists": ["cs2.steam"]},
-        headers=auth_headers(auth),
-    )
-    # Remove CS2 from the play set.
-    removed = await client.patch(
-        f"{V1}/me",
-        json={"active_games": ["chess.lichess"]},
-        headers=auth_headers(auth),
-    )
-    assert removed.json()["user"]["dismissed_checklists"] == []
-
-    # Re-add CS2 → still not dismissed, so the checklist shows again.
-    readded = await client.patch(
-        f"{V1}/me",
-        json={"active_games": ["chess.lichess", "cs2.steam"]},
-        headers=auth_headers(auth),
-    )
-    assert "cs2.steam" not in readded.json()["user"]["dismissed_checklists"]

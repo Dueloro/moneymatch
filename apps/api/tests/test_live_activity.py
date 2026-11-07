@@ -11,16 +11,13 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from moneymatch_api.adapters import registry
-from moneymatch_api.adapters.base import NormGame
 from moneymatch_api.models.play import Match, MatchPlayer
 from moneymatch_api.services import live_activity_service
 from moneymatch_api.services.hosts import lichess
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
 
 
 def _window():
@@ -36,9 +33,8 @@ async def test_chess_live_snapshot_orients_turn_and_moves(monkeypatch):
     start, end = _window()
     u_white, u_black = uuid.uuid4(), uuid.uuid4()
     match = Match(
-        game="chess.lichess",
+        game=CHESS,
         market="win_h2h",
-        brokered=True,
         host_game_id="g123",
         matched_at=start,
         window_ends_at=end,
@@ -74,9 +70,8 @@ async def test_chess_finished_maps_result_per_viewer(monkeypatch):
     start, end = _window()
     u_white, u_black = uuid.uuid4(), uuid.uuid4()
     match = Match(
-        game="chess.lichess",
+        game=CHESS,
         market="win_h2h",
-        brokered=True,
         host_game_id="g9",
         matched_at=start,
         window_ends_at=end,
@@ -101,57 +96,7 @@ async def test_chess_finished_maps_result_per_viewer(monkeypatch):
     assert live_activity_service.view_for("match", snap, u_black)["result"] == "opp"
 
 
-class _FakeAdapter:
-    id = CS2
-    brokered = False
-
-    def __init__(self, games):
-        self.games = games
-
-    async def poll_eligible_games(self, host, since_ms, filters):
-        return self.games.get(host, [])
-
-
-def _game(ms, kd):
-    return NormGame(
-        id=f"m{ms}",
-        speed="cs2",
-        rated=True,
-        created_at_ms=ms,
-        moves=0,
-        won=None,
-        drawn=False,
-        metrics={KD: kd},
-    )
-
-
-async def test_stat_race_snapshot_leader_per_viewer(monkeypatch):
-    start, end = _window()
-    u_you, u_opp = uuid.uuid4(), uuid.uuid4()
-    match = Match(
-        game=CS2,
-        market="kd_ratio",
-        brokered=False,
-        host_game_id=None,
-        matched_at=start,
-        window_ends_at=end,
-    )
-    seats = [_seat(u_you, "alice"), _seat(u_opp, "bob")]
-    mid = int((start + timedelta(minutes=5)).timestamp() * 1000)
-    games = {"alice": [_game(mid, 1.6)], "bob": [_game(mid, 1.2)]}
-    monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(games))
-
-    snap = await live_activity_service.build_match_snapshot(None, match, seats)
-    assert snap["format"] == "stat_race" and snap["status"] == "live"
-
-    you_view = live_activity_service.view_for("match", snap, u_you)
-    opp_view = live_activity_service.view_for("match", snap, u_opp)
-    assert you_view["you"] == 1.6 and you_view["opp"] == 1.2
-    assert you_view["leader"] == "you"
-    assert opp_view["you"] == 1.2 and opp_view["leader"] == "opp"
-
-
 async def test_no_snapshot_before_pairing():
     """A match with no live window yet (unpaired) has no live view."""
-    match = Match(game=CS2, market="kd_ratio", brokered=False, matched_at=None)
+    match = Match(game=CHESS, market="win_h2h", matched_at=None)
     assert await live_activity_service.build_match_snapshot(None, match, []) is None

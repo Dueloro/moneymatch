@@ -47,13 +47,6 @@ async def test_host_account_binds_to_one_user(session):
     await session.rollback()  # leave the session clean for teardown commit
 
 
-async def test_second_game_links_independently(session):
-    user = await create_user(session)
-    session.add(_link(user.id, game="chess.lichess", host_account_id="magnus"))
-    session.add(_link(user.id, game="cs2.steam", host_account_id="s1mple"))
-    await session.flush()  # different games → both fine
-
-
 async def test_concurrent_race_for_host_account_one_winner(session):
     """Two transactions racing to bind the same host account: the DB unique
     index — not an app-level check — lets exactly one win."""
@@ -111,16 +104,16 @@ async def test_get_link_returns_live_binding_over_unbound_history(session):
     from moneymatch_api.services import linking_service
 
     user = await create_user(session)
-    old = _link(user.id, game="cs2.steam", host_account_id="old_host")
+    old = _link(user.id, game="chess.lichess", host_account_id="old_host")
     session.add(old)
     await session.flush()
     old.status = "unbound"
     await session.flush()
-    new = _link(user.id, game="cs2.steam", host_account_id="new_host")
+    new = _link(user.id, game="chess.lichess", host_account_id="new_host")
     session.add(new)
     await session.flush()
 
-    got = await linking_service.get_link(session, user.id, "cs2.steam")
+    got = await linking_service.get_link(session, user.id, "chess.lichess")
     assert got is not None
     assert got.host_account_id == "new_host"
     assert got.status == "active"

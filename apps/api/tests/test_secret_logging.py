@@ -1,10 +1,7 @@
 """Secrets must not reach the logs.
 
-Steam takes its API key and a player's match-history authentication code as
-*query parameters*, because it accepts nothing else. Any logger that prints a
-full URL therefore prints both, and from stdout they reach Sentry and whatever
-aggregates logs in production. This was live: the settlement worker wrote the
-API key and a real auth code to stdout on every chain poll.
+A host API that takes a key as a query parameter leaks it through any logger
+that prints a full URL, and from stdout it reaches Sentry and log aggregation.
 """
 
 from __future__ import annotations

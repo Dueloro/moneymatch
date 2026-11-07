@@ -4,7 +4,7 @@ scipy is now a runtime dependency because the bar-setting roadmap needs several
 pieces of specialist numerics in the code path that decides where money goes.
 Three things have to be true for that to be safe, and each gets a test here:
 
-1. **The existing hand-rolled `Φ` agrees with scipy.** `pairing.normal_cdf` is
+1. **The existing hand-rolled `Φ` agrees with scipy.** `fairness.normal_cdf` is
    used by every clear-probability calculation and every pairing forecast. It is
    *not* being rewritten — it works and it is covered — but if it disagreed with
    the reference implementation anywhere that matters, that is a finding rather
@@ -23,7 +23,7 @@ import math
 import pytest
 from scipy import stats
 
-from moneymatch_api.services.pairing import normal_cdf
+from moneymatch_api.services.fairness import normal_cdf
 
 pytestmark = pytest.mark.nodb
 

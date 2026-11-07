@@ -63,19 +63,12 @@ def test_difficulty_constants_are_the_documented_three():
 #: Each needs a reason, and the reason has to survive being read out loud.
 #:
 #: `chess_accuracy` — Lichess only reports accuracy for games a player requested
-#: analysis on, so it has no reliable per-match source and is not offered. The
-#: increment is retained because the demo fixtures seed a model for it
-#: (`routers/demo.py::_DEMO_METRIC_FIXTURE`). Documented in constants.py.
+#: analysis on, so it has no reliable per-match source and is not offered.
 DOCUMENTED_ORPHAN_INCREMENTS = {"chess_accuracy"}
 
 
 def test_every_bar_increment_belongs_to_a_live_market():
-    """An increment for a market nobody can trade is a trap for the next reader.
-
-    `cs2_adr` sat here after migration 0024 retired the adapter that produced it.
-    Anything genuinely retained on purpose goes in the exemption set above, with
-    its reason — so the exception is visible rather than implied by silence.
-    """
+    """An increment for a market nobody can trade is a trap for the next reader."""
     live = {m for metrics in POOL_METRICS.values() for m in metrics}
     live |= {m for metrics in TOURNAMENT_METRICS.values() for m in metrics}
     orphans = set(METRIC_BAR_INCREMENT) - live - DOCUMENTED_ORPHAN_INCREMENTS
@@ -95,11 +88,6 @@ def test_documented_orphans_are_still_orphans():
         f"{sorted(stale)} is now a live market — drop it from "
         "DOCUMENTED_ORPHAN_INCREMENTS so the guard covers it again."
     )
-
-
-def test_cs2_adr_is_gone():
-    """Named explicitly, because it is the one that actually rotted."""
-    assert "cs2_adr" not in METRIC_BAR_INCREMENT
 
 
 def test_every_live_market_has_an_increment():
@@ -122,7 +110,7 @@ def test_skill_prior_docstring_admits_its_scope():
         "— otherwise it reads as though every game is shrunk toward a rating"
     )
     # And the claim must still be true.
-    assert skill_prior.prior_for("cs2_kd_ratio", 1500) is None
+    assert skill_prior.prior_for("chess_accuracy", 1500) is None
     assert skill_prior.prior_for("chess_moves", 1500) is not None
 
 

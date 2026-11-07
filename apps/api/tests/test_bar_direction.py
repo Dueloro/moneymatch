@@ -35,7 +35,7 @@ def _bars(mu: float, sigma: float, increment: float, low: bool) -> list[float]:
 
 def test_chess_moves_is_registered_as_fewest_wins():
     assert lower_is_better("chess_moves") is True
-    assert lower_is_better("cs2_kd_ratio") is False
+    assert lower_is_better("chess_accuracy") is False
 
 
 def test_harder_asks_for_fewer_moves():
@@ -86,7 +86,7 @@ def test_a_realistic_sample_lands_near_the_design_rates():
 
 
 def test_a_room_composes_for_a_tight_spread_player():
-    """The regression that stopped practice opponents ever joining a room.
+    """A tight-spread player's room still composes.
 
     The bar was placed with a floored spread while the fair band was judged with
     the raw one, so a tight-spread player's implied clear probability sat far
