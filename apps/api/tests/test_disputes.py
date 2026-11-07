@@ -12,10 +12,10 @@ from moneymatch_api.models.play import Match, MatchPlayer
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers
-from .factories import create_linked_account, cs2_profile
+from .factories import chess_profile, create_linked_account
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 
 
 async def _user(session, auth_id, name, *, role="user"):
@@ -31,15 +31,16 @@ async def _user(session, auth_id, name, *, role="user"):
     session.add(user)
     await session.flush()
     link = await create_linked_account(
-        session, user, CS2, host_account_id=f"h_{name}", profile=cs2_profile(name)
+        session, user, CHESS, host_account_id=f"h_{name}", profile=chess_profile(name)
     )
     return user, link
 
 
 async def _settled_match(session, players, *, state="SETTLED", winner=None):
     match = Match(
-        game=CS2,
-        market="kd_ratio",
+        game=CHESS,
+        market="win_h2h",
+        speed="blitz",
         entry_cents=1000,
         rake_bps=1000,
         pot_cents=2000,
@@ -176,8 +177,8 @@ async def test_file_pool_dispute_participant_only(session, client):
     a, la = await _user(session, "auth_dpa", "dpa")
     now = datetime.now(UTC)
     pool = SoloPool(
-        game=CS2,
-        metric="cs2_kd_ratio",
+        game=CHESS,
+        metric="chess_moves",
         difficulty="medium",
         room_bar=1.25,
         entry_cents=1000,
@@ -230,8 +231,8 @@ async def test_file_tournament_dispute(session, client):
     a, la = await _user(session, "auth_dta", "dta")
     now = datetime.now(UTC)
     t = Tournament(
-        game=CS2,
-        ranking_metric="cs2_kd_ratio",
+        game=CHESS,
+        ranking_metric="chess_wins",
         entry_cents=1000,
         rake_bps=1000,
         prize_split=[100],

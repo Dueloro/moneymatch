@@ -12,6 +12,7 @@ import json
 import os
 import pathlib
 import time
+import uuid
 from collections.abc import AsyncIterator
 
 import jwt
@@ -31,19 +32,10 @@ os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
 os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
 os.environ["SUPABASE_JWT_AUDIENCE"] = "authenticated"
 os.environ["ENV"] = "local"
-# Mount the demo router. `create_app` only includes it when this is set, and the
-# `app` fixture is session-scoped, so without it every /demo/* route 404s no
-# matter what a per-test fixture does to the other demo flags -- which is a
-# confusing way for a test to fail, because the 404 looks like a rejected flag
-# check rather than a route that was never registered.
-os.environ["DEMO_LOGIN_ENABLED"] = "1"
 # The shared ASGI client fires many writes from one host across a session; keep
 # the global limiter out of its way. The limiter itself is proven in
 # test_security_middleware.py against a purpose-built low-limit app.
 os.environ["RATE_LIMIT_WRITES_PER_MINUTE"] = "100000"
-# The PUBG host client throttles to ~9 req/min in prod; keep it out of the way of
-# respx-mocked tests (the token bucket itself is proven in test_pubg_rate_limit.py).
-os.environ["PUBG_RATE_LIMIT_PER_MIN"] = "100000"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
@@ -172,14 +164,8 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
                 "solo_pools, tournaments, users RESTART IDENTITY CASCADE"
             )
         )
-        # Restore feature flags to exactly what the migration chain seeded.
-        #
-        # Deliberately not rebuilt from `DEFAULT_FLAGS`: that is a code-side
-        # opinion about what flags exist, and it disagreed with the migrations in
-        # four places — it was missing `geo_config` (with its 14-state payload),
-        # `worker_heartbeat` and `game:cs2.faceit`, and it invented
-        # `game:cs2.steam`, which no migration seeds (AUDIT_FINDINGS.md P1-1).
-        # Replaying the captured rows means the fixture can no longer drift.
+        # Restore feature flags to exactly what the migration chain seeded, not
+        # rebuilt from `DEFAULT_FLAGS`, so the fixture can never drift from it.
         #
         # Tests needing a different geo list override it (see `test_geo_service`);
         # the default test user is in MA, which is not excluded.
@@ -194,6 +180,24 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
             )
         await session.commit()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _lichess_broker(monkeypatch) -> None:
+    """Stub Lichess open challenges so brokering a chess H2H never hits the network."""
+    from moneymatch_api.services.hosts import lichess
+
+    async def _open_challenge(clock_limit, clock_increment=0, *, users=None):
+        game_id = uuid.uuid4().hex[:8]
+        return {
+            "game_id": game_id,
+            "urls": {
+                "white": f"https://lichess.org/{game_id}?color=white",
+                "black": f"https://lichess.org/{game_id}?color=black",
+            },
+        }
+
+    monkeypatch.setattr(lichess, "create_open_challenge", _open_challenge)
 
 
 @pytest.fixture(scope="session")

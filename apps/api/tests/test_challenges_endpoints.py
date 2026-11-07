@@ -15,7 +15,7 @@ from .factories import create_linked_account
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 
 
 async def _onboard(client, auth_id, name, *, link=True):
@@ -25,7 +25,7 @@ async def _onboard(client, auth_id, name, *, link=True):
         user = await s.scalar(select(User).where(User.auth_id == auth_id))
         user.username = name
         if link:
-            await create_linked_account(s, user, CS2, host_account_id=f"host_{name}")
+            await create_linked_account(s, user, CHESS, host_account_id=f"host_{name}")
         await s.commit()
         return user.id
 
@@ -53,8 +53,9 @@ async def test_direct_challenge_and_accept(client):
         headers=auth_headers("auth_a"),
         json={
             "challengee_id": str(b_id),
-            "game": CS2,
-            "market": "kd_ratio",
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "blitz",
             "entry_preset_cents": 1000,
         },
     )
@@ -81,7 +82,12 @@ async def test_invite_link_preview_is_public_and_acceptable(client):
     r = await client.post(
         f"{V1}/challenges",
         headers=auth_headers("auth_a"),
-        json={"game": CS2, "market": "kd_ratio", "entry_preset_cents": 1000},
+        json={
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "blitz",
+            "entry_preset_cents": 1000,
+        },
     )
     assert r.status_code == 200, r.text
     body = r.json()
@@ -114,8 +120,9 @@ async def test_rematch_recreates_challenge(client):
         headers=auth_headers("auth_a"),
         json={
             "challengee_id": str(b_id),
-            "game": CS2,
-            "market": "kd_ratio",
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "blitz",
             "entry_preset_cents": 1000,
         },
     )
@@ -134,5 +141,6 @@ async def test_rematch_recreates_challenge(client):
     assert r.status_code == 200, r.text
     ch = r.json()["challenge"]
     assert ch["challengee_id"] == str(b_id)
-    assert ch["market"] == "kd_ratio"
+    assert ch["market"] == "win_h2h"
+    assert ch["speed"] == "blitz"
     assert ch["entry_cents"] == 1000

@@ -16,15 +16,16 @@ from moneymatch_api.models.linked_account import LinkedAccount
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers, new_sessionmaker
+from .factories import chess_profile
 
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-GAME = "cs2.steam"
+GAME = "chess.lichess"
 
 
 async def _onboard(client, auth_id: str, name: str) -> str:
-    """Provision a user, name them, and link them to CS2 (so they can wager)."""
+    """Provision a user, name them, and link them to Lichess (so they can wager)."""
     await client.get(f"{V1}/me", headers=auth_headers(auth_id))
     sm = new_sessionmaker()
     async with sm() as s:
@@ -40,9 +41,9 @@ async def _onboard(client, auth_id: str, name: str) -> str:
                 LinkedAccount(
                     user_id=user.id,
                     game=GAME,
-                    host_account_id=f"steam_{name}",
+                    host_account_id=f"lichess_{name}",
                     host_username=name,
-                    profile_snapshot={"username": name, "game": GAME},
+                    profile_snapshot=chess_profile(name).model_dump(),
                 )
             )
         await s.commit()
@@ -202,7 +203,7 @@ async def test_pool_invite_card_round_trip(client):
                 "invite_kind": "pool",
                 "game": GAME,
                 "entry_preset_cents": 1000,
-                "metric": "cs2_kd_ratio",
+                "metric": "chess_moves",
                 "difficulty": "medium",
             }
         },
@@ -213,7 +214,7 @@ async def test_pool_invite_card_round_trip(client):
     assert card["payload"]["status"] == "pending"
     assert card["payload"]["entry_cents"] == 1000
     assert card["payload"]["redirect_path"] == "/pools"
-    assert "K/D" in card["payload"]["title"]
+    assert "Moves to win" in card["payload"]["title"]
 
     # The sender can't answer their own invite.
     r = await client.post(
@@ -287,7 +288,8 @@ async def test_a_challenge_lands_in_the_dm_and_accepting_it_there_forms_a_match(
         json={
             "challengee_id": bob,
             "game": GAME,
-            "market": "kd_ratio",
+            "market": "win_h2h",
+            "speed": "blitz",
             "entry_preset_cents": 1000,
         },
     )
@@ -329,7 +331,8 @@ async def test_declining_a_challenge_elsewhere_stamps_the_chat_card(client):
             json={
                 "challengee_id": bob,
                 "game": GAME,
-                "market": "kd_ratio",
+                "market": "win_h2h",
+                "speed": "blitz",
                 "entry_preset_cents": 500,
             },
         )
@@ -429,8 +432,8 @@ async def test_a_challenge_to_a_non_friend_opens_no_dm(client):
             challengee_id=uuid.UUID(bob),
             challenge_id=uuid.uuid4(),
             game=GAME,
-            market="kd_ratio",
-            market_label="K/D",
+            market="win_h2h",
+            market_label="Win the game",
             entry_cents=1000,
             friendly=False,
         )

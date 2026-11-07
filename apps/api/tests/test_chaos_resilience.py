@@ -23,30 +23,23 @@ from moneymatch_api.workers import settlement_worker
 
 from .conftest import new_sessionmaker
 from .test_settlement_worker import (
-    FakeCS2Adapter,
+    FakeChessAdapter,
     _balance,
-    _game,
     _match_state,
-    setup_active_cs2,
+    setup_active_chess,
 )
 
 pytestmark = pytest.mark.asyncio
 
 
-def _winning_adapter(info) -> FakeCS2Adapter:
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    return FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.5})],
-            info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.1})],
-        }
-    )
+def _winning_adapter(info) -> FakeChessAdapter:
+    return FakeChessAdapter(info["a_host"])
 
 
 async def test_repeated_cycles_never_double_pay(monkeypatch):
     """A crashed-then-restarted worker re-runs the cycle; settlement is idempotent."""
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
+    info = await setup_active_chess(sm)
     monkeypatch.setattr(registry, "get", lambda gid: _winning_adapter(info))
 
     first = await settlement_worker.run_cycle(
@@ -74,7 +67,7 @@ async def test_repeated_cycles_never_double_pay(monkeypatch):
 async def test_concurrent_workers_settle_exactly_once(monkeypatch):
     """Two workers racing the same due match: SKIP-LOCKED settles it once."""
     sm_a = new_sessionmaker()
-    info = await setup_active_cs2(sm_a, market="kd_ratio")
+    info = await setup_active_chess(sm_a)
     monkeypatch.setattr(registry, "get", lambda gid: _winning_adapter(info))
     sm_b = new_sessionmaker()
 
@@ -97,8 +90,8 @@ async def test_persistent_host_outage_refunds_at_hard_ceiling(monkeypatch):
     """Host down for the entire window → cancel + full refund at the ceiling, no
     stranded escrow, invariant intact."""
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    monkeypatch.setattr(registry, "get", lambda gid: FakeCS2Adapter(raise_host=True))
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(raise_host=True))
 
     # Mid-window with the host down: escrow held, nothing settled (outage extends).
     mid = await settlement_worker.run_cycle(

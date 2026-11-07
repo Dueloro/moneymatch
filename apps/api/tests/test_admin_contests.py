@@ -17,7 +17,7 @@ from moneymatch_api.models.user import User
 from moneymatch_api.services import reconciliation_service, wallet_service
 
 from .conftest import auth_headers, new_sessionmaker
-from .test_settlement_worker import FakeCS2Adapter, _game, setup_active_cs2
+from .test_settlement_worker import FakeChessAdapter, setup_active_chess
 
 pytestmark = pytest.mark.asyncio
 
@@ -44,14 +44,8 @@ async def _balance(sm, user_id):
 async def test_contest_list_and_detail_money_trail(client, monkeypatch):
     await _admin(client)
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.5})],
-            info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.1})],
-        }
-    )
+    info = await setup_active_chess(sm)
+    fake = FakeChessAdapter(info["a_host"])
     monkeypatch.setattr(registry, "get", lambda gid: fake)
     # Settle it via the worker so there's a full money trail.
     from moneymatch_api.workers import settlement_worker
@@ -83,14 +77,8 @@ async def test_contest_list_and_detail_money_trail(client, monkeypatch):
 async def test_resettle_is_idempotent(client, monkeypatch):
     await _admin(client)
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.5})],
-            info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.1})],
-        }
-    )
+    info = await setup_active_chess(sm)
+    fake = FakeChessAdapter(info["a_host"])
     monkeypatch.setattr(registry, "get", lambda gid: fake)
 
     # First resettle grades + settles: winner +$18.
@@ -114,7 +102,7 @@ async def test_resettle_is_idempotent(client, monkeypatch):
 async def test_void_refunds_exactly_and_reconciles(client):
     await _admin(client)
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
+    info = await setup_active_chess(sm)
     # Both escrowed $10 in the ACTIVE match.
     assert await _balance(sm, info["a"]) == (9000, 1000)
 
@@ -138,18 +126,8 @@ async def test_void_refunds_exactly_and_reconciles(client):
 async def test_void_terminal_match_rejected(client, monkeypatch):
     await _admin(client)
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    monkeypatch.setattr(
-        registry,
-        "get",
-        lambda gid: FakeCS2Adapter(
-            {
-                info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.5})],
-                info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.1})],
-            }
-        ),
-    )
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(info["a_host"]))
     from moneymatch_api.workers import settlement_worker
 
     await settlement_worker.run_cycle(sm, now=info["matched_at"] + timedelta(seconds=5))

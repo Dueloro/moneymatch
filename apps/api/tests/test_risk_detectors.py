@@ -16,11 +16,11 @@ from moneymatch_api.models.play import Match, MatchPlayer
 from moneymatch_api.models.risk import RiskFlag
 from moneymatch_api.services import risk_detectors, sandbagging_service
 
-from .factories import create_linked_account, create_user, cs2_profile
+from .factories import chess_profile, create_linked_account, create_user
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 _BASE = datetime(2026, 7, 1, tzinfo=UTC)
 
 
@@ -28,16 +28,17 @@ async def _link(session, user):
     return await create_linked_account(
         session,
         user,
-        CS2,
+        CHESS,
         host_account_id=f"host_{user.username}",
-        profile=cs2_profile(user.username),
+        profile=chess_profile(user.username),
     )
 
 
 async def _settled(session, user, link, *, winner_id, when):
     match = Match(
-        game=CS2,
-        market="kd_ratio",
+        game=CHESS,
+        market="win_h2h",
+        speed="blitz",
         entry_cents=1000,
         rake_bps=1000,
         pot_cents=2000,
@@ -98,11 +99,11 @@ async def test_recent_loss_breaks_the_streak(session):
 
 async def test_win_streak_flag_never_blocks_wagers(session):
     user = await create_user(session, username="hot_hand")
-    session.add(RiskFlag(user_id=user.id, game=CS2, metric="*", kind="win_streak"))
+    session.add(RiskFlag(user_id=user.id, game=CHESS, metric="*", kind="win_streak"))
     await session.flush()
     # is_flagged is sandbagging-only, so the informational streak flag is ignored.
     blocked = await sandbagging_service.is_flagged(
-        session, user.id, CS2, "cs2_kd_ratio"
+        session, user.id, CHESS, "chess_moves"
     )
     assert blocked is False
 
@@ -118,8 +119,9 @@ async def _pair_match(session, a, la, b, lb, *, when, friendly=False):
     # Economics must reconcile (prize + rake == pot): a friendly refunds both
     # entries (full pot as prize, zero rake); a rake-bearing match takes the rake.
     match = Match(
-        game=CS2,
-        market="kd_ratio",
+        game=CHESS,
+        market="win_h2h",
+        speed="blitz",
         entry_cents=1000,
         rake_bps=0 if friendly else 1000,
         pot_cents=2000,

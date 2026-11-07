@@ -13,7 +13,7 @@ import pytest
 from moneymatch_api.adapters import registry
 from moneymatch_api.services import analytics
 
-from .test_settlement_worker import FakeCS2Adapter, _game, setup_active_cs2
+from .test_settlement_worker import FakeChessAdapter, setup_active_chess
 
 pytestmark = pytest.mark.asyncio
 
@@ -38,14 +38,8 @@ async def test_settlement_emits_money_events(monkeypatch):
     )
 
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.5})],
-            info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.1})],
-        }
-    )
+    info = await setup_active_chess(sm)
+    fake = FakeChessAdapter(info["a_host"])
     monkeypatch.setattr(registry, "get", lambda gid: fake)
 
     from moneymatch_api.workers import settlement_worker
@@ -75,11 +69,11 @@ async def test_capture_routes_to_posthog_when_enabled(monkeypatch):
     monkeypatch.setattr(analytics, "_initialized", True)
     monkeypatch.setattr(analytics, "_enabled", True)
 
-    analytics.capture("match_found", "user-9", {"game": "cs2.steam"})
+    analytics.capture("match_found", "user-9", {"game": "chess.lichess"})
     assert recorded == [
         {
             "event": "match_found",
             "distinct_id": "user-9",
-            "properties": {"game": "cs2.steam"},
+            "properties": {"game": "chess.lichess"},
         }
     ]

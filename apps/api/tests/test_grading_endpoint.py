@@ -8,10 +8,10 @@ from moneymatch_api.models.play import Match, MatchPlayer
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers
-from .factories import create_linked_account, cs2_profile
+from .factories import chess_profile, create_linked_account
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 
 
 async def _user(session, auth_id, name):
@@ -26,17 +26,18 @@ async def _user(session, auth_id, name):
     session.add(user)
     await session.flush()
     link = await create_linked_account(
-        session, user, CS2, host_account_id=f"h_{name}", profile=cs2_profile(name)
+        session, user, CHESS, host_account_id=f"h_{name}", profile=chess_profile(name)
     )
     return user, link
 
 
-async def test_grading_explains_a_settled_stat_race(session, client):
+async def test_grading_explains_a_settled_game(session, client):
     winner, wlink = await _user(session, "auth_gw", "gwin")
     loser, llink = await _user(session, "auth_gl", "glose")
     match = Match(
-        game=CS2,
-        market="kd_ratio",
+        game=CHESS,
+        market="win_h2h",
+        speed="blitz",
         entry_cents=1000,
         rake_bps=1000,
         pot_cents=2000,
@@ -45,8 +46,9 @@ async def test_grading_explains_a_settled_stat_race(session, client):
         state="SETTLED",
         winner_user_id=winner.id,
         resolved_at=datetime.now(UTC),
-        engine_version="stat-1",
-        outcome_detail={"metric": "cs2_kd_ratio", "winner": "gwin"},
+        engine_version="h2h-1",
+        host_game_id="g_grade",
+        outcome_detail={"host_game_id": "g_grade", "winner_handle": "h_gwin"},
     )
     session.add(match)
     await session.flush()
@@ -57,20 +59,18 @@ async def test_grading_explains_a_settled_stat_race(session, client):
                 user_id=winner.id,
                 linked_account_id=wlink.id,
                 host_account_id=wlink.host_account_id,
-                stat_line={"cs2_kd_ratio": 1.8},
             ),
             MatchPlayer(
                 match_id=match.id,
                 user_id=loser.id,
                 linked_account_id=llink.id,
                 host_account_id=llink.host_account_id,
-                stat_line={"cs2_kd_ratio": 1.1},
             ),
         ]
     )
     await session.commit()
 
-    # The loser sees a transparent "why": the rule, both stat lines, the decision.
+    # The loser sees a transparent "why": the rule, the game, the decision.
     r = await client.get(
         f"{V1}/play/matches/{match.id}/grading", headers=auth_headers("auth_gl")
     )
@@ -79,10 +79,9 @@ async def test_grading_explains_a_settled_stat_race(session, client):
     assert body["result"] == "you_lost"
     assert body["settled"] is True
     assert body["winner_username"] == "gwin"
-    assert body["your_stat_line"] == {"cs2_kd_ratio": 1.1}
-    assert body["opponent_stat_line"] == {"cs2_kd_ratio": 1.8}
     assert body["rule"]  # non-empty resolution note
-    assert body["outcome_detail"]["winner"] == "gwin"
+    assert body["outcome_detail"]["host_game_id"] == "g_grade"
+    assert body["outcome_detail"]["winner_handle"] == "h_gwin"
 
 
 async def test_grading_rejects_a_non_participant(session, client):
@@ -90,8 +89,9 @@ async def test_grading_rejects_a_non_participant(session, client):
     loser, llink = await _user(session, "auth_gl2", "glose2")
     await _user(session, "auth_outsider", "outsider")
     match = Match(
-        game=CS2,
-        market="kd_ratio",
+        game=CHESS,
+        market="win_h2h",
+        speed="blitz",
         entry_cents=1000,
         rake_bps=1000,
         pot_cents=2000,

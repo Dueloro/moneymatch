@@ -13,16 +13,16 @@ from moneymatch_api.models.feature_flag import FeatureFlag
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers, new_sessionmaker
-from .factories import create_linked_account, create_metric_model, cs2_profile
+from .factories import chess_profile, create_linked_account
 
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 
 
-async def setup_player(client, auth_id, name, *, mu=1.0, n=15, host=None):
-    """Provision a user via the auth path, then link CS2 + seed metric models."""
+async def setup_player(client, auth_id, name, *, rating=1500, host=None):
+    """Provision a user via the auth path, then link a Lichess account."""
     r = await client.get(f"{V1}/me", headers=auth_headers(auth_id))
     assert r.status_code == 200
     sm = new_sessionmaker()
@@ -31,10 +31,12 @@ async def setup_player(client, auth_id, name, *, mu=1.0, n=15, host=None):
         user.username = name
         user.residence_state = "MA"  # onboarded resident (the geo-fence needs a state)
         await create_linked_account(
-            s, user, CS2, host_account_id=host, profile=cs2_profile(name)
+            s,
+            user,
+            CHESS,
+            host_account_id=host,
+            profile=chess_profile(name, rating=rating),
         )
-        for metric in ("cs2_kd_ratio", "cs2_kills", "cs2_headshot_pct"):
-            await create_metric_model(s, user, CS2, metric, mu=mu, sigma=0.3, n=n)
         await s.commit()
 
 
@@ -45,38 +47,33 @@ def _hdr(auth_id):
 # --- markets -------------------------------------------------------------- #
 
 
-async def test_markets_lists_cs2_with_derived_multiplier(client):
+async def test_markets_lists_chess_with_derived_multiplier(client):
     await setup_player(client, "auth_m1", "m1")
     r = await client.get(
-        f"{V1}/play/markets", params={"game": CS2}, headers=_hdr("auth_m1")
+        f"{V1}/play/markets", params={"game": CHESS}, headers=_hdr("auth_m1")
     )
     assert r.status_code == 200
     body = r.json()
     assert body["linked"] is True
     assert body["entry_presets_cents"] == [500, 1000, 2500]
-    keys = {m["key"] for m in body["markets"]}
-    assert keys == {"kd_ratio", "kills", "headshot_pct", "win_next"}
-    kd = next(m for m in body["markets"] if m["key"] == "kd_ratio")
-    assert kd["multiplier_bps"] == 18000  # derived ×1.80, never an odds line
-    assert kd["provisional"] is False  # seeded n=15
-
-
-async def test_market_provisional_flag_when_metric_thin(client):
-    await setup_player(client, "auth_prov", "prov", n=4)  # below the floor
-    r = await client.get(
-        f"{V1}/play/markets", params={"game": CS2}, headers=_hdr("auth_prov")
-    )
-    kd = next(m for m in r.json()["markets"] if m["key"] == "kd_ratio")
-    assert kd["provisional"] is True
+    assert [m["key"] for m in body["markets"]] == ["win_h2h"]
+    h2h = body["markets"][0]
+    assert h2h["requires_speed"] is True and h2h["speeds"]
+    assert h2h["multiplier_bps"] == 18000  # derived ×1.80, never an odds line
 
 
 # --- queue → confirm → active -------------------------------------------- #
 
 
-async def _queue(client, auth_id, market="kd_ratio", entry=1000):
+async def _queue(client, auth_id, speed="blitz", entry=1000):
     return await client.post(
         f"{V1}/play/queue",
-        json={"game": CS2, "market": market, "entry_preset_cents": entry},
+        json={
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": speed,
+            "entry_preset_cents": entry,
+        },
         headers=_hdr(auth_id),
     )
 

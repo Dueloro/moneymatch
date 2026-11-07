@@ -1,4 +1,4 @@
-"""Settlement worker: adapter-mocked grading of each market branch, the money
+"""Settlement worker: adapter-mocked grading of each result branch, the money
 invariant after every settle, SKIP-LOCKED re-claimability, window extension on
 host outage, and the kill switches.
 """
@@ -11,8 +11,11 @@ import pytest
 from sqlalchemy import select, update
 
 from moneymatch_api.adapters import registry
-from moneymatch_api.adapters.base import NormGame
-from moneymatch_api.constants import FLAG_QUEUE_PAUSED, FLAG_SETTLEMENT_PAUSED
+from moneymatch_api.constants import (
+    FLAG_QUEUE_PAUSED,
+    FLAG_SETTLEMENT_PAUSED,
+    GAME_CHESS_LICHESS,
+)
 from moneymatch_api.models.feature_flag import FeatureFlag
 from moneymatch_api.models.play import Match, QueueTicket
 from moneymatch_api.services import (
@@ -25,36 +28,30 @@ from moneymatch_api.workers import settlement_worker
 
 from .conftest import new_sessionmaker
 from .factories import create_wallet
-from .test_matchmaking import cs2_player, enq_cs2
+from .test_matchmaking import chess_player, enq_chess
 
 pytestmark = pytest.mark.asyncio
 
 
-class FakeCS2Adapter:
-    id = "cs2.steam"
-    brokered = False
+class FakeChessAdapter:
+    """Reports a fixed result for every brokered game: a handle, "" (draw) or None."""
 
-    def __init__(self, games_by_host=None, *, raise_host=False):
-        self.games_by_host = games_by_host or {}
+    id = GAME_CHESS_LICHESS
+
+    def __init__(self, winner: str | None = None, *, raise_host=False):
+        self.winner = winner
         self.raise_host = raise_host
 
-    async def poll_eligible_games(self, host, since_ms, filters):
+    async def match_winner(self, game_id, players):
         if self.raise_host:
-            raise HostUnavailable("steam", "down")
-        return self.games_by_host.get(host, [])
+            raise HostUnavailable("lichess", "down")
+        return self.winner
 
+    async def poll_eligible_games(self, host, since_ms, filters):
+        return []
 
-def _game(created_ms: int, *, won=None, metrics=None) -> NormGame:
-    return NormGame(
-        id=f"m{created_ms}",
-        speed="cs2",
-        rated=True,
-        created_at_ms=created_ms,
-        moves=0,
-        won=won,
-        drawn=False,
-        metrics=metrics or {},
-    )
+    async def live_match(self, game_id, players):
+        return None
 
 
 async def _fund(session, user, amount):
@@ -62,15 +59,15 @@ async def _fund(session, user, amount):
     await wallet_service.demo_deposit(session, user.id, amount, memo="fund")
 
 
-async def setup_active_cs2(sm, *, market="kd_ratio"):
-    """Two funded CS2 players in an ACTIVE match, committed. Returns match info."""
+async def setup_active_chess(sm):
+    """Two funded chess players in an ACTIVE brokered match, committed."""
     async with sm() as s:
-        a = await cs2_player(s, "alice", mu=1.0, sigma=0.3)
-        b = await cs2_player(s, "bob", mu=1.0, sigma=0.3)
+        a = await chess_player(s, "alice", rating=1500)
+        b = await chess_player(s, "bob", rating=1510)
         await _fund(s, a, 10_000)
         await _fund(s, b, 10_000)
-        await enq_cs2(s, a, market=market)
-        match = (await enq_cs2(s, b, market=market)).match
+        await enq_chess(s, a)
+        match = (await enq_chess(s, b)).match
         await match_lifecycle.confirm(s, match, a)
         await match_lifecycle.confirm(s, match, b)
         await s.commit()
@@ -100,17 +97,10 @@ async def _match_state(sm, match_id):
 # --- grading branches ----------------------------------------------------- #
 
 
-async def test_stat_race_win_pays_winner_and_reconciles(monkeypatch):
+async def test_win_pays_winner_and_reconciles(monkeypatch):
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.5})],
-            info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.1})],
-        }
-    )
-    monkeypatch.setattr(registry, "get", lambda gid: fake)
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(info["a_host"]))
 
     report = await settlement_worker.run_cycle(
         sm, now=info["matched_at"] + timedelta(seconds=5)
@@ -123,27 +113,20 @@ async def test_stat_race_win_pays_winner_and_reconciles(monkeypatch):
     async with sm() as s:
         recon = await reconciliation_service.check(s, "match", info["match_id"])
         assert recon.ok and recon.totals["rake"] == 200
-        assert (await reconciliation_service.check_all(s)).ok
-        # Winner's stat line + audit back-ref are stored.
-        m = await s.get(Match, info["match_id"])
-        assert m.raw_payload_id is not None
-        seats = await match_lifecycle.players(s, info["match_id"])
-        assert any(
-            sp.stat_line and sp.stat_line.get("cs2_kd_ratio") == 1.5 for sp in seats
+        assert (
+            recon.totals["distributed"] + recon.totals["rake"]
+            == recon.totals["entries"]
         )
+        assert (await reconciliation_service.check_all(s)).ok
+        m = await s.get(Match, info["match_id"])
+        assert m.winner_user_id == info["a"]
+        assert m.raw_payload_id is not None
 
 
-async def test_stat_race_equal_stat_pushes(monkeypatch):
+async def test_draw_pushes_and_refunds_without_rake(monkeypatch):
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.3})],
-            info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.3})],
-        }
-    )
-    monkeypatch.setattr(registry, "get", lambda gid: fake)
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(""))
 
     report = await settlement_worker.run_cycle(
         sm, now=info["matched_at"] + timedelta(seconds=5)
@@ -152,49 +135,28 @@ async def test_stat_race_equal_stat_pushes(monkeypatch):
     assert await _match_state(sm, info["match_id"]) == "PUSHED"
     assert await _balance(sm, info["a"]) == (10000, 0)  # refunded
     assert await _balance(sm, info["b"]) == (10000, 0)
+    async with sm() as s:
+        recon = await reconciliation_service.check(s, "match", info["match_id"])
+        assert recon.ok and recon.totals["rake"] == 0
 
 
-async def test_win_next_win_beats_loss(monkeypatch):
+async def test_unfinished_game_waits_inside_the_window(monkeypatch):
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="win_next")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, won=True)],
-            info["b_host"]: [_game(ms, won=False)],
-        }
-    )
-    monkeypatch.setattr(registry, "get", lambda gid: fake)
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(None))
 
     report = await settlement_worker.run_cycle(
         sm, now=info["matched_at"] + timedelta(seconds=5)
     )
-    assert report.settled == 1
-    assert await _balance(sm, info["a"]) == (10800, 0)
-
-
-async def test_win_next_both_win_pushes(monkeypatch):
-    sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="win_next")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, won=True)],
-            info["b_host"]: [_game(ms, won=True)],
-        }
-    )
-    monkeypatch.setattr(registry, "get", lambda gid: fake)
-    report = await settlement_worker.run_cycle(
-        sm, now=info["matched_at"] + timedelta(seconds=5)
-    )
-    assert report.pushed == 1
+    assert report.pending == 1
+    assert await _match_state(sm, info["match_id"]) == "AWAITING_RESULT"
+    assert await _balance(sm, info["a"]) == (9000, 1000)
 
 
 async def test_no_qualifying_game_at_deadline_cancels_and_refunds(monkeypatch):
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    fake = FakeCS2Adapter({})  # neither played
-    monkeypatch.setattr(registry, "get", lambda gid: fake)
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(None))
 
     # Past the 24 h window (before the 48 h hard ceiling) → CANCEL + full refund.
     report = await settlement_worker.run_cycle(
@@ -208,8 +170,8 @@ async def test_no_qualifying_game_at_deadline_cancels_and_refunds(monkeypatch):
 
 async def test_host_outage_extends_window_without_settling(monkeypatch):
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    monkeypatch.setattr(registry, "get", lambda gid: FakeCS2Adapter(raise_host=True))
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(raise_host=True))
 
     async with sm() as s:
         before = await s.scalar(
@@ -235,19 +197,12 @@ async def test_host_outage_extends_window_without_settling(monkeypatch):
 
 async def test_locked_match_is_skipped_and_stays_claimable(monkeypatch):
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    ms = int(info["matched_at"].timestamp() * 1000) + 1000
-    fake = FakeCS2Adapter(
-        {
-            info["a_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.5})],
-            info["b_host"]: [_game(ms, metrics={"cs2_kd_ratio": 1.1})],
-        }
-    )
-    monkeypatch.setattr(registry, "get", lambda gid: fake)
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(info["a_host"]))
 
     lock_session = new_sessionmaker()()
     async with lock_session as locker:
-        # Simulate a worker that claimed the row and then crashed mid-settle: the
+        # A worker that claimed the row and then crashed mid-settle: the
         # row is locked, uncommitted.
         await locker.execute(
             select(Match).where(Match.id == info["match_id"]).with_for_update()
@@ -270,8 +225,8 @@ async def test_locked_match_is_skipped_and_stays_claimable(monkeypatch):
 
 async def test_settlement_paused_halts_the_loop(monkeypatch):
     sm = new_sessionmaker()
-    info = await setup_active_cs2(sm, market="kd_ratio")
-    monkeypatch.setattr(registry, "get", lambda gid: FakeCS2Adapter())
+    info = await setup_active_chess(sm)
+    monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter())
     async with sm() as s:
         await s.execute(
             update(FeatureFlag)
@@ -290,8 +245,8 @@ async def test_settlement_paused_halts_the_loop(monkeypatch):
 async def test_queue_paused_drains_waiting_tickets(monkeypatch):
     sm = new_sessionmaker()
     async with sm() as s:
-        a = await cs2_player(s, "waiter", mu=1.0, sigma=0.3)
-        await enq_cs2(s, a)  # A waits
+        a = await chess_player(s, "waiter")
+        await enq_chess(s, a)  # A waits
         await s.execute(
             update(FeatureFlag)
             .where(FeatureFlag.key == FLAG_QUEUE_PAUSED)
@@ -311,8 +266,8 @@ async def test_queue_paused_drains_waiting_tickets(monkeypatch):
 async def test_expired_ticket_is_reaped(monkeypatch):
     sm = new_sessionmaker()
     async with sm() as s:
-        a = await cs2_player(s, "waiter", mu=1.0, sigma=0.3)
-        await enq_cs2(s, a)
+        a = await chess_player(s, "waiter")
+        await enq_chess(s, a)
         # Backdate the ticket past its TTL.
         await s.execute(
             update(QueueTicket)
@@ -328,12 +283,12 @@ async def test_expired_ticket_is_reaped(monkeypatch):
 async def test_expired_pending_match_refunds_the_confirmer(monkeypatch):
     sm = new_sessionmaker()
     async with sm() as s:
-        a = await cs2_player(s, "alice", mu=1.0, sigma=0.3)
-        b = await cs2_player(s, "bob", mu=1.0, sigma=0.3)
+        a = await chess_player(s, "alice")
+        b = await chess_player(s, "bob")
         await _fund(s, a, 10_000)
         await _fund(s, b, 10_000)
-        await enq_cs2(s, a)
-        match = (await enq_cs2(s, b)).match
+        await enq_chess(s, a)
+        match = (await enq_chess(s, b)).match
         await match_lifecycle.confirm(s, match, a)  # only A escrows → still PENDING
         # Backdate the confirm window.
         await s.execute(

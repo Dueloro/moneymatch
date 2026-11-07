@@ -82,21 +82,6 @@ def chess_profile(
     )
 
 
-def cs2_profile(
-    username: str, *, rating: int = 1500, total_games: int = 60
-) -> ProfileSnapshot:
-    return ProfileSnapshot(
-        username=username,
-        display_name=username,
-        url=f"https://steamcommunity.com/profiles/{username}",
-        link_method="username",
-        game="cs2.steam",
-        win_rate=0.5,
-        total_games=total_games,
-        rating=rating,
-    )
-
-
 async def create_linked_account(
     session: AsyncSession,
     user: User,
