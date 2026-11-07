@@ -7,7 +7,8 @@ import { supabase } from '../lib/supabase';
 import { identify, resetIdentity } from '../lib/telemetry';
 import { AuthContext, type AuthContextValue } from './authContext';
 
-/** Build a minimal Supabase-shaped session from an injected e2e access token so the app routes past RequireAuth without a live Supabase session. */
+/** Build a minimal Supabase-shaped session from an injected e2e access token,
+ * so the app routes past RequireAuth without a live Supabase session. */
 function sessionFromToken(token: string): Session | null {
   const claims = decodeJwtClaims(token);
   if (!claims) return null;

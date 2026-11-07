@@ -16,7 +16,13 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
-import { barPhrase, barTitle, isLowerBetter, requiresWin } from '../lib/metrics';
+import {
+  barPhrase,
+  barTitle,
+  isLowerBetter,
+  metricUnit,
+  requiresWin,
+} from '../lib/metrics';
 import { feeOnNetWinnings, platformFeeNote } from '../lib/rake';
 import {
   estPrize,
@@ -207,7 +213,7 @@ export function PoolsPage() {
                         target={c.bar}
                         clearRate={c.clear_rate}
                         lowerIsBetter={isLowerBetter(m.metric)}
-                        targetUnit={isLowerBetter(m.metric) ? 'moves' : undefined}
+                        targetUnit={metricUnit(m.metric)}
                         targetNote={
                           requiresWin(m.metric)
                             ? 'Wins only. A loss or a draw does not count.'

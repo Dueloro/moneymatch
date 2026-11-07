@@ -83,9 +83,7 @@ describe('SettlementCelebration', () => {
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
 
-  // The case the first version got wrong, and the one that matters most: you
-  // have to LEAVE this app to play. Chess is on lichess.org. So the moment your contest settles, you are somewhere else — and a
-  // result only shown to an open tab is a result nobody ever sees.
+  // You play on lichess.org, so a result usually lands while you are away.
   it('announces a result that landed while you were away playing', () => {
     setActivity([
       item({

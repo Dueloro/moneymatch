@@ -17,13 +17,9 @@ import { useActivity } from './useActivity';
  *   `localStorage`, so a refresh, a second tab, or a returning visit does not
  *   replay results you have already seen.
  * - **A result that landed while you were away is still shown**, provided it is
- *   recent and has not been announced before. This is the case that matters
- *   most: **you have to leave this app to play.** Chess happens on
- *   lichess.org, so you are, almost by definition, not looking at Money Match
- *   at the moment your contest settles. Firing only on a transition an open tab happened to
- *   witness meant the real path — go play, come back — showed nothing at all.
- * - **Nothing is announced to a tab nobody is looking at.** This is the subtler
- *   half of the same problem. `useEventStream` invalidates `['activity']` the
+ *   recent and has not been announced before. You play on lichess.org, so you
+ *   are usually not looking at Money Match when your contest settles.
+ * - **Nothing is announced to a tab nobody is looking at.** `useEventStream` invalidates `['activity']` the
  *   instant the worker settles, and an explicit invalidation refetches whether
  *   or not the tab is in front. So a backgrounded tab would detect the
  *   settlement, play the whole sequence to nobody, mark the contest announced

@@ -184,9 +184,7 @@ function GameRow({ link }: { link: GameLink }) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   aria-label={`Your ${meta.name} username`}
-                  placeholder={
-                    link.game === CHESS ? 'Your Lichess username' : 'Your username'
-                  }
+                  placeholder="Your Lichess username"
                 />
                 <PillButton
                   type="submit"
@@ -206,19 +204,17 @@ function GameRow({ link }: { link: GameLink }) {
                   Cancel
                 </PillButton>
               </div>
-              {link.game === CHESS && (
-                <p className="text-xs text-text-secondary">
-                  Find yours at{' '}
-                  <a
-                    href="https://lichess.org"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline hover:text-text"
-                  >
-                    lichess.org
-                  </a>
-                </p>
-              )}
+              <p className="text-xs text-text-secondary">
+                Find yours at{' '}
+                <a
+                  href="https://lichess.org"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline hover:text-text"
+                >
+                  lichess.org
+                </a>
+              </p>
             </>
           ) : (
             <>

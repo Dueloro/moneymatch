@@ -20,10 +20,21 @@ export function requiresWin(metric: string): boolean {
   return REQUIRES_WIN.has(metric);
 }
 
+/** What a metric's number counts, when it has a unit. */
+const UNITS: Record<string, string> = { chess_moves: 'moves' };
+
+export function metricUnit(metric: string): string | undefined {
+  return UNITS[metric];
+}
+
 /** What clearing a bar takes, mid-sentence: "win in 14 moves or fewer". */
 export function barPhrase(metric: string, bar: number): string {
-  if (metric === 'chess_moves') return `win in ${bar} moves or fewer`;
-  return `clear ${bar}`;
+  const unit = metricUnit(metric);
+  const n = unit ? `${bar} ${unit}` : String(bar);
+  if (isLowerBetter(metric)) {
+    return `${requiresWin(metric) ? 'win in' : 'get'} ${n} or fewer`;
+  }
+  return requiresWin(metric) ? `win with ${n} or more` : `clear ${n}`;
 }
 
 /** The pool card's heading for a bar. */

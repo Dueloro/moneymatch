@@ -120,7 +120,13 @@ export async function ensureFriends(a: Player, b: Player): Promise<void> {
   try {
     const mine = await json<Friends>(await ctxA.get('/api/v1/friends'));
     if (mine.friends.some((f) => f.user_id === b.userId)) return;
-    await ctxA.post('/api/v1/friends', { data: { username_or_code: b.username } });
+    // 409: a request between the two already exists (e.g. from an earlier run).
+    const add = await ctxA.post('/api/v1/friends', {
+      data: { username_or_code: b.username },
+    });
+    if (!add.ok() && add.status() !== 409) {
+      throw new Error(`add friend → ${add.status()}: ${await add.text()}`);
+    }
     const theirs = await json<Friends>(await ctxB.get('/api/v1/friends'));
     const req = theirs.incoming.find((f) => f.user_id === a.userId);
     if (!req) throw new Error(`no friend request from ${a.username} to ${b.username}`);
@@ -150,6 +156,19 @@ export async function createInviteLink(
     );
     if (!body.invite_path) throw new Error('challenge created without an invite path');
     return body.invite_path;
+  } finally {
+    await ctx.dispose();
+  }
+}
+
+/** The player's available balance, in cents. */
+export async function availableCents(player: Player): Promise<number> {
+  const ctx = await api(player.authId);
+  try {
+    const wallet = await json<{ available_cents: number }>(
+      await ctx.get('/api/v1/wallet'),
+    );
+    return wallet.available_cents;
   } finally {
     await ctx.dispose();
   }

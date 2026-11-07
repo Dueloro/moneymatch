@@ -2,12 +2,11 @@
    the gameMeta helper alongside internal icon components. */
 import type { FC } from 'react';
 
-/** Per-game presentation: a clean display name, a compact label, an accent
- * color, and a small icon. Keyed by the host game id. */
+/** Per-game presentation: a clean display name, an accent color, and a small
+ * icon. Keyed by the host game id. */
 export interface GameMeta {
   id: string;
   name: string;
-  short: string;
   accent: string;
   Icon: FC<{ className?: string }>;
 }
@@ -32,7 +31,6 @@ const GAMES: Record<string, GameMeta> = {
   [CHESS]: {
     id: CHESS,
     name: 'Chess',
-    short: 'Chess',
     accent: '#e6c65c',
     Icon: ChessIcon,
   },
@@ -44,5 +42,5 @@ export function gameMeta(id: string, fallbackName?: string): GameMeta {
   const known = GAMES[id];
   if (known) return known;
   const name = (fallbackName ?? id).split(/[·—-]/)[0].trim() || id;
-  return { id, name, short: name, accent: 'var(--text-secondary)', Icon: DotIcon };
+  return { id, name, accent: 'var(--text-secondary)', Icon: DotIcon };
 }
