@@ -1,17 +1,4 @@
-"""The migration chain and the code-side flag defaults must not drift apart.
-
-The test schema is built by running migrations, so seeded rows exist in tests,
-but that alone would not stop `DEFAULT_FLAGS` and the migration chain from
-disagreeing.
-
-Both directions matter and they fail for different reasons:
-
-- **Seeded but not declared** → the code has no default for a row that exists,
-  so nothing in the application knows what the flag means.
-- **Declared but not seeded** → there is no row to toggle. The flag still reads
-  its default, so nothing looks broken until someone needs the kill switch in an
-  incident and finds it was never there.
-"""
+"""The migration chain and the code-side flag defaults must not drift apart."""
 
 from __future__ import annotations
 
@@ -22,9 +9,6 @@ from moneymatch_api.services.feature_flags import DEFAULT_FLAGS
 
 pytestmark = pytest.mark.asyncio
 
-#: Flags seeded by a migration that deliberately have no `DEFAULT_FLAGS` entry.
-#: `geo_config` carries a payload rather than a boolean, and `worker_heartbeat`
-#: is written by the worker at runtime — neither is a code-side on/off default.
 SEEDED_WITHOUT_A_CODE_DEFAULT = {"geo_config", "worker_heartbeat"}
 
 
@@ -34,7 +18,6 @@ async def _seeded_keys(session) -> set[str]:
 
 
 async def test_every_declared_game_flag_has_a_seeded_row(session):
-    """A kill switch with no row is a kill switch you find missing in an incident."""
     seeded = await _seeded_keys(session)
     declared_games = {k for k in DEFAULT_FLAGS if k.startswith("game:")}
     missing = declared_games - seeded

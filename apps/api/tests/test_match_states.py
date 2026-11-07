@@ -34,7 +34,6 @@ def test_terminal_states_have_no_exits():
 
 
 def test_illegal_transitions_rejected():
-    # Can't skip confirmation, can't reopen a settled match, can't rewind.
     assert not ms.can_transition(ms.PENDING, ms.SETTLED)
     assert not ms.can_transition(ms.ACTIVE, ms.PENDING)
     with pytest.raises(IllegalTransitionError):
@@ -44,4 +43,4 @@ def test_illegal_transitions_rejected():
 
 
 def test_assert_transition_passes_on_legal_move():
-    ms.assert_transition(ms.PENDING, ms.ACTIVE)  # no raise
+    ms.assert_transition(ms.PENDING, ms.ACTIVE)

@@ -1,4 +1,4 @@
-"""The admin audit write path (09-phase-6 · deliverable 1)."""
+"""The admin audit write path."""
 
 from __future__ import annotations
 

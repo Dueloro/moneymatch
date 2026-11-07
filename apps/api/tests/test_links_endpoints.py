@@ -1,9 +1,4 @@
-"""/links endpoints — link/refresh/unlink flow, conflicts, and flag blocking.
-
-Host APIs are respx-mocked (no live network). Covers the phase's required
-linking tests: unknown → 404, already-bound host → 409, snapshot refresh,
-disabled-flag BLOCKED, and admin-only unlink.
-"""
+"""/links endpoints — link/refresh/unlink flow, conflicts, and flag blocking."""
 
 from __future__ import annotations
 
@@ -29,12 +24,6 @@ def _lichess_user(username="magnus", rating=2800):
 
 
 def _lichess_games(ndjson: str = "") -> None:
-    """Mock the game export that linking polls to bootstrap metric models.
-
-    Chess gained a per-match metric (`chess_moves`), so `bind` now bootstraps a
-    model at link time and that reaches the export endpoint. Empty by default:
-    these suites are about the binding, not about what the model computes.
-    """
     respx.get(url__regex=r"https://lichess\.org/api/games/user/.*").mock(
         return_value=httpx.Response(200, text=ndjson)
     )
@@ -59,11 +48,9 @@ async def test_link_lichess_success(client):
     chess = _game(r.json(), CHESS)
     assert chess["status"] == "LINKED"
     assert chess["host_username"] == "magnus"
-    # Chess ratings live per time-control in `formats`.
     assert chess["profile"]["primary_speed"] == "blitz"
     assert chess["profile"]["formats"][0]["rating"] == 2800
 
-    # GET reflects the binding.
     g = await client.get("/api/v1/links", headers=auth_headers("u-chess"))
     assert _game(g.json(), CHESS)["status"] == "LINKED"
 
@@ -95,7 +82,7 @@ async def test_second_user_cannot_bind_bound_account(client):
     assert ok.status_code == 200
     clash = await client.post(
         "/api/v1/links",
-        json={"game": CHESS, "username": "Magnus"},  # case variant, same account
+        json={"game": CHESS, "username": "Magnus"},
         headers=auth_headers("second"),
     )
     assert clash.status_code == 409
@@ -136,7 +123,6 @@ async def test_refresh_updates_snapshot(client):
         json={"game": CHESS, "username": "magnus"},
         headers=auth_headers("refresh"),
     )
-    # Rating changes upstream; refresh should pick it up.
     respx.get(f"{LI}/magnus").mock(
         return_value=httpx.Response(200, json=_lichess_user(rating=2850))
     )

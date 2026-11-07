@@ -70,7 +70,6 @@ async def test_grading_explains_a_settled_game(session, client):
     )
     await session.commit()
 
-    # The loser sees a transparent "why": the rule, the game, the decision.
     r = await client.get(
         f"{V1}/play/matches/{match.id}/grading", headers=auth_headers("auth_gl")
     )
@@ -79,7 +78,7 @@ async def test_grading_explains_a_settled_game(session, client):
     assert body["result"] == "you_lost"
     assert body["settled"] is True
     assert body["winner_username"] == "gwin"
-    assert body["rule"]  # non-empty resolution note
+    assert body["rule"]
     assert body["outcome_detail"]["host_game_id"] == "g_grade"
     assert body["outcome_detail"]["winner_handle"] == "h_gwin"
 

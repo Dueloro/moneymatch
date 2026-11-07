@@ -3,15 +3,6 @@ import { expect, test } from '@playwright/test';
 import { e2eAuthConfigured, signInAs } from './auth';
 import { LICHESS_A, availableCents, linkedA } from './fixtures';
 
-/**
- * Solo pools, one player: the fee is shown before committing, joining takes a
- * confirm step, the queued status appears, and leaving before a room forms
- * costs nothing: the entry is only escrowed once the room forms.
- *
- * A formed room and its split need four similar-rated linked players and real
- * wins on Lichess, which the API has no seam to seed.
- */
-
 test('join a pool through the confirm step, then leave with the balance untouched', async ({
   browser,
 }) => {
@@ -35,7 +26,6 @@ test('join a pool through the confirm step, then leave with the balance untouche
   const queued = page
     .getByTestId('pool-status')
     .or(page.getByTestId('rail-pool-status'));
-  // Shown inline below xl and in the side rail from xl up; use whichever is on screen.
   const shown = queued.filter({ visible: true }).first();
   await expect(shown).toBeVisible();
   // Escrow waits for the room to form, so queuing holds nothing yet.

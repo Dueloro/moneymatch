@@ -1,7 +1,6 @@
-"""`bootstrap()` must not destroy a model it has no evidence to replace.
-
-An empty result set (host outage, rate limit, no stored games) is not evidence,
-and evidence is the only thing allowed to overwrite a model.
+"""`bootstrap()` must not destroy a model it has no evidence to replace. An empty
+result set (host outage, rate limit, no stored games) is not evidence, and
+evidence is the only thing allowed to overwrite a model.
 """
 
 from __future__ import annotations
@@ -22,8 +21,6 @@ HOST = "bootstrap_host"
 
 
 class _FakeAdapter:
-    """Returns a fixed list of finished games, oldest-first."""
-
     def __init__(self, moves: list[float]):
         self._games = [
             NormGame(
@@ -94,7 +91,6 @@ async def test_a_host_outage_does_not_erase_established_history(session, monkeyp
 async def test_first_bootstrap_with_no_history_still_creates_a_model(
     session, monkeypatch
 ):
-    """The guard is 'do not destroy', not 'do not create'."""
     user = await _linked_user(session, "brand_new")
     monkeypatch.setattr(registry, "get", lambda _g: _FakeAdapter([]))
     await metric_models_service.bootstrap(session, user.id, GAME_CHESS_LICHESS, HOST)

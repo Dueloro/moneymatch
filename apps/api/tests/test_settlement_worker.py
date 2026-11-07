@@ -34,8 +34,6 @@ pytestmark = pytest.mark.asyncio
 
 
 class FakeChessAdapter:
-    """Reports a fixed result for every brokered game: a handle, "" (draw) or None."""
-
     id = GAME_CHESS_LICHESS
 
     def __init__(self, winner: str | None = None, *, raise_host=False):
@@ -60,7 +58,6 @@ async def _fund(session, user, amount):
 
 
 async def setup_active_chess(sm):
-    """Two funded chess players in an ACTIVE brokered match, committed."""
     async with sm() as s:
         a = await chess_player(s, "alice", rating=1500)
         b = await chess_player(s, "bob", rating=1510)
@@ -94,9 +91,6 @@ async def _match_state(sm, match_id):
         return await s.scalar(select(Match.state).where(Match.id == match_id))
 
 
-# --- grading branches ----------------------------------------------------- #
-
-
 async def test_win_pays_winner_and_reconciles(monkeypatch):
     sm = new_sessionmaker()
     info = await setup_active_chess(sm)
@@ -107,8 +101,8 @@ async def test_win_pays_winner_and_reconciles(monkeypatch):
     )
     assert report.settled == 1
     assert await _match_state(sm, info["match_id"]) == "SETTLED"
-    assert await _balance(sm, info["a"]) == (10800, 0)  # +$18 prize
-    assert await _balance(sm, info["b"]) == (9000, 0)  # −$10 stake
+    assert await _balance(sm, info["a"]) == (10800, 0)
+    assert await _balance(sm, info["b"]) == (9000, 0)
 
     async with sm() as s:
         recon = await reconciliation_service.check(s, "match", info["match_id"])
@@ -187,12 +181,11 @@ async def test_host_outage_extends_window_without_settling(monkeypatch):
         after = await s.scalar(
             select(Match.window_ends_at).where(Match.id == info["match_id"])
         )
-    assert after > before  # outage did not consume the window
-    # No money moved.
+    assert after > before
     assert await _balance(sm, info["a"]) == (9000, 1000)
 
 
-# --- SKIP LOCKED re-claimability ------------------------------------------ #
+# SKIP LOCKED re-claimability.
 
 
 async def test_locked_match_is_skipped_and_stays_claimable(monkeypatch):
@@ -202,15 +195,15 @@ async def test_locked_match_is_skipped_and_stays_claimable(monkeypatch):
 
     lock_session = new_sessionmaker()()
     async with lock_session as locker:
-        # A worker that claimed the row and then crashed mid-settle: the
-        # row is locked, uncommitted.
+        # A worker that claimed the row and then crashed mid-settle: the row is locked,
+        # uncommitted.
         await locker.execute(
             select(Match).where(Match.id == info["match_id"]).with_for_update()
         )
         report = await settlement_worker.run_cycle(
             sm, now=info["matched_at"] + timedelta(seconds=5)
         )
-        assert report.settled == 0  # skipped, not lost
+        assert report.settled == 0
         assert await _match_state(sm, info["match_id"]) == "ACTIVE"
 
     # Lock released → a subsequent cycle claims and settles it.
@@ -218,9 +211,6 @@ async def test_locked_match_is_skipped_and_stays_claimable(monkeypatch):
         sm, now=info["matched_at"] + timedelta(seconds=6)
     )
     assert report2.settled == 1
-
-
-# --- kill switches + housekeeping ----------------------------------------- #
 
 
 async def test_settlement_paused_halts_the_loop(monkeypatch):
@@ -239,14 +229,14 @@ async def test_settlement_paused_halts_the_loop(monkeypatch):
         sm, now=info["matched_at"] + timedelta(seconds=5)
     )
     assert report.paused is True
-    assert await _match_state(sm, info["match_id"]) == "ACTIVE"  # untouched
+    assert await _match_state(sm, info["match_id"]) == "ACTIVE"
 
 
 async def test_queue_paused_drains_waiting_tickets(monkeypatch):
     sm = new_sessionmaker()
     async with sm() as s:
         a = await chess_player(s, "waiter")
-        await enq_chess(s, a)  # A waits
+        await enq_chess(s, a)
         await s.execute(
             update(FeatureFlag)
             .where(FeatureFlag.key == FLAG_QUEUE_PAUSED)
@@ -268,7 +258,6 @@ async def test_expired_ticket_is_reaped(monkeypatch):
     async with sm() as s:
         a = await chess_player(s, "waiter")
         await enq_chess(s, a)
-        # Backdate the ticket past its TTL.
         await s.execute(
             update(QueueTicket)
             .where(QueueTicket.user_id == a.id)
@@ -289,8 +278,7 @@ async def test_expired_pending_match_refunds_the_confirmer(monkeypatch):
         await _fund(s, b, 10_000)
         await enq_chess(s, a)
         match = (await enq_chess(s, b)).match
-        await match_lifecycle.confirm(s, match, a)  # only A escrows → still PENDING
-        # Backdate the confirm window.
+        await match_lifecycle.confirm(s, match, a)
         await s.execute(
             update(Match)
             .where(Match.id == match.id)

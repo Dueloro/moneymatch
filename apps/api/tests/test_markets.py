@@ -19,7 +19,6 @@ def test_chess_win_h2h_needs_speed():
 
 
 def test_multiplier_is_derived_18x_at_default_rake():
-    # 2·(1 − 0.10) = ×1.80 → 18000 bps (02-design-system §4). Derived, not set.
     m = markets.get(GAME_CHESS_LICHESS, "win_h2h")
     assert m.multiplier_bps == 18_000
 

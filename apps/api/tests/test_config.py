@@ -1,4 +1,4 @@
-"""Config fail-fast behaviour (00-README §3.9)."""
+"""Config fail-fast behaviour."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from moneymatch_api.config import Settings
 
 
 def _settings(**env: str) -> Settings:
-    # `_env_file=None` isolates the test from any local .env.
     return Settings(_env_file=None, **env)  # type: ignore[call-arg]
 
 

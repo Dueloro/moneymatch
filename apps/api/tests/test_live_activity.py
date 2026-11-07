@@ -1,8 +1,4 @@
-"""Live under-the-card snapshots for in-flight H2H matches (build + orient).
-
-Pure unit tests: models are built in-memory (never flushed) and the host reads
-are faked, so this covers the snapshot shape and the per-viewer orientation
-without a database."""
+"""Live under-the-card snapshots for in-flight H2H matches (build + orient)."""
 
 from __future__ import annotations
 
@@ -45,7 +41,7 @@ async def test_chess_live_snapshot_orients_turn_and_moves(monkeypatch):
         assert game_id == "g123"
         return {
             "status": "started",
-            "moves": "e4 e5 Nf3",  # 3 plies → black to move; 2 full moves
+            "moves": "e4 e5 Nf3",
             "winner": None,
             "players": {
                 "white": {"user": {"name": "alice"}},
@@ -63,7 +59,7 @@ async def test_chess_live_snapshot_orients_turn_and_moves(monkeypatch):
     black_view = live_activity_service.view_for("match", snap, u_black)
     assert white_view["your_color"] == "white" and white_view["turn"] == "opp"
     assert black_view["your_color"] == "black" and black_view["turn"] == "you"
-    assert white_view["result"] is None  # ongoing
+    assert white_view["result"] is None
 
 
 async def test_chess_finished_maps_result_per_viewer(monkeypatch):
@@ -97,6 +93,5 @@ async def test_chess_finished_maps_result_per_viewer(monkeypatch):
 
 
 async def test_no_snapshot_before_pairing():
-    """A match with no live window yet (unpaired) has no live view."""
     match = Match(game=CHESS, market="win_h2h", matched_at=None)
     assert await live_activity_service.build_match_snapshot(None, match, []) is None

@@ -33,7 +33,6 @@ async def test_emit_pushes_to_subscription(session, monkeypatch):
     await push_service.subscribe(
         session, user.id, endpoint="https://push/ep1", p256dh="k", auth="a"
     )
-    # A pushable notification fans out to the browser subscription.
     await notifications_service.emit(session, user.id, "settled", {"match_id": "m"})
     assert len(sent) == 1 and sent[0]["endpoint"] == "https://push/ep1"
 
@@ -46,7 +45,7 @@ async def test_non_push_kind_is_in_app_only(session, monkeypatch):
     await push_service.subscribe(
         session, user.id, endpoint="https://push/ep2", p256dh="k", auth="a"
     )
-    await notifications_service.emit(session, user.id, "refund", {})  # not in copy map
+    await notifications_service.emit(session, user.id, "refund", {})
     assert sent == []
 
 
@@ -69,7 +68,6 @@ async def test_dead_subscription_is_pruned(session, monkeypatch):
     )
     assert await _count(session, user.id) == 1
     await notifications_service.emit(session, user.id, "settled", {})
-    # A 410 Gone means the browser dropped the subscription → we prune it.
     assert await _count(session, user.id) == 0
 
 

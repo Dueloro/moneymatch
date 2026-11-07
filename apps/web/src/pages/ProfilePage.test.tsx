@@ -134,7 +134,7 @@ describe('ProfilePage', () => {
     expect(screen.getByText('magnus · 100 games')).toBeInTheDocument();
     expect(screen.getByText('Rating 2100')).toBeInTheDocument();
     expect(screen.getByText('5 win streak')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('200')).toBeInTheDocument(); // daily loss cap ($)
+    expect(screen.getByDisplayValue('200')).toBeInTheDocument();
   });
 
   it('shows a blocked account', () => {
@@ -150,10 +150,8 @@ describe('ProfilePage', () => {
     fireEvent.change(screen.getByPlaceholderText('Your Lichess username'), {
       target: { value: 'magnus' },
     });
-    // First click shows the permanent-link confirmation.
     fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
     expect(screen.getByText(/permanently links/)).toBeInTheDocument();
-    // Second click confirms and triggers the mutation.
     fireEvent.click(screen.getByRole('button', { name: 'Link account' }));
     expect(createMutate).toHaveBeenCalledWith(
       { game: 'chess.lichess', username: 'magnus' },
@@ -171,14 +169,11 @@ describe('ProfilePage', () => {
   it('changes password: current-password step (with email fallback) then new password', async () => {
     renderWithProviders(<ProfilePage />);
 
-    // Collapsed until the button is pressed.
     expect(
       screen.queryByPlaceholderText('Enter current password'),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
 
-    // Step 1: confirm current password (no email-based reset — accounts are
-    // username-only with no inbox on file).
     expect(screen.getByPlaceholderText('Enter current password')).toBeInTheDocument();
     expect(
       screen.queryByText('Forgot your password? Verify with email.'),
@@ -190,7 +185,6 @@ describe('ProfilePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(verifyCurrentPassword).toHaveBeenCalledWith('oldpass1');
 
-    // Step 2: set + confirm the new password, which calls changePassword.
     await screen.findByPlaceholderText('New password');
     fireEvent.change(screen.getByPlaceholderText('New password'), {
       target: { value: 'newpass1' },

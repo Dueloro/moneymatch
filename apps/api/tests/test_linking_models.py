@@ -30,10 +30,10 @@ async def test_one_account_per_user_per_game(session):
     user = await create_user(session)
     session.add(_link(user.id, host_account_id="a"))
     await session.flush()
-    session.add(_link(user.id, host_account_id="b"))  # same (user, game)
+    session.add(_link(user.id, host_account_id="b"))
     with pytest.raises(IntegrityError):
         await session.flush()
-    await session.rollback()  # leave the session clean for teardown commit
+    await session.rollback()
 
 
 async def test_host_account_binds_to_one_user(session):
@@ -41,18 +41,16 @@ async def test_host_account_binds_to_one_user(session):
     u2 = await create_user(session)
     session.add(_link(u1.id, host_account_id="shared"))
     await session.flush()
-    session.add(_link(u2.id, host_account_id="shared"))  # same (game, host)
+    session.add(_link(u2.id, host_account_id="shared"))
     with pytest.raises(IntegrityError):
         await session.flush()
-    await session.rollback()  # leave the session clean for teardown commit
+    await session.rollback()
 
 
 async def test_concurrent_race_for_host_account_one_winner(session):
-    """Two transactions racing to bind the same host account: the DB unique
-    index — not an app-level check — lets exactly one win."""
     u1 = await create_user(session)
     u2 = await create_user(session)
-    await session.commit()  # both users visible to the independent sessions
+    await session.commit()
 
     sm = new_sessionmaker()
 
@@ -67,40 +65,34 @@ async def test_concurrent_race_for_host_account_one_winner(session):
                 return False
 
     results = await asyncio.gather(_bind(u1.id), _bind(u2.id))
-    assert sorted(results) == [False, True]  # exactly one winner
+    assert sorted(results) == [False, True]
 
 
 async def test_soft_unbound_row_frees_the_binding_slot(session):
-    """A soft-unbound row keeps its uniqueness slot released: the same host account
-    rebinds to a fresh active row (the partial index only counts live bindings)."""
     u1 = await create_user(session)
     u2 = await create_user(session)
     first = _link(u1.id, host_account_id="rebindable")
     session.add(first)
     await session.flush()
 
-    # Soft-unbind, then a *new* user binds the same host account — allowed.
     first.status = "unbound"
     await session.flush()
     session.add(_link(u2.id, host_account_id="rebindable"))
-    await session.flush()  # no IntegrityError — the slot was freed
+    await session.flush()
 
 
 async def test_two_live_bindings_still_conflict(session):
-    """The partial uniqueness still blocks two *live* bindings of one host."""
     u1 = await create_user(session)
     u2 = await create_user(session)
     session.add(_link(u1.id, host_account_id="still_unique"))
     await session.flush()
-    session.add(_link(u2.id, host_account_id="still_unique"))  # both active
+    session.add(_link(u2.id, host_account_id="still_unique"))
     with pytest.raises(IntegrityError):
         await session.flush()
     await session.rollback()
 
 
 async def test_get_link_returns_live_binding_over_unbound_history(session):
-    """With an unbound history row *and* a fresh active row for the same
-    (user, game), the wager-path lookup returns the live binding."""
     from moneymatch_api.services import linking_service
 
     user = await create_user(session)
@@ -130,4 +122,4 @@ async def test_raw_payloads_are_append_only(session):
             text("UPDATE raw_payloads SET source = 'x' WHERE id = :id"),
             {"id": row.id},
         )
-    await session.rollback()  # leave the session clean for teardown commit
+    await session.rollback()

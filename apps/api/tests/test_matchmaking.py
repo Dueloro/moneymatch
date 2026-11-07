@@ -58,9 +58,6 @@ def _ticket(user, link, *, rating, now, host=None):
     )
 
 
-# --- pairing basics ------------------------------------------------------- #
-
-
 async def test_first_searches_second_matches(session):
     alice = await chess_player(session, "alice")
     bob = await chess_player(session, "bob")
@@ -68,7 +65,6 @@ async def test_first_searches_second_matches(session):
     r = await enq_chess(session, bob)
     assert r.status == "matched"
     assert r.match.state == "PENDING" and r.match.entry_cents == 1000
-    # Alice now polls to matched.
     assert (await matchmaking.poll_status(session, alice)).status == "matched"
 
 
@@ -112,9 +108,6 @@ async def test_match_econ_reconciles_to_pot(session):
     assert m.prize_cents == 1800 and m.rake_cents == 200
 
 
-# --- Elo band ------------------------------------------------------------- #
-
-
 async def test_chess_far_rating_does_not_pair_fresh(session):
     alice = await chess_player(session, "alice", rating=1200)
     bob = await chess_player(session, "bob", rating=2600)
@@ -126,18 +119,16 @@ async def test_crafted_direct_match_cannot_bypass_the_band(session):
     strong = await chess_player(session, "strong", rating=2600)
     weak = await chess_player(session, "weak", rating=1200)
     r = await enq_chess(session, strong)
-    # Taking the other side directly runs the identical checks → rejected.
     with pytest.raises(MatchmakingError) as exc:
         await matchmaking.take_waiting(session, weak, r.ticket.id)
     assert exc.value.code == "not_pairable"
 
 
 async def test_widening_band_pairs_a_near_miss_after_waiting(session):
-    # 200 Elo apart: outside the fresh 100 band, inside once a ticket has waited.
     a = await chess_player(session, "a", rating=1700)
     b = await chess_player(session, "b", rating=1500)
     r = await enq_chess(session, a)
-    assert (await enq_chess(session, b)).status == "searching"  # too tight fresh
+    assert (await enq_chess(session, b)).status == "searching"
 
     r.ticket.created_at = datetime.now(UTC) - timedelta(seconds=90)
     await session.flush()
@@ -145,11 +136,7 @@ async def test_widening_band_pairs_a_near_miss_after_waiting(session):
     assert (await matchmaking.poll_status(session, b)).status == "matched"
 
 
-# --- selection ------------------------------------------------------------ #
-
-
 async def test_selection_prefers_the_closest_of_two_eligible(session):
-    # Seeded as raw waiting tickets so they don't auto-pair before the seeker.
     seeker = await chess_player(session, "seeker", rating=1500)
     now = datetime.now(UTC)
     for name, rating in (("near", 1530), ("far", 1560)):
@@ -169,9 +156,6 @@ async def test_selection_prefers_the_closest_of_two_eligible(session):
         )
     )
     assert paired_ticket.baseline_snapshot["rating"] == 1530
-
-
-# --- can_pair seam -------------------------------------------------------- #
 
 
 async def test_self_pair_is_impossible(session):
@@ -201,30 +185,24 @@ async def test_same_two_accounts_cannot_repair_within_24h(session):
     a = await chess_player(session, "a")
     b = await chess_player(session, "b")
     await enq_chess(session, a)
-    m = (await enq_chess(session, b)).match  # first pairing
+    m = (await enq_chess(session, b)).match
     m.state = "CANCELED"
     m.resolved_at = datetime.now(UTC)
     await session.flush()
-    # Both re-queue immediately → the 24 h repeat guard keeps them apart.
     await enq_chess(session, a)
     assert (await enq_chess(session, b)).status == "searching"
-
-
-# --- frozen baselines ----------------------------------------------------- #
 
 
 async def test_baseline_is_frozen_against_later_profile_refresh(session):
     a = await chess_player(session, "a", rating=1500)
     b = await chess_player(session, "b", rating=1500)
-    r = await enq_chess(session, a)  # freezes A's baseline at 1500
+    r = await enq_chess(session, a)
     assert r.status == "searching"
 
-    # A's profile is refreshed to a wildly different rating after queueing.
     link = await matchmaking._require_link(session, a.id, CHESS)
     link.profile_snapshot = chess_profile("a", rating=2600).model_dump()
     await session.flush()
 
-    # Pairing must use the FROZEN rating → still inside the band → matched.
     m = (await enq_chess(session, b)).match
     assert m is not None
     a_seat = await session.scalar(
@@ -236,7 +214,7 @@ async def test_baseline_is_frozen_against_later_profile_refresh(session):
     assert a_seat.baseline_snapshot["rating"] == 1500
 
 
-# --- race safety (real concurrent transactions) --------------------------- #
+# race safety (real concurrent transactions)
 
 
 @pytest_asyncio.fixture
@@ -250,12 +228,11 @@ async def test_two_concurrent_enqueues_one_waiting_ticket_forms_one_match(
     committing_session,
 ):
     sm = new_sessionmaker()
-    # Seed A (waiting) + two takers B, C, all committed so separate txns see them.
     async with sm() as s:
         a = await chess_player(s, "racer_a")
         b = await chess_player(s, "racer_b")
         c = await chess_player(s, "racer_c")
-        await enq_chess(s, a)  # A waits
+        await enq_chess(s, a)
         await s.commit()
         b_id, c_id = b.id, c.id
 
@@ -277,7 +254,8 @@ async def test_two_concurrent_enqueues_one_waiting_ticket_forms_one_match(
 
 async def test_excluded_state_is_geo_blocked_from_h2h(session):
     """A resident of a geo-fenced state is refused before queueing (parity with
-    pools/tournaments)."""
+    pools/tournaments).
+    """
     from sqlalchemy import text
 
     from moneymatch_api.services.geo_service import RegionBlockedError

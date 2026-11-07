@@ -1,14 +1,4 @@
-"""Guards against documentation that contradicts the code it describes (1.6).
-
-A comment that disagrees with its own code is a distinct category of defect from
-a plain bug: it actively misleads whoever reads the file to check, which is
-exactly what happened with the geo-fence (`# fail closed` above `return set()`)
-and with the difficulty constants (a docstring quoting `k = {0.5, 1.0, 1.75}`
-while the code used `{0.385, 0.842, 1.282}`).
-
-Fixing the text once is not enough — the text drifted because nothing stopped
-it. These tests are what stops it.
-"""
+"""Guards against documentation that contradicts the code it describes."""
 
 from __future__ import annotations
 
@@ -28,11 +18,9 @@ pytestmark = pytest.mark.nodb
 
 
 def test_difficulty_constants_are_the_documented_three():
-    """A sanity anchor: the tiers themselves have not silently changed."""
     assert set(POOL_DIFFICULTY_K) == {"easy", "medium", "hard"}
     assert POOL_DIFFICULTY_K["easy"] < POOL_DIFFICULTY_K["medium"]
     assert POOL_DIFFICULTY_K["medium"] < POOL_DIFFICULTY_K["hard"]
-    # Implied clear rates, which are what the card actually promises.
     for difficulty, expected in (("easy", 0.35), ("medium", 0.20), ("hard", 0.10)):
         actual = fairness.p_target_for_k(POOL_DIFFICULTY_K[difficulty])
         assert actual == pytest.approx(expected, abs=0.005), (
@@ -41,16 +29,10 @@ def test_difficulty_constants_are_the_documented_three():
         )
 
 
-#: Increments kept for metrics that are not offered as pool/tournament markets.
-#: Each needs a reason, and the reason has to survive being read out loud.
-#:
-#: `chess_accuracy` — Lichess only reports accuracy for games a player requested
-#: analysis on, so it has no reliable per-match source and is not offered.
 DOCUMENTED_ORPHAN_INCREMENTS = {"chess_accuracy"}
 
 
 def test_every_bar_increment_belongs_to_a_live_market():
-    """An increment for a market nobody can trade is a trap for the next reader."""
     live = {m for metrics in POOL_METRICS.values() for m in metrics}
     live |= {m for metrics in TOURNAMENT_METRICS.values() for m in metrics}
     orphans = set(METRIC_BAR_INCREMENT) - live - DOCUMENTED_ORPHAN_INCREMENTS
@@ -62,7 +44,6 @@ def test_every_bar_increment_belongs_to_a_live_market():
 
 
 def test_documented_orphans_are_still_orphans():
-    """If an exempted metric becomes live, the exemption must be removed."""
     live = {m for metrics in POOL_METRICS.values() for m in metrics}
     live |= {m for metrics in TOURNAMENT_METRICS.values() for m in metrics}
     stale = DOCUMENTED_ORPHAN_INCREMENTS & live
@@ -73,11 +54,6 @@ def test_documented_orphans_are_still_orphans():
 
 
 def test_every_live_market_has_an_increment():
-    """The other direction: a market with no increment falls back to 0.01.
-
-    For a whole-number metric that silently quotes bars at a resolution the game
-    cannot express.
-    """
     live = {m for metrics in POOL_METRICS.values() for m in metrics}
     missing = live - set(METRIC_BAR_INCREMENT)
     assert not missing, f"pool markets with no declared increment: {sorted(missing)}"
@@ -89,16 +65,10 @@ def test_skill_prior_only_covers_chess_moves():
 
 
 def test_shrink_really_is_a_no_op_without_a_prior():
-    """The behaviour the docstring now describes, asserted rather than trusted."""
     assert skill_prior.shrink(1.23, 0.45, 30, None) == (1.23, 0.45)
 
 
 def test_fairness_source_has_no_stale_difficulty_comments():
-    """`test_fairness.py` labelled 0.5/1.0/1.75 as easy/medium/hard in comments.
-
-    Those tests pass `k` explicitly so they were never *wrong*, but the comments
-    reinforced the same false mental model the docstring did.
-    """
     source = inspect.getsource(fairness)
     for stale in ("Easy (k=0.5)", "Medium (k=1.0)", "Hard (k=1.75)"):
         assert stale not in source

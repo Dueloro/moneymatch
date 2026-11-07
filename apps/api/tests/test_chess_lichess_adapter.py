@@ -1,6 +1,7 @@
 """chess.lichess adapter — profile mapping, normalization, and brokered-game
-integrity (`match_winner` only grades a game between our two accounts).
-Host calls respx-mocked."""
+integrity (`match_winner` only grades a game between our two accounts). Host calls
+respx-mocked.
+"""
 
 from __future__ import annotations
 
@@ -30,16 +31,11 @@ def _user(**over):
     return base
 
 
-# --------------------------------------------------------------------------- #
-# Profile mapping
-# --------------------------------------------------------------------------- #
-
-
 def test_maps_lichess_user_into_profile():
     p = ADAPTER._to_profile(_user())
     assert p.game == "chess.lichess"
     assert p.username == "Magnus"
-    assert p.primary_speed == "bullet"  # most games
+    assert p.primary_speed == "bullet"
     assert {f.speed for f in p.formats} == {"blitz", "bullet"}
     assert p.total_games == 1700
     assert p.win_rate == round((1000 + 0.5 * 200) / 1700, 4)
@@ -62,7 +58,6 @@ def test_normalize_marks_user_win_and_skips_others():
     norm = ADAPTER._normalize(game, "magnus")
     assert norm is not None and norm.won is True and norm.moves == 2
 
-    # A game the user isn't in is skipped.
     assert ADAPTER._normalize(game, "stranger") is None
 
 
@@ -81,11 +76,6 @@ def test_normalize_draw_is_not_a_win():
     }
     norm = ADAPTER._normalize(game, "magnus")
     assert norm.drawn is True and norm.won is False
-
-
-# --------------------------------------------------------------------------- #
-# fetch_profile + brokered-game integrity
-# --------------------------------------------------------------------------- #
 
 
 @respx.mock
@@ -117,7 +107,5 @@ async def test_match_winner_requires_both_our_accounts():
     respx.get("https://lichess.org/game/export/g1").mock(
         return_value=httpx.Response(200, json=game)
     )
-    # Winner is our player "alice".
     assert await ADAPTER.match_winner("g1", ["alice", "bob"]) == "alice"
-    # An outsider replacing a seat → unverifiable (integrity guard).
     assert await ADAPTER.match_winner("g1", ["alice", "carol"]) is None

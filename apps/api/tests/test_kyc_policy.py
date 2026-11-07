@@ -1,5 +1,6 @@
-"""KYC seam (10-phase-7 §1): the policy hook is inert at MVP, the flag is
-guarded in code, and the threshold logic activates only when kyc_live is on."""
+"""KYC seam: the policy hook is inert at MVP, the flag is guarded in code, and the
+threshold logic activates only when kyc_live is on.
+"""
 
 from __future__ import annotations
 
@@ -53,7 +54,6 @@ def test_resolver_guards_live_flag_in_code() -> None:
     [KycAction.DEPOSIT, KycAction.WITHDRAWAL, KycAction.STAKE],
 )
 def test_kyc_never_required_at_mvp(action: KycAction) -> None:
-    # kyc_live is False → every boundary is inert, even a huge amount.
     assert (
         kyc_required(
             _user(),

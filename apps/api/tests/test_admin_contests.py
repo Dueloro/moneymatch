@@ -1,8 +1,6 @@
-"""`/admin/contests` — list/detail money trail + the resettle/void money fixes.
-
-The required Phase-6 properties: resettle is idempotent (no double-pay) and void
-refunds exactly the escrowed amounts with the invariant intact. Reuses the
-settlement-worker test harness (adapter-mocked grading).
+"""`/admin/contests` — list/detail money trail + the resettle/void money fixes. The
+required Phase-6 properties: resettle is idempotent (no double-pay) and void
+refunds exactly the escrowed amounts with the invariant intact.
 """
 
 from __future__ import annotations
@@ -47,7 +45,6 @@ async def test_contest_list_and_detail_money_trail(client, monkeypatch):
     info = await setup_active_chess(sm)
     fake = FakeChessAdapter(info["a_host"])
     monkeypatch.setattr(registry, "get", lambda gid: fake)
-    # Settle it via the worker so there's a full money trail.
     from moneymatch_api.workers import settlement_worker
 
     await settlement_worker.run_cycle(sm, now=info["matched_at"] + timedelta(seconds=5))
@@ -81,7 +78,6 @@ async def test_resettle_is_idempotent(client, monkeypatch):
     fake = FakeChessAdapter(info["a_host"])
     monkeypatch.setattr(registry, "get", lambda gid: fake)
 
-    # First resettle grades + settles: winner +$18.
     r = await client.post(
         f"{V1}/admin/matches/{info['match_id']}/resettle",
         headers=auth_headers("auth_admin"),
@@ -96,14 +92,13 @@ async def test_resettle_is_idempotent(client, monkeypatch):
         headers=auth_headers("auth_admin"),
     )
     assert r.status_code == 200, r.text
-    assert await _balance(sm, info["a"]) == (10800, 0)  # unchanged
+    assert await _balance(sm, info["a"]) == (10800, 0)
 
 
 async def test_void_refunds_exactly_and_reconciles(client):
     await _admin(client)
     sm = new_sessionmaker()
     info = await setup_active_chess(sm)
-    # Both escrowed $10 in the ACTIVE match.
     assert await _balance(sm, info["a"]) == (9000, 1000)
 
     r = await client.post(

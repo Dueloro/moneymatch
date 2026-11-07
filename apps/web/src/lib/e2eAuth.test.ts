@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// Exercise the bypass with the flag ON; the OFF path is a trivial short-circuit.
 vi.mock('./env', () => ({ env: { e2eAuth: true } }));
 
 import { decodeJwtClaims, E2E_TOKEN_KEY, getE2eToken } from './e2eAuth';

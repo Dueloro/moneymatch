@@ -1,15 +1,5 @@
-"""Property-based money invariants (Phase 0.3). **Never delete this file.**
-
-`Split.__post_init__` asserts `sum(payouts) + rake == pot`. That assertion is
-the load-bearing rule of the whole money layer, and the example-based tests in
-`test_money_math.py` only exercise the cases somebody thought of.
-
-This file exercises the cases nobody thought of: arbitrary pots, rake rates,
-winner counts and weight vectors, including the adversarial corners (pot smaller
-than the winner count, zero rake, total rake, ties in a weighted split).
-
-The invariants asserted here may not be weakened, relaxed, or made conditional.
-If a change appears to require it, the change is wrong.
+"""Property-based money invariants. **Never delete this file.** `Split.__post_init__`
+asserts `sum(payouts) + rake == pot`.
 """
 
 from __future__ import annotations
@@ -23,8 +13,7 @@ from moneymatch_api.services.money_math import BPS_DENOMINATOR, Split
 
 pytestmark = pytest.mark.nodb
 
-# $0 to $1,000,000 in cents. Wide enough to catch overflow-ish arithmetic and
-# integer-division drift without making the suite slow.
+# $0 to $1,000,000 in cents.
 pots = st.integers(min_value=0, max_value=100_000_000)
 rakes = st.integers(min_value=0, max_value=BPS_DENOMINATOR)
 winners = st.integers(min_value=1, max_value=64)
@@ -35,15 +24,13 @@ weight_vectors = st.lists(
 
 def _assert_split_is_sound(split: Split, pot: int) -> None:
     """Every invariant a `Split` must satisfy, in one place."""
-    # The rule.
     assert sum(split.payouts_cents) + split.rake_cents == pot
     assert split.pot_cents == pot
-    # Integer cents only — a float here means money was computed in floating
-    # point somewhere upstream.
+    # Integer cents only — a float here means money was computed in floating point
+    # somewhere upstream.
     assert isinstance(split.rake_cents, int)
     assert all(isinstance(p, int) for p in split.payouts_cents)
     assert not isinstance(split.rake_cents, bool)
-    # Money is never negative and never minted.
     assert split.rake_cents >= 0
     assert all(p >= 0 for p in split.payouts_cents)
     assert sum(split.payouts_cents) <= pot
@@ -75,7 +62,6 @@ def test_split_weighted_always_reconciles(pot: int, rake_bps: int, weights: list
 def test_split_weighted_respects_weight_ordering(
     pot: int, rake_bps: int, weights: list[int]
 ):
-    """A strictly larger weight can never receive strictly less."""
     assume(sum(weights) > 0)
     split = money_math.split_weighted(pot, tuple(weights), rake_bps)
     for i, wi in enumerate(weights):
@@ -87,16 +73,10 @@ def test_split_weighted_respects_weight_ordering(
 @given(pot=pots, rake_bps=rakes)
 @settings(max_examples=200)
 def test_rake_never_exceeds_its_nominal_rate(pot: int, rake_bps: int):
-    """`rake_for` floors, so it is always ≤ the true percentage of the pot."""
     rake = money_math.rake_for(pot, rake_bps)
     assert isinstance(rake, int)
     assert 0 <= rake <= pot
     assert rake * BPS_DENOMINATOR <= pot * rake_bps
-
-
-# --------------------------------------------------------------------------- #
-# Adversarial corners, named explicitly so a failure reads clearly.
-# --------------------------------------------------------------------------- #
 
 
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 7, 64])
@@ -146,7 +126,6 @@ def test_zero_pot_is_sound_everywhere():
 
 
 def test_split_rejects_a_non_reconciling_construction():
-    """The guard itself must actually fire."""
     with pytest.raises(ValueError):
         Split(pot_cents=100, rake_cents=10, payouts_cents=(80,))
     with pytest.raises(ValueError):

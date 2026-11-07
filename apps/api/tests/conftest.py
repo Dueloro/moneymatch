@@ -1,9 +1,4 @@
-"""Pytest fixtures: settings, a real Postgres schema, ASGI client, and JWT minting.
-
-Tests run against a real Postgres (the models use citext/jsonb), pointed at
-`TEST_DATABASE_URL` (or a local default). Schema is created once per session;
-`users`/`admin_audit` are truncated between tests for isolation.
-"""
+"""Pytest fixtures: settings, a real Postgres schema, ASGI client, and JWT minting."""
 
 from __future__ import annotations
 
@@ -19,7 +14,6 @@ import jwt
 import pytest
 import pytest_asyncio
 
-# Configure the environment before importing app modules (config reads env).
 TEST_DB_URL = os.environ.get(
     "TEST_DATABASE_URL",
     "postgresql+asyncpg://moneymatch:moneymatch@localhost:5433/moneymatch_test",
@@ -32,9 +26,6 @@ os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
 os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
 os.environ["SUPABASE_JWT_AUDIENCE"] = "authenticated"
 os.environ["ENV"] = "local"
-# The shared ASGI client fires many writes from one host across a session; keep
-# the global limiter out of its way. The limiter itself is proven in
-# test_security_middleware.py against a purpose-built low-limit app.
 os.environ["RATE_LIMIT_WRITES_PER_MINUTE"] = "100000"
 
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -62,31 +53,14 @@ def make_token(
     return jwt.encode(payload, secret, algorithm=algorithm)
 
 
-#: Feature-flag rows exactly as the migration chain seeds them, captured once
-#: after `_schema` migrates and replayed by `_clean` before each test.
+# : Feature-flag rows exactly as the migration chain seeds them, captured once : after
+# `_schema` migrates and replayed by `_clean` before each test.
 _SEEDED_FLAGS: list[tuple[str, bool, str]] = []
 
-#: Repo path to `alembic.ini` (tests/ -> apps/api/).
 _ALEMBIC_INI = pathlib.Path(__file__).resolve().parents[1] / "alembic.ini"
 
 
 def _alembic_upgrade_head() -> None:
-    """Run the migration chain against the test database.
-
-    Synchronous, so it is called via `asyncio.to_thread` — alembic's env.py
-    drives its own event loop and cannot be nested inside the running one.
-    It reads `DATABASE_URL`, which this module points at the test database
-    before any app module is imported.
-
-    **Built without handing alembic the ini file**, deliberately. `migrations/
-    env.py` calls `fileConfig(config.config_file_name)` when one is set, and
-    `fileConfig` defaults to `disable_existing_loggers=True` — so running
-    migrations in-process silently switches off every logger configured before
-    it, including `httpx` and `httpcore`. That broke `test_secret_logging.py`,
-    which asserts those loggers can still report trouble. Passing no ini leaves
-    `config_file_name` as None, env.py skips the logging setup, and only
-    `script_location` is needed because env.py sets the database URL itself.
-    """
     from alembic import command
     from alembic.config import Config
 
@@ -97,34 +71,18 @@ def _alembic_upgrade_head() -> None:
 
 @pytest_asyncio.fixture(scope="session")
 async def _schema(request) -> AsyncIterator[None]:
-    # Nothing selected touches Postgres (e.g. `pytest -m nodb`), so do not
-    # connect. Decided over the whole selected set rather than per test because
-    # this fixture is session-scoped and builds the schema exactly once.
+    # Decided over the whole selected set rather than per test because this fixture is
+    # session-scoped and builds the schema exactly once.
     if all(item.get_closest_marker("nodb") for item in request.session.items):
         yield
         return
 
     engine = get_engine()
-    # Build the test schema by running the **migration chain**, not `create_all`.
-    #
-    # `create_all` carries no migration seed data, no raw-SQL triggers and no
-    # guarantee of agreeing with the chain. That gap is what let the geo-fence
-    # bug reach production: the fence reads its state list from a row seeded by
-    # migration 0001, that row never existed in tests, and the fence therefore
-    # read "unconfigured" in every test that has ever run. See
-    # AUDIT_FINDINGS.md P0-1.
-    #
-    # Running migrations costs ~3 seconds once per session against a ~11.5
-    # minute suite, and it continuously proves the thing every deploy relies on:
-    # that the chain applies cleanly to an empty database.
     async with engine.begin() as conn:
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
     await asyncio.to_thread(_alembic_upgrade_head)
 
-    # Capture the seeded state so `_clean` can restore exactly what the
-    # migrations produced, rather than holding its own opinion about what
-    # should exist — an opinion is the thing that drifts.
     global _SEEDED_FLAGS
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
@@ -139,36 +97,22 @@ async def _schema(request) -> AsyncIterator[None]:
 
 @pytest_asyncio.fixture(autouse=True)
 async def _clean(request, _schema: None) -> AsyncIterator[None]:
-    """Reset user-owned tables and reseed feature flags before each test.
-
-    A test marked `@pytest.mark.nodb` skips the truncate, so pure-function
-    suites (scoring maths, ranking direction) need no live Postgres. `_schema`
-    stays an ordinary parameter: resolving an async fixture imperatively with
-    `request.getfixturevalue` makes pytest-asyncio call `Runner.run()` inside
-    the already-running loop, which errors the setup of every database test in
-    the suite. `_schema` decides for itself whether to connect.
-    """
     if request.node.get_closest_marker("nodb"):
         yield
         return
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
         # CASCADE from users clears wallets/limits/ledger_entries/linked_accounts/
-        # metric_models; platform_ledger and raw_payloads have no user FK, so name
-        # them explicitly.
-        # `users` CASCADE clears everything with a user FK; solo_pools /
-        # tournaments have no user FK (their entries do), so name them explicitly.
+        # metric_models; platform_ledger and raw_payloads have no user FK, so name them
+        # explicitly.
         await session.execute(
             text(
                 "TRUNCATE admin_audit, platform_ledger, raw_payloads, "
                 "solo_pools, tournaments, users RESTART IDENTITY CASCADE"
             )
         )
-        # Restore feature flags to exactly what the migration chain seeded, not
-        # rebuilt from `DEFAULT_FLAGS`, so the fixture can never drift from it.
-        #
-        # Tests needing a different geo list override it (see `test_geo_service`);
-        # the default test user is in MA, which is not excluded.
+        # Tests needing a different geo list override it (see `test_geo_service`); the
+        # default test user is in MA, which is not excluded.
         await session.execute(text("DELETE FROM feature_flags"))
         for key, enabled, payload in _SEEDED_FLAGS:
             await session.execute(
@@ -184,7 +128,6 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
 
 @pytest.fixture(autouse=True)
 def _lichess_broker(monkeypatch) -> None:
-    """Stub Lichess open challenges so brokering a chess H2H never hits the network."""
     from moneymatch_api.services.hosts import lichess
 
     async def _open_challenge(clock_limit, clock_increment=0, *, users=None):
@@ -214,7 +157,6 @@ async def client(app) -> AsyncIterator[AsyncClient]:
 
 @pytest_asyncio.fixture
 async def session() -> AsyncIterator[AsyncSession]:
-    """A committing session for exercising services directly (no HTTP layer)."""
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as s:
         yield s
@@ -222,8 +164,6 @@ async def session() -> AsyncIterator[AsyncSession]:
 
 
 def new_sessionmaker():
-    """Fresh sessionmaker for tests that need independent transactions/connections
-    (e.g. the FOR UPDATE concurrency harness)."""
     return get_sessionmaker()
 
 

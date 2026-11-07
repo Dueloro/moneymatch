@@ -1,5 +1,6 @@
-"""Tournament engine: field formation (dispersion cap), the 50/30/20 split with
-ties and forfeits, and the settlement invariant on integer cents."""
+"""Tournament engine: field formation (dispersion cap), the 50/30/20 split with ties
+and forfeits, and the settlement invariant on integer cents.
+"""
 
 from __future__ import annotations
 
@@ -66,7 +67,6 @@ async def _bal(session, user):
 
 
 async def _form(session, n=10, *, rating=1500):
-    """Form a full field of `n` similar players. Returns (tournament, users)."""
     users = []
     for i in range(n):
         users.append(await t_player(session, f"p{i}", rating=rating + i * 5))
@@ -85,19 +85,14 @@ async def _entries(session, tid):
     )
 
 
-# --- field formation ------------------------------------------------------ #
-
-
 async def test_field_forms_under_dispersion_cap(session):
     tournament, users = await _form(session, 10)
     assert tournament.field_size == 10 and tournament.state == "LOCKED"
-    # Everyone escrowed the entry.
     for u in users:
         assert (await _bal(session, u))[1] == 1000
 
 
 async def test_dispersion_cap_refuses_a_lopsided_field(session):
-    # Nine tight players + one far outlier → the full field can't form fairly.
     for i in range(9):
         await enq(session, await t_player(session, f"p{i}", rating=1500 + i * 5))
     outlier = await t_player(session, "outlier", rating=2600)
@@ -106,13 +101,12 @@ async def test_dispersion_cap_refuses_a_lopsided_field(session):
     assert (await session.scalar(select(Tournament.id))) is None
 
 
-# --- prize split / invariants --------------------------------------------- #
+# prize split / invariants.
 
 
 async def test_top_three_split_50_30_20_and_reconciles(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
-    # Distinct descending scores → unambiguous 1..10 ranking.
     grades = {e.id: _scored(20.0 - i) for i, e in enumerate(entries)}
     await tournament_engine.settle_tournament(session, tournament, grades)
     assert tournament.state == "SETTLED"
@@ -130,8 +124,7 @@ async def test_top_three_split_50_30_20_and_reconciles(session):
 
 async def test_tie_splits_combined_slices_remainder_to_earlier_enqueue(session):
     tournament, users = await _form(session, 10)
-    entries = await _entries(session, tournament.id)  # ordered by enqueued_at
-    # First two tie for 1st (combined 1st+2nd slices); rest descending.
+    entries = await _entries(session, tournament.id)
     grades = {}
     grades[entries[0].id] = _scored(30.0)
     grades[entries[1].id] = _scored(30.0)
@@ -140,7 +133,6 @@ async def test_tie_splits_combined_slices_remainder_to_earlier_enqueue(session):
     await tournament_engine.settle_tournament(session, tournament, grades)
     fresh = {e.id: e for e in await _entries(session, tournament.id)}
     a, b = fresh[entries[0].id], fresh[entries[1].id]
-    # Net $90; 1st+2nd slices = 45+27 = 72 → 36 each; both share rank 1.
     assert a.rank == 1 and b.rank == 1
     assert a.payout_cents + b.payout_cents == 4500 + 2700
     assert abs(a.payout_cents - b.payout_cents) <= 1  # remainder ≤ 1 cent
@@ -152,7 +144,7 @@ async def test_zero_match_entrant_forfeits_and_is_paid_nothing(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
     grades = {e.id: _scored(15.0 - i) for i, e in enumerate(entries)}
-    grades[entries[-1].id] = TournamentGrade(values=[])  # played nothing → forfeit
+    grades[entries[-1].id] = TournamentGrade(values=[])
     await tournament_engine.settle_tournament(session, tournament, grades)
     forfeiter = next(
         e for e in await _entries(session, tournament.id) if e.id == entries[-1].id
@@ -166,7 +158,7 @@ async def test_unverifiable_refunded_off_the_top(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
     grades = {e.id: _scored(15.0 - i) for i, e in enumerate(entries)}
-    grades[entries[-1].id] = TournamentGrade(values=None)  # host couldn't verify
+    grades[entries[-1].id] = TournamentGrade(values=None)
     await tournament_engine.settle_tournament(session, tournament, grades)
     refunded = next(
         e for e in await _entries(session, tournament.id) if e.id == entries[-1].id
@@ -194,16 +186,13 @@ async def test_under_min_ranked_cancels_and_refunds_all(session):
 async def test_lone_scorer_with_forfeits_settles_and_pays(session):
     tournament, _ = await _form(session, 10)
     entries = await _entries(session, tournament.id)
-    # One real score; the rest played and produced nothing (values=[], a
-    # forfeit — not a host outage). The field still has 10 participants, so it
-    # settles and the sole scorer takes the pot rather than cancelling.
     grades = {e.id: TournamentGrade(values=[]) for e in entries}
     grades[entries[0].id] = _scored(15.0)
     await tournament_engine.settle_tournament(session, tournament, grades)
     assert tournament.state == "SETTLED"
     settled = {e.id: e for e in await _entries(session, tournament.id)}
     assert settled[entries[0].id].status == "RANKED"
-    assert settled[entries[0].id].payout_cents > 1000  # more than their stake
+    assert settled[entries[0].id].payout_cents > 1000
     assert settled[entries[1].id].status == "OUT"
     assert settled[entries[1].id].payout_cents == 0
     recon = await reconciliation_service.check(session, "tournament", tournament.id)

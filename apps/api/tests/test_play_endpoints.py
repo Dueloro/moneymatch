@@ -1,6 +1,6 @@
-"""`/play` + `/activity` HTTP surface: markets, the queue → confirm → active
-flow, the waiting list, tamper-resistance (no amounts/timestamps, no settle
-endpoint), and the queue kill switch.
+"""`/play` + `/activity` HTTP surface: markets, the queue → confirm → active flow,
+the waiting list, tamper-resistance (no amounts/timestamps, no settle endpoint),
+and the queue kill switch.
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ CHESS = "chess.lichess"
 
 
 async def setup_player(client, auth_id, name, *, rating=1500, host=None):
-    """Provision a user via the auth path, then link a Lichess account."""
     r = await client.get(f"{V1}/me", headers=auth_headers(auth_id))
     assert r.status_code == 200
     sm = new_sessionmaker()
@@ -44,9 +43,6 @@ def _hdr(auth_id):
     return auth_headers(auth_id)
 
 
-# --- markets -------------------------------------------------------------- #
-
-
 async def test_markets_lists_chess_with_derived_multiplier(client):
     await setup_player(client, "auth_m1", "m1")
     r = await client.get(
@@ -59,10 +55,7 @@ async def test_markets_lists_chess_with_derived_multiplier(client):
     assert [m["key"] for m in body["markets"]] == ["win_h2h"]
     h2h = body["markets"][0]
     assert h2h["requires_speed"] is True and h2h["speeds"]
-    assert h2h["multiplier_bps"] == 18000  # derived ×1.80, never an odds line
-
-
-# --- queue → confirm → active -------------------------------------------- #
+    assert h2h["multiplier_bps"] == 18000
 
 
 async def _queue(client, auth_id, speed="blitz", entry=1000):
@@ -90,11 +83,9 @@ async def test_full_queue_confirm_activate_flow(client):
     assert body2["status"] == "matched"
     match_id = body2["match"]["id"]
 
-    # Alice sees "matched" on her status poll.
     rs = await client.get(f"{V1}/play/queue/status", headers=_hdr("auth_a"))
     assert rs.json()["status"] == "matched"
 
-    # Both confirm → ACTIVE, with an honest forecast on the card.
     rc1 = await client.post(
         f"{V1}/play/matches/{match_id}/confirm", headers=_hdr("auth_a")
     )
@@ -107,7 +98,6 @@ async def test_full_queue_confirm_activate_flow(client):
     assert active["forecast"]["you_win_prob"] > 0
     assert "model gives you" in active["forecast"]["label"]
 
-    # Escrow shows on the wallet ("$X in play").
     rw = await client.get(f"{V1}/wallet", headers=_hdr("auth_a"))
     assert rw.json()["escrow_cents"] == 1000
 
@@ -115,7 +105,7 @@ async def test_full_queue_confirm_activate_flow(client):
 async def test_waiting_list_and_direct_match(client):
     await setup_player(client, "auth_w1", "w1")
     await setup_player(client, "auth_w2", "w2")
-    await _queue(client, "auth_w1")  # w1 waits
+    await _queue(client, "auth_w1")
 
     rw = await client.get(f"{V1}/play/waiting", headers=_hdr("auth_w2"))
     waiting = rw.json()["waiting"]
@@ -140,22 +130,18 @@ async def test_activity_lists_the_match(client):
     assert len(items) == 1
     assert items[0]["type"] == "match"
     assert items[0]["opponent_username"] == "ac2"
-    assert items[0]["net_cents"] is None  # still in flight
-
-
-# --- tamper-resistance ---------------------------------------------------- #
+    assert items[0]["net_cents"] is None
 
 
 async def test_queue_rejects_non_preset_entry(client):
     await setup_player(client, "auth_t1", "t1")
-    r = await _queue(client, "auth_t1", entry=1234)  # not a preset
+    r = await _queue(client, "auth_t1", entry=1234)
     assert r.status_code == 422
     assert r.json()["code"] == "invalid_entry"
 
 
 async def test_there_is_no_settle_endpoint(client):
     await setup_player(client, "auth_ns", "ns")
-    # A client can never post a settlement — only the worker settles.
     r = await client.post(
         f"{V1}/play/matches/00000000-0000-0000-0000-000000000000/settle",
         json={"winner": "me", "amount_cents": 99999},

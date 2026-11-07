@@ -1,5 +1,6 @@
-"""Notifications (08-phase-5 · tests): unread counts and idempotent mark-read,
-at the service level and over the HTTP Inbox surface."""
+"""Notifications: unread counts and idempotent mark-read, at the service level and
+over the HTTP Inbox surface.
+"""
 
 from __future__ import annotations
 
@@ -25,10 +26,8 @@ async def test_unread_count_and_mark_read_idempotent(session):
 
     assert await notes.unread_count(session, user.id) == 3
 
-    # Mark one read → 2 left.
     unread = await notes.mark_read(session, user.id, ids=[a.id])
     assert unread == 2
-    # Re-marking the same one is a no-op.
     assert await notes.mark_read(session, user.id, ids=[a.id]) == 2
 
     # Mark all read → 0, and again is idempotent.
@@ -54,11 +53,9 @@ async def test_inbox_endpoint_and_me_bell(client):
         await notes.emit(s, user.id, "friend_request", {"x": 2})
         await s.commit()
 
-    # /me carries the unread count for the sidebar bell.
     r = await client.get(f"{V1}/me", headers=auth_headers("auth_a"))
     assert r.json()["unread_notifications"] == 2
 
-    # Inbox lists them, then marking read clears the bell.
     r = await client.get(f"{V1}/notifications", headers=auth_headers("auth_a"))
     body = r.json()
     assert body["unread"] == 2 and len(body["items"]) == 2

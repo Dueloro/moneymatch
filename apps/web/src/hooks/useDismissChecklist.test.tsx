@@ -5,17 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useMe, useSetDismissedChecklists } from './useMe';
 
-/**
- * These tests exercise the *real* dismiss path — the click → PATCH → cache →
- * reload chain — instead of stubbing the mutation. The previous coverage mocked
- * `useSetDismissedChecklists` to a bare `vi.fn`, so a broken write (or a card
- * that reappears on reload) sailed through green. Here only the transport
- * (`lib/api`) and auth are mocked; the mutation, cache, and `/me` refetch are
- * the code under test.
- */
-
-// A stand-in server: the mocked PATCH persists here, the mocked GET reads back
-// from here — so "reload" (a fresh QueryClient) genuinely re-reads server state.
 const { server, apiGet, apiPatch } = vi.hoisted(() => {
   const server = { dismissed: [] as string[] };
   return {
@@ -29,7 +18,6 @@ const { server, apiGet, apiPatch } = vi.hoisted(() => {
         _path: string,
         opts: { body: { dismissed_checklists: string[] } },
       ): Promise<{ data: unknown; error: unknown }> => {
-        // Simulate a real round-trip so concurrent dismisses can interleave.
         await new Promise((r) => setTimeout(r, 5));
         server.dismissed = opts.body.dismissed_checklists;
         return { data: meResponse(server.dismissed), error: undefined };
@@ -75,7 +63,6 @@ function wrapperFor(client: QueryClient) {
   );
 }
 
-/** Render `/me` + the dismiss mutation together on one client, like the app. */
 function renderMeWithDismiss(client: QueryClient) {
   return renderHook(() => ({ me: useMe(), dismiss: useSetDismissedChecklists() }), {
     wrapper: wrapperFor(client),
@@ -105,8 +92,6 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
       body: { dismissed_checklists: ['future.game'] },
     });
 
-    // Reload: a brand-new client with an empty cache must re-read the dismissal
-    // from the server, proving it was persisted and not just optimistic.
     const reloaded = renderMeWithDismiss(makeClient());
     await waitFor(() =>
       expect(reloaded.result.current.me.data?.user.dismissed_checklists).toEqual([
@@ -122,9 +107,6 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
 
     act(() => result.current.dismiss.mutate('future.game'));
 
-    // Cache reflects the dismissal immediately — the PATCH has a 5ms delay, so
-    // this can only be the optimistic update, which is what makes the X feel
-    // like it did something on a slow connection.
     await waitFor(() =>
       expect(result.current.me.data?.user.dismissed_checklists).toContain(
         'future.game',
@@ -142,9 +124,6 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
       result.current.dismiss.mutate('future.game');
     });
 
-    // The old code built the list from a stale `dismissed_checklists`, so the
-    // second dismiss overwrote the first ([future] instead of [chess, future]) and a
-    // card reappeared on reload. Both must persist.
     await waitFor(() =>
       expect(new Set(server.dismissed)).toEqual(
         new Set(['chess.lichess', 'future.game']),
@@ -163,8 +142,6 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
 
     act(() => result.current.dismiss.mutate('future.game'));
 
-    // After the error settles, the dismissal is rolled back and the server was
-    // never mutated — the card comes back rather than silently vanishing.
     await waitFor(() => expect(result.current.dismiss.isError).toBe(true));
     expect(server.dismissed).toEqual([]);
     await waitFor(() =>

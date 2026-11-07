@@ -13,12 +13,6 @@ from moneymatch_api.services.sandbagging_service import SandbaggingBlockedError
 
 from .factories import chess_profile, create_linked_account, create_user
 
-# No module-level `pytest.mark.asyncio`: `asyncio_mode = "auto"` in pyproject
-# already collects every async test here, so the marker was redundant — and
-# applying it to the three pure z-test functions below made pytest warn on each
-# one. Warnings in a money-relevant control are where a real warning goes to
-# hide (AUDIT_FINDINGS.md P2-1).
-
 CHESS = "chess.lichess"
 METRIC = "chess_moves"
 
@@ -30,7 +24,6 @@ def test_sandbag_z_none_without_enough_history():
 
 @pytest.mark.nodb
 def test_sandbag_z_flags_a_tanked_recent_window():
-    # Older baseline steady ~1.5; recent 10 tanked to ~0.6 → strongly negative z.
     baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
     recent = [0.6] * 10
     z = sandbagging_service.sandbag_z(recent + baseline, recent_n=10)
@@ -61,7 +54,6 @@ def test_sandbag_z_steady_form_not_flagged():
 
 class _FakeAdapter:
     def __init__(self, values_oldest_first):
-        # NormGame list is oldest-first (as adapters return).
         self._games = [
             NormGame(
                 id=str(i),
@@ -85,7 +77,6 @@ async def test_evaluate_writes_flag_and_blocks(session, monkeypatch):
     await create_linked_account(
         session, user, CHESS, host_account_id="host_tank", profile=chess_profile("tank")
     )
-    # Oldest-first: a ~35-move baseline, then a recent tail of slow ~55-move wins.
     baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
     recent_tanked = [55.0, 54.0, 56.0, 55.0, 53.0, 57.0, 55.0, 54.0, 56.0, 55.0]
     monkeypatch.setattr(
@@ -107,7 +98,6 @@ async def test_existing_flag_blocks_without_re_evaluating(session, monkeypatch):
     )
     await session.flush()
 
-    # Adapter would raise if called — the existing flag short-circuits first.
     def _boom(_g):
         raise AssertionError("should not evaluate when already flagged")
 
@@ -129,14 +119,12 @@ async def test_steady_player_not_blocked(session, monkeypatch):
     )
     steady = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0] * 4
     monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(steady))
-    # No raise.
     await sandbagging_service.assert_not_sandbagging(
         session, user, CHESS, METRIC, "host_clean"
     )
 
 
 async def test_improving_player_not_blocked(session, monkeypatch):
-    """Winning in fewer moves than the baseline is improvement, not tanking."""
     user = await create_user(session, username="improver")
     await create_linked_account(
         session,

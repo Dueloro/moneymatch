@@ -122,9 +122,7 @@ describe('PlayPage', () => {
 
   it('renders one 1v1 card per market with the derived payout inside it', () => {
     renderWithProviders(<PlayPage />);
-    // 1 market = 1 card. Entry is a control inside it, not a grid dimension.
     expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
-    // 2 x $10 x (1 - 0.10) = $18.00, derived. Never an odds line.
     expect(screen.getByText('$18.00')).toBeInTheDocument();
   });
 
@@ -205,7 +203,6 @@ describe('PlayPage', () => {
   });
 
   it('opens the confirm card for a ?match= deep-link (Inbox "Respond")', () => {
-    // Queue is idle — the accepted-challenge match only comes from ?match=.
     mockStatus({ status: 'idle', match: null, can_cancel: false });
     vi.mocked(useMatch).mockReturnValue({
       data: {

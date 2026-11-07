@@ -1,9 +1,4 @@
-"""`/admin/flags` — list, toggle kill switches, edit geo_config, audit.
-
-The load-bearing property: a flip is read per-request, so it takes effect with no
-restart (09-phase-6 · "flag flips take effect without restart"). Each write lands
-an `admin_audit` row.
-"""
+"""`/admin/flags` — list, toggle kill switches, edit geo_config, audit."""
 
 from __future__ import annotations
 
@@ -52,7 +47,6 @@ async def test_toggle_takes_effect_without_restart(client):
     assert r.status_code == 200, r.text
     assert r.json()["enabled"] is True
 
-    # A fresh session reads the new value immediately (no process restart).
     sm = new_sessionmaker()
     async with sm() as s:
         flags = await feature_flags.get_boolean_flags(s)

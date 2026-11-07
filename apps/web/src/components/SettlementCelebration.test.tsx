@@ -8,9 +8,6 @@ import { outcomeOf } from '../hooks/useSettlementCelebration';
 import { SettlementCelebration } from './SettlementCelebration';
 import { SettlementProvider } from './SettlementProvider';
 
-// The overlay now reads the shared settlement stream from context, so tests
-// mount it inside the provider (which runs the detection hook against the
-// mocked activity above).
 function Cel() {
   return (
     <SettlementProvider>
@@ -20,10 +17,8 @@ function Cel() {
 }
 
 /**
- * Settlement is the moment the product does its job, and it used to happen
- * silently — a row in Activity changed state while you were looking at another
- * page. These cover the two things that make announcing it trustworthy: it
- * fires on the *transition*, and it fires exactly once.
+ * These cover the two things that make announcing it trustworthy: it fires on
+ * the *transition*, and it fires exactly once.
  */
 
 const activity = vi.hoisted(() => ({ data: undefined as unknown }));
@@ -83,7 +78,6 @@ describe('SettlementCelebration', () => {
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
 
-  // You play on lichess.org, so a result usually lands while you are away.
   it('announces a result that landed while you were away playing', () => {
     setActivity([
       item({
@@ -112,9 +106,6 @@ describe('SettlementCelebration', () => {
   });
 
   it('ignores an unannounced result that is no longer recent', () => {
-    // Coming back tomorrow should be quiet, even on a fresh browser. Sit clearly
-    // past the one-hour window (not exactly on it) so the boundary `<=` compare
-    // can't flip on sub-millisecond timing.
     setActivity([
       item({
         id: 'a',
@@ -138,8 +129,6 @@ describe('SettlementCelebration', () => {
 
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
     expect(screen.getByText('You won')).toBeInTheDocument();
-    // The visible figure counts up from zero; the announced text carries the
-    // final amount immediately, which is the number that must be right.
     expect(screen.getByRole('status')).toHaveTextContent(/You won \$90\.00/);
   });
 
@@ -153,16 +142,11 @@ describe('SettlementCelebration', () => {
     });
 
     expect(screen.getByText('You lost…')).toBeInTheDocument();
-    // A loss is stated, but the amount lost is deliberately not disclosed —
-    // not visibly and not in the announcement.
     expect(screen.getByRole('status')).toHaveTextContent(/You lost/);
     expect(screen.getByRole('status')).not.toHaveTextContent('$25.00');
     expect(screen.queryByTestId('settlement-amount')).not.toBeInTheDocument();
   });
 
-  // Only a win and a loss are celebrated for now. A push and a refund still
-  // classify correctly in the hook — a refund is NOT a loss and must never be
-  // shown as one — they simply have no overlay yet.
   it('shows no overlay for a refund, and never calls it a loss', () => {
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
     const { rerender } = render(<Cel />);
@@ -189,7 +173,6 @@ describe('SettlementCelebration', () => {
   });
 
   it('still classifies a refund as a refund, ready to re-enable', () => {
-    // The classification is the part that must not rot while the overlay is off.
     expect(outcomeOf(item({ id: 'x', state: 'CANCELED', net_cents: 0 }))).toBe(
       'refund',
     );
@@ -256,10 +239,6 @@ describe('SettlementCelebration', () => {
       rerender(<Cel />);
     });
 
-    // The one that resolved first is shown first, regardless of list order.
-    // Asserted on the card's whole text: the title appears both in the visible
-    // line and in the screen-reader announcement, so a bare text query matches
-    // twice.
     expect(screen.getByRole('status')).toHaveTextContent(/First/);
     expect(screen.getByRole('status')).not.toHaveTextContent(/Second/);
   });
@@ -328,11 +307,6 @@ describe('SettlementCelebration', () => {
   });
 
   it('takes the screen, and gives it back within two seconds', () => {
-    // A deliberate change from the first version, which floated a card and
-    // never intercepted input. The takeover brief asks for the screen, so it
-    // does block — and the bound on that cost is the whole design: ~1.9s, or
-    // instantly on a click or Escape. Anything longer would need to go back to
-    // being non-blocking.
     vi.useFakeTimers();
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
     const { rerender } = render(<Cel />);
@@ -343,13 +317,11 @@ describe('SettlementCelebration', () => {
     });
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
 
-    // Still up just before the deadline...
     act(() => {
       vi.advanceTimersByTime(1_800);
     });
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
 
-    // ...and gone just after it.
     act(() => {
       vi.advanceTimersByTime(200);
     });
@@ -357,8 +329,6 @@ describe('SettlementCelebration', () => {
   });
 
   it('keeps the win and the loss distinguishable by more than colour', () => {
-    // A win states the amount in lime; a loss is quieter and shows no amount.
-    // If they ever converge on the same treatment, this is what should fail.
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
     const { rerender, unmount } = render(<Cel />);
     act(() => {
@@ -380,16 +350,6 @@ describe('SettlementCelebration', () => {
   });
 });
 
-/**
- * The failure that made the feature useless in practice.
- *
- * `useEventStream` invalidates `['activity']` the moment the worker settles,
- * and an explicit invalidation refetches whether or not the tab is in front.
- * You have to leave this app to play, so that refetch reliably landed in a
- * backgrounded tab: the sequence played to nobody, the contest was marked
- * announced, and coming back showed nothing — permanently, because the
- * announced set is persisted.
- */
 describe('SettlementCelebration — a tab nobody is looking at', () => {
   let hidden = false;
   let focused = true;
@@ -458,7 +418,6 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
     });
     first.unmount();
 
-    // A fresh tab, reading the same persisted announced set.
     hidden = false;
     render(<Cel />);
     expect(screen.getByTestId('settlement-celebration')).toHaveAttribute(
@@ -468,12 +427,6 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
   });
 
   it('shows a result on a visible tab even when it is not the focused window', () => {
-    // The gate is visibility, not focus. `document.hasFocus()` is false whenever
-    // the page is not the OS-frontmost surface — devtools focused, another app
-    // in front, an embedded webview — which is exactly where a settlement
-    // usually lands (you leave this app to play). Requiring focus held the
-    // result forever in those cases and the sequence never played. A visible
-    // tab is on screen, so it is shown to.
     focused = false;
     setActivity([item({ id: 'p-away' })]);
     const { rerender } = render(<Cel />);
@@ -518,7 +471,6 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
     setActivity(many);
     render(<Cel />);
 
-    // All nine are recorded as announced; only the last few are performed.
     const stored = JSON.parse(
       window.localStorage.getItem('mm.announced-settlements.v2') ?? '[]',
     ) as string[];

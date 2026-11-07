@@ -1,8 +1,4 @@
-"""Server-side analytics seam (09-phase-6 · deliverable 3).
-
-Unconfigured ⇒ a safe no-op (tests never hit the network). The money/liquidity
-events fire from the settlement path — asserted by monkeypatching `capture`.
-"""
+"""Server-side analytics seam."""
 
 from __future__ import annotations
 
@@ -20,7 +16,6 @@ pytestmark = pytest.mark.asyncio
 
 async def test_capture_is_noop_without_key():
     analytics.reset_for_tests()
-    # No POSTHOG_API_KEY in the test env → returns cleanly, no exception, no network.
     analytics.capture("entry_queued", "user-123", {"x": 1})
     assert analytics._ensure_client() is False
 
@@ -52,7 +47,6 @@ async def test_settlement_emits_money_events(monkeypatch):
 
 
 async def test_capture_routes_to_posthog_when_enabled(monkeypatch):
-    """With the client forced live, capture forwards to the posthog module."""
     import sys
     import types
 

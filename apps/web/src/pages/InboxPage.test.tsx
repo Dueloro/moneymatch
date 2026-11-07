@@ -150,7 +150,6 @@ describe('InboxPage (chat)', () => {
 
   it('opens on the notification feed, with conversations listed alongside', () => {
     renderWithProviders(<InboxPage />);
-    // Notifications keep their home in the Inbox — pinned, and selected first.
     expect(screen.getByText('Everything the platform sent you')).toBeInTheDocument();
     expect(screen.getByText('jordn_cs')).toBeInTheDocument();
     expect(screen.getByText('Dueloro Support')).toBeInTheDocument();
@@ -160,13 +159,11 @@ describe('InboxPage (chat)', () => {
     renderWithProviders(<InboxPage />);
     fireEvent.click(screen.getByText('jordn_cs'));
 
-    // Scope to the thread — the list preview shows the same latest line.
     const thread = within(screen.getByLabelText('Chat with jordn_cs'));
     expect(thread.getByText('run it back?')).toBeInTheDocument();
     expect(thread.getByTestId('invite-card')).toBeInTheDocument();
     expect(thread.getByText('Solo pool · medium')).toBeInTheDocument();
     expect(thread.getByLabelText('Message')).toBeInTheDocument();
-    // Opening a thread with unread messages clears its badge.
     expect(markReadMutate).toHaveBeenCalledWith('c-1');
   });
 

@@ -79,7 +79,7 @@ describe('WalletPage', () => {
     expect(screen.getByText('$1,000.00')).toBeInTheDocument();
     // Escrow and lifetime now read as one supporting line under the hero.
     expect(screen.getByText(/\$26\.00 in play/)).toBeInTheDocument();
-    expect(screen.getByText('+$68.94')).toBeInTheDocument(); // lifetime
+    expect(screen.getByText('+$68.94')).toBeInTheDocument();
   });
 
   it('shows the signup grant ledger row', () => {

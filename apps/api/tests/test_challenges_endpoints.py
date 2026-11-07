@@ -1,6 +1,7 @@
-"""`/challenges` HTTP surface: direct challenge → accept forms a PENDING match;
-the invite-link flow returns a shareable path with a public preview; and
-rematch re-challenges the same opponent (08-phase-5 · deliverables 3, 6)."""
+"""`/challenges` HTTP surface: direct challenge → accept forms a PENDING match; the
+invite-link flow returns a shareable path with a public preview; and rematch re-
+challenges the same opponent.
+"""
 
 from __future__ import annotations
 
@@ -32,7 +33,6 @@ async def _onboard(client, auth_id, name, *, link=True):
 
 async def _befriend(client, a_auth, b_auth):
     r = await client.get(f"{V1}/friends", headers=auth_headers(b_auth))
-    # a adds b, b accepts.
     await client.post(
         f"{V1}/friends",
         headers=auth_headers(a_auth),
@@ -63,7 +63,6 @@ async def test_direct_challenge_and_accept(client):
     challenge_id = r.json()["challenge"]["id"]
     assert r.json()["challenge"]["state"] == "sent"
 
-    # bob accepts → gets a match id, and the match is his to confirm.
     r = await client.post(
         f"{V1}/challenges/{challenge_id}/accept", headers=auth_headers("auth_b")
     )
@@ -94,13 +93,11 @@ async def test_invite_link_preview_is_public_and_acceptable(client):
     token = body["invite_token"]
     assert body["invite_path"] == f"/i/{token}"
 
-    # Public preview: no auth header.
     r = await client.get(f"{V1}/challenges/token/{token}")
     assert r.status_code == 200
     assert r.json()["challenger_username"] == "alice"
     assert r.json()["valid"] is True
 
-    # A fresh, linked user accepts the invite.
     await _onboard(client, "auth_c", "carol")
     r = await client.post(
         f"{V1}/challenges/token/{token}/accept", headers=auth_headers("auth_c")
@@ -114,7 +111,6 @@ async def test_rematch_recreates_challenge(client):
     b_id = await _onboard(client, "auth_b", "bob")
     await _befriend(client, "auth_a", "auth_b")
 
-    # First contest via a direct challenge → accept.
     r = await client.post(
         f"{V1}/challenges",
         headers=auth_headers("auth_a"),
@@ -132,7 +128,6 @@ async def test_rematch_recreates_challenge(client):
     )
     match_id = r.json()["match_id"]
 
-    # Rematch: one field, same opponent/market/entry.
     r = await client.post(
         f"{V1}/challenges",
         headers=auth_headers("auth_a"),

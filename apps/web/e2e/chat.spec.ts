@@ -10,25 +10,11 @@ import {
   runId,
 } from './fixtures';
 
-/**
- * Inbox messaging, driven as a real user pair: A befriends B → A messages B
- * from the Friends tab → B's bell lights **from another page** → B replies.
- * Then, for two linked players, a head-to-head invite sent from the chat
- * composer is accepted on the card and forms a real PENDING match.
- *
- * The part unit tests can't prove: two independent sessions, the poll loop,
- * the unread cursor, and a chat invite being the same binding aggregate as the
- * Inbox Respond pill.
- */
-
-// The poll cadence is 15 s for the list and 6 s for an open thread, so the
-// cross-session assertions get a generous window.
 const POLL = { timeout: 30_000 };
 
 test('friends → DM → unread badge → reply', async ({ browser }) => {
   test.skip(!e2eAuthConfigured(), 'Set E2E_AUTH=1 and run the stack with the seam on.');
 
-  // Fresh players each run, so the friendship is always new.
   const id = runId();
   const a = await ensurePlayer({
     authId: `e2e_chat_a_${id}`,
@@ -42,7 +28,6 @@ test('friends → DM → unread badge → reply', async ({ browser }) => {
   const pageA = await signInAs(browser, a.authId, { path: '/social?tab=friends' });
   const pageB = await signInAs(browser, b.authId, { path: '/social?tab=friends' });
 
-  // --- Messaging follows friendship, so establish it first. ---------------- //
   await pageA.getByLabel('Add friend by username or code').fill(b.username);
   await pageA.getByRole('button', { name: 'Add' }).click();
 
@@ -51,7 +36,6 @@ test('friends → DM → unread badge → reply', async ({ browser }) => {
   await pageB.getByRole('button', { name: 'Accept' }).first().click(POLL);
   await expect(pageB.getByText(a.username).first()).toBeVisible(POLL);
 
-  // --- A opens the DM straight from the friend row. ------------------------ //
   await pageA.reload();
   await pageA.getByRole('tab', { name: 'Friends' }).click();
   await pageA.getByRole('button', { name: 'Message' }).first().click(POLL);
@@ -62,11 +46,9 @@ test('friends → DM → unread badge → reply', async ({ browser }) => {
   await pageA.getByLabel('Message').press('Enter');
   await expect(pageA.getByText('run it back?')).toBeVisible();
 
-  // --- B is on a different page entirely; the bell must still light. ------- //
   await pageB.goto('/wallet');
   await expect(pageB.getByTestId('inbox-unread-dot').first()).toBeVisible(POLL);
 
-  // Opening the thread clears the badge and shows the line.
   await pageB.goto('/social?tab=inbox');
   await pageB.getByRole('button').filter({ hasText: a.username }).first().click(POLL);
   const threadB = pageB.getByLabel(`Chat with ${a.username}`);
@@ -98,7 +80,6 @@ test('head-to-head invite from chat → accept → PENDING match', async ({ brow
   await pageA.getByRole('button', { name: 'Message' }).first().click(POLL);
   await expect(pageA.getByLabel(`Chat with ${b.username}`)).toBeVisible(POLL);
 
-  // The composer reuses ChallengeDialog, pre-targeted at the peer.
   await pageA.getByRole('button', { name: 'Send an invite' }).click();
   await pageA.getByRole('menuitem', { name: /Head-to-head/ }).click();
   await pageA.getByRole('button', { name: 'blitz' }).click();
@@ -114,7 +95,6 @@ test('head-to-head invite from chat → accept → PENDING match', async ({ brow
   await expect(cardB).toBeVisible(POLL);
   await cardB.getByRole('button', { name: 'Accept' }).click();
 
-  // Accepting navigates to the formed match, and it is a genuine one.
   await expect(pageB).toHaveURL(/\/play\?match=/, POLL);
   await expect(pageB.getByRole('button', { name: /Confirm & stake/ })).toBeVisible(
     POLL,

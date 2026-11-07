@@ -119,7 +119,6 @@ describe('NotificationsFeed', () => {
 
     expect(screen.getByText(/jordn_cs challenged you/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Respond' })).toBeInTheDocument();
-    // Mark-read fired on view (unread > 0).
     expect(markMutate).toHaveBeenCalledWith(undefined);
 
     fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
@@ -139,7 +138,6 @@ describe('NotificationsFeed', () => {
     vi.mocked(usePool).mockReturnValue(poolData());
     renderWithProviders(<NotificationsFeed />);
 
-    // Collapsed: the roster is not fetched or rendered yet.
     expect(screen.queryByText('testbot_ada')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Your pool room filled/ }));
@@ -178,13 +176,11 @@ describe('NotificationsFeed', () => {
     renderWithProviders(<NotificationsFeed />);
     fireEvent.click(screen.getByRole('button', { name: /A contest settled/ }));
 
-    // The winner's own number, worded for a fewest-is-better metric.
     expect(screen.getByText(/in 8 · bar 12/)).toBeInTheDocument();
     expect(screen.getByText('Cleared')).toBeInTheDocument();
     expect(screen.getByText('Missed')).toBeInTheDocument();
     expect(screen.getByText('+$90.00')).toBeInTheDocument();
 
-    // Cleared is listed above missed regardless of the order the API returned.
     const rows = screen.getAllByText(/player \(you\)|testbot_ada/);
     expect(rows[0]).toHaveTextContent('player');
   });

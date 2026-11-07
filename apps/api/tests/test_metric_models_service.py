@@ -25,11 +25,6 @@ def _norm(match_id, **metrics):
     )
 
 
-# --------------------------------------------------------------------------- #
-# Pure EWMA math
-# --------------------------------------------------------------------------- #
-
-
 def test_compute_ewma_empty_and_single():
     assert svc.compute_ewma([]) == (0.0, 0.0, 0)
     mu, sigma, n = svc.compute_ewma([1.5])
@@ -37,17 +32,10 @@ def test_compute_ewma_empty_and_single():
 
 
 def test_compute_ewma_weights_recent_samples_more():
-    # Oldest-first: three lows then a recent high. Recency weighting pulls the
-    # mean above the simple average (3.25).
     mu, sigma, n = svc.compute_ewma([1.0, 1.0, 1.0, 10.0], half_life=2)
     assert n == 4
     assert mu > 3.25
     assert sigma > 0
-
-
-# --------------------------------------------------------------------------- #
-# Bootstrap against a fake adapter
-# --------------------------------------------------------------------------- #
 
 
 class _FakeAdapter:
@@ -79,7 +67,7 @@ async def test_bootstrap_is_idempotent_upsert(session, monkeypatch):
         registry, "get", lambda gid: _FakeAdapter([_norm("1", chess_moves=30.0)])
     )
     await svc.bootstrap(session, user.id, "chess.lichess", "magnus")
-    await svc.bootstrap(session, user.id, "chess.lichess", "magnus")  # re-run
+    await svc.bootstrap(session, user.id, "chess.lichess", "magnus")
 
     rows = list(
         await session.scalars(
@@ -88,11 +76,10 @@ async def test_bootstrap_is_idempotent_upsert(session, monkeypatch):
             )
         )
     )
-    assert len(rows) == 1  # upserted, not duplicated
+    assert len(rows) == 1
 
 
 async def test_bootstrap_noop_for_a_game_with_no_rate_metrics(session, monkeypatch):
-    """A game the registry has no per-match metric for never reaches its host."""
     user = await create_user(session)
     called = False
 
@@ -105,4 +92,4 @@ async def test_bootstrap_noop_for_a_game_with_no_rate_metrics(session, monkeypat
     monkeypatch.setitem(svc.GAME_RATE_METRICS, "chess.lichess", ())
 
     assert await svc.bootstrap(session, user.id, "chess.lichess", "magnus") == []
-    assert called is False  # no rate metrics → adapter never polled
+    assert called is False

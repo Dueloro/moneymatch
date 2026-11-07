@@ -1,9 +1,4 @@
-"""AuthZ gate on the whole `/admin` tree (09-phase-6 · tests · "non-admin 403").
-
-Parametrized over **every** registered `/admin/*` route so any route added later
-is covered automatically: a non-admin gets 403, an unauthenticated caller is
-rejected, and an admin is let through the gate.
-"""
+"""AuthZ gate on the whole `/admin` tree."""
 
 from __future__ import annotations
 
@@ -23,17 +18,11 @@ V1 = "/api/v1"
 
 
 def _admin_routes() -> list[tuple[str, str]]:
-    """(METHOD, concrete-path) for every `/admin/*` route, path params filled.
-
-    Enumerated from the OpenAPI schema (robust to FastAPI's deferred router
-    inclusion) so any admin route added later is covered automatically.
-    """
     schema = create_app().openapi()
     out: list[tuple[str, str]] = []
     for path, methods in schema.get("paths", {}).items():
         if "/admin" not in path:
             continue
-        # Fill any {param} with a UUID (valid for both UUID- and str-typed params).
         concrete = path
         while "{" in concrete:
             start = concrete.index("{")
@@ -62,7 +51,6 @@ async def _onboard(client, auth_id: str, name: str, *, admin: bool = False):
 
 
 async def test_admin_routes_exist():
-    # Guard against the enumeration silently matching nothing.
     assert ADMIN_ROUTES, "no /admin routes registered"
 
 
@@ -80,7 +68,6 @@ async def test_unauthenticated_rejected(client, method, path):
 
 
 async def test_admin_passes_gate(client):
-    # An admin clears the gate on a representative read (200, not 403).
     await _onboard(client, "auth_admin", "the_admin", admin=True)
     r = await client.get(f"{V1}/admin/flags", headers=auth_headers("auth_admin"))
     assert r.status_code == 200, r.text

@@ -1,7 +1,3 @@
-"""`/pools` + `/tournaments` HTTP surface: difficulty-bar previews from the
-viewer's own baseline, the enqueue flow, the geo-fence blocking a resident
-*before* any ledger write, and that no user-supplied number is ever accepted."""
-
 from __future__ import annotations
 
 import pytest
@@ -69,9 +65,6 @@ def _hdr(auth_id):
     return auth_headers(auth_id)
 
 
-# --- pool markets --------------------------------------------------------- #
-
-
 async def test_pool_markets_quote_bars_from_own_baseline(client):
     await setup_player(client, "auth_pm", "pm", mu=34.0)
     r = await client.get(
@@ -88,11 +81,10 @@ async def test_pool_markets_quote_bars_from_own_baseline(client):
         "medium": 25.0,
         "hard": 22.0,
     }
-    # Estimated multiplier is disclosed as an estimate, never an odds line.
     assert by_diff["medium"]["est_multiplier_bps"] > 0
 
 
-# --- pool enqueue + geo-fence --------------------------------------------- #
+# pool enqueue + geo-fence.
 
 
 async def test_pool_enqueue_searches_then_room_status(client):
@@ -111,8 +103,6 @@ async def test_pool_enqueue_searches_then_room_status(client):
 
 
 async def test_activity_shows_pool_wager_and_live_without_any_match(client):
-    """Regression: a user whose only in-flight contest is a pool (no H2H match)
-    still sees it in Activity as a current wager — and with its live view."""
     from datetime import UTC, datetime, timedelta
 
     from moneymatch_api.models.linked_account import LinkedAccount
@@ -178,7 +168,7 @@ async def test_activity_shows_pool_wager_and_live_without_any_match(client):
     assert len(items) == 1
     it = items[0]
     assert it["type"] == "pool" and it["state"] == "LOCKED"
-    assert it["net_cents"] is None  # in flight → shown as "in play"
+    assert it["net_cents"] is None
     assert it["live"]["status"] == "cleared" and it["live"]["current"] == 22
 
 
@@ -234,7 +224,6 @@ async def test_pool_rejects_non_preset_entry(client):
 
 async def test_no_endpoint_accepts_a_bar_or_room_bar(client):
     await setup_player(client, "auth_b", "bb")
-    # A crafted body with bar/room_bar/payout is ignored — the server derives them.
     r = await client.post(
         f"{V1}/pools/queue",
         json={
@@ -248,10 +237,7 @@ async def test_no_endpoint_accepts_a_bar_or_room_bar(client):
         },
         headers=_hdr("auth_b"),
     )
-    assert r.status_code == 200  # extra fields ignored, not honored
-
-
-# --- tournament markets + enqueue ----------------------------------------- #
+    assert r.status_code == 200
 
 
 async def test_tournament_markets_and_enqueue(client):

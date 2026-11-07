@@ -1,8 +1,3 @@
-"""Challenges (08-phase-5 · tests): the accept path forms a correct PENDING
-match; decline/expiry notify the challenger; invite tokens are single-use, expire,
-and survive a fresh-signup accept; an unlinked challengee is prompted to link;
-and the pair rake-cap flips a challenge to a zero-rake friendly."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -72,7 +67,6 @@ async def test_direct_accept_forms_pending_match(session):
         entry_cents=ENTRY,
     )
     assert ch.state == "sent"
-    # challengee got a challenge_received notification.
     assert len(await _notifications(session, b.id, "challenge_received")) == 1
 
     match = await challenge_service.accept_direct(session, b, ch.id)
@@ -87,7 +81,6 @@ async def test_direct_accept_forms_pending_match(session):
         )
     )
     assert {s.user_id for s in seats} == {a.id, b.id}
-    # challenge resolved + linked to the match; challenger notified.
     assert ch.state == "accepted" and ch.match_id == match.id
     assert len(await _notifications(session, a.id, "challenge_accepted")) == 1
 
@@ -167,7 +160,6 @@ async def test_expiry_notifies_and_is_terminal(session):
         speed=SPEED,
         entry_cents=ENTRY,
     )
-    # Force it past its TTL and run the worker's expiry sweep.
     ch.expires_at = datetime.now(UTC) - timedelta(minutes=1)
     await session.flush()
     n = await challenge_service.expire_due(session)
@@ -175,7 +167,6 @@ async def test_expiry_notifies_and_is_terminal(session):
     assert ch.state == "expired"
     sys_notes = await _notifications(session, a.id, "system")
     assert any(n.payload.get("event") == "challenge_expired" for n in sys_notes)
-    # Accepting an expired challenge fails.
     with pytest.raises(APIError) as exc:
         await challenge_service.accept_direct(session, b, ch.id)
     assert exc.value.code in ("not_open", "expired")
@@ -190,14 +181,12 @@ async def test_invite_token_single_use_and_fresh_signup(session):
     assert ch.invite_token is not None
     token = ch.invite_token
 
-    # A brand-new user links + accepts — the funnel's end state.
     newcomer = await create_user(session, username="carol")
     await create_linked_account(session, newcomer, CHESS, host_account_id="host_carol")
     match = await challenge_service.accept_invite(session, newcomer, token)
     assert match.state == "PENDING"
     assert {s for s in (ch.challenger_id, ch.challengee_id)} == {a.id, newcomer.id}
 
-    # Single-use: a second accept fails.
     other = await create_user(session, username="dave")
     await create_linked_account(session, other, CHESS, host_account_id="host_dave")
     with pytest.raises(APIError) as exc:

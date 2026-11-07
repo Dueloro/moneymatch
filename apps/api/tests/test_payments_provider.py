@@ -1,5 +1,6 @@
-"""Payments seam (10-phase-7 §1): the demo provider books through the real
-ledger, and real rails are guarded in code so a config flip alone is inert."""
+"""Payments seam: the demo provider books through the real ledger, and real rails are
+guarded in code so a config flip alone is inert.
+"""
 
 from __future__ import annotations
 
@@ -41,8 +42,6 @@ def test_resolver_returns_demo_when_not_live() -> None:
 
 
 def test_resolver_guards_live_flag_in_code() -> None:
-    # A config flip alone must never move real money: with no live provider
-    # compiled in, `payments_live=true` raises rather than silently degrading.
     with pytest.raises(PaymentsMisconfiguredError):
         get_payment_provider(_settings(payments_live=True))
 

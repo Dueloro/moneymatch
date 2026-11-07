@@ -38,5 +38,5 @@ async def test_progress_advances_with_link(client, session):
         "getting_started"
     ]
     assert gs["linked_game"] is True
-    assert gs["placed_wager"] is False  # hasn't wagered yet
+    assert gs["placed_wager"] is False
     assert gs["complete"] is False

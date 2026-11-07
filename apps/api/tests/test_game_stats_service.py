@@ -68,7 +68,6 @@ async def test_recent_loss_resets_streak_to_zero(session):
     user = await create_user(session, username="loser")
     other = await create_user(session, username="rival")
     link = await _link(session, user)
-    # Two older wins, then a most-recent loss → streak resets to 0.
     await _settled(session, user, link, winner_id=user.id, when=_BASE)
     await _settled(
         session, user, link, winner_id=user.id, when=_BASE + timedelta(hours=1)
@@ -86,7 +85,6 @@ async def test_only_leading_wins_after_last_loss_count(session):
     user = await create_user(session, username="bouncer")
     other = await create_user(session, username="foe")
     link = await _link(session, user)
-    # win, loss, win, win (newest) → only the two trailing wins count.
     await _settled(session, user, link, winner_id=user.id, when=_BASE)
     await _settled(
         session, user, link, winner_id=other.id, when=_BASE + timedelta(hours=1)

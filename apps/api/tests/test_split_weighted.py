@@ -18,7 +18,6 @@ def test_50_30_20_split_exact():
 
 
 def test_renormalizes_when_fewer_places_filled():
-    # Only two ranked → pass weights[:2]; net 3600 split 50/30 → 2250/1350.
     split = money_math.split_weighted(4000, (50, 30), 1000)
     assert split.payouts_cents == (2250, 1350)
     assert sum(split.payouts_cents) + split.rake_cents == 4000
@@ -28,7 +27,6 @@ def test_flooring_remainder_goes_to_rake():
     # A pot that doesn't divide cleanly: remainder cents land in the rake.
     split = money_math.split_weighted(1000, (50, 30, 20), 1000)
     assert sum(split.payouts_cents) + split.rake_cents == 1000
-    # net = 900; 450/270/180 = 900 exactly here, so remainder 0.
     assert split.payouts_cents == (450, 270, 180)
 
 

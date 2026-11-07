@@ -43,7 +43,6 @@ describe('useEventStream', () => {
   beforeEach(() => {
     FakeEventSource.instances = [];
     vi.stubGlobal('EventSource', FakeEventSource as unknown as typeof EventSource);
-    // The ticket exchange: bearer token in the header, opaque ticket back.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => ({ ticket: 'tk1' }) })),
@@ -56,10 +55,8 @@ describe('useEventStream', () => {
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const es = FakeEventSource.instances[0];
-    // The stream URL carries only the single-use ticket — not the access token.
     expect(es.url).toBe('http://api.test/api/v1/events/stream?ticket=tk1');
     expect(es.url).not.toContain('tok');
-    // The token was sent in the ticket request's Authorization header.
     expect(fetch).toHaveBeenCalledWith('http://api.test/api/v1/events/ticket', {
       method: 'POST',
       headers: { Authorization: 'Bearer tok' },

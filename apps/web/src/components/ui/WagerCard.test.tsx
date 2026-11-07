@@ -35,7 +35,6 @@ describe('WagerCard fee disclosure (rake always visible pre-commit)', () => {
         feeNote={(entry) => `${(entry / 100).toFixed(2)} platform fee`}
       />,
     );
-    // Middle preset (2500) is selected by default.
     expect(screen.getByText('25.00 platform fee')).toBeInTheDocument();
   });
 

@@ -1,9 +1,4 @@
-"""Direct-insert factories for service/DB tests.
-
-These bypass the HTTP layer and (deliberately) the wallet_service so a test can
-arrange a known starting balance before exercising the money primitives. Real
-provisioning + signup grant is tested separately.
-"""
+"""Direct-insert factories for service/DB tests."""
 
 from __future__ import annotations
 
@@ -86,7 +81,6 @@ def chess_profile(
 def chess_moves_corrected(
     mu: float, sigma: float, n: int, rating: float | None = 1500
 ) -> tuple[float, float]:
-    """(mu, sigma) for `chess_moves` after the rating prior and spread floor."""
     mu, sigma = skill_prior.shrink(
         mu, sigma, n, skill_prior.prior_for("chess_moves", rating)
     )

@@ -22,7 +22,6 @@ async def test_dismiss_persists_on_me(client):
     )
     assert r.status_code == 200
     assert r.json()["user"]["dismissed_checklists"] == ["chess.lichess"]
-    # Survives a fresh read (server-side, not client state).
     again = await client.get(f"{V1}/me", headers=auth_headers(auth))
     assert again.json()["user"]["dismissed_checklists"] == ["chess.lichess"]
 

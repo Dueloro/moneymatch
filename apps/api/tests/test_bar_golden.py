@@ -1,20 +1,4 @@
-"""Golden-snapshot harness for bar-setting mathematics (Phase 0.2).
-
-`IMPLEMENTATION_STATUS.md` §5 claims an "audit replay guarantee": every number a
-player sees re-derives byte-for-byte from stored inputs. That claim was not
-machine-checked. This file makes it so, and is the regression net for every
-Phase 2 change to the maths.
-
-For a fixed corpus of (game, metric, μ, σ, n) it records, per difficulty:
-`σ_effective`, `n_eff`, `bar`, `p_quoted`, `room_bar` and the display
-`multiplier`, and diffs the whole thing against a frozen JSON file.
-
-**Any change that moves a number must move it in the golden file, deliberately,
-with the diff reviewed in the commit.** Regenerate with:
-
-    UPDATE_BAR_GOLDEN=1 pytest tests/test_bar_golden.py
-
-"""
+"""Golden-snapshot harness for bar-setting mathematics."""
 
 from __future__ import annotations
 
@@ -39,7 +23,6 @@ pytestmark = pytest.mark.nodb
 
 GOLDEN_PATH = pathlib.Path(__file__).parent / "golden" / "bar_snapshots.json"
 
-#: (label, game, metric, μ, σ, n): the lognormal, lower-is-better chess bar.
 CORPUS: list[tuple[str, str, str, float, float, int]] = [
     ("chess_moves_1000", "chess.lichess", "chess_moves", 26.8, 11.94, 20),
     ("chess_moves_2000", "chess.lichess", "chess_moves", 36.9, 11.94, 60),
@@ -48,12 +31,6 @@ CORPUS: list[tuple[str, str, str, float, float, int]] = [
 
 
 def ewma_n_eff(n: int, half_life: int = METRIC_EWMA_HALF_LIFE) -> float:
-    """Kish effective sample size of the EWMA window: ``(Σw)² / Σw²``.
-
-    `compute_ewma` reports the *raw* count `n`, which overstates how much
-    evidence a recency-weighted mean actually carries. Recorded here from Phase
-    0 so the Student-t work in Phase 2.3 has a baseline to move against.
-    """
     if n <= 0:
         return 0.0
     weights = [0.5 ** ((n - 1 - i) / half_life) for i in range(n)]
@@ -84,8 +61,6 @@ def _snapshot_case(
             positive=shape["positive"],
         )
         p_target = fairness.p_target_for_k(k)
-        # A room of identical members is the deterministic reference shape: the
-        # room bar must equal the personal bar, which is itself a useful check.
         room_bar = fairness.room_bar([bar] * POOL_ROOM_SIZE, increment)
         multiplier_bps = money_math.pool_multiplier_estimate_bps(
             p_target, POOL_ROOM_SIZE
@@ -113,14 +88,6 @@ def _snapshot_case(
 
 
 def _numerics_meta() -> dict:
-    """Library versions that can move a quoted number.
-
-    scipy quantiles feed bar placement from Phase 2.3 onward. A patch release
-    that shifts a quantile in the sixth decimal place can move a *rounded* bar,
-    which is a real change to what a player is quoted. Recording the version
-    here means such a diff can be **attributed** rather than guessed at
-    (REPLY_TO_AGENT.md §3).
-    """
     import scipy
 
     return {"scipy": scipy.__version__}
@@ -134,7 +101,6 @@ def build_snapshot() -> dict:
 
 
 def test_bar_golden_snapshot():
-    """The whole bar surface, frozen. A diff here is a deliberate maths change."""
     current = build_snapshot()
 
     if os.environ.get("UPDATE_BAR_GOLDEN"):
@@ -166,12 +132,6 @@ def test_bar_golden_snapshot():
 
 
 def test_numerics_version_is_recorded_and_unchanged():
-    """A library upgrade must be a deliberate, reviewed event.
-
-    This is intentionally a *separate* failure from a bar diff: an upgrade that
-    moves no bar should still be noticed and re-blessed, and an upgrade that
-    does move a bar should not be mistaken for a maths change.
-    """
     if os.environ.get("UPDATE_BAR_GOLDEN"):
         pytest.skip("regenerating")
     stored = json.loads(GOLDEN_PATH.read_text())["meta"]
@@ -191,14 +151,12 @@ def test_numerics_version_is_recorded_and_unchanged():
     ],
 )
 def test_known_bars(label: str, expected: dict[str, float]):
-    """Literal anchors, so a careless golden regeneration can't bless a regression."""
     case = _snapshot_case(label, *next(rest for lbl, *rest in CORPUS if lbl == label))
     actual = {d: case["difficulties"][d]["bar"] for d in expected}
     assert actual == pytest.approx(expected)
 
 
 def test_n_eff_matches_published_values():
-    """`n_eff` for known windows (MONEYMATCH_RESEARCH.md §2.6)."""
     assert ewma_n_eff(20, 10) == pytest.approx(17.3, abs=0.1)
     assert ewma_n_eff(50, 10) == pytest.approx(27.1, abs=0.1)
     assert ewma_n_eff(50, 20) == pytest.approx(40.4, abs=0.1)

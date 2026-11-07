@@ -40,7 +40,6 @@ describe('AdminFlagsPage', () => {
     renderWithProviders(<AdminFlagsPage />);
     expect(screen.getByText('settlement_paused')).toBeInTheDocument();
 
-    // The settlement_paused row (enabled=false) offers "Enable".
     const enableButtons = screen.getAllByText('Enable');
     await userEvent.click(enableButtons[0]);
     expect(mutate).toHaveBeenCalledWith({ key: 'settlement_paused', enabled: true });

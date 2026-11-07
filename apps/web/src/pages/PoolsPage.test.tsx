@@ -12,7 +12,6 @@ vi.mock('../hooks/useWallet', () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
   }),
 }));
-// GettingStarted (rendered by PoolsPage) reads /me; no `user` → no checklist.
 vi.mock('../hooks/useMe', () => ({
   useMe: () => ({ data: { getting_started: null } }),
   useSetDismissedChecklists: () => ({ mutate: vi.fn() }),
@@ -46,8 +45,7 @@ const MOVES_METRIC = {
   cards: [
     { difficulty: 'easy', bar: 34, clear_rate: 0.35, est_multiplier_bps: 25700 },
     { difficulty: 'medium', bar: 28, clear_rate: 0.2, est_multiplier_bps: 36000 },
-    // Capped at room_size x (1 - rake). Before that cap this card advertised
-    // $225,000 on a $25 entry, which no pot could ever fund.
+    // Capped at room_size x (1 - rake).
     { difficulty: 'hard', bar: 22, clear_rate: 0.1, est_multiplier_bps: 36000 },
   ],
 };
@@ -82,18 +80,14 @@ describe('PoolsPage', () => {
 
   it('renders one card per bar, with entry as a control inside it', () => {
     renderWithProviders(<PoolsPage />);
-    // 3 difficulties = 3 cards. Entry is a segmented control inside each card
-    // rather than a third grid dimension, so no sentence repeats.
     expect(screen.getAllByRole('button', { name: 'Join pool' })).toHaveLength(3);
     expect(screen.getAllByText('Moves to win').length).toBeGreaterThan(0);
-    expect(screen.getByText('28')).toBeInTheDocument(); // headline bar
+    expect(screen.getByText('28')).toBeInTheDocument();
     expect(screen.getByText('Win in 28 moves or fewer')).toBeInTheDocument();
     expect(
       screen.getAllByText('Wins only. A loss or a draw does not count.'),
     ).toHaveLength(3);
-    // The clear rate is a meter carrying the real number, not a sentence.
     expect(screen.getByText('20%')).toBeInTheDocument();
-    // Payout for the default (middle) entry on the medium bar: $10 -> $36.00.
     expect(screen.getAllByText('$36.00').length).toBeGreaterThan(0);
   });
 
@@ -102,11 +96,9 @@ describe('PoolsPage', () => {
     const card = screen.getByText('Win in 28 moves or fewer').closest('.rounded-card')!;
     const wc = within(card as HTMLElement);
 
-    // First tap arms the card; nothing commits until the confirm underneath.
     fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
     expect(enterMutate).not.toHaveBeenCalled();
 
-    // The confirm button carries the selected amount (default middle preset $10).
     fireEvent.click(wc.getByRole('button', { name: 'Confirm · $10.00' }));
     expect(enterMutate).toHaveBeenCalledWith({
       game: 'chess.lichess',
@@ -115,7 +107,6 @@ describe('PoolsPage', () => {
       entry_preset_cents: 1000,
     });
 
-    // Changing the entry inside the card changes what gets joined.
     fireEvent.click(wc.getByRole('tab', { name: '$25.00' }));
     fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
     fireEvent.click(wc.getByRole('button', { name: 'Confirm · $25.00' }));
@@ -155,7 +146,6 @@ describe('PoolsPage', () => {
     renderWithProviders(<PoolsPage />);
     expect(screen.getByTestId('room-card')).toBeInTheDocument();
     expect(screen.getByText(/Win in 30 moves or fewer/)).toBeInTheDocument();
-    // Your bar of 28 is already under the room's 30 moves.
     expect(screen.getByTestId('room-card')).toHaveTextContent('your bar 28');
     expect(screen.getByText('2 under')).toBeInTheDocument();
     expect(screen.getByText(/4 players · pot \$40.00/)).toBeInTheDocument();
@@ -166,7 +156,6 @@ describe('PoolsPage', () => {
 
   it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
     renderWithProviders(<PoolsPage />);
-    // Tucked away by default — only the toggle shows, not the panel.
     expect(screen.queryByTestId('pool-filters')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('pool-filters-toggle'));
     expect(screen.getByTestId('pool-filters')).toBeInTheDocument();

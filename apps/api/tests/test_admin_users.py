@@ -1,8 +1,4 @@
-"""`/admin/users` — search, detail, freeze/unfreeze, adjust, unbind, ledger.
-
-Covers the operator loop from exit criterion 1: find a user, see their money
-trail, and fix things — all audited.
-"""
+"""`/admin/users` — search, detail, freeze/unfreeze, adjust, unbind, ledger."""
 
 from __future__ import annotations
 
@@ -143,11 +139,9 @@ async def test_force_unbind_soft_unbinds_and_preserves_row(client):
     async with sm() as s:
         from moneymatch_api.models.linked_account import LinkedAccount
 
-        # Soft-unbind: the row is retained (history intact) but marked unbound.
         row = await s.get(LinkedAccount, link_id)
         assert row is not None and row.status == "unbound"
 
-    # A second unbind is a clean 409, not a 500.
     r2 = await client.post(
         f"{V1}/admin/linked-accounts/{link_id}/unbind",
         headers=auth_headers("auth_admin"),

@@ -3,16 +3,6 @@ import { expect, test } from '@playwright/test';
 import { e2eAuthConfigured, signInAs } from './auth';
 import { lichessConfigured, linkedA, linkedB } from './fixtures';
 
-/**
- * Head to head, through the UI: two linked players queue the same blitz market
- * at $10, get paired on rating, both confirm, and the slip hands each of them
- * the Lichess game set up for them.
- *
- * Settlement is not driven here: it needs the game played to a result
- * on Lichess, and the API has no seam to finish one. The money math is covered
- * by the API suite (`apps/api/tests/test_settlement_worker.py`).
- */
-
 test('two linked players queue blitz at $10, match, confirm, and get the game', async ({
   browser,
 }) => {
@@ -21,7 +11,6 @@ test('two linked players queue blitz at $10, match, confirm, and get the game', 
     !lichessConfigured(),
     'Set E2E_LICHESS_A and E2E_LICHESS_B to link players.',
   );
-  // The rating band widens for up to a minute before two distant ratings pair.
   test.setTimeout(150_000);
 
   const a = await linkedA();
@@ -46,7 +35,6 @@ test('two linked players queue blitz at $10, match, confirm, and get the game', 
   await pageA.getByRole('button', confirm).click();
   await pageB.getByRole('button', confirm).click();
 
-  // Active: each side gets the seat link for the Lichess game set up for them.
   for (const page of [pageA, pageB]) {
     await expect(page.getByRole('link', { name: /Go play your game/ })).toHaveAttribute(
       'href',

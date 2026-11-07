@@ -60,7 +60,7 @@ describe('ActivityPage', () => {
     renderWithProviders(<ActivityPage />);
     expect(screen.getByText('vs kvem_ · Win the game')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
-    expect(screen.getByText('+$8.00')).toBeInTheDocument(); // signed net, green
+    expect(screen.getByText('+$8.00')).toBeInTheDocument();
   });
 
   it('renders a settled pool row from its title, not an opponent', () => {
@@ -147,8 +147,6 @@ describe('ActivityPage', () => {
   });
 
   it('pops a settlement toast when a match newly resolves', () => {
-    // The settlement toast now goes through the global bus, rendered by <Toaster />.
-    // A fresh element each render avoids React's same-reference bailout.
     const view = () => (
       <>
         <ActivityPage />
@@ -156,12 +154,10 @@ describe('ActivityPage', () => {
       </>
     );
 
-    // First paint: the match is still live (seeds the "seen" set as empty).
     mockItems([item({ id: 'm9', state: 'ACTIVE', net_cents: null })]);
     const { rerender } = renderWithProviders(view());
     expect(screen.queryByText(/You won/)).not.toBeInTheDocument();
 
-    // Next poll: it settled as a win → the toast pops.
     mockItems([
       item({
         id: 'm9',

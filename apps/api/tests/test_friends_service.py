@@ -1,5 +1,6 @@
-"""Friendship state machine (08-phase-5 · tests): duplicate requests, blocked
-users, self-add rejected, the mirror-accept shortcut, caps, and presence."""
+"""Friendship state machine: duplicate requests, blocked users, self-add rejected,
+the mirror-accept shortcut, caps, and presence.
+"""
 
 from __future__ import annotations
 
@@ -63,7 +64,6 @@ async def test_mirror_request_auto_accepts(session):
     b = await create_user(session, username="bob")
     await friends_service.add_friend(session, a, "bob")
 
-    # bob adding alice back mirrors the pending request → accepted.
     fr = await friends_service.add_friend(session, b, "alice")
     assert fr.state == "accepted"
     assert fr.accepted_at is not None
@@ -74,7 +74,6 @@ async def test_accept_only_by_addressee(session):
     b = await create_user(session, username="bob")
     fr = await friends_service.add_friend(session, a, "bob")
 
-    # The requester can't accept their own request.
     with pytest.raises(APIError) as exc:
         await friends_service.accept_by_id(session, a, fr.id)
     assert exc.value.code == "not_addressee"
@@ -100,7 +99,6 @@ async def test_blocked_relationship_blocks_readd(session):
     fr = await friends_service.add_friend(session, a, "bob")
     await friends_service.block(session, a, fr.id)
 
-    # Neither party can re-add while blocked.
     with pytest.raises(APIError) as exc:
         await friends_service.add_friend(session, b, "alice")
     assert exc.value.code == "blocked"
@@ -112,7 +110,6 @@ async def test_decline_removes_row_and_allows_readd(session):
     fr = await friends_service.add_friend(session, a, "bob")
     await friends_service.decline(session, b, fr.id)
 
-    # Fresh request is allowed after a decline.
     fr2 = await friends_service.add_friend(session, a, "bob")
     assert fr2.state == "pending"
 
@@ -134,7 +131,6 @@ async def test_list_partitions_and_presence(session):
     await create_user(session, username="carol")
     d = await create_user(session, username="dave")
 
-    # a↔b accepted (b online), a→c pending outbound, d→a pending incoming.
     fr_ab = await friends_service.add_friend(session, a, "bob")
     await friends_service.accept_by_id(session, b, fr_ab.id)
     b.last_seen_at = datetime.now(UTC)
@@ -157,8 +153,6 @@ async def test_presence_window():
 
 
 async def test_reverse_pair_unique_guard(session):
-    """A→B pending then B→A (non-mirror path already covered); ensure the DB
-    never holds two rows for the same pair."""
     a = await create_user(session, username="alice")
     b = await create_user(session, username="bob")
     fr = await friends_service.add_friend(session, a, "bob")

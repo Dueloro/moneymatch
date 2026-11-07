@@ -79,7 +79,6 @@ async def test_file_dispute_and_dedupe(session, client):
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "open"
 
-    # Filing again is a conflict.
     r2 = await client.post(
         f"{V1}/play/matches/{match.id}/dispute",
         json={"reason": "again"},
@@ -87,7 +86,6 @@ async def test_file_dispute_and_dedupe(session, client):
     )
     assert r2.status_code == 409 and r2.json()["code"] == "already_disputed"
 
-    # The filer can read their dispute back.
     r3 = await client.get(
         f"{V1}/play/matches/{match.id}/dispute", headers=auth_headers("auth_da")
     )
@@ -97,7 +95,7 @@ async def test_file_dispute_and_dedupe(session, client):
 async def test_non_participant_cannot_dispute(session, client):
     a, la = await _user(session, "auth_dc", "dc")
     b, lb = await _user(session, "auth_dd", "dd")
-    await _user(session, "auth_de", "de")  # outsider
+    await _user(session, "auth_de", "de")
     match = await _settled_match(session, [(a, la), (b, lb)], winner=a.id)
     await session.commit()
 
@@ -135,7 +133,6 @@ async def test_admin_resolves_and_notifies(session, client):
         json={"reason": "regrade please"},
         headers=auth_headers("auth_dh"),
     )
-    # Admin lists open disputes and resolves one.
     lst = await client.get(f"{V1}/admin/disputes", headers=auth_headers("auth_admin_d"))
     assert lst.status_code == 200
     dispute_id = next(
@@ -151,7 +148,6 @@ async def test_admin_resolves_and_notifies(session, client):
     )
     assert res.status_code == 200 and res.json()["status"] == "resolved"
 
-    # The filer got a notification.
     notes = list(
         await session.scalars(
             select(Notification).where(
@@ -163,7 +159,6 @@ async def test_admin_resolves_and_notifies(session, client):
     assert len(notes) == 1
     assert notes[0].payload["status"] == "resolved"
 
-    # And the dispute is closed.
     row = await session.get(Dispute, dispute_id)
     await session.refresh(row)
     assert row.status == "resolved" and row.resolved_at is not None
@@ -212,7 +207,6 @@ async def test_file_pool_dispute_participant_only(session, client):
     assert r.status_code == 201, r.text
     assert r.json()["ref_type"] == "pool" and r.json()["status"] == "open"
 
-    # A non-participant can't contest it.
     await _user(session, "auth_dpb", "dpb")
     await session.commit()
     r2 = await client.post(
@@ -268,7 +262,6 @@ async def test_file_tournament_dispute(session, client):
     assert r.status_code == 201, r.text
     assert r.json()["ref_type"] == "tournament"
 
-    # Read it back through the generic getter.
     g = await client.get(
         f"{V1}/disputes/tournament/{t.id}", headers=auth_headers("auth_dta")
     )

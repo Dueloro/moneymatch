@@ -67,15 +67,12 @@ describe('TournamentPage', () => {
 
   it('renders one card per metric and joins with the entry chosen inside it', () => {
     renderWithProviders(<TournamentPage />);
-    // 1 metric = 1 card. The advertised field size is the server's, not a
-    // number invented per entry preset.
     expect(screen.getAllByRole('button', { name: 'Join tournament' })).toHaveLength(1);
     expect(screen.getByText('top 3 paid')).toBeInTheDocument();
     expect(
       screen.getByText('Most wins across your games in the window ranks first.'),
     ).toBeInTheDocument();
 
-    // Join the $10 card (its entry amount is unique across cards).
     const card = screen
       .getByRole('button', { name: 'Join tournament' })
       .closest('.rounded-card')!;
@@ -136,7 +133,6 @@ describe('TournamentPage', () => {
   });
 
   it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
-    // A single metric hides the filter bar entirely, so use two here.
     vi.mocked(useTournamentMarkets).mockReturnValue({
       data: { ...MARKETS, metrics: [...MARKETS.metrics, STREAK_METRIC] },
     } as unknown as ReturnType<typeof useTournamentMarkets>);
@@ -147,7 +143,6 @@ describe('TournamentPage', () => {
   });
 
   it('metric filter trims the grid to the chosen metric', () => {
-    // Two open metrics so the Metric chip row appears (hidden for a single one).
     vi.mocked(useTournamentMarkets).mockReturnValue({
       data: {
         game: 'chess.lichess',
@@ -166,7 +161,6 @@ describe('TournamentPage', () => {
       },
     } as unknown as ReturnType<typeof useTournamentMarkets>);
     renderWithProviders(<TournamentPage />);
-    // Baseline: 2 metrics = 2 cards.
     expect(screen.getAllByRole('button', { name: 'Join tournament' })).toHaveLength(2);
     fireEvent.click(screen.getByTestId('tournament-filters-toggle'));
     const filters = screen.getByTestId('tournament-filters');

@@ -2,15 +2,7 @@ import { request, type APIRequestContext, type APIResponse } from '@playwright/t
 
 import { API_BASE, mintToken } from './auth';
 
-/**
- * Test players built through the public API (no seed script): mint a token via
- * the `/dev/e2e/token` seam, finish the profile with `PATCH /me`, and, when a
- * Lichess handle is given, bind it with `POST /links`. Every step is idempotent
- * so a stable `authId` can be reused across runs.
- *
- * Linking verifies the handle against the live Lichess API, and a handle can be
- * bound to one account only, so reuse the same `authId` for the same handle.
- */
+/** Every step is idempotent so a stable `authId` can be reused across runs. */
 
 export const CHESS = 'chess.lichess';
 
@@ -20,13 +12,10 @@ export interface Player {
   userId: string;
 }
 
-/** Real Lichess handles for the linked players, from the environment. */
 export const LICHESS_A = process.env.E2E_LICHESS_A;
 export const LICHESS_B = process.env.E2E_LICHESS_B;
 export const lichessConfigured = (): boolean => Boolean(LICHESS_A && LICHESS_B);
 
-/** The two linked players. A handle binds to one account, so every spec that
- * links uses these same ids. */
 export const linkedA = () =>
   ensurePlayer({
     authId: process.env.E2E_AUTH_ID_A ?? 'e2e_linked_a',
@@ -55,12 +44,10 @@ async function json<T>(resp: APIResponse): Promise<T> {
   return (await resp.json()) as T;
 }
 
-/** A short random suffix so per-run players never collide on username. */
 export function runId(): string {
   return Math.random().toString(36).slice(2, 8);
 }
 
-/** Provision and onboard a player; link Lichess when `lichess` is set. */
 export async function ensurePlayer(opts: {
   authId: string;
   username: string;
@@ -97,7 +84,6 @@ export async function ensurePlayer(opts: {
           }),
         );
       }
-      // A leftover search from an earlier run would pair with the wrong ticket.
       await ctx.delete('/api/v1/play/queue');
     }
 
@@ -111,7 +97,6 @@ export async function ensurePlayer(opts: {
   }
 }
 
-/** Make `a` and `b` friends (request + accept), if they are not already. */
 export async function ensureFriends(a: Player, b: Player): Promise<void> {
   const ctxA = await api(a.authId);
   const ctxB = await api(b.authId);
@@ -120,7 +105,6 @@ export async function ensureFriends(a: Player, b: Player): Promise<void> {
   try {
     const mine = await json<Friends>(await ctxA.get('/api/v1/friends'));
     if (mine.friends.some((f) => f.user_id === b.userId)) return;
-    // 409: a request between the two already exists (e.g. from an earlier run).
     const add = await ctxA.post('/api/v1/friends', {
       data: { username_or_code: b.username },
     });
@@ -137,7 +121,6 @@ export async function ensureFriends(a: Player, b: Player): Promise<void> {
   }
 }
 
-/** Mint a shareable head-to-head invite link as `player`; returns its path. */
 export async function createInviteLink(
   player: Player,
   opts: { speed?: string; entryCents?: number } = {},
@@ -161,7 +144,6 @@ export async function createInviteLink(
   }
 }
 
-/** The player's available balance, in cents. */
 export async function availableCents(player: Player): Promise<number> {
   const ctx = await api(player.authId);
   try {

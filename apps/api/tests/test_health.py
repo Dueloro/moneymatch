@@ -24,5 +24,4 @@ async def test_health_reports_seeded_flags(client):
 
 
 async def test_health_is_public(client):
-    # No Authorization header required.
     assert (await client.get("/api/v1/health")).status_code == 200

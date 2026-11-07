@@ -41,7 +41,6 @@ function match(overrides: Partial<ActivityItem> = {}): ActivityItem {
 describe('ActivityCard', () => {
   it('expands to show per-match stats and a contest action', () => {
     renderWithProviders(<ActivityCard item={match()} />);
-    // Collapsed: detail not shown yet.
     expect(screen.queryByText('abcd1234')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /details/i }));
@@ -50,11 +49,9 @@ describe('ActivityCard', () => {
       'href',
       'https://lichess.org/abcd1234',
     );
-    // Stat table shows the shared keys with your + opponent values.
     expect(screen.getByText('Accuracy')).toBeInTheDocument();
     expect(screen.getByText('88')).toBeInTheDocument();
     expect(screen.getByText('74')).toBeInTheDocument();
-    // A settled contest can be contested.
     expect(
       screen.getByRole('button', { name: 'Contest this result' }),
     ).toBeInTheDocument();

@@ -1,12 +1,6 @@
-"""Chaos / resilience (10-phase-7 §2).
-
-Builds on the SKIP-LOCKED re-claimability + outage-extension proofs in
-test_settlement_worker.py with the two guarantees the phase names explicitly:
-
-- A worker that dies mid-settlement never double-pays — the row settles exactly
-  once no matter how many cycles (or concurrent workers) run over it.
-- A host API that stays down through the whole window strands no escrow: the
-  match cancels and fully refunds at the hard ceiling, invariant intact.
+"""Chaos / resilience. Builds on the SKIP-LOCKED re-claimability + outage-extension
+proofs in test_settlement_worker.py with the two guarantees the phase names
+explicitly:
 """
 
 from __future__ import annotations
@@ -47,10 +41,8 @@ async def test_repeated_cycles_never_double_pay(monkeypatch):
     )
     assert first.settled == 1
     paid = await _balance(sm, info["a"])
-    assert paid == (10800, 0)  # winner +$18
+    assert paid == (10800, 0)
 
-    # Two more full cycles (as if the worker had crashed and been restarted after
-    # committing) must not touch a SETTLED match again.
     for offset in (6, 7):
         again = await settlement_worker.run_cycle(
             sm, now=info["matched_at"] + timedelta(seconds=offset)
@@ -77,7 +69,6 @@ async def test_concurrent_workers_settle_exactly_once(monkeypatch):
         settlement_worker.run_cycle(sm_b, now=now),
     )
 
-    # Exactly one of the two cycles booked the settlement; the other skipped.
     assert report_a.settled + report_b.settled == 1
     assert await _match_state(sm_a, info["match_id"]) == "SETTLED"
     assert await _balance(sm_a, info["a"]) == (10800, 0)
@@ -87,20 +78,16 @@ async def test_concurrent_workers_settle_exactly_once(monkeypatch):
 
 
 async def test_persistent_host_outage_refunds_at_hard_ceiling(monkeypatch):
-    """Host down for the entire window → cancel + full refund at the ceiling, no
-    stranded escrow, invariant intact."""
     sm = new_sessionmaker()
     info = await setup_active_chess(sm)
     monkeypatch.setattr(registry, "get", lambda gid: FakeChessAdapter(raise_host=True))
 
-    # Mid-window with the host down: escrow held, nothing settled (outage extends).
     mid = await settlement_worker.run_cycle(
         sm, now=info["matched_at"] + timedelta(hours=1)
     )
     assert mid.pending == 1
-    assert await _balance(sm, info["a"]) == (9000, 1000)  # escrow still held
+    assert await _balance(sm, info["a"]) == (9000, 1000)
 
-    # At the hard ceiling the match cancels and both stakes come back in full.
     ceiling = await settlement_worker.run_cycle(
         sm,
         now=info["matched_at"] + timedelta(seconds=MATCH_MAX_LIFETIME_SECONDS + 1),
@@ -114,7 +101,6 @@ async def test_persistent_host_outage_refunds_at_hard_ceiling(monkeypatch):
         recon = await reconciliation_service.check(s, "match", info["match_id"])
         assert recon.ok and recon.totals["rake"] == 0  # a refund rakes nothing
 
-    # A further cycle over the CANCELED match changes nothing.
     tail = await settlement_worker.run_cycle(
         sm, now=info["matched_at"] + timedelta(seconds=MATCH_MAX_LIFETIME_SECONDS + 2)
     )

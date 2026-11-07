@@ -42,8 +42,6 @@ describe('useDisplayBalance — holds the tick until the overlay closes', () => 
   });
 
   it('holds at the pre-win balance while a win overlay is up', () => {
-    // Wallet has already taken the win (100_000 → 109_000); the display backs
-    // the net out so the number the user sees behind the veil is the old one.
     wallet.data = { available_cents: 109_000 };
     settlement.current = settle({ outcome: 'win', netCents: 9_000 });
     expect(renderHook(() => useDisplayBalance()).result.current).toBe(100_000);
@@ -56,8 +54,6 @@ describe('useDisplayBalance — holds the tick until the overlay closes', () => 
   });
 
   it('reveals the new balance once the overlay is dismissed', () => {
-    // After dismiss `current` clears; the live (post-win) balance flows through
-    // and AnimatedBalance animates the difference — the tick, now visible.
     wallet.data = { available_cents: 109_000 };
     settlement.current = null;
     expect(renderHook(() => useDisplayBalance()).result.current).toBe(109_000);

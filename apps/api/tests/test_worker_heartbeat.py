@@ -1,4 +1,4 @@
-"""Worker heartbeat → /health + admin reconciliation (09-phase-6 · deliverable 4)."""
+"""Worker heartbeat → /health + admin reconciliation."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ V1 = "/api/v1"
 
 async def test_health_worker_stale_until_cycle(client):
     body = (await client.get(f"{V1}/health")).json()
-    # Never ran → no heartbeat → stale.
     assert body["worker"]["heartbeat_at"] is None
     assert body["worker"]["stale"] is True
 

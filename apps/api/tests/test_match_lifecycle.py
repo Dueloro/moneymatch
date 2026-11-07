@@ -1,5 +1,5 @@
-"""Match lifecycle: confirm/escrow, activation (chess broker),
-decline/expiry refunds, and settle (win/push/cancel) with the money invariants.
+"""Match lifecycle: confirm/escrow, activation (chess broker), decline/expiry
+refunds, and settle (win/push/cancel) with the money invariants.
 """
 
 from __future__ import annotations
@@ -40,13 +40,11 @@ async def _link(session, user):
 
 
 async def fund(session, user, amount_cents):
-    """Give a user a real, promo-backed balance so global solvency stays checkable."""
     await create_wallet(session, user, available_cents=0)
     await wallet_service.demo_deposit(session, user.id, amount_cents, memo="test fund")
 
 
 async def paired_chess(session, *, amount=10_000):
-    """Two funded chess players paired into a PENDING match. Returns (match, a, b)."""
     a = await chess_player(session, "alice", rating=1500)
     b = await chess_player(session, "bob", rating=1510)
     await fund(session, a, amount)
@@ -61,20 +59,16 @@ async def _balances(session, user):
     return w.available_cents, w.escrow_cents, w.lifetime_net_cents
 
 
-# --- confirm / escrow ----------------------------------------------------- #
-
-
 async def test_confirm_escrows_and_both_confirms_activate(session):
     match, a, b = await paired_chess(session)
     await match_lifecycle.confirm(session, match, a)
-    # One side confirmed → still PENDING, only that side escrowed.
     assert match.state == "PENDING"
     assert (await _balances(session, a))[:2] == (9000, 1000)
     assert (await _balances(session, b))[:2] == (10000, 0)
 
     await match_lifecycle.confirm(session, match, b)
     assert match.state == "ACTIVE"
-    assert match.matched_at is not None  # server-stamped
+    assert match.matched_at is not None
     assert match.window_ends_at is not None
     assert (await _balances(session, b))[:2] == (9000, 1000)
 
@@ -82,14 +76,14 @@ async def test_confirm_escrows_and_both_confirms_activate(session):
 async def test_double_confirm_is_idempotent(session):
     match, a, b = await paired_chess(session)
     await match_lifecycle.confirm(session, match, a)
-    await match_lifecycle.confirm(session, match, a)  # no second escrow
+    await match_lifecycle.confirm(session, match, a)
     assert (await _balances(session, a))[:2] == (9000, 1000)
 
 
 async def test_confirm_insufficient_balance_fails_and_stays_pending(session):
     a = await chess_player(session, "poor")
     b = await chess_player(session, "rich")
-    await fund(session, a, 500)  # < entry
+    await fund(session, a, 500)
     await fund(session, b, 10_000)
     await enq_chess(session, a)
     match = (await enq_chess(session, b)).match
@@ -97,12 +91,12 @@ async def test_confirm_insufficient_balance_fails_and_stays_pending(session):
     with pytest.raises(StakeBlockedError):
         await match_lifecycle.confirm(session, match, a)
     assert match.state == "PENDING"
-    assert (await _balances(session, a))[:2] == (500, 0)  # nothing escrowed
+    assert (await _balances(session, a))[:2] == (500, 0)
 
 
 async def test_chess_activation_brokers_and_sets_play_urls(session, monkeypatch):
     async def fake_challenge(clock_limit, clock_increment=0, *, users=None):
-        assert users and len(users) == 2  # restricted to the two linked handles
+        assert users and len(users) == 2
         return {"game_id": "g123", "urls": {"white": "u/w", "black": "u/b"}}
 
     monkeypatch.setattr(lichess, "create_open_challenge", fake_challenge)
@@ -123,7 +117,7 @@ async def test_chess_activation_brokers_and_sets_play_urls(session, monkeypatch)
 
 async def test_chess_broker_failure_leaves_match_pending(session, monkeypatch):
     async def failed_challenge(clock_limit, clock_increment=0, *, users=None):
-        return None  # host down / rejected
+        return None
 
     monkeypatch.setattr(lichess, "create_open_challenge", failed_challenge)
 
@@ -141,20 +135,14 @@ async def test_chess_broker_failure_leaves_match_pending(session, monkeypatch):
     assert match.state == "PENDING"
 
 
-# --- cancel / decline ----------------------------------------------------- #
-
-
 async def test_decline_refunds_confirmer_no_rake(session):
     match, a, b = await paired_chess(session)
-    await match_lifecycle.confirm(session, match, a)  # only A escrowed
+    await match_lifecycle.confirm(session, match, a)
     await match_lifecycle.cancel_pending(session, match, reason="declined")
     assert match.state == "CANCELED"
     assert (await _balances(session, a))[:2] == (10000, 0)  # refunded in full
     recon = await reconciliation_service.check(session, "match", match.id)
     assert recon.ok and recon.totals["rake"] == 0
-
-
-# --- settle --------------------------------------------------------------- #
 
 
 async def _activate(session, match, a, b):
@@ -171,7 +159,6 @@ async def test_settle_win_pays_winner_and_books_rake(session):
         session, match, SettlementResult(kind=WIN, winner_user_id=a.id)
     )
     assert match.state == "SETTLED" and match.winner_user_id == a.id
-    # Winner: +$18 prize on a $10 stake → +$8 net; loser: −$10.
     a_av, a_es, a_life = await _balances(session, a)
     b_av, b_es, b_life = await _balances(session, b)
     assert (a_av, a_es, a_life) == (10800, 0, 800)
@@ -179,15 +166,13 @@ async def test_settle_win_pays_winner_and_books_rake(session):
 
     recon = await reconciliation_service.check(session, "match", match.id)
     assert recon.ok
-    assert recon.totals["rake"] == 200  # $2 platform fee
+    assert recon.totals["rake"] == 200
     # sum(payouts) + rake == sum(entries): 1800 + 200 == 2000.
     assert recon.totals["distributed"] + recon.totals["rake"] == recon.totals["entries"]
     assert (await reconciliation_service.check_all(session)).ok
 
 
 async def test_settle_friendly_win_refunds_both_records_winner(session):
-    """A friendly (pair past the rake cap) grades a winner but refunds both
-    entries with zero rake — the leaderboard-excluded, fun-only path (08-phase-5)."""
     from moneymatch_api.services import markets, matchmaking
 
     a = await chess_player(session, "alice")
@@ -212,7 +197,7 @@ async def test_settle_friendly_win_refunds_both_records_winner(session):
     await match_lifecycle.settle(
         session, match, SettlementResult(kind=WIN, winner_user_id=a.id)
     )
-    assert match.state == "SETTLED" and match.winner_user_id == a.id  # recorded
+    assert match.state == "SETTLED" and match.winner_user_id == a.id
     # Both fully refunded, zero net, zero rake.
     assert (await _balances(session, a)) == (10000, 0, 0)
     assert (await _balances(session, b)) == (10000, 0, 0)
@@ -252,7 +237,6 @@ async def test_settle_is_idempotent_on_terminal_match(session):
         session, match, SettlementResult(kind=WIN, winner_user_id=a.id)
     )
     before = await _balances(session, a)
-    # A second settle is a no-op (worker double-fire safe).
     await match_lifecycle.settle(
         session, match, SettlementResult(kind=WIN, winner_user_id=b.id)
     )

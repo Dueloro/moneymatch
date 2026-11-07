@@ -1,5 +1,6 @@
-"""wallet_service: ledger rows, cached balances, invariants, immutability,
-and FOR UPDATE concurrency."""
+"""wallet_service: ledger rows, cached balances, invariants, immutability, and FOR
+UPDATE concurrency.
+"""
 
 from __future__ import annotations
 
@@ -33,9 +34,7 @@ async def _reload(session, wallet_id) -> Wallet:
     return await session.get(Wallet, wallet_id, populate_existing=True)
 
 
-# --------------------------------------------------------------------------- #
-# Primitives: ledger rows + balance cache
-# --------------------------------------------------------------------------- #
+# Primitives: ledger rows + balance cache.
 
 
 async def test_demo_deposit_credits_and_funds_from_promo(session):
@@ -48,7 +47,6 @@ async def test_demo_deposit_credits_and_funds_from_promo(session):
     assert entry.balance_after_cents == 10_00
     w = await _reload(session, wallet.id)
     assert w.available_cents == 10_00
-    # Promo account went negative by the credited amount (funds the demo money).
     promo = await session.scalar(
         select(func.coalesce(func.sum(PlatformLedgerEntry.amount_cents), 0)).where(
             PlatformLedgerEntry.account == "platform:promo"
@@ -70,7 +68,6 @@ async def test_escrow_hold_release_refund_payout_balances(session):
     w = await _reload(session, wallet.id)
     assert (w.available_cents, w.escrow_cents, w.lifetime_net_cents) == (100_00, 0, 0)
 
-    # Consume path: stake lost, lifetime records the loss.
     await ws.escrow_hold(session, user.id, 10_00, ref_type="match", ref_id=REF)
     await ws.escrow_release(session, user.id, 10_00, ref_type="match", ref_id=REF)
     w = await _reload(session, wallet.id)
@@ -80,7 +77,6 @@ async def test_escrow_hold_release_refund_payout_balances(session):
         -10_00,
     )
 
-    # Payout credits available and records the win.
     await ws.payout(session, user.id, 18_00, ref_type="match", ref_id=REF)
     w = await _reload(session, wallet.id)
     assert (w.available_cents, w.lifetime_net_cents) == (108_00, 8_00)
@@ -132,9 +128,7 @@ async def test_positive_amount_required(session):
         await ws.demo_deposit(session, user.id, -100)
 
 
-# --------------------------------------------------------------------------- #
 # Odd-pot settlement reconciles exactly (remainder → rake)
-# --------------------------------------------------------------------------- #
 
 
 async def test_odd_pot_settlement_reconciles(session):
@@ -169,9 +163,7 @@ async def test_odd_pot_settlement_reconciles(session):
     assert payouts + rake_total == pot  # sum(payouts) + rake == sum(entries)
 
 
-# --------------------------------------------------------------------------- #
-# Property-style storm: invariants hold across random operations
-# --------------------------------------------------------------------------- #
+# Property-style storm: invariants hold across random operations.
 
 
 @pytest.mark.parametrize("seed", range(20))
@@ -180,7 +172,7 @@ async def test_random_storm_keeps_invariants(session, seed):
     user = await create_user(session)
     wallet = await create_wallet(session, user, available_cents=100_00)
     ref = uuid.uuid4()
-    held = 0  # currently escrowed for `ref`
+    held = 0
 
     for _ in range(40):
         op = rng.choice(["deposit", "withdraw", "hold", "refund", "release", "payout"])
@@ -208,7 +200,7 @@ async def test_random_storm_keeps_invariants(session, seed):
             elif op == "payout":
                 await ws.payout(session, user.id, amt, ref_type="match", ref_id=ref)
         except ws.WalletError:
-            pass  # rejected ops must leave state untouched
+            pass
 
         w = await _reload(session, wallet.id)
         assert w.available_cents >= 0
@@ -229,9 +221,7 @@ async def test_random_storm_keeps_invariants(session, seed):
         assert w.escrow_cents == escrow_sum
 
 
-# --------------------------------------------------------------------------- #
 # Append-only immutability (DB trigger)
-# --------------------------------------------------------------------------- #
 
 
 async def test_ledger_update_and_delete_rejected(session):
@@ -241,7 +231,6 @@ async def test_ledger_update_and_delete_rejected(session):
     await session.commit()
 
     sm = new_sessionmaker()
-    # Each DDL error aborts its transaction, so isolate the two attempts.
     for stmt in (
         "UPDATE ledger_entries SET amount_cents = 999 WHERE id = :i",
         "DELETE FROM ledger_entries WHERE id = :i",
@@ -250,11 +239,6 @@ async def test_ledger_update_and_delete_rejected(session):
             with pytest.raises(Exception) as ei:
                 await s.execute(text(stmt), {"i": entry.id})
             assert "append-only" in str(ei.value.__cause__ or ei.value)
-
-
-# --------------------------------------------------------------------------- #
-# Concurrency: two parallel escrows against a balance that covers only one
-# --------------------------------------------------------------------------- #
 
 
 async def test_concurrent_escrow_exactly_one_succeeds(session):

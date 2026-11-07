@@ -31,7 +31,7 @@ async def test_queue_view_reports_waiting_depth(client):
     sm = new_sessionmaker()
     async with sm() as s:
         a = await chess_player(s, "waiter")
-        await enq_chess(s, a)  # one waiting ticket
+        await enq_chess(s, a)
         await s.commit()
 
     r = await client.get(f"{V1}/admin/queue", headers=auth_headers("auth_admin"))
@@ -50,7 +50,6 @@ async def test_reconciliation_clean_book(client):
     body = r.json()
     assert body["solvency_ok"] is True
     assert body["contest_violations"] == []
-    # Worker heartbeat has never been written in this test → stale.
     assert body["worker"]["stale"] is True
 
 
@@ -59,7 +58,6 @@ async def test_risk_view_and_clear_flag(client):
     sm = new_sessionmaker()
     from moneymatch_api.models.risk import RiskFlag
 
-    # Seed a user with an open sandbagging flag.
     async with sm() as s:
         flagged = await chess_player(s, "tanker")
         flag = RiskFlag(
@@ -78,7 +76,6 @@ async def test_risk_view_and_clear_flag(client):
     flags = r.json()["flags"]
     assert any(f["id"] == str(flag_id) for f in flags)
 
-    # Clear it → audited, and it drops off the open queue.
     r = await client.post(
         f"{V1}/admin/risk/flags/{flag_id}/clear", headers=auth_headers("auth_admin")
     )

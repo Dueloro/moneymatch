@@ -1,4 +1,4 @@
-"""The worker's nightly pass + its self-throttling cadence (backlog · Phase B)."""
+"""The worker's nightly pass + its self-throttling cadence."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ async def test_run_nightly_refreshes_models_and_flags_sandbagger(session, monkey
     await create_linked_account(
         session, user, CHESS, host_account_id="host_tank", profile=chess_profile("tank")
     )
-    await session.commit()  # visible to run_nightly's own sessions
+    await session.commit()
 
     baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
     recent_tanked = [55.0, 54.0, 56.0, 55.0, 53.0, 57.0, 55.0, 54.0, 56.0, 55.0]
@@ -85,6 +85,6 @@ async def test_maybe_run_nightly_runs_once_then_throttles(monkeypatch):
     monkeypatch.setattr("moneymatch_api.workers.nightly.run_nightly", _fake_nightly)
     sm = new_sessionmaker()
 
-    assert await settlement_worker.maybe_run_nightly(sm) is True  # never run → due
-    assert await settlement_worker.maybe_run_nightly(sm) is False  # throttled
+    assert await settlement_worker.maybe_run_nightly(sm) is True
+    assert await settlement_worker.maybe_run_nightly(sm) is False
     assert len(calls) == 1

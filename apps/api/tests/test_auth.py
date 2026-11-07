@@ -16,9 +16,6 @@ async def _user_count() -> int:
         return (await session.execute(select(func.count(User.id)))).scalar_one()
 
 
-# --- token validity ---------------------------------------------------------
-
-
 async def test_missing_authorization_rejected(client):
     resp = await client.get("/api/v1/me")
     assert resp.status_code == 401
@@ -54,9 +51,6 @@ async def test_valid_token_accepted(client):
     assert resp.status_code == 200
 
 
-# --- auto-provisioning ------------------------------------------------------
-
-
 async def test_first_call_provisions_user(client):
     assert await _user_count() == 0
     resp = await client.get("/api/v1/me", headers=auth_headers("auth-new"))
@@ -80,9 +74,6 @@ async def test_distinct_subjects_get_distinct_users(client):
     await client.get("/api/v1/me", headers=auth_headers("auth-1"))
     await client.get("/api/v1/me", headers=auth_headers("auth-2"))
     assert await _user_count() == 2
-
-
-# --- onboarding -------------------------------------------------------------
 
 
 async def test_onboarding_sets_identity(client):
