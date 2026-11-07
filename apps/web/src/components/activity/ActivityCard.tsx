@@ -11,7 +11,6 @@ import { useCreateChallenge } from '../../hooks/useChallenges';
 import { useFileDispute, type ContestRefType } from '../../hooks/useDisputes';
 import { AmountText } from '../ui/AmountText';
 import { ExpandableCard } from '../ui/ExpandableCard';
-import { GameBadge } from '../ui/GameBadge';
 import { PillButton } from '../ui/PillButton';
 import { LiveLine } from './LiveLine';
 
@@ -52,7 +51,7 @@ function stateLabel(item: ActivityItem): string {
   }
 }
 
-/** Stat-race result line (matches only; pools and tournaments have no opponent). */
+/** Match result line (matches only; pools and tournaments have no opponent). */
 function statLine(item: ActivityItem): string | null {
   if (item.type !== 'match') return null;
   const you = statValue(item.your_stat_line);
@@ -159,15 +158,11 @@ function DetailBody({ item }: { item: ActivityItem }) {
           {d.prize_cents ? (
             <Fact label="Prize" value={formatCurrency(d.prize_cents)} />
           ) : null}
-          {d.host_game_id && !d.host_game_id.startsWith('demo-') ? (
+          {d.host_game_id ? (
             <Fact
-              label="Match id"
+              label="Game"
               value={d.host_game_id}
-              href={
-                item.game.startsWith('chess.')
-                  ? `https://lichess.org/${d.host_game_id}`
-                  : undefined
-              }
+              href={`https://lichess.org/${d.host_game_id}`}
             />
           ) : null}
         </div>
@@ -251,7 +246,7 @@ function ContestSection({ item }: { item: ActivityItem }) {
             onChange={(e) => setReason(e.target.value)}
             rows={3}
             maxLength={1000}
-            placeholder="e.g. my last round wasn't counted"
+            placeholder="e.g. my game wasn't counted"
             className="mt-1 w-full resize-none rounded-inset border border-hairline bg-bg px-3 py-2 text-sm text-text outline-none focus:border-text-secondary"
           />
           <div className="mt-2 flex items-center gap-2">
@@ -313,12 +308,7 @@ export function ActivityCard({
       left={
         <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${dotClass(item)}`} />
       }
-      title={
-        <span className="flex min-w-0 items-center gap-2">
-          <GameBadge game={item.game} />
-          <span className="truncate">{title(item)}</span>
-        </span>
-      }
+      title={<span className="truncate">{title(item)}</span>}
       subline={
         <>
           {stateLabel(item)}

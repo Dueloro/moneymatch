@@ -95,7 +95,7 @@ const THREAD = {
       payload: {
         invite_kind: 'pool' as const,
         title: 'Solo pool · medium',
-        game: 'cs2.steam',
+        game: 'chess.lichess',
         entry_cents: 1000,
         status: 'pending' as const,
         redirect_path: '/pools',

@@ -1,16 +1,9 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '../test/testUtils';
 import { PlayPage } from './PlayPage';
 
-vi.mock('../hooks/useLinks', () => ({ useLinks: vi.fn() }));
-// useGameSelection reads the play set from /me. Gating is fail-closed: an empty
-// set now falls back to Chess only, so these CS2 fixtures set an explicit play
-// set of ['cs2.steam'] — how a real CS2 player is configured after the backfill.
-vi.mock('../hooks/useMe', () => ({
-  useMe: () => ({ data: { user: { active_games: ['cs2.steam'] } } }),
-}));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
@@ -35,7 +28,6 @@ vi.mock('../hooks/useMatchmaking', async () => {
   };
 });
 
-import { useLinks } from '../hooks/useLinks';
 import {
   prizeForEntry,
   useConfirmMatch,
@@ -52,17 +44,34 @@ import {
 const joinMutate = vi.fn();
 const confirmMutate = vi.fn();
 
-const KD_MARKET = {
-  key: 'kd_ratio',
-  label: 'K/D ratio',
-  kind: 'stat_race' as const,
-  metric: 'cs2_kd_ratio',
-  requires_speed: false,
-  speeds: [],
+const H2H_MARKET = {
+  key: 'win_h2h',
+  label: 'Win the game',
+  kind: 'win_h2h' as const,
+  requires_speed: true,
+  speeds: ['bullet', 'blitz', 'rapid'],
   multiplier_bps: 18000,
   queue_depth: 0,
-  provisional: false,
-  resolution_note: 'Higher K/D ratio wins · equal = push.',
+  resolution_note: 'Win the game · draw = push.',
+};
+
+const MATCH = {
+  game: 'chess.lichess',
+  market: 'win_h2h',
+  market_label: 'Win the game',
+  kind: 'win_h2h',
+  speed: 'blitz',
+  entry_cents: 1000,
+  pot_cents: 2000,
+  prize_cents: 1800,
+  rake_cents: 200,
+  multiplier_bps: 18000,
+  state: 'PENDING',
+  host_game_id: null,
+  matched_at: null,
+  window_ends_at: null,
+  you_confirmed: false,
+  your_play_url: null,
 };
 
 function mockStatus(status: unknown) {
@@ -74,26 +83,12 @@ function mockStatus(status: unknown) {
 describe('PlayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useLinks).mockReturnValue({
-      data: {
-        games: [
-          {
-            game: 'cs2.steam',
-            display_name: 'CS2 — FACEIT',
-            status: 'LINKED',
-            host_username: 'me',
-            linked_at: null,
-            profile: null,
-          },
-        ],
-      },
-    } as unknown as ReturnType<typeof useLinks>);
     vi.mocked(useMarkets).mockReturnValue({
       data: {
-        game: 'cs2.steam',
+        game: 'chess.lichess',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
-        markets: [KD_MARKET],
+        markets: [H2H_MARKET],
       },
     } as unknown as ReturnType<typeof useMarkets>);
     mockStatus({ status: 'idle', match: null, can_cancel: false });
@@ -137,9 +132,9 @@ describe('PlayPage', () => {
     renderWithProviders(<PlayPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Find match' }));
     expect(joinMutate).toHaveBeenCalledWith({
-      game: 'cs2.steam',
-      market: 'kd_ratio',
-      speed: undefined,
+      game: 'chess.lichess',
+      market: 'win_h2h',
+      speed: 'blitz',
       entry_preset_cents: 1000,
     });
   });
@@ -149,34 +144,54 @@ describe('PlayPage', () => {
       status: 'searching',
       match: null,
       waited_seconds: 12,
-      tolerance_stage: 0,
       can_cancel: true,
     });
     renderWithProviders(<PlayPage />);
     expect(screen.getByText('Searching…')).toBeInTheDocument();
+    expect(screen.getByText('Matching you on skill…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
+  });
+
+  it('says the search is widening after a longer wait', () => {
+    mockStatus({
+      status: 'searching',
+      match: null,
+      waited_seconds: 45,
+      can_cancel: true,
+    });
+    renderWithProviders(<PlayPage />);
+    expect(
+      screen.getByText('Widening the search for a fair match…'),
+    ).toBeInTheDocument();
+  });
+
+  it('links to the Lichess game once the match is on', () => {
+    mockStatus({
+      status: 'matched',
+      match: {
+        ...MATCH,
+        id: 'm2',
+        state: 'ACTIVE',
+        players: [],
+        you_confirmed: true,
+        your_play_url: 'https://lichess.org/abcd1234',
+        forecast: null,
+      },
+      can_cancel: false,
+    });
+    renderWithProviders(<PlayPage />);
+    expect(screen.getByRole('link', { name: /Go play your game/ })).toHaveAttribute(
+      'href',
+      'https://lichess.org/abcd1234',
+    );
   });
 
   it('shows the matched card with the honest forecast and confirms', () => {
     mockStatus({
       status: 'matched',
       match: {
+        ...MATCH,
         id: 'm1',
-        game: 'cs2.steam',
-        market: 'kd_ratio',
-        market_label: 'K/D ratio',
-        kind: 'stat_race',
-        speed: null,
-        entry_cents: 1000,
-        pot_cents: 2000,
-        prize_cents: 1800,
-        rake_cents: 200,
-        multiplier_bps: 18000,
-        state: 'PENDING',
-        brokered: false,
-        host_game_id: null,
-        matched_at: null,
-        window_ends_at: null,
         players: [
           {
             user_id: 'u2',
@@ -189,8 +204,6 @@ describe('PlayPage', () => {
             is_you: false,
           },
         ],
-        you_confirmed: false,
-        your_play_url: null,
         forecast: { you_win_prob: 0.52, label: 'Even duel — model gives you 52%' },
       },
       can_cancel: false,
@@ -206,22 +219,8 @@ describe('PlayPage', () => {
     mockStatus({ status: 'idle', match: null, can_cancel: false });
     vi.mocked(useMatch).mockReturnValue({
       data: {
+        ...MATCH,
         id: 'deep1',
-        game: 'cs2.steam',
-        market: 'kd_ratio',
-        market_label: 'K/D ratio',
-        kind: 'stat_race',
-        speed: null,
-        entry_cents: 1000,
-        pot_cents: 2000,
-        prize_cents: 1800,
-        rake_cents: 200,
-        multiplier_bps: 18000,
-        state: 'PENDING',
-        brokered: false,
-        host_game_id: null,
-        matched_at: null,
-        window_ends_at: null,
         players: [
           {
             user_id: 'u3',
@@ -234,8 +233,6 @@ describe('PlayPage', () => {
             is_you: false,
           },
         ],
-        you_confirmed: false,
-        your_play_url: null,
         forecast: null,
       },
     } as unknown as ReturnType<typeof useMatch>);
@@ -243,49 +240,6 @@ describe('PlayPage', () => {
     renderWithProviders(<PlayPage />, { route: '/play?match=deep1' });
     fireEvent.click(screen.getByRole('button', { name: /Confirm & stake/ }));
     expect(confirmMutate).toHaveBeenCalledWith('deep1');
-  });
-
-  it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
-    // A single market hides the filter bar entirely, so use two here.
-    vi.mocked(useMarkets).mockReturnValue({
-      data: {
-        game: 'cs2.steam',
-        linked: true,
-        entry_presets_cents: [500, 1000, 2500],
-        markets: [KD_MARKET, { ...KD_MARKET, key: 'adr', label: 'ADR' }],
-      },
-    } as unknown as ReturnType<typeof useMarkets>);
-    renderWithProviders(<PlayPage />);
-    expect(screen.queryByTestId('play-filters')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('play-filters-toggle'));
-    expect(screen.getByTestId('play-filters')).toBeInTheDocument();
-  });
-
-  it('market filter trims the grid to the chosen market', () => {
-    // Two open markets so the Market chip row appears (hidden for a single one).
-    vi.mocked(useMarkets).mockReturnValue({
-      data: {
-        game: 'cs2.steam',
-        linked: true,
-        entry_presets_cents: [500, 1000, 2500],
-        markets: [
-          KD_MARKET,
-          {
-            ...KD_MARKET,
-            key: 'headshot_pct',
-            label: 'Headshot %',
-            metric: 'cs2_headshot_pct',
-          },
-        ],
-      },
-    } as unknown as ReturnType<typeof useMarkets>);
-    renderWithProviders(<PlayPage />);
-    // Baseline: 2 markets = 2 cards.
-    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(2);
-    fireEvent.click(screen.getByTestId('play-filters-toggle'));
-    const filters = screen.getByTestId('play-filters');
-    fireEvent.click(within(filters).getByRole('button', { name: 'Headshot %' }));
-    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
   });
 });
 

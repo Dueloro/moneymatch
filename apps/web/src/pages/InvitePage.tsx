@@ -75,7 +75,7 @@ export function InvitePage() {
                   Sign in to accept
                 </PillButton>
                 <p className="mt-3 text-xs text-text-secondary">
-                  New here? You&apos;ll create an account and link your game next.
+                  New here? You&apos;ll create an account and link Lichess next.
                 </p>
               </div>
             ) : me.data?.needs_onboarding ? (
@@ -91,7 +91,7 @@ export function InvitePage() {
                 </PillButton>
                 {needsLink && (
                   <p className="mt-3 text-xs text-red">
-                    Link your {preview.game} account first.{' '}
+                    Link your Lichess account first.{' '}
                     <button className="underline" onClick={() => navigate('/profile')}>
                       go to Profile
                     </button>

@@ -12,10 +12,10 @@ function makeToken(payload: Record<string, unknown>): string {
 
 describe('decodeJwtClaims', () => {
   it('extracts sub + email from a JWT payload', () => {
-    const token = makeToken({ sub: 'seed_player1', email: 'p1@demo.test' });
+    const token = makeToken({ sub: 'seed_player1', email: 'p1@example.test' });
     expect(decodeJwtClaims(token)).toEqual({
       sub: 'seed_player1',
-      email: 'p1@demo.test',
+      email: 'p1@example.test',
     });
   });
 

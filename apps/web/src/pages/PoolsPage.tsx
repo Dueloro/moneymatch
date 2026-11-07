@@ -1,28 +1,23 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { GameChecklists } from '../components/GameChecklists';
+import { GettingStarted } from '../components/GettingStarted';
 import { ModeSwitcher } from '../components/ModeSwitcher';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
 import { ClearBar } from '../components/ui/ClearBar';
-import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
 import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
-import { GameTabs } from '../components/ui/GameTabs';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
-import { gameMeta, isComingSoon } from '../lib/games';
-import { barTitle, isLowerBetter, requiresWin } from '../lib/metrics';
+import { barPhrase, barTitle, isLowerBetter, requiresWin } from '../lib/metrics';
 import { feeOnNetWinnings, platformFeeNote } from '../lib/rake';
-import { filledSpots } from '../lib/spots';
-import { useAuth } from '../auth/useAuth';
-import { useGameSelection } from '../hooks/useGameSelection';
 import {
   estPrize,
   useEnterPool,
@@ -32,22 +27,17 @@ import {
   type PoolView,
 } from '../hooks/usePools';
 
-// A full pool is POOL_ROOM_SIZE (backend); we advertise the target on each card.
-const POOL_CAPACITY = 4;
-
 // Difficulty chips read easiest to hardest regardless of API order.
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'];
 
 export function PoolsPage() {
   usePageTitle('Solo pools');
-  const { isDemo } = useAuth();
-  const { games, selected: game, select: setGame } = useGameSelection();
-  const playableGame = game && !isComingSoon(game) ? game : undefined;
   const {
     data: markets,
-    isError: marketsUnavailable,
+    isError: marketsError,
     isLoading: marketsLoading,
-  } = usePoolMarkets(playableGame);
+    refetch: refetchMarkets,
+  } = usePoolMarkets();
   const { data: status } = usePoolStatus();
   const enter = useEnterPool();
 
@@ -89,38 +79,24 @@ export function PoolsPage() {
         <ModeSwitcher />
         <div className="ml-auto">
           <HowItWorks id="pools">
-            Three or four similar-skill players each get a personal bar quoted from
-            their own baseline. Clear your bar in your next match and you take a share
-            of the pot. You are playing the number, not the other players.
+            Three or four similar-skill players each get a personal bar from their own
+            baseline: a number of moves. Win your next Lichess game in that many moves
+            or fewer and you take a share of the pot. You are playing the number, not
+            the other players.
           </HowItWorks>
         </div>
       </div>
-      <GameTabs games={games} selected={game} onSelect={setGame} />
     </div>
   );
 
-  if (game && isComingSoon(game)) {
+  if (marketsError) {
     return (
       <div>
         {header}
-        <ComingSoonPanel name={gameMeta(game).name} />
-      </div>
-    );
-  }
-
-  // The markets endpoint 404s for a game that doesn't offer pools yet.
-  if (game && marketsUnavailable) {
-    return (
-      <div>
-        {header}
-        <EmptyState
-          title={`No pools on ${gameMeta(game).name} yet`}
-          subline="Solo pools are Counter Strike 2 only for now. More games are coming."
-          action={
-            <Link to="/play">
-              <PillButton>Play head to head</PillButton>
-            </Link>
-          }
+        <ErrorState
+          title="Could not load pools"
+          subline="The connection dropped. Try again."
+          onRetry={() => refetchMarkets()}
         />
       </div>
     );
@@ -131,11 +107,11 @@ export function PoolsPage() {
       <div>
         {header}
         <EmptyState
-          title={`Link your ${game ? gameMeta(game).name : 'game'} account`}
-          subline="Pools are graded from your real matches, so we need to know which account is yours."
+          title="Link your Lichess account"
+          subline="Pools settle from your Lichess games, so we need to know which account is yours."
           action={
             <Link to="/profile">
-              <PillButton>Link a game</PillButton>
+              <PillButton>Link Lichess</PillButton>
             </Link>
           }
         />
@@ -150,7 +126,7 @@ export function PoolsPage() {
     <div>
       {header}
 
-      <GameChecklists />
+      <GettingStarted />
 
       {/* From xl up the rail's "Room formed" section owns this, so a formed room
        * stops pushing the grid down. Below xl there is no rail, so keep it here
@@ -203,10 +179,7 @@ export function PoolsPage() {
       {marketsLoading ? (
         <SkeletonList rows={3} />
       ) : openMetrics.length === 0 ? (
-        <EmptyState
-          title="No pools on this game yet"
-          subline="Play a match on it and its pools appear here."
-        />
+        <EmptyState title="No pools open right now" subline="Check back shortly." />
       ) : (
         <>
           {!hasResults ? (
@@ -224,7 +197,7 @@ export function PoolsPage() {
                   {/* One card per bar. Entry is a control inside it, so a
                    * three-difficulty metric is three cards, not nine. */}
                   {m.cards.map((c) => {
-                    const key = `${game}:${m.metric}:${c.difficulty}`;
+                    const key = `${m.metric}:${c.difficulty}`;
                     return (
                       <WagerCard
                         key={key}
@@ -248,8 +221,6 @@ export function PoolsPage() {
                             feeOnNetWinnings(estPrize(entry, c.est_multiplier_bps)),
                           )
                         }
-                        capacity={POOL_CAPACITY}
-                        filled={isDemo ? filledSpots(key, POOL_CAPACITY) : undefined}
                         buttonLabel="Join pool"
                         disabled={busy}
                         joining={enter.isPending}
@@ -313,7 +284,6 @@ function PoolStatusBanner({
 }
 
 function RoomBanner({ pool }: { pool: PoolView }) {
-  const gameName = gameMeta(pool.game).name;
   return (
     <Card className="mb-6 p-5" data-testid="room-card">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -324,8 +294,9 @@ function RoomBanner({ pool }: { pool: PoolView }) {
               Room formed
             </p>
           </div>
-          <h2 className="mt-2 text-xl font-semibold capitalize text-text">
-            {pool.difficulty} {pool.metric_label} · bar {pool.room_bar}
+          <h2 className="mt-2 text-xl font-semibold text-text">
+            <span className="capitalize">{pool.difficulty}</span> ·{' '}
+            {barTitle(pool.metric, pool.room_bar)}
           </h2>
           <p className="mt-1 text-xs text-text-secondary">
             {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
@@ -337,8 +308,8 @@ function RoomBanner({ pool }: { pool: PoolView }) {
         </div>
       </div>
       <p className="mt-4 text-sm text-text" data-testid="room-play-cue">
-        Your {formatCurrency(pool.entry_cents)} is in escrow, so you can now play your{' '}
-        {gameName} game. Clear the room bar in your next match to take your share.
+        Your {formatCurrency(pool.entry_cents)} is in escrow. Play your next game on
+        Lichess and {barPhrase(pool.metric, pool.room_bar)} to take your share.
       </p>
     </Card>
   );

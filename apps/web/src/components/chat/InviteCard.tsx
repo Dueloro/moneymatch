@@ -13,7 +13,7 @@ const KIND_META = {
   h2h: { label: 'Head-to-head challenge', Icon: SwordsIcon, path: '/play' },
 } as const;
 
-/** Small metadata pill inside an invite card (game, entry, friendly). */
+/** Small metadata pill inside an invite card (entry, friendly). */
 function Chip({
   children,
   highlight = false,
@@ -76,8 +76,7 @@ export function InviteCard({ message }: { message: ChatMessage }) {
       data-testid="invite-card"
       className="w-full max-w-md overflow-hidden rounded-card border border-hairline bg-panel-raised "
       style={{
-        // A faint wash of the game's accent, so a CS2 card reads differently
-        // from a PUBG one at a glance.
+        // A faint wash of the game's accent.
         backgroundImage: `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, transparent), transparent 60%)`,
       }}
     >
@@ -110,7 +109,6 @@ export function InviteCard({ message }: { message: ChatMessage }) {
           {p.title ?? 'Invite'}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <Chip>{p.game ? gameMeta(p.game).name : 'Game'}</Chip>
           {p.entry_cents != null && (
             <Chip highlight>{formatCurrency(p.entry_cents)} entry</Chip>
           )}

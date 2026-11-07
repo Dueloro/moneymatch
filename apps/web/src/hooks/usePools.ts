@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { CHESS } from '../lib/games';
 
 // Wire types mirror `schemas/pools.py`. Every bar / room bar / payout is
 // server-derived; the client only sends metric + difficulty + a preset choice.
@@ -82,9 +83,7 @@ function messageOf(error: unknown, fallback: string): string {
   return typeof msg === 'string' && msg ? msg : fallback;
 }
 
-const CS2 = 'cs2.steam';
-
-export function usePoolMarkets(game: string = CS2) {
+export function usePoolMarkets(game: string = CHESS) {
   const { session } = useAuth();
   return useQuery({
     queryKey: ['pool-markets', game],

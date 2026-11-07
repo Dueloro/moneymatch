@@ -1,8 +1,7 @@
 // Friendly labels for the market/metric identifiers the API embeds in free-text
-// it hands the client — most visibly the ledger `memo` ("chess_accuracy easy
-// pool entry", "kd_ratio entry"). Mirrors METRIC_LABELS in the API's
-// constants.py, and adds the short market ids used in H2H match memos
-// (`match.market`, e.g. "kd_ratio"). Keep in sync when a metric/market is added.
+// it hands the client — most visibly the ledger `memo` ("chess_moves easy pool
+// entry"). Mirrors METRIC_LABELS in the API's constants.py. Keep in sync when a
+// metric/market is added.
 const ID_LABELS: Record<string, string> = {
   // Metric ids (pool/tournament memos: "{metric} {difficulty} pool entry").
   chess_accuracy: 'Chess accuracy',
@@ -10,19 +9,7 @@ const ID_LABELS: Record<string, string> = {
   chess_win_streak: 'Longest win streak',
   chess_wins: 'Total wins',
   chess_fastest_win: 'Fastest win',
-  cs2_kd_ratio: 'K/D ratio',
-  cs2_headshot_pct: 'Headshot %',
-  cs2_kills: 'Kills',
-  dota2_kda_ratio: 'KDA ratio',
-  dota2_gpm: 'GPM',
-  pubg_kills: 'Kills',
-  pubg_damage: 'Damage',
-  pubg_headshot_pct: 'Headshot %',
-  // Short market ids (H2H match memos: "{market} entry").
-  kd_ratio: 'K/D ratio',
-  kda_ratio: 'KDA ratio',
-  gpm: 'GPM',
-  headshot_pct: 'Headshot %',
+  win_h2h: 'Head to head',
 };
 
 /** Title-case a bare snake_case id so an unmapped identifier never shows raw. */

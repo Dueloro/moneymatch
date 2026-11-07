@@ -59,7 +59,7 @@ function poolData(over: Record<string, unknown> = {}) {
       members: [
         {
           user_id: 'u1',
-          username: 'demo',
+          username: 'player',
           personal_bar: 12,
           status: 'LOCKED',
           payout_cents: 0,
@@ -143,7 +143,7 @@ describe('NotificationsFeed', () => {
     expect(screen.queryByText('testbot_ada')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Your pool room filled/ }));
-    expect(screen.getByText('demo (you)')).toBeInTheDocument();
+    expect(screen.getByText('player (you)')).toBeInTheDocument();
     expect(screen.getByText('testbot_ada')).toBeInTheDocument();
     expect(screen.getByText(/Moves to win · hard/)).toBeInTheDocument();
   });
@@ -165,7 +165,7 @@ describe('NotificationsFeed', () => {
           },
           {
             user_id: 'u1',
-            username: 'demo',
+            username: 'player',
             personal_bar: 12,
             status: 'CLEARED',
             payout_cents: 9000,
@@ -185,8 +185,8 @@ describe('NotificationsFeed', () => {
     expect(screen.getByText('+$90.00')).toBeInTheDocument();
 
     // Cleared is listed above missed regardless of the order the API returned.
-    const rows = screen.getAllByText(/demo \(you\)|testbot_ada/);
-    expect(rows[0]).toHaveTextContent('demo');
+    const rows = screen.getAllByText(/player \(you\)|testbot_ada/);
+    expect(rows[0]).toHaveTextContent('player');
   });
 
   it('opens a tournament to show the ranking', () => {
@@ -202,7 +202,7 @@ describe('NotificationsFeed', () => {
         standings: [
           {
             user_id: 'u1',
-            username: 'demo',
+            username: 'player',
             score: 3,
             matches: 3,
             rank: 1,
@@ -226,7 +226,7 @@ describe('NotificationsFeed', () => {
     renderWithProviders(<NotificationsFeed />);
     fireEvent.click(screen.getByRole('button', { name: /A contest settled/ }));
 
-    expect(screen.getByText('#1 demo (you)')).toBeInTheDocument();
+    expect(screen.getByText('#1 player (you)')).toBeInTheDocument();
     expect(screen.getByText('#2 testbot_ada')).toBeInTheDocument();
     expect(screen.getByText('3 · 3 matches')).toBeInTheDocument();
     expect(screen.getByText('+$112.50')).toBeInTheDocument();

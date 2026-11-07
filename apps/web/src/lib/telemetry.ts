@@ -1,5 +1,5 @@
-// Client telemetry. The event NAMES are the load-bearing part — they outlast
-// the demo and must stay stable (ported from poc-reference telemetry.ts). Phase 6
+// Client telemetry. The event NAMES are the load-bearing part and must stay
+// stable (ported from poc-reference telemetry.ts). Phase 6
 // points `track` at PostHog (behind VITE_POSTHOG_KEY); with no key it stays
 // console-only, so local/dev never sends events (09-phase-6 · deliverable 3).
 

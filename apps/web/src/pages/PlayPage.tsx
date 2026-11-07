@@ -1,15 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { ModeSwitcher } from '../components/ModeSwitcher';
 import { PlaySlip } from '../components/play/PlaySlip';
 import { CardGrid } from '../components/ui/CardGrid';
-import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
 import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
-import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
-import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
@@ -17,9 +14,8 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { dashless, formatCurrency } from '../lib/format';
-import { gameMeta, isComingSoon } from '../lib/games';
+import { CHESS, gameMeta } from '../lib/games';
 import { platformFeeNote } from '../lib/rake';
-import { useGameSelection } from '../hooks/useGameSelection';
 import {
   prizeForEntry,
   useJoinQueue,
@@ -37,7 +33,7 @@ function marketHeadline(market: MarketRow): string {
   return dashless(market.resolution_note).split('·')[0]?.trim() ?? '';
 }
 
-/** Default speed for a speed-gated market (chess): the middle option if present. */
+/** Default speed for a speed-gated market: the middle option if present. */
 function defaultSpeed(market: MarketRow): string | undefined {
   if (!market.requires_speed) return undefined;
   return market.speeds[1] ?? market.speeds[0] ?? undefined;
@@ -49,16 +45,12 @@ const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
 export function PlayPage() {
   usePageTitle('Head to head');
-  const { games, selected: game, select: setGame } = useGameSelection();
-  // Coming-soon games have no markets endpoint, so don't fetch for them.
-  const playableGame = game && !isComingSoon(game) ? game : undefined;
-
   const {
     data: markets,
     isLoading: marketsLoading,
     isError: marketsError,
     refetch: refetchMarkets,
-  } = useMarkets(playableGame);
+  } = useMarkets(CHESS);
 
   // Inbox "Respond" lands here as /play?match=<id>; open that match's slip
   // directly (it isn't in the viewer's queue status when it came from a challenge).
@@ -73,35 +65,24 @@ export function PlayPage() {
           status: 'matched',
           match: deepLinkMatch,
           waited_seconds: null,
-          tolerance_stage: null,
           can_cancel: false,
         }
       : liveStatus;
 
-  const waiting = useWaiting(playableGame);
+  const waiting = useWaiting(CHESS);
   const join = useJoinQueue();
   const take = useTakeWaiting();
 
-  const [marketFilter, setMarketFilter] = useState<string>(ALL);
   const [speedByMarket, setSpeedByMarket] = useState<Record<string, string>>({});
 
-  const selectGame = games.find((g) => g.game === game);
   const linked = markets?.linked ?? false;
-  const meta = game ? gameMeta(game, selectGame?.display_name) : null;
+  const gameName = gameMeta(CHESS).name;
   const presets = markets?.entry_presets_cents ?? [];
   // A match is in flight: surface the slip and freeze new joins.
   const inFlight = status?.status === 'searching' || status?.status === 'matched';
 
-  // Only markets you can actually wager on are browsable.
-  const openMarkets = useMemo(
-    () => (markets?.markets ?? []).filter((m) => !m.provisional),
-    [markets],
-  );
-  const filteredMarkets = openMarkets.filter(
-    (m) => marketFilter === ALL || m.key === marketFilter,
-  );
-  const activeCount = marketFilter !== ALL ? 1 : 0;
-  const hasResults = filteredMarkets.length > 0 && presets.length > 0;
+  const openMarkets = markets?.markets ?? [];
+  const hasResults = openMarkets.length > 0 && presets.length > 0;
 
   const header = (
     <div className="mb-6 flex flex-col gap-3">
@@ -109,24 +90,14 @@ export function PlayPage() {
         <ModeSwitcher />
         <div className="ml-auto">
           <HowItWorks id="play">
-            You go 1v1 with an evenly matched opponent for the same stake. Both of you
-            play your own next match, we read the result from the game, and the better
-            stat line takes the pot.
+            You play one game of chess on Lichess against an opponent at your skill
+            level, for the same stake. We read the result from Lichess and the winner
+            takes the pot. A draw refunds both stakes.
           </HowItWorks>
         </div>
       </div>
-      <GameTabs games={games} selected={game} onSelect={setGame} />
     </div>
   );
-
-  if (game && isComingSoon(game)) {
-    return (
-      <div>
-        {header}
-        <ComingSoonPanel name={gameMeta(game, selectGame?.display_name).name} />
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -142,11 +113,11 @@ export function PlayPage() {
         />
       ) : !linked ? (
         <EmptyState
-          title={`Link your ${meta?.name ?? 'game'} account`}
-          subline="Head to head is graded from your real matches, so we need to know which account is yours."
+          title="Link your Lichess account"
+          subline="Head to head settles from your Lichess games, so we need to know which account is yours."
           action={
             <Link to="/profile">
-              <PillButton>Link a game</PillButton>
+              <PillButton>Link Lichess</PillButton>
             </Link>
           }
         />
@@ -154,54 +125,23 @@ export function PlayPage() {
         <>
           {inFlight && (
             <div className="mb-8">
-              <PlaySlip
-                status={status}
-                market={null}
-                entryCents={null}
-                presetsCents={presets}
-                onSelectEntry={() => {}}
-                onFindMatch={() => {}}
-                finding={false}
-              />
+              <PlaySlip status={status} />
             </div>
           )}
 
           {!inFlight && (
             <>
-              <SectionHeader
-                level="page"
-                action={
-                  openMarkets.length > 1 && (
-                    <FilterBar
-                      testId="play-filters"
-                      activeCount={activeCount}
-                      onClear={() => setMarketFilter(ALL)}
-                    >
-                      <FilterChips
-                        label="Market"
-                        options={openMarkets.map((m) => m.key)}
-                        selected={marketFilter}
-                        onSelect={(v) => setMarketFilter(v as string)}
-                        format={(k) =>
-                          openMarkets.find((m) => m.key === k)?.label ?? String(k)
-                        }
-                      />
-                    </FilterBar>
-                  )
-                }
-              >
-                Head to head
-              </SectionHeader>
+              <SectionHeader level="page">Head to head</SectionHeader>
 
               {hasResults ? (
-                <CardGrid count={filteredMarkets.length}>
-                  {filteredMarkets.map((m) => {
+                <CardGrid count={openMarkets.length}>
+                  {openMarkets.map((m) => {
                     const speed = speedByMarket[m.key] ?? defaultSpeed(m);
-                    const key = `${game}:${m.key}:${speed ?? ''}`;
+                    const key = `${m.key}:${speed ?? ''}`;
                     return (
                       <WagerCard
                         key={key}
-                        gameName={meta?.name ?? 'Game'}
+                        gameName={gameName}
                         tag={speed?.toUpperCase()}
                         title={m.label}
                         subtitle={marketHeadline(m)}
@@ -223,13 +163,12 @@ export function PlayPage() {
                             entry * 2 - prizeForEntry(entry, m.multiplier_bps),
                           )
                         }
-                        capacity={2}
                         oneVsOne
                         buttonLabel="Find match"
                         joining={join.isPending}
                         onJoin={(entry) =>
                           join.mutate({
-                            game: game!,
+                            game: CHESS,
                             market: m.key,
                             speed,
                             entry_preset_cents: entry,
@@ -241,8 +180,8 @@ export function PlayPage() {
                 </CardGrid>
               ) : (
                 <EmptyState
-                  title="Nothing matches those filters"
-                  subline="Clear them to see every open market."
+                  title="No head to head markets right now"
+                  subline="Check back shortly."
                 />
               )}
             </>

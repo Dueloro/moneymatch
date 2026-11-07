@@ -10,13 +10,11 @@ import { toast } from '../lib/toast';
 export interface MarketRow {
   key: string;
   label: string;
-  kind: 'win_h2h' | 'win_next' | 'stat_race';
-  metric: string | null;
+  kind: 'win_h2h';
   requires_speed: boolean;
   speeds: string[];
   multiplier_bps: number;
   queue_depth: number;
-  provisional: boolean;
   resolution_note: string;
 }
 
@@ -56,7 +54,6 @@ export interface MatchView {
   rake_cents: number;
   multiplier_bps: number;
   state: 'PENDING' | 'ACTIVE' | 'AWAITING_RESULT' | 'SETTLED' | 'PUSHED' | 'CANCELED';
-  brokered: boolean;
   host_game_id: string | null;
   matched_at: string | null;
   window_ends_at: string | null;
@@ -70,7 +67,6 @@ export interface QueueStatus {
   status: 'idle' | 'searching' | 'matched';
   match: MatchView | null;
   waited_seconds: number | null;
-  tolerance_stage: number | null;
   can_cancel: boolean;
 }
 

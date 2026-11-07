@@ -41,15 +41,14 @@ const { server, apiGet, apiPatch } = vi.hoisted(() => {
     return {
       user: {
         id: 'u1',
-        username: 'demo',
-        email: 'demo@dueloro.com',
+        username: 'player',
+        email: 'player@example.com',
         friend_code: 'MM-TEST',
         residence_state: 'MA',
         dob_attested_18plus: true,
         role: 'user',
         status: 'active',
         member_since: '2026-01-01T00:00:00Z',
-        active_games: ['chess.lichess', 'cs2.steam'],
         dismissed_checklists: dismissed,
       },
       needs_onboarding: false,
@@ -98,12 +97,12 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
       expect(result.current.me.data?.user.dismissed_checklists).toEqual([]),
     );
 
-    act(() => result.current.dismiss.mutate('cs2.steam'));
+    act(() => result.current.dismiss.mutate('future.game'));
 
     // The write lands server-side (not localStorage).
-    await waitFor(() => expect(server.dismissed).toEqual(['cs2.steam']));
+    await waitFor(() => expect(server.dismissed).toEqual(['future.game']));
     expect(apiPatch).toHaveBeenCalledWith('/api/v1/me', {
-      body: { dismissed_checklists: ['cs2.steam'] },
+      body: { dismissed_checklists: ['future.game'] },
     });
 
     // Reload: a brand-new client with an empty cache must re-read the dismissal
@@ -111,7 +110,7 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
     const reloaded = renderMeWithDismiss(makeClient());
     await waitFor(() =>
       expect(reloaded.result.current.me.data?.user.dismissed_checklists).toEqual([
-        'cs2.steam',
+        'future.game',
       ]),
     );
   });
@@ -121,13 +120,15 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
     const { result } = renderMeWithDismiss(client);
     await waitFor(() => expect(result.current.me.data).toBeTruthy());
 
-    act(() => result.current.dismiss.mutate('cs2.steam'));
+    act(() => result.current.dismiss.mutate('future.game'));
 
     // Cache reflects the dismissal immediately — the PATCH has a 5ms delay, so
     // this can only be the optimistic update, which is what makes the X feel
     // like it did something on a slow connection.
     await waitFor(() =>
-      expect(result.current.me.data?.user.dismissed_checklists).toContain('cs2.steam'),
+      expect(result.current.me.data?.user.dismissed_checklists).toContain(
+        'future.game',
+      ),
     );
   });
 
@@ -138,15 +139,15 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
 
     act(() => {
       result.current.dismiss.mutate('chess.lichess');
-      result.current.dismiss.mutate('cs2.steam');
+      result.current.dismiss.mutate('future.game');
     });
 
     // The old code built the list from a stale `dismissed_checklists`, so the
-    // second dismiss overwrote the first ([cs2] instead of [chess, cs2]) and a
+    // second dismiss overwrote the first ([future] instead of [chess, future]) and a
     // card reappeared on reload. Both must persist.
     await waitFor(() =>
       expect(new Set(server.dismissed)).toEqual(
-        new Set(['chess.lichess', 'cs2.steam']),
+        new Set(['chess.lichess', 'future.game']),
       ),
     );
   });
@@ -160,7 +161,7 @@ describe('useSetDismissedChecklists — real dismiss → persist path', () => {
     const { result } = renderMeWithDismiss(client);
     await waitFor(() => expect(result.current.me.data).toBeTruthy());
 
-    act(() => result.current.dismiss.mutate('cs2.steam'));
+    act(() => result.current.dismiss.mutate('future.game'));
 
     // After the error settles, the dismissal is rolled back and the server was
     // never mutated — the card comes back rather than silently vanishing.

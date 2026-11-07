@@ -35,8 +35,8 @@ vi.mock('../hooks/useActivity', () => ({
 function item(over: Partial<ActivityItem> & { id: string }): ActivityItem {
   return {
     type: 'pool',
-    game: 'cs2.steam',
-    market: 'cs2_kills',
+    game: 'chess.lichess',
+    market: 'win_h2h',
     market_label: 'Kills',
     kind: 'pool',
     state: 'LOCKED',
@@ -84,8 +84,7 @@ describe('SettlementCelebration', () => {
   });
 
   // The case the first version got wrong, and the one that matters most: you
-  // have to LEAVE this app to play. Chess is on lichess.org, CS2 is a desktop
-  // client. So the moment your contest settles, you are somewhere else — and a
+  // have to LEAVE this app to play. Chess is on lichess.org. So the moment your contest settles, you are somewhere else — and a
   // result only shown to an open tab is a result nobody ever sees.
   it('announces a result that landed while you were away playing', () => {
     setActivity([
@@ -493,7 +492,7 @@ describe('SettlementCelebration — a tab nobody is looking at', () => {
   });
 
   it('announces a result that resolved during a long match, not just a quick one', () => {
-    // Forty minutes away is an ordinary CS2 Premier match, not a stale visit.
+    // Forty minutes away is an ordinary classical game, not a stale visit.
     setActivity([
       item({
         id: 'p-long',

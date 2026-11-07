@@ -5,24 +5,17 @@ import { renderWithProviders } from '../test/testUtils';
 import { PoolsPage } from './PoolsPage';
 
 vi.mock('../auth/useAuth', () => ({
-  useAuth: () => ({ isDemo: false, session: null }),
+  useAuth: () => ({ session: null }),
 }));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
   }),
 }));
-// GameChecklists (rendered by PoolsPage) reads /me; no `user` → no checklist cards.
+// GettingStarted (rendered by PoolsPage) reads /me; no `user` → no checklist.
 vi.mock('../hooks/useMe', () => ({
   useMe: () => ({ data: { getting_started: null } }),
   useSetDismissedChecklists: () => ({ mutate: vi.fn() }),
-}));
-vi.mock('../hooks/useGameSelection', () => ({
-  useGameSelection: () => ({
-    games: [{ game: 'cs2.steam', display_name: 'Counter Strike 2', status: 'LINKED' }],
-    selected: 'cs2.steam',
-    select: vi.fn(),
-  }),
 }));
 vi.mock('../hooks/usePools', async () => {
   const actual =
@@ -46,16 +39,16 @@ import {
 
 const enterMutate = vi.fn();
 
-const KD_METRIC = {
-  metric: 'cs2_kd_ratio',
-  label: 'K/D ratio',
+const MOVES_METRIC = {
+  metric: 'chess_moves',
+  label: 'Moves to win',
   provisional: false,
   cards: [
-    { difficulty: 'easy', bar: 1.65, clear_rate: 0.35, est_multiplier_bps: 25700 },
-    { difficulty: 'medium', bar: 1.8, clear_rate: 0.2, est_multiplier_bps: 36000 },
+    { difficulty: 'easy', bar: 34, clear_rate: 0.35, est_multiplier_bps: 25700 },
+    { difficulty: 'medium', bar: 28, clear_rate: 0.2, est_multiplier_bps: 36000 },
     // Capped at room_size x (1 - rake). Before that cap this card advertised
     // $225,000 on a $25 entry, which no pot could ever fund.
-    { difficulty: 'hard', bar: 2.0, clear_rate: 0.1, est_multiplier_bps: 36000 },
+    { difficulty: 'hard', bar: 22, clear_rate: 0.1, est_multiplier_bps: 36000 },
   ],
 };
 
@@ -70,10 +63,10 @@ describe('PoolsPage', () => {
     vi.clearAllMocks();
     vi.mocked(usePoolMarkets).mockReturnValue({
       data: {
-        game: 'cs2.steam',
+        game: 'chess.lichess',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
-        metrics: [KD_METRIC],
+        metrics: [MOVES_METRIC],
       },
     } as unknown as ReturnType<typeof usePoolMarkets>);
     mockStatus({ status: 'idle', pool: null });
@@ -92,8 +85,12 @@ describe('PoolsPage', () => {
     // 3 difficulties = 3 cards. Entry is a segmented control inside each card
     // rather than a third grid dimension, so no sentence repeats.
     expect(screen.getAllByRole('button', { name: 'Join pool' })).toHaveLength(3);
-    expect(screen.getAllByText('K/D ratio').length).toBeGreaterThan(0);
-    expect(screen.getByText('1.80')).toBeInTheDocument(); // headline bar
+    expect(screen.getAllByText('Moves to win').length).toBeGreaterThan(0);
+    expect(screen.getByText('28')).toBeInTheDocument(); // headline bar
+    expect(screen.getByText('Win in 28 moves or fewer')).toBeInTheDocument();
+    expect(
+      screen.getAllByText('Wins only. A loss or a draw does not count.'),
+    ).toHaveLength(3);
     // The clear rate is a meter carrying the real number, not a sentence.
     expect(screen.getByText('20%')).toBeInTheDocument();
     // Payout for the default (middle) entry on the medium bar: $10 -> $36.00.
@@ -102,7 +99,7 @@ describe('PoolsPage', () => {
 
   it('confirms in the card before joining, using the selected entry', () => {
     renderWithProviders(<PoolsPage />);
-    const card = screen.getByText('Clear 1.8').closest('.rounded-card')!;
+    const card = screen.getByText('Win in 28 moves or fewer').closest('.rounded-card')!;
     const wc = within(card as HTMLElement);
 
     // First tap arms the card; nothing commits until the confirm underneath.
@@ -112,8 +109,8 @@ describe('PoolsPage', () => {
     // The confirm button carries the selected amount (default middle preset $10).
     fireEvent.click(wc.getByRole('button', { name: 'Confirm · $10.00' }));
     expect(enterMutate).toHaveBeenCalledWith({
-      game: 'cs2.steam',
-      metric: 'cs2_kd_ratio',
+      game: 'chess.lichess',
+      metric: 'chess_moves',
       difficulty: 'medium',
       entry_preset_cents: 1000,
     });
@@ -123,8 +120,8 @@ describe('PoolsPage', () => {
     fireEvent.click(wc.getByRole('button', { name: 'Join pool' }));
     fireEvent.click(wc.getByRole('button', { name: 'Confirm · $25.00' }));
     expect(enterMutate).toHaveBeenLastCalledWith({
-      game: 'cs2.steam',
-      metric: 'cs2_kd_ratio',
+      game: 'chess.lichess',
+      metric: 'chess_moves',
       difficulty: 'medium',
       entry_preset_cents: 2500,
     });
@@ -135,13 +132,13 @@ describe('PoolsPage', () => {
       status: 'formed',
       pool: {
         id: 'p1',
-        game: 'cs2.steam',
-        metric: 'cs2_kd_ratio',
-        metric_label: 'K/D ratio',
+        game: 'chess.lichess',
+        metric: 'chess_moves',
+        metric_label: 'Moves to win',
         difficulty: 'medium',
-        room_bar: 1.75,
-        your_bar: 1.8,
-        bar_delta: -0.05,
+        room_bar: 30,
+        your_bar: 28,
+        bar_delta: 2,
         entry_cents: 1000,
         pot_cents: 4000,
         prize_cents: 0,
@@ -157,11 +154,10 @@ describe('PoolsPage', () => {
     });
     renderWithProviders(<PoolsPage />);
     expect(screen.getByTestId('room-card')).toBeInTheDocument();
-    expect(screen.getByText(/bar 1.75/)).toBeInTheDocument(); // room bar
+    expect(screen.getByText(/Win in 30 moves or fewer/)).toBeInTheDocument();
     expect(screen.getByText(/4 players · pot \$40.00/)).toBeInTheDocument();
-    // The "you can now play" cue reassures the entry is escrowed.
     expect(screen.getByTestId('room-play-cue')).toHaveTextContent(
-      /you can now play your .* game/i,
+      /play your next game on lichess and win in 30 moves or fewer/i,
     );
   });
 

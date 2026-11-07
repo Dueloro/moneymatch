@@ -7,7 +7,7 @@ import { SideRail } from './SideRail';
 // No session, so wallet/activity/queue stay disabled and fall to their empty
 // states. The pool status is the thing under test, so drive it directly.
 vi.mock('../../auth/useAuth', () => ({
-  useAuth: () => ({ isDemo: false, session: null }),
+  useAuth: () => ({ session: null }),
 }));
 vi.mock('../../hooks/usePools', async () => {
   const actual =
@@ -29,13 +29,13 @@ const FORMED = {
   status: 'formed',
   pool: {
     id: 'p1',
-    game: 'cs2.steam',
-    metric: 'cs2_kd_ratio',
-    metric_label: 'K/D ratio',
+    game: 'chess.lichess',
+    metric: 'chess_moves',
+    metric_label: 'Moves to win',
     difficulty: 'medium',
-    room_bar: 1.75,
-    your_bar: 1.8,
-    bar_delta: -0.05,
+    room_bar: 32,
+    your_bar: 34,
+    bar_delta: -2,
     entry_cents: 1000,
     pot_cents: 4000,
     prize_cents: 0,
@@ -74,20 +74,18 @@ describe('SideRail', () => {
     mockStatus(FORMED);
     renderWithProviders(<SideRail />);
     const card = screen.getByTestId('rail-room-card');
-    expect(card).toHaveTextContent('medium K/D ratio');
-    expect(card).toHaveTextContent('Room bar 1.75');
+    expect(card).toHaveTextContent('medium Moves to win');
+    expect(card).toHaveTextContent('Room bar 32');
     expect(card).toHaveTextContent('4 players · pot $40.00');
-    // The room names its game (the CS2 short label).
-    expect(card).toHaveTextContent('CS2');
     expect(screen.getByTestId('rail-room-play-cue')).toHaveTextContent(
-      /you can now play your .* game/i,
+      /play your next game on lichess/i,
     );
   });
 
   it('reflects a cleared live result instead of the play cue', () => {
     mockStatus({
       ...FORMED,
-      pool: { ...FORMED.pool, your_cleared: true, your_current: 2.1 },
+      pool: { ...FORMED.pool, your_cleared: true, your_current: 28 },
     });
     renderWithProviders(<SideRail />);
     // Once your played match clears the bar, the room shows it (and stops

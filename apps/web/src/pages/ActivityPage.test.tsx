@@ -19,10 +19,10 @@ function item(overrides: Partial<ActivityItem>): ActivityItem {
   return {
     type: 'match',
     id: 'm1',
-    game: 'cs2.steam',
-    market: 'kd_ratio',
-    market_label: 'K/D ratio',
-    kind: 'stat_race',
+    game: 'chess.lichess',
+    market: 'win_h2h',
+    market_label: 'Win the game',
+    kind: 'win_h2h',
     state: 'ACTIVE',
     entry_cents: 1000,
     title: null,
@@ -49,30 +49,17 @@ function mockItems(items: ActivityItem[]) {
 describe('ActivityPage', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('does not render the CS2 setup card (that lives on Profile only)', () => {
-    // Even with a CS2 contest in the feed, the share-code setup card must not
-    // appear here — Activity is a results log, not a setup surface.
-    mockItems([item({ game: 'cs2.steam', state: 'ACTIVE', net_cents: null })]);
-    renderWithProviders(<ActivityPage />);
-    expect(screen.queryByTestId('cs2-setup-card')).not.toBeInTheDocument();
-    expect(screen.queryByText('CS2 is set up')).not.toBeInTheDocument();
-    expect(screen.queryByText('Set up CS2')).not.toBeInTheDocument();
-  });
-
-  it('shows a won stat-race with the signed prize and stat line', () => {
+  it('shows a won match with the signed prize', () => {
     mockItems([
       item({
         state: 'SETTLED',
         net_cents: 800,
         resolved_at: new Date().toISOString(),
-        your_stat_line: { cs2_kd_ratio: 1.5, game_id: 'g1' },
-        opponent_stat_line: { cs2_kd_ratio: 1.1, game_id: 'g2' },
       }),
     ]);
     renderWithProviders(<ActivityPage />);
-    expect(screen.getByText('vs kvem_ · K/D ratio')).toBeInTheDocument();
+    expect(screen.getByText('vs kvem_ · Win the game')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
-    expect(screen.getByText(/You 1.5 · kvem_ 1.1/)).toBeInTheDocument();
     expect(screen.getByText('+$8.00')).toBeInTheDocument(); // signed net, green
   });
 
@@ -81,7 +68,7 @@ describe('ActivityPage', () => {
       item({
         type: 'pool',
         id: 'pool1',
-        title: 'K/D ratio · Medium pool',
+        title: 'Moves to win · Medium pool',
         state: 'SETTLED',
         net_cents: 800,
         opponent_username: null,
@@ -89,7 +76,7 @@ describe('ActivityPage', () => {
       }),
     ]);
     renderWithProviders(<ActivityPage />);
-    expect(screen.getByText('K/D ratio · Medium pool')).toBeInTheDocument();
+    expect(screen.getByText('Moves to win · Medium pool')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
     expect(screen.getByText('+$8.00')).toBeInTheDocument();
   });
@@ -140,23 +127,23 @@ describe('ActivityPage', () => {
       item({
         type: 'pool',
         id: 'poolLive',
-        title: 'K/D ratio · Medium pool',
+        title: 'Moves to win · Medium pool',
         state: 'LOCKED',
         net_cents: null,
         opponent_username: null,
         live: {
           kind: 'pool',
-          label: 'K/D ratio',
+          label: 'Moves to win',
           status: 'cleared',
-          current: 1.6,
-          target: 1.25,
+          current: 24,
+          target: 30,
           cleared: true,
           matches: 1,
         },
       }),
     ]);
     renderWithProviders(<ActivityPage />);
-    expect(screen.getByText(/K\/D ratio 1.60 · cleared 1.25/)).toBeInTheDocument();
+    expect(screen.getByText(/Moves to win 24 · cleared 30/)).toBeInTheDocument();
   });
 
   it('pops a settlement toast when a match newly resolves', () => {

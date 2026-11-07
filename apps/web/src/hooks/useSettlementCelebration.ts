@@ -7,16 +7,9 @@ import { useActivity } from './useActivity';
  * Notices the moment one of your contests settles, so the result can be shown
  * rather than merely appearing in a list.
  *
- * Settlement is the moment the product does its job, and until now it arrived
- * silently: a row in Activity changed state while you were probably looking at
- * a different page. This watches for the transition itself.
- *
- * There is no settlement event on the wire to listen for — `/events/stream`
- * pushes a bare ping and the client refetches — so the transition is detected
- * by diffing successive Activity snapshots. That is deliberate rather than a
- * workaround: it fires for any route to settlement (worker, admin resettle, a
- * dispute resolution) instead of only the one path that happened to emit an
- * event.
+ * `/events/stream` pushes a bare ping and the client refetches, so the
+ * transition is detected by diffing successive Activity snapshots. That fires
+ * for any route to settlement (worker, admin resettle, a dispute resolution).
  *
  * Two properties that make it trustworthy:
  *
@@ -25,10 +18,9 @@ import { useActivity } from './useActivity';
  *   replay results you have already seen.
  * - **A result that landed while you were away is still shown**, provided it is
  *   recent and has not been announced before. This is the case that matters
- *   most and the one the first version got wrong: **you have to leave this app
- *   to play.** Chess happens on lichess.org, CS2 in a desktop client. So you
- *   are, almost by definition, not looking at Money Match at the moment your
- *   contest settles. Firing only on a transition an open tab happened to
+ *   most: **you have to leave this app to play.** Chess happens on
+ *   lichess.org, so you are, almost by definition, not looking at Money Match
+ *   at the moment your contest settles. Firing only on a transition an open tab happened to
  *   witness meant the real path — go play, come back — showed nothing at all.
  * - **Nothing is announced to a tab nobody is looking at.** This is the subtler
  *   half of the same problem. `useEventStream` invalidates `['activity']` the
@@ -73,10 +65,8 @@ const MAX_BURST = 3;
  * How recently a contest must have resolved to be worth announcing on arrival.
  *
  * This has to cover *playing an entire game elsewhere with this tab closed*,
- * which sets the floor much higher than it first appears: a CS2 Premier match
- * runs 40 minutes and a slow chess game is not far behind. Ten minutes — the
- * first guess — expired mid-match and swallowed exactly the results it existed
- * to show. An hour covers a full session and is still unambiguously "just now";
+ * which sets the floor much higher than it first appears: a classical chess
+ * game can run well past half an hour. An hour covers a full session and is still unambiguously "just now";
  * yesterday's history stays silent either way. Compared against the browser
  * clock, so it is deliberately generous about skew.
  */

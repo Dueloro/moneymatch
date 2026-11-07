@@ -20,7 +20,7 @@ function settle(over: Partial<Settlement>): Settlement {
     outcome: 'win',
     netCents: 9_000,
     title: 'Kills · Easy pool',
-    game: 'cs2.steam',
+    game: 'chess.lichess',
     type: 'pool',
     ...over,
   };

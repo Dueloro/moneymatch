@@ -6,12 +6,11 @@ import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
 import { useLeaveTournament, useTournamentStatus } from '../../hooks/useTournaments';
 import { useWallet } from '../../hooks/useWallet';
 import { formatCurrency } from '../../lib/format';
-import { gameMeta } from '../../lib/games';
+import { barPhrase } from '../../lib/metrics';
 import { LiveLine } from '../activity/LiveLine';
 import { AnimatedBalance } from '../ui/AnimatedBalance';
 import { Card } from '../ui/Card';
 import { ClearBar } from '../ui/ClearBar';
-import { GameBadge } from '../ui/GameBadge';
 import { PillButton } from '../ui/PillButton';
 import { SectionHeader } from '../ui/SectionHeader';
 
@@ -87,12 +86,7 @@ function InPlayCard({ item }: { item: ActivityItem }) {
           {formatCurrency(item.entry_cents)}
         </p>
       </div>
-      <div className="mt-0.5 flex items-center gap-1.5">
-        <GameBadge game={item.game} />
-        <span className="truncate text-xs text-text-secondary">
-          {item.market_label}
-        </span>
-      </div>
+      <p className="mt-0.5 truncate text-xs text-text-secondary">{item.market_label}</p>
       {pool ? (
         <div className="mt-3">
           <ClearBar
@@ -168,7 +162,6 @@ function RoomFormed() {
         <p className="min-w-0 flex-1 truncate text-sm font-medium capitalize text-text">
           {pool.difficulty} {pool.metric_label}
         </p>
-        <GameBadge game={pool.game} />
       </div>
       <p className="mt-0.5 text-xs text-text-secondary">
         {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
@@ -198,12 +191,12 @@ function RoomFormed() {
               · your {pool.metric_label} {pool.your_current}
             </span>
           )}
-          . Play again to beat {pool.room_bar}.
+          . Play again to {barPhrase(pool.metric, pool.room_bar)}.
         </p>
       ) : (
         <p className="mt-3 text-xs text-text" data-testid="rail-room-play-cue">
-          Your {formatCurrency(pool.entry_cents)} is in escrow, so you can now play your{' '}
-          {gameMeta(pool.game).name} game.
+          Your {formatCurrency(pool.entry_cents)} is in escrow. Play your next game on
+          Lichess.
         </p>
       )}
     </Card>

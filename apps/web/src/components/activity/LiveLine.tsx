@@ -2,11 +2,10 @@ import type { LiveInfo } from '../../hooks/useActivity';
 
 type Tone = 'live' | 'good' | 'bad' | 'muted';
 
-/** Format a live metric value: numbers to ≤2 dp, win/next verbs to words. */
-function fmtVal(v: number | string | null | undefined): string {
+/** Format a live metric value to at most 2 dp. */
+function fmtVal(v: number | null | undefined): string {
   if (v == null) return '-';
-  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2);
-  return { won: 'won', lost: 'lost', pending: 'in a match' }[v] ?? v;
+  return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
 /** Collapse a viewer-oriented `live` object into one line + a tone. */
@@ -54,18 +53,7 @@ function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
       tone: 'live',
     };
   }
-  if (live.status === 'waiting')
-    return { text: `waiting for your next match`, tone: 'muted' };
-  if (live.format === 'stat_race') {
-    const tone: Tone =
-      live.leader === 'you' ? 'good' : live.leader === 'opp' ? 'bad' : 'live';
-    return {
-      text: `${label} · you ${fmtVal(live.you)} · opp ${fmtVal(live.opp)}`,
-      tone,
-    };
-  }
-  // win_next
-  return { text: `you ${fmtVal(live.you)} · opp ${fmtVal(live.opp)}`, tone: 'live' };
+  return null;
 }
 
 const TONE_DOT: Record<Tone, string> = {

@@ -20,7 +20,7 @@ export interface ActivityItem {
   your_stat_line: Record<string, unknown> | null;
   opponent_stat_line: Record<string, unknown> | null;
   // Best-effort live in-game view for an in-flight contest, oriented to you.
-  // Shape depends on kind/format (pool | tournament | match·chess/stat_race/win_next).
+  // Shape depends on kind (pool | tournament | match).
   live: LiveInfo | null;
   // Structured "learn more" payload for the expanded card.
   detail: ActivityDetail | null;
@@ -58,7 +58,7 @@ export interface ActivityDetail {
 /** The under-the-card live view. Which fields are present depends on kind/format. */
 export interface LiveInfo {
   kind: 'pool' | 'match' | 'tournament';
-  format?: 'chess' | 'stat_race' | 'win_next';
+  format?: 'chess';
   label?: string | null;
   status: string;
   // pool
@@ -71,15 +71,10 @@ export interface LiveInfo {
   your_color?: string | null;
   turn?: 'you' | 'opp' | null;
   result?: 'you' | 'opp' | 'draw' | null;
-  // stat_race / win_next
-  you?: number | string | null;
-  opp?: number | string | null;
-  leader?: 'you' | 'opp' | 'tie' | null;
   // tournament
   score?: number | null;
   rank?: number | null;
   field?: number;
-  score_matches?: number;
 }
 
 /** The unified activity feed (matches + pools + tournaments). Polls every 10 s. */
@@ -103,7 +98,7 @@ export function useActivity() {
   });
 }
 
-/** The graded stat value from a stat-race `stat_line` (skips the `game_id` field). */
+/** The graded stat value from a match `stat_line` (skips the `game_id` field). */
 export function statValue(line: Record<string, unknown> | null): number | null {
   if (!line) return null;
   for (const [key, value] of Object.entries(line)) {

@@ -5,11 +5,10 @@ import { ModeSwitcher } from '../components/ModeSwitcher';
 import { AmountText } from '../components/ui/AmountText';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
-import { ComingSoonPanel } from '../components/ui/ComingSoonPanel';
 import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ErrorState } from '../components/ui/ErrorState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
-import { GameTabs } from '../components/ui/GameTabs';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
@@ -17,11 +16,8 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
 import { formatCurrency } from '../lib/format';
-import { gameMeta, isComingSoon } from '../lib/games';
+import { tournamentRule } from '../lib/metrics';
 import { platformFeeNote, rakeOnPot } from '../lib/rake';
-import { filledSpots } from '../lib/spots';
-import { useAuth } from '../auth/useAuth';
-import { useGameSelection } from '../hooks/useGameSelection';
 import {
   useEnterTournament,
   useLeaveTournament,
@@ -33,21 +29,18 @@ import {
 /** The Tournament section: browse joinable skill fields as cards. */
 export function TournamentPage() {
   usePageTitle('Tournament');
-  const { isDemo } = useAuth();
-  const { games, selected: game, select: setGame } = useGameSelection();
-  const playableGame = game && !isComingSoon(game) ? game : undefined;
   const {
     data: markets,
-    isError: marketsUnavailable,
+    isError: marketsError,
     isLoading: marketsLoading,
-  } = useTournamentMarkets(playableGame);
+    refetch: refetchMarkets,
+  } = useTournamentMarkets();
   const { data: status } = useTournamentStatus();
   const enter = useEnterTournament();
 
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
 
   const places = markets?.prize_split.length ?? 3;
-  const scoreN = markets?.score_matches ?? 3;
 
   const header = (
     <div className="mb-6 flex flex-col gap-3">
@@ -55,38 +48,23 @@ export function TournamentPage() {
         <ModeSwitcher />
         <div className="ml-auto">
           <HowItWorks id="tournament">
-            A field of similar-skill players all chase the same stat. Your best {scoreN}{' '}
-            matches inside the window are scored automatically, and the top {places}{' '}
+            A field of similar-skill players chase the same stat. Every rated Lichess
+            game you finish inside the window counts automatically, and the top {places}{' '}
             split the pot. No reporting, no brackets, just play.
           </HowItWorks>
         </div>
       </div>
-      <GameTabs games={games} selected={game} onSelect={setGame} />
     </div>
   );
 
-  if (game && isComingSoon(game)) {
+  if (marketsError) {
     return (
       <div>
         {header}
-        <ComingSoonPanel name={gameMeta(game).name} />
-      </div>
-    );
-  }
-
-  // The markets endpoint 404s for a game that doesn't offer tournaments yet.
-  if (game && marketsUnavailable) {
-    return (
-      <div>
-        {header}
-        <EmptyState
-          title={`No tournaments on ${gameMeta(game).name} yet`}
-          subline="Tournaments are Counter Strike 2 only for now. More games are coming."
-          action={
-            <Link to="/pools">
-              <PillButton>Browse solo pools</PillButton>
-            </Link>
-          }
+        <ErrorState
+          title="Could not load tournaments"
+          subline="The connection dropped. Try again."
+          onRetry={() => refetchMarkets()}
         />
       </div>
     );
@@ -97,11 +75,11 @@ export function TournamentPage() {
       <div>
         {header}
         <EmptyState
-          title={`Link your ${game ? gameMeta(game).name : 'game'} account`}
-          subline="Tournaments score your best matches automatically, so we need to know which account is yours."
+          title="Link your Lichess account"
+          subline="Tournaments score your Lichess games automatically, so we need to know which account is yours."
           action={
             <Link to="/profile">
-              <PillButton>Link a game</PillButton>
+              <PillButton>Link Lichess</PillButton>
             </Link>
           }
         />
@@ -158,8 +136,8 @@ export function TournamentPage() {
         <SkeletonList rows={3} />
       ) : openMetrics.length === 0 ? (
         <EmptyState
-          title="No tournaments on this game yet"
-          subline="Play a match on it and they appear here."
+          title="No tournaments open right now"
+          subline="Check back shortly."
         />
       ) : (
         <>
@@ -171,22 +149,20 @@ export function TournamentPage() {
           ) : (
             <CardGrid count={filteredMetrics.length}>
               {filteredMetrics.map((m) => {
-                const key = `${game}:${m.metric}`;
+                const key = m.metric;
                 return (
                   <WagerCard
                     key={key}
                     gameName={`${fieldSize} players`}
                     tag={`top ${places} paid`}
                     title={m.label}
-                    subtitle={`Your best ${scoreN} matches in the window are scored automatically.`}
+                    subtitle={tournamentRule(m.metric, m.label)}
                     entryOptions={presets}
                     payoutFor={(entry) => entry * fieldSize}
                     payoutLabel="Pot if full"
                     // Rake is taken off the full pot before the top places split
                     // it (money_math.split_by_weights).
                     feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
-                    capacity={fieldSize}
-                    filled={isDemo ? filledSpots(key, fieldSize) : undefined}
                     buttonLabel="Join tournament"
                     disabled={busy}
                     joining={enter.isPending}
@@ -263,6 +239,9 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
       <h2 className="mt-2 text-xl font-semibold text-text">
         {tournament.metric_label}
       </h2>
+      <p className="mt-1 text-xs text-text-secondary">
+        {tournamentRule(tournament.metric, tournament.metric_label)}
+      </p>
       <div className="mt-3">
         {tournament.standings.map((row) => (
           <ListRow
@@ -275,8 +254,8 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
             }
             subline={
               row.score != null
-                ? `${row.score.toFixed(2)} · ${row.matches} matches`
-                : 'No qualifying match yet'
+                ? `${Number.isInteger(row.score) ? row.score : row.score.toFixed(2)} · ${row.matches} ${row.matches === 1 ? 'game' : 'games'}`
+                : 'No qualifying game yet'
             }
             right={
               settled && row.payout_cents > 0 ? (

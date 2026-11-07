@@ -9,8 +9,8 @@ describe('humanizeIds — no raw identifiers reach the player', () => {
     );
   });
 
-  it('maps a short H2H market id', () => {
-    expect(humanizeIds('kd_ratio entry')).toBe('K/D ratio entry');
+  it('maps the H2H market id', () => {
+    expect(humanizeIds('win_h2h entry')).toBe('Head to head entry');
   });
 
   it('maps a multi-word metric id', () => {
@@ -24,7 +24,7 @@ describe('humanizeIds — no raw identifiers reach the player', () => {
   });
 
   it('leaves plain memos with no ids untouched', () => {
-    expect(humanizeIds('pool refund (demo reset)')).toBe('pool refund (demo reset)');
+    expect(humanizeIds('pool refund')).toBe('pool refund');
     expect(humanizeIds('Added funds')).toBe('Added funds');
   });
 });

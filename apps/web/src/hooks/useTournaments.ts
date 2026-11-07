@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { CHESS } from '../lib/games';
 
 // Wire types mirror `schemas/tournaments.py`. Scores, ranks, and payouts are all
 // server-computed; the client only picks a metric + a preset entry.
@@ -18,7 +19,6 @@ export interface TournamentMarkets {
   entry_presets_cents: number[];
   prize_split: number[];
   field_size: number;
-  score_matches: number;
   metrics: TournamentMetric[];
 }
 
@@ -43,7 +43,6 @@ export interface TournamentView {
   rake_cents: number;
   prize_split: number[];
   field_size: number;
-  score_matches: number;
   state: string;
   window_starts_at: string;
   window_ends_at: string;
@@ -67,9 +66,7 @@ function messageOf(error: unknown, fallback: string): string {
   return typeof msg === 'string' && msg ? msg : fallback;
 }
 
-const CS2 = 'cs2.steam';
-
-export function useTournamentMarkets(game: string = CS2) {
+export function useTournamentMarkets(game: string = CHESS) {
   const { session } = useAuth();
   return useQuery({
     queryKey: ['tournament-markets', game],

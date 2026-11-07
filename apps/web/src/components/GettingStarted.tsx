@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
 
-import { useLinks } from '../hooks/useLinks';
 import { useMe, useSetDismissedChecklists } from '../hooks/useMe';
-import { gameMeta } from '../lib/games';
+import { CHESS } from '../lib/games';
 import { Card } from './ui/Card';
 
 interface Step {
@@ -12,87 +11,39 @@ interface Step {
 }
 
 /**
- * Per-game onboarding checklist for the Play tab. One card per game in the
- * player's active set that hasn't been dismissed (and isn't already complete),
- * walking them from linking that game's account to their first contest. The X
- * dismisses the card server-side (`dismissed_checklists`), so it stays gone
- * across reload and devices — never localStorage.
- *
- * Both steps are per-game: linked from `/links`, first-contest from the account's
- * `contested_games` (the games it has actually entered a contest for) — so a
- * chess veteran who just added CS2 sees CS2's contest step still open.
+ * The new-player checklist: link Lichess, then play a first match. Progress is
+ * the server's `getting_started`; the X dismisses it server-side
+ * (`dismissed_checklists`), so it stays gone across reloads and devices.
  */
-export function GameChecklists() {
+export function GettingStarted() {
   const me = useMe();
-  const links = useLinks();
   const setDismissed = useSetDismissedChecklists();
 
   const user = me.data?.user;
-  if (!user) return null;
+  const progress = me.data?.getting_started;
+  if (!user || !progress || progress.complete) return null;
+  if ((user.dismissed_checklists ?? []).includes(CHESS)) return null;
 
-  const active = user.active_games ?? [];
-  const dismissed = new Set(user.dismissed_checklists ?? []);
-  const contested = new Set(me.data?.contested_games ?? []);
-  const linkedGames = new Set(
-    (links.data?.games ?? []).filter((g) => g.status === 'LINKED').map((g) => g.game),
-  );
-
-  const cards = active
-    .filter((game) => !dismissed.has(game))
-    .map((game) => {
-      const name = gameMeta(game).name;
-      const steps: Step[] = [
-        {
-          done: linkedGames.has(game),
-          label: `Link your ${name} account`,
-          to: '/profile',
-        },
-        {
-          done: contested.has(game),
-          label: `Join your first ${name} contest`,
-          to: '/pools',
-        },
-      ];
-      return { game, name, steps };
-    })
-    .filter((c) => !c.steps.every((s) => s.done));
-
-  if (cards.length === 0) return null;
-
-  // The hook computes the full server list from the freshest cache, so we only
-  // pass the one game being dismissed (no stale-closure append here).
-  const dismiss = (game: string) => setDismissed.mutate(game);
+  const steps: Step[] = [
+    { done: progress.linked_game, label: 'Link your Lichess account', to: '/profile' },
+    { done: progress.placed_wager, label: 'Play your first match', to: '/play' },
+  ];
 
   return (
-    <div className="mb-6 flex flex-col gap-3">
-      {cards.map((c) => (
-        <ChecklistCard
-          key={c.game}
-          name={c.name}
-          steps={c.steps}
-          onDismiss={() => dismiss(c.game)}
-        />
-      ))}
+    <div className="mb-6">
+      <ChecklistCard steps={steps} onDismiss={() => setDismissed.mutate(CHESS)} />
     </div>
   );
 }
 
-function ChecklistCard({
-  name,
-  steps,
-  onDismiss,
-}: {
-  name: string;
-  steps: Step[];
-  onDismiss: () => void;
-}) {
+function ChecklistCard({ steps, onDismiss }: { steps: Step[]; onDismiss: () => void }) {
   const done = steps.filter((s) => s.done).length;
   return (
     <Card className="relative p-4">
       <button
         type="button"
         onClick={onDismiss}
-        aria-label={`Dismiss ${name} checklist`}
+        aria-label="Dismiss checklist"
         className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full text-text-tertiary transition hover:bg-panel hover:text-text focus-visible:outline-none focus-visible:ring-2"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
@@ -106,7 +57,7 @@ function ChecklistCard({
       </button>
 
       <p className="text-sm font-semibold text-text">
-        Get started with {name}{' '}
+        Get started{' '}
         <span className="font-normal text-text-tertiary">
           {done} of {steps.length}
         </span>
