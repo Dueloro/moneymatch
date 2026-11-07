@@ -1,9 +1,7 @@
-# MoneyMatch — Design Guidelines
+# Design guidelines
 
-**What this is.** The design system the product's UI follows today, written so a
-new engineer or agent can build a new screen that looks like it belongs without
-seeing the app first. It is descriptive of the current build (post-revamp) and
-prescriptive for new work: when in doubt, match what is here.
+The design system the UI follows, so a new screen looks like it belongs. When in
+doubt, match what is here.
 
 **The one rule that generates most of the others:** *fewer, better-argued
 decisions, enforced in code.* Every primitive below is a real component; new
@@ -58,18 +56,16 @@ Two hard constraints when extending the palette:
 1. **Selection is not a colour.** A selected chip/tab/segment gets a raised
    surface + a `line-strong` border, no hue. That is what lets an entry picker
    sit two lines above a lime payout without competing.
-2. **One meaning per colour.** The revamp's whole gain was that lime stopped
-   meaning five things. Add a new colour only if it arrives with a single job.
+2. **One meaning per colour.** Add a new colour only if it arrives with a
+   single job.
 
 **Cyan (`live`) is deliberately underused** — dots, one-word labels, and the 25%
 wash in the clear bar only. It never fills a shape or runs across a sentence. It
 is the intended candidate if a second main colour is ever promoted, because its
 meaning ("happening now") is already established.
 
-**Game accents** (`#f0883e` CS2 orange, `#e8a13a` PUBG amber, `#e6c65c` chess
-gold, `#e15b4c` Dota brick) appear in only two places: the icon of the
-**selected** game tab, and chat invite cards — the two spots where more than one
-game can appear at once. They are not used on browse cards.
+**The chess accent** (`#e6c65c` gold, `lib/games.tsx`) appears only on the
+linked-game row and on chat invite cards. It is not used on browse cards.
 
 **Chat avatar accents** are five pastels picked by hashing the person's name
 (same person, same colour). They appear nowhere outside chat.
@@ -113,8 +109,8 @@ read as "this is a number."
   Cards never cast shadows — they separate by surface value and border.
 - **Motion.** Four animations only, all disabled under `prefers-reduced-motion`
   (which also clamps transitions to 0.01ms): the ticker marquee, the 0.28s rise
-  on a matched card, `animate-pulse` on live dots/skeletons, and a 260ms FLIP
-  glide when game pills reorder. The balance counts up rather than snapping.
+  on a matched card, `animate-pulse` on live dots/skeletons, and the money-delta
+  flash on a balance change. The balance counts up rather than snapping.
 - **Focus.** One global rule: `:focus-visible` draws a 2px `focus` ring with 2px
   offset on every interactive element. Mouse clicks don't ring; every keyboard
   path does.
@@ -153,8 +149,6 @@ primitive rather than a one-off.
 - **`ExpandableCard`** / **`ListRow`** — the expandable and flat row primitives.
 - **`FilterBar`** — pill toggle with a hamburger, "Filters", and a paper
   active-count badge; opens a `Card` of chip rows.
-- **`GameTabs`** — the game switcher; selected pill gets a `panel-raised` fill, a
-  strong border, and **its icon in the game's accent**.
 - **`EmptyState`** — a dashed hairline box (title, grey line, usually a button).
   **`ErrorState`** is the same with a red-tinted dashed border + "Try again".
 - **`Skeleton`** / **`SkeletonList`** — `panel-raised` pulses at 8px radius. The
@@ -199,19 +193,19 @@ paragraph (the "How it works" prose lives in a dismissible disclosure instead).
 1. Metric / field size in 12px grey (left) + optional `panel-raised` tag pill
    (right): difficulty, "top 3 paid", "BLITZ".
 2. Title at 18px semibold.
-3. **The headline number** at 30px semibold (e.g. `1.80`) with "to clear" beside
-   it. (Tournaments and 1v1 have no bar, so they omit this.)
+3. **The headline number**: the bar target at 30px semibold with "or fewer" (or
+   "or better") beside it. Tournaments and 1v1 have no bar, so they omit it.
 4. **The clear-rate meter:** a 6px track with a grey fill proportional to how
    often you clear that bar, over "16% of your recent matches clear it".
 5. `ENTRY` mono caption, then a **segmented control of dollar amounts** (default
    middle preset).
-6. `EST. WIN` over the payout at 18px **in lime**, with fill count ("3 of 4 in")
-   or "1v1" on the right.
+6. The payout caption over the payout at 18px **in lime**, the fee note under
+   it, and "1v1" on the right for head-to-head.
 7. A full-width `lg` primary button naming the outcome: "Join pool", "Join
    tournament", "Find match".
 
 Changing the entry updates the payout **in place**. Entry is a parameter, not a
-product — this is why nine near-identical cards collapsed to three.
+product.
 
 ---
 
@@ -220,15 +214,14 @@ product — this is why nine near-identical cards collapsed to three.
 The product's one loud element, and the thing a stranger should remember. A
 horizontal track showing **your number** against **the number to beat**, gap
 shaded: a full-height white tick for the target, a filled bar for ground covered,
-the remaining distance washed in cyan at 25%. Underneath, two 12px lines:
-"your avg **1.42**" and either "need +0.38" (grey) or "clear" (lime). The target
-sits at ~78% of the track so an overshoot reads as an overshoot.
+the remaining distance washed in cyan at 25%. Underneath, one 12px line: your
+number, then either "need −N" (grey) or "clear" / "N under" (lime). For
+`chess_moves` lower is better. The target sits at ~78% of the track so an
+overshoot reads as an overshoot.
 
-It appears in exactly four places, always meaning the same thing: the
-formed-room banner (Solo pools), the standings/in-play card, the rail's in-play
-card, and the Activity live line. On browse cards — where the server quotes a bar
-and a clear rate but not your baseline — the card shows the **clear-rate meter**
-instead rather than inventing the "you" end of the bar. Nothing else in the UI is
+It appears only where your own number is known (the formed pool and the rail's
+in-play card). Browse cards show the **clear-rate meter** instead rather than
+inventing the "you" end of the bar. Nothing else in the UI is
 allowed to be this loud; everything around it stays quiet.
 
 ---
@@ -256,12 +249,3 @@ monospace, bordered tables, square buttons, green `#080` for OK and red `#b00`
 for anything wrong. It should keep looking like one. Do not apply the consumer
 design system to it.
 
----
-
-## 10. One honest open issue
-
-`filledSpots()` in `apps/web/src/lib/spots.ts` invents the "3 of 4 in" figure on
-every contest card by hashing the card key. It is not a live count. On a
-real-money product that is fabricated social proof and needs a product decision —
-show a real count, or show nothing — before any further visual work makes it more
-prominent.
