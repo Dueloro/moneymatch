@@ -14,29 +14,29 @@ from moneymatch_api.services import (
     metric_models_service,
     pool_engine,
     reconciliation_service,
+    skill_prior,
     wallet_service,
 )
 from moneymatch_api.services.pool_engine import PoolError, PoolGrade
 
 from .factories import (
+    chess_profile,
     create_linked_account,
     create_metric_model,
     create_user,
     create_wallet,
-    cs2_profile,
 )
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+METRIC = "chess_moves"
 
 
 class _FakeAdapter:
     """No-network stand-in so the sandbagging detector has nothing to flag."""
 
-    id = CS2
-    brokered = False
+    id = CHESS
 
     async def poll_eligible_games(self, host, since_ms, filters):
         return []
@@ -49,12 +49,16 @@ def _stub_host(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda game_id: _FakeAdapter())
 
 
-async def pool_player(session, name, *, mu, sigma=0.30, n=15, fund=10_000):
+async def pool_player(session, name, *, mu, sigma=8.0, n=15, fund=10_000):
     user = await create_user(session, username=name)
     link = await create_linked_account(
-        session, user, CS2, host_account_id=f"host_{name}", profile=cs2_profile(name)
+        session,
+        user,
+        CHESS,
+        host_account_id=f"host_{name}",
+        profile=chess_profile(name),
     )
-    await create_metric_model(session, user, CS2, KD, mu=mu, sigma=sigma, n=n)
+    await create_metric_model(session, user, CHESS, METRIC, mu=mu, sigma=sigma, n=n)
     await create_wallet(session, user, available_cents=0)
     await wallet_service.demo_deposit(session, user.id, fund, memo="fund")
     return user, link
@@ -62,8 +66,23 @@ async def pool_player(session, name, *, mu, sigma=0.30, n=15, fund=10_000):
 
 async def enq(session, user, *, difficulty="medium", entry=1000):
     return await pool_engine.enqueue(
-        session, user, game=CS2, metric=KD, difficulty=difficulty, entry_cents=entry
+        session,
+        user,
+        game=CHESS,
+        metric=METRIC,
+        difficulty=difficulty,
+        entry_cents=entry,
     )
+
+
+def _corrected(mu, sigma, n, rating=1500):
+    """(mu, sigma) after the rating prior and spread floor, as the engine reads them."""
+    mu, sigma = skill_prior.shrink(mu, sigma, n, skill_prior.prior_for(METRIC, rating))
+    return mu, fairness.effective_sigma(sigma, 1.0)
+
+
+def _bar(mu, sigma, k):
+    return fairness.personal_bar(mu, sigma, k, 1.0, True, positive=True, floor=2.0)
 
 
 async def _bal(session, user):
@@ -75,26 +94,22 @@ async def _bal(session, user):
 
 
 async def test_preview_quotes_bars_from_own_baseline(session):
-    user, _ = await pool_player(session, "u", mu=1.50, sigma=0.30)
-    preview = await pool_engine.preview_bars(session, user, CS2, KD)
+    user, _ = await pool_player(session, "u", mu=34.0, sigma=8.0)
+    preview = await pool_engine.preview_bars(session, user, CHESS, METRIC)
     assert preview["provisional"] is False
     by_diff = {c["difficulty"]: c for c in preview["cards"]}
-    # μ + k·σ rounded to 0.05, derived from the tier constants rather than
-    # written down, so retuning difficulty moves the expectation with it.
+    mu, sigma = _corrected(34.0, 8.0, 15)
+    # Derived from the tier constants, so retuning difficulty moves the
+    # expectation with it.
     for difficulty, k in POOL_DIFFICULTY_K.items():
-        assert by_diff[difficulty]["bar"] == fairness.personal_bar(1.50, 0.30, k, 0.05)
-    assert by_diff["easy"]["bar"] < by_diff["hard"]["bar"]  # harder asks for more
+        assert by_diff[difficulty]["bar"] == _bar(mu, sigma, k)
+    assert by_diff["easy"]["bar"] > by_diff["hard"]["bar"]  # harder asks for fewer
 
-    # Disclosed clear rates, not odds. The promise is that the rate shown is the
-    # one implied by the bar *actually quoted*, so that is what is pinned here.
-    # It drifts off the nominal 1 − Φ(k) because the bar is rounded to the
-    # metric's quoting increment: at k=0.842, μ+kσ is 1.7526 and the card can
-    # only say 1.75, which is a slightly easier bar than the tier nominally asks
-    # for. Reporting 1 − Φ(k) instead would advertise a rate for a bar nobody is
-    # graded against.
+    # Disclosed clear rates, not odds: the rate shown is the one implied by the
+    # bar actually quoted (rounded to whole moves), not the nominal 1 − Φ(k).
     medium = by_diff["medium"]
     assert medium["clear_rate"] == pytest.approx(
-        fairness.clear_prob(medium["bar"], 1.50, 0.30, False), abs=1e-4
+        fairness.clear_prob(medium["bar"], mu, sigma, True, positive=True), abs=1e-4
     )
     # And rounding is the only thing moving it: still near the design rate.
     assert medium["clear_rate"] == pytest.approx(
@@ -104,8 +119,8 @@ async def test_preview_quotes_bars_from_own_baseline(session):
 
 async def test_sparse_history_can_now_enter(session):
     # No "play more matches to unlock": a single graded match is baseline enough.
-    user, _ = await pool_player(session, "rookie", mu=1.50, n=4)
-    preview = await pool_engine.preview_bars(session, user, CS2, KD)
+    user, _ = await pool_player(session, "rookie", mu=34.0, n=4)
+    preview = await pool_engine.preview_bars(session, user, CHESS, METRIC)
     assert preview["provisional"] is False and preview["cards"]
     result = await enq(session, user)  # does not raise
     assert result.status in ("searching", "formed")
@@ -113,7 +128,7 @@ async def test_sparse_history_can_now_enter(session):
 
 async def test_no_baseline_cannot_enter(session):
     # A stat you've never produced (no samples) has no bar to quote — that's math.
-    user, _ = await pool_player(session, "blank", mu=1.50, n=0)
+    user, _ = await pool_player(session, "blank", mu=34.0, n=0)
     with pytest.raises(PoolError) as exc:
         await enq(session, user)
     assert exc.value.code == "no_stat_baseline"
@@ -125,7 +140,7 @@ async def test_no_baseline_cannot_enter(session):
 async def test_room_forms_at_size_with_derived_room_bar(session):
     # Four similar players → a Medium room forms; room_bar = round(mean(bars)).
     users = []
-    for i, mu in enumerate([1.48, 1.50, 1.52, 1.50]):
+    for i, mu in enumerate([34.0, 35.0, 36.0, 35.0]):
         u, _ = await pool_player(session, f"p{i}", mu=mu)
         users.append(u)
     for u in users[:3]:
@@ -138,39 +153,17 @@ async def test_room_forms_at_size_with_derived_room_bar(session):
     entries = list(
         await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool.id))
     )
-    expected = fairness.room_bar([e.personal_bar for e in entries], 0.05)
+    expected = fairness.room_bar([e.personal_bar for e in entries], 1.0)
     assert pool.room_bar == expected
     # Everyone escrowed exactly the entry.
     for u in users:
         assert (await _bal(session, u))[1] == 1000
 
 
-async def test_demo_user_forms_a_room_of_one_immediately(session):
-    # The demo user skips the "searching" wait: one enqueue → a formed, escrowed
-    # room of one, so the click-through lands straight on "room formed · play".
-    from moneymatch_api.constants import DEMO_AUTH_ID
-
-    user, _ = await pool_player(session, "demo", mu=1.50)
-    user.auth_id = DEMO_AUTH_ID
-    await session.flush()
-
-    result = await enq(session, user)
-    assert result.status == "formed"
-    pool = result.pool
-    assert pool.room_size == 1 and pool.min_entrants == 1 and pool.state == "LOCKED"
-    assert (await _bal(session, user)) == (9000, 1000)  # $10 entry escrowed
-
-    # Dismissing the formed demo room refunds the entry and frees the queue.
-    assert await pool_engine.cancel(session, user) is True
-    refreshed = await session.get(SoloPool, pool.id)
-    assert refreshed.state == "CANCELED"
-    assert (await _bal(session, user)) == (10000, 0)
-
-
-async def test_real_user_cannot_dismiss_a_formed_room(session):
-    # Non-demo formed rooms hold committed money — cancel is a no-op for them.
+async def test_cannot_dismiss_a_formed_room(session):
+    # Formed rooms hold committed money — cancel is a no-op for them.
     users = []
-    for i, mu in enumerate([1.48, 1.50, 1.52, 1.50]):
+    for i, mu in enumerate([34.0, 35.0, 36.0, 35.0]):
         u, _ = await pool_player(session, f"r{i}", mu=mu)
         users.append(u)
     for u in users[:3]:
@@ -182,7 +175,7 @@ async def test_real_user_cannot_dismiss_a_formed_room(session):
 
 async def test_room_bar_reproduces_byte_for_byte_from_snapshots(session):
     users = []
-    for i, mu in enumerate([1.48, 1.50, 1.52, 1.50]):
+    for i, mu in enumerate([34.0, 35.0, 36.0, 35.0]):
         u, _ = await pool_player(session, f"p{i}", mu=mu)
         users.append(u)
     for u in users[:3]:
@@ -194,24 +187,23 @@ async def test_room_bar_reproduces_byte_for_byte_from_snapshots(session):
     )
     # Re-derive each personal bar from the stored baseline, then the room bar.
     redrawn_bars = [
-        fairness.personal_bar(
+        _bar(
             e.baseline_snapshot["mu"],
             e.baseline_snapshot["sigma"],
             POOL_DIFFICULTY_K["medium"],
-            0.05,
         )
         for e in entries
     ]
     assert redrawn_bars == [e.personal_bar for e in entries]
-    assert fairness.room_bar(redrawn_bars, 0.05) == pool.room_bar
+    assert fairness.room_bar(redrawn_bars, 1.0) == pool.room_bar
 
 
 async def test_composition_refuses_a_shark(session):
-    # Three fair players + one shark (far higher μ) → no fair room forms.
-    for i, mu in enumerate([1.50, 1.52, 1.48]):
+    # Three fair players + one shark (far fewer moves to win) → no fair room.
+    for i, mu in enumerate([35.0, 36.0, 34.0]):
         u, _ = await pool_player(session, f"p{i}", mu=mu)
         await enq(session, u)
-    shark, _ = await pool_player(session, "shark", mu=2.60)
+    shark, _ = await pool_player(session, "shark", mu=12.0, sigma=3.0, n=60)
     result = await enq(session, shark)
     assert result.status == "searching"  # shark can't be dragged into the room
     count = await session.scalar(select(SoloPool.id))
@@ -219,12 +211,12 @@ async def test_composition_refuses_a_shark(session):
 
 
 async def test_baseline_frozen_against_model_refresh(session):
-    u1, _ = await pool_player(session, "a", mu=1.50)
-    frozen = fairness.personal_bar(1.50, 0.30, POOL_DIFFICULTY_K["medium"], 0.05)
-    await enq(session, u1)  # freezes the bar at μ=1.50
+    u1, _ = await pool_player(session, "a", mu=34.0)
+    frozen = _bar(*_corrected(34.0, 8.0, 15), POOL_DIFFICULTY_K["medium"])
+    await enq(session, u1)  # freezes the bar at μ=34
     # Refresh the model to something wild after queueing.
-    model = await metric_models_service.get_metric_model(session, u1.id, CS2, KD)
-    model.mu = 5.0
+    model = await metric_models_service.get_metric_model(session, u1.id, CHESS, METRIC)
+    model.mu = 90.0
     await session.flush()
     ticket = await pool_engine.get_waiting_ticket(session, u1.id)
     assert ticket.personal_bar == frozen  # unchanged (frozen at enqueue)
@@ -246,7 +238,7 @@ async def _form_room(session, mus):
 
 
 async def test_settle_clearers_split_pool_minus_rake(session):
-    pool, users = await _form_room(session, [1.50, 1.50, 1.52, 1.48])
+    pool, users = await _form_room(session, [35.0, 35.0, 36.0, 34.0])
     entries = list(
         await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool.id))
     )
@@ -254,7 +246,7 @@ async def test_settle_clearers_split_pool_minus_rake(session):
     grades = {}
     for i, e in enumerate(entries):
         grades[e.user_id] = PoolGrade(
-            cleared=(i < 2), telemetry={KD: 2.0 if i < 2 else 0.1}
+            cleared=(i < 2), telemetry={METRIC: 20.0 if i < 2 else 60.0}
         )
     await pool_engine.settle_pool(session, pool, grades)
     assert pool.state == "SETTLED"
@@ -267,7 +259,7 @@ async def test_settle_clearers_split_pool_minus_rake(session):
 
 
 async def test_settle_no_clearers_refunds_all_zero_rake(session):
-    pool, users = await _form_room(session, [1.50, 1.50, 1.52, 1.48])
+    pool, users = await _form_room(session, [35.0, 35.0, 36.0, 34.0])
     entries = list(
         await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool.id))
     )
@@ -281,7 +273,7 @@ async def test_settle_no_clearers_refunds_all_zero_rake(session):
 
 
 async def test_settle_unverifiable_refunded_off_the_top(session):
-    pool, users = await _form_room(session, [1.50, 1.50, 1.52, 1.48])
+    pool, users = await _form_room(session, [35.0, 35.0, 36.0, 34.0])
     entries = list(
         await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool.id))
     )

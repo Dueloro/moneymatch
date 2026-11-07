@@ -13,12 +13,12 @@ from moneymatch_api.workers import settlement_worker
 from moneymatch_api.workers.nightly import run_nightly
 
 from .conftest import new_sessionmaker
-from .factories import create_linked_account, create_user, cs2_profile
+from .factories import chess_profile, create_linked_account, create_user
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+METRIC = "chess_moves"
 
 
 class _FakeAdapter:
@@ -26,13 +26,13 @@ class _FakeAdapter:
         self._games = [
             NormGame(
                 id=str(i),
-                speed="cs2",
+                speed="blitz",
                 rated=True,
                 created_at_ms=i,
                 moves=0,
-                won=None,
+                won=True,
                 drawn=False,
-                metrics={KD: v},
+                metrics={METRIC: v},
             )
             for i, v in enumerate(values_oldest_first)
         ]
@@ -44,7 +44,7 @@ class _FakeAdapter:
 async def test_run_nightly_refreshes_models_and_flags_sandbagger(session, monkeypatch):
     user = await create_user(session, username="tank")
     await create_linked_account(
-        session, user, CS2, host_account_id="host_tank", profile=cs2_profile("tank")
+        session, user, CHESS, host_account_id="host_tank", profile=chess_profile("tank")
     )
     await session.commit()  # visible to run_nightly's own sessions
 
@@ -61,7 +61,7 @@ async def test_run_nightly_refreshes_models_and_flags_sandbagger(session, monkey
 
     model = await session.scalar(
         select(MetricModel).where(
-            MetricModel.user_id == user.id, MetricModel.metric == KD
+            MetricModel.user_id == user.id, MetricModel.metric == METRIC
         )
     )
     assert model is not None and model.n == len(baseline) + len(recent_tanked)

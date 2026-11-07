@@ -14,10 +14,6 @@ with the diff reviewed in the commit.** Regenerate with:
 
     UPDATE_BAR_GOLDEN=1 pytest tests/test_bar_golden.py
 
-The corpus is seeded with the four cases in `IMPLEMENTATION_STATUS.md` §5.4 that
-are known to reproduce deployed behaviour exactly; `test_known_deployed_bars`
-asserts those independently of the golden file, so a careless regeneration
-cannot silently bless a regression against real observed output.
 """
 
 from __future__ import annotations
@@ -43,29 +39,11 @@ pytestmark = pytest.mark.nodb
 
 GOLDEN_PATH = pathlib.Path(__file__).parent / "golden" / "bar_snapshots.json"
 
-#: (label, game, metric, μ, σ, n). Seeded with the four §5.4 cases that match
-#: deployed behaviour, plus coverage of the lognormal branch and every other
-#: shipped pool metric so a change cannot move a number unnoticed.
+#: (label, game, metric, μ, σ, n): the lognormal, lower-is-better chess bar.
 CORPUS: list[tuple[str, str, str, float, float, int]] = [
-    # --- known to match deployed behaviour (IMPLEMENTATION_STATUS.md §5.4) ---
-    ("cs2_kd_private_prior", "cs2.steam", "cs2_kd_ratio", 1.00, 0.25, 3),
-    ("cs2_kd_public_lifetime", "cs2.steam", "cs2_kd_ratio", 0.606, 0.25, 3),
-    ("cs2_kills_seeded", "cs2.steam", "cs2_kills", 10.92, 6.0, 3),
-    ("cs2_headshot_seeded", "cs2.steam", "cs2_headshot_pct", 42.34, 12.0, 3),
-    # --- established players, larger samples ---
-    ("cs2_kd_established", "cs2.steam", "cs2_kd_ratio", 1.18, 0.31, 40),
-    ("cs2_kills_established", "cs2.steam", "cs2_kills", 17.0, 5.5, 50),
-    ("cs2_headshot_established", "cs2.steam", "cs2_headshot_pct", 43.5, 13.2, 50),
-    # --- lognormal branch (positive support + lower-is-better) ---
     ("chess_moves_1000", "chess.lichess", "chess_moves", 26.8, 11.94, 20),
     ("chess_moves_2000", "chess.lichess", "chess_moves", 36.9, 11.94, 60),
     ("chess_moves_tight", "chess.lichess", "chess_moves", 25.7, 2.0, 9),
-    # --- other shipped pool metrics ---
-    ("dota2_kda", "dota2.opendota", "dota2_kda_ratio", 3.2, 0.8, 30),
-    ("dota2_gpm", "dota2.opendota", "dota2_gpm", 520.0, 90.0, 30),
-    ("pubg_kills", "pubg.steam", "pubg_kills", 4.5, 2.0, 25),
-    ("pubg_damage", "pubg.steam", "pubg_damage", 380.0, 120.0, 25),
-    ("pubg_headshot", "pubg.steam", "pubg_headshot_pct", 22.0, 8.0, 25),
 ]
 
 
@@ -202,27 +180,6 @@ def test_numerics_version_is_recorded_and_unchanged():
         "Re-run the golden harness, review whether any bar moved, and re-bless "
         "the file in a commit that says so."
     )
-
-
-@pytest.mark.parametrize(
-    ("label", "expected"),
-    [
-        # IMPLEMENTATION_STATUS.md §5.4 — verified against the deployed app.
-        ("cs2_kd_private_prior", {"easy": 1.10, "medium": 1.20, "hard": 1.30}),
-        ("cs2_kd_public_lifetime", {"easy": 0.70, "medium": 0.80, "hard": 0.95}),
-        ("cs2_kills_seeded", {"easy": 13.0, "medium": 16.0, "hard": 19.0}),
-        ("cs2_headshot_seeded", {"easy": 47.0, "medium": 52.0, "hard": 58.0}),
-    ],
-)
-def test_known_deployed_bars(label: str, expected: dict[str, float]):
-    """The four cases observed in production, asserted independently.
-
-    These are the anchor: they were read off the deployed app, so they pin the
-    maths to reality rather than to whatever the golden file happens to hold.
-    """
-    case = _snapshot_case(label, *next(rest for lbl, *rest in CORPUS if lbl == label))
-    actual = {d: case["difficulties"][d]["bar"] for d in expected}
-    assert actual == pytest.approx(expected)
 
 
 def test_n_eff_matches_published_values():

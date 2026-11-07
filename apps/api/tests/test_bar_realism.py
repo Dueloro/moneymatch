@@ -117,8 +117,8 @@ def test_the_floor_alone_would_not_have_been_enough():
 
 
 def test_a_rate_metric_is_untouched_by_the_change():
-    """cs2_kd_ratio is not positive-support, so it keeps the normal placement."""
-    assert positive_support("cs2_kd_ratio") is False
+    """chess_accuracy is not positive-support, so it keeps the normal placement."""
+    assert positive_support("chess_accuracy") is False
     assert fairness.personal_bar(1.2, 0.3, 1.0, 0.05, False) == pytest.approx(1.5)
 
 
@@ -195,7 +195,7 @@ def test_an_unreadable_rating_still_produces_a_sane_bar():
 
 
 def test_a_metric_with_no_measured_prior_keeps_its_own_numbers():
-    assert skill_prior.prior_for("cs2_kd_ratio", 1500) is None
+    assert skill_prior.prior_for("chess_accuracy", 1500) is None
     assert skill_prior.shrink(1.2, 0.3, 4, None) == (1.2, 0.3)
 
 

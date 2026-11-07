@@ -53,7 +53,7 @@ def _norm(**over):
 
 def test_the_metric_is_registered_as_win_only():
     assert requires_win("chess_moves") is True
-    assert requires_win("cs2_kd_ratio") is False
+    assert requires_win("chess_accuracy") is False
 
 
 def test_a_win_still_scores_its_move_count():
@@ -131,4 +131,4 @@ def test_a_fast_win_clears_and_a_slow_win_does_not():
 
 def test_an_unmeasurable_metric_is_untouched_by_the_rule():
     """Only win-required metrics turn a missing value into a loss."""
-    assert _outcome("cs2_kd_ratio", None, played=True) == "refund"
+    assert _outcome("chess_accuracy", None, played=True) == "refund"

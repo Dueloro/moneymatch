@@ -24,24 +24,24 @@ from moneymatch_api.workers import settlement_worker
 
 from .conftest import new_sessionmaker
 from .factories import (
+    chess_profile,
     create_linked_account,
     create_metric_model,
     create_user,
     create_wallet,
-    cs2_profile,
 )
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+MOVES = "chess_moves"
+WINS = "chess_wins"
 
 
 class FakeAdapter:
     """Returns per-host games; used for both the sandbagging poll and grading."""
 
-    id = CS2
-    brokered = False
+    id = CHESS
 
     def __init__(self, games_by_host=None):
         self.games_by_host = games_by_host or {}
@@ -50,26 +50,27 @@ class FakeAdapter:
         return self.games_by_host.get(host, [])
 
 
-def _game(created_ms: int, kd: float) -> NormGame:
+def _game(created_ms: int, moves: float, *, won: bool = True) -> NormGame:
+    """A rated game; `chess_moves` is only emitted for a win, as the adapter does."""
     return NormGame(
         id=f"m{created_ms}",
-        speed="cs2",
+        speed="blitz",
         rated=True,
         created_at_ms=created_ms,
-        moves=0,
-        won=None,
+        moves=int(moves),
+        won=won,
         drawn=False,
-        metrics={KD: kd},
+        metrics={MOVES: moves} if won else {},
     )
 
 
-async def _player(session, name, *, mu, fund=10_000, host=None):
+async def _player(session, name, *, mu=35.0, fund=10_000, host=None):
     host = host or f"host_{name}"
     user = await create_user(session, username=name)
     await create_linked_account(
-        session, user, CS2, host_account_id=host, profile=cs2_profile(name)
+        session, user, CHESS, host_account_id=host, profile=chess_profile(name)
     )
-    await create_metric_model(session, user, CS2, KD, mu=mu, sigma=0.30, n=15)
+    await create_metric_model(session, user, CHESS, MOVES, mu=mu, sigma=8.0, n=15)
     await create_wallet(session, user, available_cents=0)
     await wallet_service.demo_deposit(session, user.id, fund, memo="fund")
     return user, host
@@ -91,15 +92,20 @@ async def test_pool_settles_from_server_telemetry(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())  # no sandbag history
     async with sm() as s:
         users = []
-        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
             u, host = await _player(s, f"p{i}", mu=mu)
             users.append((u, host))
         for u, _ in users[:3]:
             await pool_engine.enqueue(
-                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
             )
         res = await pool_engine.enqueue(
-            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            s,
+            users[3][0],
+            game=CHESS,
+            metric=MOVES,
+            difficulty="medium",
+            entry_cents=1000,
         )
         pool_id = res.pool.id
         room_bar = res.pool.room_bar
@@ -114,12 +120,12 @@ async def test_pool_settles_from_server_telemetry(monkeypatch):
         await s.commit()
         mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
 
-    # Two clear (KD above room_bar), two miss.
+    # Two clear (won in fewer moves than room_bar), two miss.
     games = {
-        users[0][1]: [_game(mid_ms, room_bar + 0.5)],
-        users[1][1]: [_game(mid_ms, room_bar + 0.5)],
-        users[2][1]: [_game(mid_ms, 0.3)],
-        users[3][1]: [_game(mid_ms, 0.3)],
+        users[0][1]: [_game(mid_ms, room_bar - 5)],
+        users[1][1]: [_game(mid_ms, room_bar - 5)],
+        users[2][1]: [_game(mid_ms, room_bar + 20)],
+        users[3][1]: [_game(mid_ms, room_bar + 20)],
     }
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
 
@@ -144,15 +150,20 @@ async def test_pool_boundary_match_excluded_then_refunded(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
     async with sm() as s:
         users = []
-        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
             u, host = await _player(s, f"b{i}", mu=mu)
             users.append((u, host))
         for u, _ in users[:3]:
             await pool_engine.enqueue(
-                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
             )
         res = await pool_engine.enqueue(
-            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            s,
+            users[3][0],
+            game=CHESS,
+            metric=MOVES,
+            difficulty="medium",
+            entry_cents=1000,
         )
         pool_id = res.pool.id
         start = datetime.now(UTC) - timedelta(hours=2)
@@ -166,7 +177,7 @@ async def test_pool_boundary_match_excluded_then_refunded(monkeypatch):
 
     # Every match sits 1 ms BEFORE the window start → excluded → all unverifiable.
     before_ms = int(start.timestamp() * 1000) - 1
-    games = {host: [_game(before_ms, 5.0)] for _, host in users}
+    games = {host: [_game(before_ms, 10.0)] for _, host in users}
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
 
     await settlement_worker.run_cycle(sm)
@@ -187,15 +198,20 @@ async def test_live_snapshot_written_for_inflight_pool(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())  # empty sandbag poll
     async with sm() as s:
         users = []
-        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
             u, host = await _player(s, f"L{i}", mu=mu)
             users.append((u, host))
         for u, _ in users[:3]:
             await pool_engine.enqueue(
-                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
             )
         res = await pool_engine.enqueue(
-            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            s,
+            users[3][0],
+            game=CHESS,
+            metric=MOVES,
+            difficulty="medium",
+            entry_cents=1000,
         )
         pool_id = res.pool.id
         room_bar = res.pool.room_bar
@@ -206,8 +222,8 @@ async def test_live_snapshot_written_for_inflight_pool(monkeypatch):
 
     mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
     games = {
-        users[0][1]: [_game(mid_ms, room_bar + 0.5)],  # clears
-        users[2][1]: [_game(mid_ms, 0.3)],  # misses
+        users[0][1]: [_game(mid_ms, room_bar - 5)],  # clears
+        users[2][1]: [_game(mid_ms, room_bar + 20)],  # misses
         # users[1] and users[3] have played nothing yet → "waiting".
     }
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
@@ -253,15 +269,20 @@ async def test_pool_settles_early_when_all_members_decided(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
     async with sm() as s:
         users = []
-        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
             u, host = await _player(s, f"E{i}", mu=mu)
             users.append((u, host))
         for u, _ in users[:3]:
             await pool_engine.enqueue(
-                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
             )
         res = await pool_engine.enqueue(
-            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            s,
+            users[3][0],
+            game=CHESS,
+            metric=MOVES,
+            difficulty="medium",
+            entry_cents=1000,
         )
         pool_id = res.pool.id
         room_bar = res.pool.room_bar
@@ -271,10 +292,10 @@ async def test_pool_settles_early_when_all_members_decided(monkeypatch):
     mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
     # Every member has a decided in-window match → the outcome is already final.
     games = {
-        users[0][1]: [_game(mid_ms, room_bar + 0.5)],  # clears
-        users[1][1]: [_game(mid_ms, room_bar + 0.5)],  # clears
-        users[2][1]: [_game(mid_ms, 0.3)],  # misses
-        users[3][1]: [_game(mid_ms, 0.3)],  # misses
+        users[0][1]: [_game(mid_ms, room_bar - 5)],  # clears
+        users[1][1]: [_game(mid_ms, room_bar - 5)],  # clears
+        users[2][1]: [_game(mid_ms, room_bar + 20)],  # misses
+        users[3][1]: [_game(mid_ms, room_bar + 20)],  # misses
     }
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
 
@@ -308,15 +329,20 @@ async def test_pool_not_settled_early_while_a_member_is_still_playing(monkeypatc
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter())
     async with sm() as s:
         users = []
-        for i, mu in enumerate([1.50, 1.50, 1.52, 1.48]):
+        for i, mu in enumerate([35.0, 35.0, 36.0, 34.0]):
             u, host = await _player(s, f"W{i}", mu=mu)
             users.append((u, host))
         for u, _ in users[:3]:
             await pool_engine.enqueue(
-                s, u, game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+                s, u, game=CHESS, metric=MOVES, difficulty="medium", entry_cents=1000
             )
         res = await pool_engine.enqueue(
-            s, users[3][0], game=CS2, metric=KD, difficulty="medium", entry_cents=1000
+            s,
+            users[3][0],
+            game=CHESS,
+            metric=MOVES,
+            difficulty="medium",
+            entry_cents=1000,
         )
         pool_id = res.pool.id
         room_bar = res.pool.room_bar
@@ -326,8 +352,8 @@ async def test_pool_not_settled_early_while_a_member_is_still_playing(monkeypatc
     mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
     # Only two of four have played — the other two are still "waiting".
     games = {
-        users[0][1]: [_game(mid_ms, room_bar + 0.5)],
-        users[2][1]: [_game(mid_ms, 0.3)],
+        users[0][1]: [_game(mid_ms, room_bar - 5)],
+        users[2][1]: [_game(mid_ms, room_bar + 20)],
     }
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
 
@@ -351,12 +377,14 @@ async def test_tournament_settles_and_pays_top_three(monkeypatch):
     async with sm() as s:
         players = []
         for i in range(10):
-            u, host = await _player(s, f"t{i}", mu=1.50 + i * 0.01)
+            u, host = await _player(s, f"t{i}")
             players.append((u, host))
         for u, _ in players[:-1]:
-            await tournament_engine.enqueue(s, u, game=CS2, metric=KD, entry_cents=1000)
+            await tournament_engine.enqueue(
+                s, u, game=CHESS, metric=WINS, entry_cents=1000
+            )
         res = await tournament_engine.enqueue(
-            s, players[-1][0], game=CS2, metric=KD, entry_cents=1000
+            s, players[-1][0], game=CHESS, metric=WINS, entry_cents=1000
         )
         tid = res.tournament.id
         start = datetime.now(UTC) - timedelta(hours=2)
@@ -369,9 +397,10 @@ async def test_tournament_settles_and_pays_top_three(monkeypatch):
         await s.commit()
         mid_ms = int((start + timedelta(minutes=30)).timestamp() * 1000)
 
-    # Distinct descending KDs so ranking is unambiguous.
+    # Distinct descending win counts so ranking is unambiguous.
     games = {
-        host: [_game(mid_ms, 2.0 - i * 0.1)] for i, (_, host) in enumerate(players)
+        host: [_game(mid_ms + j, 30) for j in range(10 - i)]
+        for i, (_, host) in enumerate(players)
     }
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
 
@@ -402,12 +431,14 @@ async def test_tournament_standings_refresh_during_window(monkeypatch):
     async with sm() as s:
         players = []
         for i in range(10):
-            u, host = await _player(s, f"s{i}", mu=1.50 + i * 0.01)
+            u, host = await _player(s, f"s{i}")
             players.append((u, host))
         for u, _ in players[:-1]:
-            await tournament_engine.enqueue(s, u, game=CS2, metric=KD, entry_cents=1000)
+            await tournament_engine.enqueue(
+                s, u, game=CHESS, metric=WINS, entry_cents=1000
+            )
         res = await tournament_engine.enqueue(
-            s, players[-1][0], game=CS2, metric=KD, entry_cents=1000
+            s, players[-1][0], game=CHESS, metric=WINS, entry_cents=1000
         )
         tid = res.tournament.id
         # Window still open (started an hour ago, ends in the future).
@@ -422,7 +453,8 @@ async def test_tournament_standings_refresh_during_window(monkeypatch):
         mid_ms = int((start + timedelta(minutes=10)).timestamp() * 1000)
 
     games = {
-        host: [_game(mid_ms, 2.0 - i * 0.1)] for i, (_, host) in enumerate(players)
+        host: [_game(mid_ms + j, 30) for j in range(10 - i)]
+        for i, (_, host) in enumerate(players)
     }
     monkeypatch.setattr(registry, "get", lambda g: FakeAdapter(games))
 

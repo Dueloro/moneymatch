@@ -84,8 +84,8 @@ def test_direction_is_registered_per_metric():
     assert am.higher_is_better("chess_win_streak") is True
     assert am.higher_is_better("chess_fastest_win") is False
     # Rate metrics are not in the registry and default to higher-is-better.
-    assert am.higher_is_better("cs2_kd_ratio") is True
-    assert am.is_aggregate("cs2_kd_ratio") is False
+    assert am.higher_is_better("chess_accuracy") is True
+    assert am.is_aggregate("chess_accuracy") is False
 
 
 def _entry(name: str, minute: int):

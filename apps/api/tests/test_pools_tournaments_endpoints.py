@@ -10,21 +10,20 @@ from sqlalchemy import func, select, text
 from moneymatch_api.constants import POOL_DIFFICULTY_K
 from moneymatch_api.models.user import User
 from moneymatch_api.models.wallet import LedgerEntry, Wallet
-from moneymatch_api.services import fairness
+from moneymatch_api.services import fairness, skill_prior
 
 from .conftest import auth_headers, new_sessionmaker
-from .factories import create_linked_account, create_metric_model, cs2_profile
+from .factories import chess_profile, create_linked_account, create_metric_model
 
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+MOVES = "chess_moves"
 
 
 class _FakeAdapter:
-    id = CS2
-    brokered = False
+    id = CHESS
 
     async def poll_eligible_games(self, host, since_ms, filters):
         return []
@@ -37,7 +36,7 @@ def _stub_host(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda game_id: _FakeAdapter())
 
 
-async def setup_player(client, auth_id, name, *, mu=1.50, n=15, state="MA"):
+async def setup_player(client, auth_id, name, *, mu=34.0, n=15, state="MA"):
     r = await client.get(f"{V1}/me", headers=auth_headers(auth_id))
     assert r.status_code == 200
     sm = new_sessionmaker()
@@ -46,9 +45,9 @@ async def setup_player(client, auth_id, name, *, mu=1.50, n=15, state="MA"):
         user.username = name
         user.residence_state = state
         await create_linked_account(
-            s, user, CS2, host_account_id=f"host_{name}", profile=cs2_profile(name)
+            s, user, CHESS, host_account_id=f"host_{name}", profile=chess_profile(name)
         )
-        await create_metric_model(s, user, CS2, KD, mu=mu, sigma=0.30, n=n)
+        await create_metric_model(s, user, CHESS, MOVES, mu=mu, sigma=8.0, n=n)
         await s.commit()
 
 
@@ -76,19 +75,22 @@ def _hdr(auth_id):
 
 
 async def test_pool_markets_quote_bars_from_own_baseline(client):
-    await setup_player(client, "auth_pm", "pm", mu=1.50)
+    await setup_player(client, "auth_pm", "pm", mu=34.0)
     r = await client.get(
-        f"{V1}/pools/markets", params={"game": CS2}, headers=_hdr("auth_pm")
+        f"{V1}/pools/markets", params={"game": CHESS}, headers=_hdr("auth_pm")
     )
     assert r.status_code == 200
     body = r.json()
     assert body["linked"] is True
-    kd = next(m for m in body["metrics"] if m["metric"] == KD)
-    assert kd["provisional"] is False
-    by_diff = {c["difficulty"]: c for c in kd["cards"]}
-    # μ + k·σ at the medium tier, derived so a retune moves it too.
+    moves = next(m for m in body["metrics"] if m["metric"] == MOVES)
+    assert moves["provisional"] is False
+    by_diff = {c["difficulty"]: c for c in moves["cards"]}
+    # The medium-tier bar from the rating-shrunk baseline, derived so a retune
+    # moves it too.
+    mu, sigma = skill_prior.shrink(34.0, 8.0, 15, skill_prior.prior_for(MOVES, 1500))
+    sigma = fairness.effective_sigma(sigma, 1.0)
     assert by_diff["medium"]["bar"] == fairness.personal_bar(
-        1.50, 0.30, POOL_DIFFICULTY_K["medium"], 0.05
+        mu, sigma, POOL_DIFFICULTY_K["medium"], 1.0, True, positive=True, floor=2.0
     )
     # Estimated multiplier is disclosed as an estimate, never an odds line.
     assert by_diff["medium"]["est_multiplier_bps"] > 0
@@ -102,8 +104,8 @@ async def test_pool_enqueue_searches_then_room_status(client):
     r = await client.post(
         f"{V1}/pools/queue",
         json={
-            "game": CS2,
-            "metric": KD,
+            "game": CHESS,
+            "metric": MOVES,
             "difficulty": "medium",
             "entry_preset_cents": 1000,
         },
@@ -130,10 +132,10 @@ async def test_activity_shows_pool_wager_and_live_without_any_match(client):
         )
         now = datetime.now(UTC)
         pool = SoloPool(
-            game=CS2,
-            metric=KD,
+            game=CHESS,
+            metric=MOVES,
             difficulty="medium",
-            room_bar=1.25,
+            room_bar=25.0,
             entry_cents=1000,
             rake_bps=500,
             room_size=1,
@@ -150,7 +152,7 @@ async def test_activity_shows_pool_wager_and_live_without_any_match(client):
                 user_id=user.id,
                 linked_account_id=la.id,
                 host_account_id=la.host_account_id,
-                personal_bar=1.25,
+                personal_bar=25.0,
                 status="LOCKED",
             )
         )
@@ -160,12 +162,12 @@ async def test_activity_shows_pool_wager_and_live_without_any_match(client):
                 ref_id=pool.id,
                 data={
                     "kind": "pool",
-                    "label": "K/D ratio",
-                    "target": 1.25,
+                    "label": "Moves to win",
+                    "target": 25.0,
                     "members": {
                         str(user.id): {
                             "status": "cleared",
-                            "current": 1.6,
+                            "current": 22,
                             "cleared": True,
                             "matches": 1,
                         }
@@ -181,7 +183,7 @@ async def test_activity_shows_pool_wager_and_live_without_any_match(client):
     it = items[0]
     assert it["type"] == "pool" and it["state"] == "LOCKED"
     assert it["net_cents"] is None  # in flight → shown as "in play"
-    assert it["live"]["status"] == "cleared" and it["live"]["current"] == 1.6
+    assert it["live"]["status"] == "cleared" and it["live"]["current"] == 22
 
 
 async def test_geo_fence_blocks_before_any_ledger_write(client):
@@ -201,8 +203,8 @@ async def test_geo_fence_blocks_before_any_ledger_write(client):
     r = await client.post(
         f"{V1}/pools/queue",
         json={
-            "game": CS2,
-            "metric": KD,
+            "game": CHESS,
+            "metric": MOVES,
             "difficulty": "medium",
             "entry_preset_cents": 1000,
         },
@@ -224,8 +226,8 @@ async def test_pool_rejects_non_preset_entry(client):
     r = await client.post(
         f"{V1}/pools/queue",
         json={
-            "game": CS2,
-            "metric": KD,
+            "game": CHESS,
+            "metric": MOVES,
             "difficulty": "medium",
             "entry_preset_cents": 1234,
         },
@@ -240,8 +242,8 @@ async def test_no_endpoint_accepts_a_bar_or_room_bar(client):
     r = await client.post(
         f"{V1}/pools/queue",
         json={
-            "game": CS2,
-            "metric": KD,
+            "game": CHESS,
+            "metric": MOVES,
             "difficulty": "medium",
             "entry_preset_cents": 1000,
             "personal_bar": 0.1,
@@ -259,7 +261,7 @@ async def test_no_endpoint_accepts_a_bar_or_room_bar(client):
 async def test_tournament_markets_and_enqueue(client):
     await setup_player(client, "auth_t", "tt")
     m = await client.get(
-        f"{V1}/tournaments/markets", params={"game": CS2}, headers=_hdr("auth_t")
+        f"{V1}/tournaments/markets", params={"game": CHESS}, headers=_hdr("auth_t")
     )
     assert m.status_code == 200
     body = m.json()
@@ -267,7 +269,7 @@ async def test_tournament_markets_and_enqueue(client):
 
     r = await client.post(
         f"{V1}/tournaments/queue",
-        json={"game": CS2, "metric": KD, "entry_preset_cents": 1000},
+        json={"game": CHESS, "metric": "chess_wins", "entry_preset_cents": 1000},
         headers=_hdr("auth_t"),
     )
     assert r.status_code == 200 and r.json()["status"] == "searching"

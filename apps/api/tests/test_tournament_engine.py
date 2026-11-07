@@ -1,6 +1,5 @@
-"""Tournament engine: field formation (dispersion cap), first-N scoring, the
-50/30/20 split with ties and forfeits, and the settlement invariant — the ported
-`test_tournament.py` spec on integer cents (single-elim cut)."""
+"""Tournament engine: field formation (dispersion cap), the 50/30/20 split with
+ties and forfeits, and the settlement invariant on integer cents."""
 
 from __future__ import annotations
 
@@ -15,23 +14,16 @@ from moneymatch_api.services import (
 )
 from moneymatch_api.services.tournament_engine import TournamentGrade
 
-from .factories import (
-    create_linked_account,
-    create_metric_model,
-    create_user,
-    create_wallet,
-    cs2_profile,
-)
+from .factories import chess_profile, create_linked_account, create_user, create_wallet
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+METRIC = "chess_wins"
 
 
 class _FakeAdapter:
-    id = CS2
-    brokered = False
+    id = CHESS
 
     async def poll_eligible_games(self, host, since_ms, filters):
         return []
@@ -44,12 +36,15 @@ def _stub_host(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda game_id: _FakeAdapter())
 
 
-async def t_player(session, name, *, mu, sigma=0.30, n=15, fund=10_000):
+async def t_player(session, name, *, rating, fund=10_000):
     user = await create_user(session, username=name)
     await create_linked_account(
-        session, user, CS2, host_account_id=f"host_{name}", profile=cs2_profile(name)
+        session,
+        user,
+        CHESS,
+        host_account_id=f"host_{name}",
+        profile=chess_profile(name, rating=rating),
     )
-    await create_metric_model(session, user, CS2, KD, mu=mu, sigma=sigma, n=n)
     await create_wallet(session, user, available_cents=0)
     await wallet_service.demo_deposit(session, user.id, fund, memo="fund")
     return user
@@ -57,8 +52,12 @@ async def t_player(session, name, *, mu, sigma=0.30, n=15, fund=10_000):
 
 async def enq(session, user, *, entry=1000):
     return await tournament_engine.enqueue(
-        session, user, game=CS2, metric=KD, entry_cents=entry
+        session, user, game=CHESS, metric=METRIC, entry_cents=entry
     )
+
+
+def _scored(score: float) -> TournamentGrade:
+    return TournamentGrade(values=[score], score=score, counted=1)
 
 
 async def _bal(session, user):
@@ -66,11 +65,11 @@ async def _bal(session, user):
     return w.available_cents, w.escrow_cents
 
 
-async def _form(session, n=10, *, mu=1.50):
+async def _form(session, n=10, *, rating=1500):
     """Form a full field of `n` similar players. Returns (tournament, users)."""
     users = []
     for i in range(n):
-        users.append(await t_player(session, f"p{i}", mu=mu + i * 0.01))
+        users.append(await t_player(session, f"p{i}", rating=rating + i * 5))
     for u in users[:-1]:
         await enq(session, u)
     result = await enq(session, users[-1])
@@ -100,29 +99,11 @@ async def test_field_forms_under_dispersion_cap(session):
 async def test_dispersion_cap_refuses_a_lopsided_field(session):
     # Nine tight players + one far outlier → the full field can't form fairly.
     for i in range(9):
-        await enq(session, await t_player(session, f"p{i}", mu=1.50 + i * 0.01))
-    outlier = await t_player(session, "outlier", mu=5.0, sigma=0.30)
+        await enq(session, await t_player(session, f"p{i}", rating=1500 + i * 5))
+    outlier = await t_player(session, "outlier", rating=2600)
     result = await enq(session, outlier)
     assert result.status == "searching"
     assert (await session.scalar(select(Tournament.id))) is None
-
-
-# --- first-N scoring ------------------------------------------------------ #
-
-
-async def test_first_n_average_scores_earliest_three(session):
-    tournament, users = await _form(session, 10)
-    entries = await _entries(session, tournament.id)
-    # Give the first entrant 5 matches; only the first 3 count.
-    grades = {}
-    grades[entries[0].id] = TournamentGrade(values=[2.0, 2.0, 2.0, 0.0, 0.0])
-    for e in entries[1:]:
-        grades[e.id] = TournamentGrade(values=[1.0, 1.0, 1.0])
-    await tournament_engine.settle_tournament(session, tournament, grades)
-    top = next(e for e in await _entries(session, tournament.id) if e.rank == 1)
-    assert top.id == entries[0].id
-    assert top.score == pytest.approx(2.0)  # mean of first 3, not all 5
-    assert top.matches_counted == 3
 
 
 # --- prize split / invariants --------------------------------------------- #
@@ -132,9 +113,7 @@ async def test_top_three_split_50_30_20_and_reconciles(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
     # Distinct descending scores → unambiguous 1..10 ranking.
-    grades = {
-        e.id: TournamentGrade(values=[2.0 - i * 0.1]) for i, e in enumerate(entries)
-    }
+    grades = {e.id: _scored(20.0 - i) for i, e in enumerate(entries)}
     await tournament_engine.settle_tournament(session, tournament, grades)
     assert tournament.state == "SETTLED"
     # Pool $100, rake 10% = $10, net $90 → 45/27/18.
@@ -154,10 +133,10 @@ async def test_tie_splits_combined_slices_remainder_to_earlier_enqueue(session):
     entries = await _entries(session, tournament.id)  # ordered by enqueued_at
     # First two tie for 1st (combined 1st+2nd slices); rest descending.
     grades = {}
-    grades[entries[0].id] = TournamentGrade(values=[3.0])
-    grades[entries[1].id] = TournamentGrade(values=[3.0])
+    grades[entries[0].id] = _scored(30.0)
+    grades[entries[1].id] = _scored(30.0)
     for i, e in enumerate(entries[2:], start=2):
-        grades[e.id] = TournamentGrade(values=[2.0 - i * 0.1])
+        grades[e.id] = _scored(20.0 - i)
     await tournament_engine.settle_tournament(session, tournament, grades)
     fresh = {e.id: e for e in await _entries(session, tournament.id)}
     a, b = fresh[entries[0].id], fresh[entries[1].id]
@@ -172,9 +151,7 @@ async def test_tie_splits_combined_slices_remainder_to_earlier_enqueue(session):
 async def test_zero_match_entrant_forfeits_and_is_paid_nothing(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
-    grades = {
-        e.id: TournamentGrade(values=[1.5 - i * 0.1]) for i, e in enumerate(entries)
-    }
+    grades = {e.id: _scored(15.0 - i) for i, e in enumerate(entries)}
     grades[entries[-1].id] = TournamentGrade(values=[])  # played nothing → forfeit
     await tournament_engine.settle_tournament(session, tournament, grades)
     forfeiter = next(
@@ -188,9 +165,7 @@ async def test_zero_match_entrant_forfeits_and_is_paid_nothing(session):
 async def test_unverifiable_refunded_off_the_top(session):
     tournament, users = await _form(session, 10)
     entries = await _entries(session, tournament.id)
-    grades = {
-        e.id: TournamentGrade(values=[1.5 - i * 0.1]) for i, e in enumerate(entries)
-    }
+    grades = {e.id: _scored(15.0 - i) for i, e in enumerate(entries)}
     grades[entries[-1].id] = TournamentGrade(values=None)  # host couldn't verify
     await tournament_engine.settle_tournament(session, tournament, grades)
     refunded = next(
@@ -207,7 +182,7 @@ async def test_under_min_ranked_cancels_and_refunds_all(session):
     # Only 3 produce a score (< min_ranked 4) → CANCELED, everyone refunded.
     grades = {e.id: TournamentGrade(values=None) for e in entries}
     for e in entries[:3]:
-        grades[e.id] = TournamentGrade(values=[1.5])
+        grades[e.id] = _scored(15.0)
     await tournament_engine.settle_tournament(session, tournament, grades)
     assert tournament.state == "CANCELED" and tournament.rake_cents == 0
     for u in users:
@@ -223,7 +198,7 @@ async def test_lone_scorer_with_forfeits_settles_and_pays(session):
     # forfeit — not a host outage). The field still has 10 participants, so it
     # settles and the sole scorer takes the pot rather than cancelling.
     grades = {e.id: TournamentGrade(values=[]) for e in entries}
-    grades[entries[0].id] = TournamentGrade(values=[1.5])
+    grades[entries[0].id] = _scored(15.0)
     await tournament_engine.settle_tournament(session, tournament, grades)
     assert tournament.state == "SETTLED"
     settled = {e.id: e for e in await _entries(session, tournament.id)}

@@ -11,7 +11,7 @@ from moneymatch_api.models.risk import RiskFlag
 from moneymatch_api.services import sandbagging_service
 from moneymatch_api.services.sandbagging_service import SandbaggingBlockedError
 
-from .factories import create_linked_account, create_user, cs2_profile
+from .factories import chess_profile, create_linked_account, create_user
 
 # No module-level `pytest.mark.asyncio`: `asyncio_mode = "auto"` in pyproject
 # already collects every async test here, so the marker was redundant — and
@@ -19,8 +19,8 @@ from .factories import create_linked_account, create_user, cs2_profile
 # one. Warnings in a money-relevant control are where a real warning goes to
 # hide (AUDIT_FINDINGS.md P2-1).
 
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+METRIC = "chess_moves"
 
 
 @pytest.mark.nodb
@@ -50,13 +50,13 @@ class _FakeAdapter:
         self._games = [
             NormGame(
                 id=str(i),
-                speed="cs2",
+                speed="blitz",
                 rated=True,
                 created_at_ms=i,
                 moves=0,
                 won=None,
                 drawn=False,
-                metrics={KD: v},
+                metrics={METRIC: v},
             )
             for i, v in enumerate(values_oldest_first)
         ]
@@ -68,7 +68,7 @@ class _FakeAdapter:
 async def test_evaluate_writes_flag_and_blocks(session, monkeypatch):
     user = await create_user(session, username="tank")
     await create_linked_account(
-        session, user, CS2, host_account_id="host_tank", profile=cs2_profile("tank")
+        session, user, CHESS, host_account_id="host_tank", profile=chess_profile("tank")
     )
     # Oldest-first: steady baseline then a tanked recent tail.
     baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
@@ -79,7 +79,7 @@ async def test_evaluate_writes_flag_and_blocks(session, monkeypatch):
 
     with pytest.raises(SandbaggingBlockedError):
         await sandbagging_service.assert_not_sandbagging(
-            session, user, CS2, KD, "host_tank"
+            session, user, CHESS, METRIC, "host_tank"
         )
     flag = await session.scalar(select(RiskFlag).where(RiskFlag.user_id == user.id))
     assert flag is not None and flag.kind == "sandbagging" and flag.resolved is False
@@ -87,7 +87,9 @@ async def test_evaluate_writes_flag_and_blocks(session, monkeypatch):
 
 async def test_existing_flag_blocks_without_re_evaluating(session, monkeypatch):
     user = await create_user(session, username="flagged")
-    session.add(RiskFlag(user_id=user.id, game=CS2, metric=KD, kind="sandbagging"))
+    session.add(
+        RiskFlag(user_id=user.id, game=CHESS, metric=METRIC, kind="sandbagging")
+    )
     await session.flush()
 
     # Adapter would raise if called — the existing flag short-circuits first.
@@ -97,18 +99,22 @@ async def test_existing_flag_blocks_without_re_evaluating(session, monkeypatch):
     monkeypatch.setattr(registry, "get", _boom)
     with pytest.raises(SandbaggingBlockedError):
         await sandbagging_service.assert_not_sandbagging(
-            session, user, CS2, KD, "host_flagged"
+            session, user, CHESS, METRIC, "host_flagged"
         )
 
 
 async def test_steady_player_not_blocked(session, monkeypatch):
     user = await create_user(session, username="clean")
     await create_linked_account(
-        session, user, CS2, host_account_id="host_clean", profile=cs2_profile("clean")
+        session,
+        user,
+        CHESS,
+        host_account_id="host_clean",
+        profile=chess_profile("clean"),
     )
     steady = [1.5, 1.4, 1.6, 1.5, 1.55, 1.45] * 4
     monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(steady))
     # No raise.
     await sandbagging_service.assert_not_sandbagging(
-        session, user, CS2, KD, "host_clean"
+        session, user, CHESS, METRIC, "host_clean"
     )
