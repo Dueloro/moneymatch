@@ -3,18 +3,9 @@ import type { ReactNode } from 'react';
 export interface SegmentOption<T extends string | number> {
   value: T;
   label: ReactNode;
-  /** Optional count rendered after the label (sub-tabs). */
   badge?: number;
 }
 
-/**
- * One segmented control, used for every "pick one of a few" in the product: the
- * contest-mode switcher, the entry amount inside a card, and the Social
- * sub-tabs. Selection is structural (a raised pill on a recessed track), never
- * a hue, so it never competes with money or with the primary action.
- *
- * Renders as a real tablist so keyboard and screen-reader behaviour is correct.
- */
 export function Segmented<T extends string | number>({
   options,
   value,

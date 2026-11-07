@@ -1,7 +1,3 @@
-/**
- * Bottom-right uppercase, letter-spaced mono breadcrumb (02-design §1).
- * Doubles as a stable QA/e2e locator — hence the data-testid.
- */
 export function FooterBreadcrumb({ segments }: { segments: string[] }) {
   return (
     <div

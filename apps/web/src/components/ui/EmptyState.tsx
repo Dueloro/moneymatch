@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react';
 
-/**
- * Empty states are invitations, not apologies: a plain title, one line of
- * context, and a way forward. No seeded or bot content anywhere.
- */
 export function EmptyState({
   title,
   subline,

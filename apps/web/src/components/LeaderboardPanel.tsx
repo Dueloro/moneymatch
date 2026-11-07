@@ -2,7 +2,6 @@ import { formatRoi, useLeaderboard } from '../hooks/useLeaderboard';
 import { EmptyState } from './ui/EmptyState';
 import { ListRow } from './ui/ListRow';
 
-/** Leaderboard tab (design p.7): ROI-ranked real users, you-row highlighted. */
 export function LeaderboardPanel() {
   const { data } = useLeaderboard();
 
@@ -35,7 +34,6 @@ export function LeaderboardPanel() {
           }
           subline={`${row.contests} contests`}
           right={
-            // ROI is a return on money, so lime stays correct here.
             <span className={row.roi_bps >= 0 ? 'text-green' : 'text-text-secondary'}>
               {formatRoi(row.roi_bps)}
             </span>

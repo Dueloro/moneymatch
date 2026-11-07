@@ -13,15 +13,10 @@ import { ExpandableCard } from './ui/ExpandableCard';
 import { PillButton } from './ui/PillButton';
 import { useAcceptChallenge, useDeclineChallenge } from '../hooks/useChallenges';
 
-/** The notification feed (design p.11): rows with an unread dot, age, and action
- * pills (View → deep link; Respond → accept/decline a challenge). Mark-read on
- * view. It lives inside the Inbox, as the pinned "Notifications" thread of the
- * messaging surface. */
 export function NotificationsFeed() {
   const { data } = useNotifications();
   const markRead = useMarkNotificationsRead();
 
-  // Mark everything read once, when there's something unread (design: on view).
   useEffect(() => {
     if (data && data.unread > 0) markRead.mutate(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,9 +80,6 @@ function NotificationRow({ note }: { note: NotificationItem }) {
       ? (p.match_id as string)
       : null;
 
-  // A contest notification carries the id of the thing it is about, so the row
-  // can open into the room itself: who is in it, and once it settles, what
-  // everyone did. Anything else stays a plain row.
   const poolId = p.kind === 'pool' ? ((p.pool_id as string) ?? null) : null;
   const tournamentId =
     p.kind === 'tournament' ? ((p.tournament_id as string) ?? null) : null;

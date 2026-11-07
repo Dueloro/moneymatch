@@ -6,10 +6,6 @@ interface Side {
   you?: boolean;
 }
 
-/**
- * Head-to-head duel card: the emotional core of a match. Both players, the pot,
- * and what you take home. Used for the matched slip state and the landing hero.
- */
 export function VersusCard({
   marketLabel,
   you,

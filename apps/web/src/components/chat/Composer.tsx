@@ -22,11 +22,6 @@ const INVITE_OPTIONS: {
   { key: 'h2h', label: 'Head-to-head', hint: 'Straight duel', Icon: SwordsIcon },
 ];
 
-/**
- * The typing bar. The invite button sits right next to it (design ask): it opens
- * the three things you can invite a friend to, which is also the shortcut into
- * the Solo Pools / Tournament tabs.
- */
 export function Composer({
   conversationId,
   disabled = false,
@@ -35,7 +30,6 @@ export function Composer({
 }: {
   conversationId: string;
   disabled?: boolean;
-  /** Support threads take messages but not invites. */
   canInvite: boolean;
   onPickInvite: (choice: InviteChoice) => void;
 }) {
@@ -44,8 +38,6 @@ export function Composer({
   const send = useSendMessage();
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Reset the draft when switching threads — a half-typed line shouldn't follow
-  // you into someone else's conversation.
   useEffect(() => {
     setText('');
     setMenuOpen(false);
@@ -68,7 +60,7 @@ export function Composer({
       await send.mutateAsync({ conversationId, body });
       track('chat_message_sent');
     } catch {
-      setText(body); // put the draft back rather than losing it
+      setText(body);
     }
   }
 

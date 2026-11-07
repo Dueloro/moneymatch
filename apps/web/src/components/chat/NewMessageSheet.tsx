@@ -4,8 +4,6 @@ import { useFriends } from '../../hooks/useFriends';
 import { PillButton } from '../ui/PillButton';
 import { Avatar } from './Avatar';
 
-/** Pick a friend to start (or reopen) a conversation with. Messaging follows
- * friendship, so this list is the whole address book. */
 export function NewMessageSheet({
   onPick,
   onClose,
@@ -15,7 +13,6 @@ export function NewMessageSheet({
   onPick: (userId: string) => void;
   onClose: () => void;
   pending: boolean;
-  /** Why the thread couldn't be opened (e.g. the friendship just ended). */
   error?: string | null;
 }) {
   const { data } = useFriends();

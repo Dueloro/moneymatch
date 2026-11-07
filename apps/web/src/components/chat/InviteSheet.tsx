@@ -6,8 +6,6 @@ import { CHESS } from '../../lib/games';
 import { PillButton } from '../ui/PillButton';
 import { PresetSelector } from '../ui/PresetSelector';
 
-// The server validates entry against its own presets (`ENTRY_PRESETS_CENTS`);
-// these are the same three amounts every wager surface offers.
 const ENTRY_PRESETS = [500, 1000, 2500];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
@@ -28,11 +26,6 @@ const COPY = {
   },
 } as const;
 
-/**
- * Compose a pool / tournament invite from inside a thread: pick an entry
- * preset, and the card lands in the conversation. "Open <tab>" is the
- * escape hatch to the surface where rooms are actually joined.
- */
 export function InviteSheet({
   conversationId,
   kind,

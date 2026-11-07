@@ -10,10 +10,6 @@ import {
   type QueueStatus,
 } from '../../hooks/useMatchmaking';
 
-/**
- * The in-flight slip: searching (band + cancel) → matched (opponent card +
- * Confirm) → active ("Go play"). It follows the server's queue status.
- */
 export function PlaySlip({ status }: { status: QueueStatus | undefined }) {
   if (status?.status === 'matched' && status.match) {
     return <MatchedSlip match={status.match} />;

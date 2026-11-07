@@ -5,32 +5,8 @@ import { useSettlement } from '../hooks/useSettlement';
 import type { SettlementOutcome } from '../hooks/useSettlementCelebration';
 import { formatCurrency } from '../lib/format';
 
-/**
- * The result of a wager, taking the screen for a moment.
- *
- * Settlement is the moment the product does its job. It used to happen silently
- * — a row in Activity changed state, usually while you were looking at something
- * else — so the one event worth witnessing was the one you missed.
- *
- * The treatment is Money Match's, not a casino's: the app is quiet and dark and
- * lets exactly one thing be loud, and lime *is* money. So a **win** is stated
- * plainly and in lime — a check, "You won", the amount counting up — over a
- * faint lime wash. A **loss** is quieter still: muted, no colour, no amount, a
- * flat line rather than a shatter. The balance itself does the rest, ticking to
- * its new value once this closes (see `useDisplayBalance`).
- *
- * ~1.9s, dismissable on click or Escape. It fires on any screen, so it has to be
- * over before it becomes something to wait out.
- */
-
-/** Total time on screen before it dismisses itself. */
 const HOLD_MS = 1_900;
 
-/**
- * Only a win and a loss are shown for now. A push and a refund still classify
- * correctly in the hook — a refund is *not* a loss and must never be shown as
- * one — they simply have no sequence. Re-enabling one is adding it here.
- */
 const CELEBRATED: ReadonlySet<SettlementOutcome> = new Set<SettlementOutcome>([
   'win',
   'loss',
@@ -43,14 +19,10 @@ export function SettlementCelebration() {
   const show = current && CELEBRATED.has(current.outcome) ? current : null;
   const win = show?.outcome === 'win';
 
-  // The amount counts up to what you won — the app's one "money moves" gesture,
-  // used here and on the balance. A loss shows no amount, so it never runs.
   const [target, setTarget] = useState(0);
   const amount = useCountUp(target, 850);
   useEffect(() => setTarget(win && show ? Math.abs(show.netCents) : 0), [win, show]);
 
-  // Consume every outcome so the queue drains, but only hold the screen for the
-  // ones that have a sequence.
   useEffect(() => {
     if (!current) return;
     timer.current = setTimeout(dismiss, show ? HOLD_MS : 0);
@@ -66,8 +38,6 @@ export function SettlementCelebration() {
     return () => window.removeEventListener('keydown', onKey);
   }, [show, dismiss]);
 
-  // A one-frame entrance (opacity, plus a small rise/scale for a win only), via
-  // transitions so the global reduced-motion clamp turns it off for free.
   const [entered, setEntered] = useState(false);
   useEffect(() => {
     if (!show) {
@@ -81,8 +51,6 @@ export function SettlementCelebration() {
   if (!show) return null;
 
   const headline = win ? 'You won' : 'You lost…';
-  // Accessibility mirrors the visible copy: the win says the amount, the loss
-  // deliberately does not.
   const announced = win
     ? `You won ${formatCurrency(show.netCents)} on ${show.title}`
     : `You lost on ${show.title}`;
@@ -96,8 +64,6 @@ export function SettlementCelebration() {
       data-testid="settlement-celebration"
       data-outcome={show.outcome}
     >
-      {/* Veil. A faint lime wash lifts a win off the dark UI; a loss gets a plain
-       * dim, no hue. Only opacity animates. */}
       <div
         aria-hidden="true"
         className={`absolute inset-0 transition-opacity duration-500 ${
@@ -161,7 +127,6 @@ export function SettlementCelebration() {
           {headline}
         </h2>
 
-        {/* Win only: the amount, smaller than the headline, in money-lime. */}
         {win && (
           <p
             data-testid="settlement-amount"

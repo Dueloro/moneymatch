@@ -6,20 +6,6 @@ import { ClearRate } from './ClearBar';
 import { PillButton } from './PillButton';
 import { Segmented } from './Segmented';
 
-/**
- * One joinable contest. The important change from the first build: **entry is a
- * control inside the card, not a separate card**.
- *
- * The old version rendered the difficulty × entry cross-product, so Solo Pools
- * showed nine cards where three sentences repeated verbatim and only the dollar
- * amount differed. A stake is a parameter of a contest, not a different
- * contest. Picking an entry here updates the payout in place, and the grid drops
- * from nine cards to three (16-ui-revamp-plan §1).
- *
- * The headline is the **clear bar**: the number to beat, drawn against your own
- * baseline. That is the product's actual idea, and it says what "Clears ≈ 20% of
- * the time" was trying to say without a sentence.
- */
 export function WagerCard({
   gameName,
   tag,
@@ -45,39 +31,22 @@ export function WagerCard({
   requireConfirm = false,
 }: {
   gameName: string;
-  /** Difficulty, field size, or speed. One word where possible. */
   tag?: string;
   title: string;
-  /** One short line. Not a paragraph. */
   subtitle?: string;
-  /** The number to beat. Omitted for markets with no bar (e.g. win the game). */
   target?: number | null;
-  /** Server's estimate (0..1) of how often you clear that bar. */
   clearRate?: number | null;
-  /** True when a smaller number wins (fewest moves), so the copy flips. */
   lowerIsBetter?: boolean;
-  /** What the headline number counts, e.g. "moves". */
   targetUnit?: string;
-  /**
-   * One short qualifier under the bar, for a condition the number alone cannot
-   * carry. "14 moves or fewer" reads as though any short game counts, so a
-   * win-only metric has to say so or a player who loses in ten is entitled to
-   * think they cleared it.
-   */
   targetNote?: string;
   entryOptions: number[];
-  /** Derived payout for the selected entry. */
   payoutFor: (entryCents: number) => number;
   payoutLabel: string;
   oneVsOne?: boolean;
   /**
-   * Optional pre-commit fee disclosure shown below the payout, computed from the
-   * selected entry so it shows real dollars (e.g. "$2.00 platform fee"). The
-   * rake must always be visible before commit on every joinable surface
-   * (design-guidelines §8).
+   * The rake must always be visible before commit on every joinable surface.
    */
   feeNote?: (entryCents: number) => string;
-  /** Speed options for speed-gated markets (chess). Shows a picker if > 1. */
   speedOptions?: string[];
   selectedSpeed?: string;
   onSpeedChange?: (speed: string) => void;
@@ -85,17 +54,12 @@ export function WagerCard({
   onJoin: (entryCents: number) => void;
   disabled?: boolean;
   joining?: boolean;
-  /** Two-step join: the first click reveals a confirm button under the card
-   * (for money-commitment contests you can't back out of once matched). */
   requireConfirm?: boolean;
 }) {
-  // Default to the middle preset: the one most people pick, and it makes the
-  // segmented control's purpose obvious at a glance.
   const [entry, setEntry] = useState(
     () => entryOptions[Math.floor(entryOptions.length / 2)] ?? entryOptions[0],
   );
   const selected = entryOptions.includes(entry) ? entry : entryOptions[0];
-  // Armed = the first tap happened; a confirm button is showing beneath.
   const [armed, setArmed] = useState(false);
 
   return (
@@ -183,8 +147,6 @@ export function WagerCard({
 
       <div className="mt-4">
         {requireConfirm && armed && !disabled ? (
-          // Second step: a confirm button pops up under the card. No blurb —
-          // the amount is on the button, and the commitment is the whole point.
           <div className="flex flex-col gap-2">
             <PillButton
               className="mm-glow"

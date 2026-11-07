@@ -9,11 +9,6 @@ import { Logo } from './brand';
 import { BellIcon, NavIcon } from './icons';
 import { NAV, isPlayPath } from './nav';
 
-/**
- * Sticky top bar on mobile: logo left, balance and account right. The balance
- * moves here because the rail doesn't render on a phone, and it is the number a
- * returning player checks first.
- */
 export function MobileTopBar() {
   const me = useMe();
   const available = useDisplayBalance();
@@ -54,10 +49,6 @@ export function MobileTopBar() {
   );
 }
 
-/**
- * Fixed bottom tab bar on mobile. Four tabs at ~94px each on a 375px screen,
- * down from six at ~62px, so every target clears 44px comfortably.
- */
 export function MobileTabBar() {
   const unread = useInboxUnread();
   const { pathname } = useLocation();

@@ -13,7 +13,6 @@ const KIND_META = {
   h2h: { label: 'Head-to-head challenge', Icon: SwordsIcon, path: '/play' },
 } as const;
 
-/** Small metadata pill inside an invite card (entry, friendly). */
 function Chip({
   children,
   highlight = false,
@@ -41,12 +40,6 @@ const STATUS_STYLE: Record<string, string> = {
   expired: 'border-hairline text-text-tertiary',
 };
 
-/**
- * An invite rendered inside the thread (design: the invite lands where you talk,
- * not only in the notification feed). A head-to-head card wraps a real challenge
- * — accepting forms the PENDING match and jumps to it. Pool / tournament cards
- * open the tab where the room is actually joined.
- */
 export function InviteCard({ message }: { message: ChatMessage }) {
   const navigate = useNavigate();
   const respond = useRespondInvite();
@@ -76,7 +69,6 @@ export function InviteCard({ message }: { message: ChatMessage }) {
       data-testid="invite-card"
       className="w-full max-w-md overflow-hidden rounded-card border border-hairline bg-panel-raised "
       style={{
-        // A faint wash of the game's accent.
         backgroundImage: `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, transparent), transparent 60%)`,
       }}
     >

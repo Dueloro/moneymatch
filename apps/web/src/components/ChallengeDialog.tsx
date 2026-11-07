@@ -9,11 +9,7 @@ import { RadioRow } from './ui/Field';
 import { PillButton } from './ui/PillButton';
 import { PresetSelector } from './ui/PresetSelector';
 
-/**
- * Create a challenge (design p.3 "Invite friend"): pick speed + entry,
- * then either challenge a specific friend or mint a shareable invite link. The
- * server owns entry cents and the friendly/pair-cap decision.
- */
+/** The server owns entry cents and the friendly/pair-cap decision. */
 export function ChallengeDialog({
   friend,
   onClose,

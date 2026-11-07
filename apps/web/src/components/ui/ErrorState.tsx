@@ -1,7 +1,5 @@
 import { PillButton } from './PillButton';
 
-/** Shown when a query fails, so a surface degrades to an honest, retryable
- * message instead of a silently empty shell. Says what broke and what to do. */
 export function ErrorState({
   title = 'Something went wrong',
   subline = 'We could not load this. Try again.',

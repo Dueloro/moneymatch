@@ -1,7 +1,3 @@
-/** Shared inline stroke icons (currentColor). Kept tiny and dependency-free. */
-
-/** One glyph per primary destination, shared by the sidebar and the mobile tab
- * bar so the two navigations read as the same thing at both sizes. */
 const NAV_GLYPHS: Record<string, JSX.Element> = {
   '/pools': (
     <path

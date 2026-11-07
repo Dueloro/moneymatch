@@ -1,13 +1,5 @@
 import type { ReactNode } from 'react';
 
-/**
- * The one heading component (16-ui-revamp-plan §3), replacing the three styles
- * the inventory found competing at the same rank: `.label-mono`, the 12px
- * uppercase tertiary label on Profile, and Wallet's 14px semibold.
- *
- * Three levels only. The mono uppercase treatment is gone from headings entirely
- * and survives only as `.label-money`, the caption above a currency figure.
- */
 export function SectionHeader({
   level = 'section',
   children,
@@ -17,9 +9,7 @@ export function SectionHeader({
 }: {
   level?: 'page' | 'section' | 'sub';
   children: ReactNode;
-  /** One line of supporting copy under the heading. */
   hint?: ReactNode;
-  /** Right-aligned slot: a filter toggle, a "see all" link. */
   action?: ReactNode;
   className?: string;
 }) {

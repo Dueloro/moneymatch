@@ -4,10 +4,8 @@ import { MenuIcon } from './icons';
 import { PillButton } from './PillButton';
 import { Popover } from './Popover';
 
-/** Sentinel for "no filter on this dimension" across the browse pages. */
 export const ALL = 'all';
 
-/** A single row of filter chips: an "All" option plus one chip per value. */
 export function FilterChips<T extends string | number>({
   label,
   options,
@@ -54,14 +52,6 @@ export function FilterChips<T extends string | number>({
   );
 }
 
-/**
- * A hamburger-toggled filter panel shared by the browse pages. Owns its own
- * open/closed state and renders the caller's `FilterChips` rows as children,
- * plus a "Clear filters" action when any filter is active.
- *
- * It lives in the page heading's action slot, opposite the title, and drops its
- * panel as a `Popover` — opening it used to push every card down the screen.
- */
 export function FilterBar({
   testId,
   activeCount,

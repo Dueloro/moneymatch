@@ -10,11 +10,6 @@ interface Step {
   to: string;
 }
 
-/**
- * The new-player checklist: link Lichess, then play a first match. Progress is
- * the server's `getting_started`; the X dismisses it server-side
- * (`dismissed_checklists`), so it stays gone across reloads and devices.
- */
 export function GettingStarted() {
   const me = useMe();
   const setDismissed = useSetDismissedChecklists();

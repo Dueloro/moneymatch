@@ -16,13 +16,8 @@ import { LiveLine } from './LiveLine';
 
 const LIVE_STATES = new Set(['ACTIVE', 'AWAITING_RESULT']);
 const TERMINAL_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
-// A settled outcome the player can contest (matches also allow PUSHED).
 const DISPUTABLE_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 
-/**
- * A win is money, so it gets lime. A contest still running is not money yet, so
- * it gets the live tone. Everything else is settled and quiet.
- */
 function dotClass(item: ActivityItem): string {
   const won = item.state === 'SETTLED' && (item.net_cents ?? 0) > 0;
   if (won) return 'bg-green';
@@ -51,7 +46,6 @@ function stateLabel(item: ActivityItem): string {
   }
 }
 
-/** Match result line (matches only; pools and tournaments have no opponent). */
 function statLine(item: ActivityItem): string | null {
   if (item.type !== 'match') return null;
   const you = statValue(item.your_stat_line);
@@ -71,7 +65,6 @@ function fmt(v: number | string): string {
   return v;
 }
 
-/** Side-by-side you-vs-opponent stat table for a match's expanded view. */
 function StatCompare({ detail }: { detail: ActivityDetail }) {
   const you = detail.your_stats ?? {};
   const opp = detail.opponent_stats ?? {};
@@ -111,7 +104,6 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
   );
 }
 
-/** A labelled fact chip used in the pool/tournament expanded view. */
 function Fact({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="rounded-inset bg-panel-raised px-3 py-2">
@@ -168,7 +160,6 @@ function DetailBody({ item }: { item: ActivityItem }) {
     );
   }
 
-  // pool / tournament
   const facts: Array<[string, string]> = [];
   if (d.metric_label) facts.push(['Metric', d.metric_label]);
   if (d.difficulty) facts.push(['Difficulty', d.difficulty]);
@@ -195,7 +186,6 @@ const REF_OF: Record<ActivityItem['type'], ContestRefType> = {
   tournament: 'tournament',
 };
 
-/** "Contest this result" files a dispute (support review) inline. */
 function ContestSection({ item }: { item: ActivityItem }) {
   const file = useFileDispute();
   const [open, setOpen] = useState(false);
@@ -268,7 +258,6 @@ function ContestSection({ item }: { item: ActivityItem }) {
   );
 }
 
-/** One-tap rematch on a settled H2H row → challenge the same opponent. */
 function RematchButton({ item }: { item: ActivityItem }) {
   const rematch = useCreateChallenge();
   if (item.type !== 'match' || !TERMINAL_STATES.has(item.state)) return null;
@@ -295,7 +284,6 @@ export function ActivityCard({
   defaultOpen = false,
 }: {
   item: ActivityItem;
-  /** Open on mount. Used for your latest finished contest. */
   defaultOpen?: boolean;
 }) {
   const sub = statLine(item);

@@ -12,7 +12,6 @@ import { TextInput } from './ui/Field';
 import { SkeletonList } from './ui/Skeleton';
 import { PillButton } from './ui/PillButton';
 
-/** A row for a game we have no link record for yet (unlinked default). */
 function unlinkedLink(id: string): GameLink {
   return {
     game: id,
@@ -25,7 +24,6 @@ function unlinkedLink(id: string): GameLink {
   };
 }
 
-/** The best rating for a snapshot: the primary speed's, else any. */
 function skillBadge(p: ProfileSnapshot): string | null {
   const rating =
     p.rating ??
@@ -35,11 +33,6 @@ function skillBadge(p: ProfileSnapshot): string | null {
   return rating != null ? `Rating ${rating}` : null;
 }
 
-/**
- * The linked-account editor: one row per game the server offers (row →
- * username input → server verify → LINKED). Reused by Profile and the
- * onboarding link step.
- */
 export function LinkGames() {
   const links = useLinks();
 

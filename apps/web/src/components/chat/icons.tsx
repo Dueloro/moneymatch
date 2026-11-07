@@ -1,5 +1,3 @@
-/** Inline stroke icons used by the chat surface (currentColor, no deps). */
-
 export function ChatIcon({ className = 'h-[18px] w-[18px]' }: { className?: string }) {
   return (
     <svg

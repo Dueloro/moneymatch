@@ -15,8 +15,6 @@ import { ListRow } from './ui/ListRow';
 import { PillButton } from './ui/PillButton';
 import { SectionHeader } from './ui/SectionHeader';
 
-/** Friends tab (design p.8): add by username/code, pending requests, and the
- * friend list with presence dots + a Challenge pill. */
 export function FriendsPanel() {
   const { data } = useFriends();
   const add = useAddFriend();
@@ -30,14 +28,12 @@ export function FriendsPanel() {
       await add.mutateAsync(query.trim());
       setQuery('');
     } catch {
-      /* error shown below */
+      // error shown below.
     }
   }
 
   return (
     <div>
-      {/* The lists span the column; the add field keeps the reading measure,
-       * because a single-line input has no business being 800px wide. */}
       <form onSubmit={submitAdd} className="flex max-w-read gap-2">
         <TextInput
           value={query}
@@ -134,8 +130,6 @@ function FriendRow({
       title={friend.username ?? 'Player'}
       subline={friend.online ? 'Active now' : 'Offline'}
       right={
-        // Three actions crowded the username on a phone. `sm` buttons plus a
-        // wrap keeps all three reachable without squeezing the name.
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <PillButton
             size="sm"

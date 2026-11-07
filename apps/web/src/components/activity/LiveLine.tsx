@@ -2,13 +2,11 @@ import type { LiveInfo } from '../../hooks/useActivity';
 
 type Tone = 'live' | 'good' | 'bad' | 'muted';
 
-/** Format a live metric value to at most 2 dp. */
 function fmtVal(v: number | null | undefined): string {
   if (v == null) return '-';
   return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
-/** Collapse a viewer-oriented `live` object into one line + a tone. */
 function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
   const label = live.label ?? 'stat';
   if (live.kind === 'pool') {
@@ -37,7 +35,6 @@ function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
       };
     return { text: `waiting for your first match`, tone: 'muted' };
   }
-  // match
   if (live.format === 'chess') {
     if (live.status === 'waiting')
       return { text: `game not started yet`, tone: 'muted' };
@@ -69,7 +66,6 @@ const TONE_TEXT: Record<Tone, string> = {
   muted: 'text-text-secondary',
 };
 
-/** The under-the-card live line for an in-flight contest. */
 export function LiveLine({ live }: { live: LiveInfo }) {
   const d = liveDescriptor(live);
   if (!d) return null;

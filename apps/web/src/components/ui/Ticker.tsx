@@ -1,13 +1,6 @@
 import { formatCurrency } from '../../lib/format';
 import { useWaiting } from '../../hooks/useMatchmaking';
 
-/**
- * Live activity crawl fed by real players currently waiting for a match. Honest
- * liveness: it renders nothing when no one is waiting, so we
- * never fabricate activity.
- *
- * The dot is the `live` cyan, not lime. Somebody queuing is not money.
- */
 export function Ticker() {
   const { data } = useWaiting(undefined);
   const items = data?.waiting ?? [];

@@ -3,21 +3,11 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { useDismissed } from '../../hooks/useDismissed';
 import { Popover } from './Popover';
 
-/**
- * "How it works": the browse pages' explainer prose, demoted from a permanent
- * grey wall to an affordance (16-ui-revamp-plan §1). Open on a player's first
- * visit to a surface, closed and remembered forever after. The copy still
- * exists; it just stops being rent.
- *
- * It sits at the top right of the browse header and opens as a `Popover`, so
- * reading it no longer shoves the contest grid down the page.
- */
 export function HowItWorks({
   id,
   children,
   label = 'How it works',
 }: {
-  /** Storage key, unique per surface. */
   id: string;
   children: ReactNode;
   label?: string;

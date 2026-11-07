@@ -5,20 +5,6 @@ import { isLowerBetter } from '../../lib/metrics';
 import { AmountText } from '../ui/AmountText';
 import { ListRow } from '../ui/ListRow';
 
-/**
- * The body behind a contest notification.
- *
- * A notification used to be a dead end: "Your pool room filled" told you a room
- * existed but not who was in it, and "A contest settled" told you something
- * finished but not what happened or to whom. Both of those are answerable from
- * data the API already returns, so opening the row answers them in place rather
- * than sending you off to hunt through Activity.
- *
- * Fetching lives here, not in the row, because `ExpandableCard` only mounts its
- * children once opened. A feed of fifty notifications therefore costs zero
- * requests until something is actually opened.
- */
-
 function Line({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-text-secondary">{children}</p>;
 }
@@ -32,9 +18,6 @@ export function PoolDetail({ poolId }: { poolId: string }) {
   const settled = pool.state === 'SETTLED' || pool.state === 'CANCELED';
   const lower = isLowerBetter(pool.metric);
 
-  // Once settled, lead with whoever cleared: the outcome is the point of
-  // opening a settled contest. While it is live, order is meaningless, so
-  // keep the room's own order and just mark yourself.
   const members: PoolMember[] = settled
     ? [...pool.members].sort((a, b) => rankOf(a) - rankOf(b))
     : pool.members;

@@ -7,7 +7,6 @@ import { Avatar } from './Avatar';
 import { BellIcon } from '../ui/icons';
 import { LifebuoyIcon, PlusIcon } from './icons';
 
-/** What the right pane is showing. `notifications` is the pinned feed. */
 export type Selection =
   { type: 'notifications' } | { type: 'conversation'; id: string };
 
@@ -64,11 +63,6 @@ function Row({
   );
 }
 
-/**
- * The left rail: the pinned Notifications feed and Support thread, then every
- * direct message. Notifications keep their home here — the Inbox now holds both
- * the feed and the conversations.
- */
 export function ConversationList({
   conversations,
   selection,

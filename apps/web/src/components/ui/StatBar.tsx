@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react';
 
-/**
- * Horizontal cells of a small label over a bold value. Uses the one card radius
- * and border rule so it sits in the same system as everything else.
- */
 export function StatBar({ cells }: { cells: { label: string; value: ReactNode }[] }) {
   return (
     <div className="flex divide-x divide-hairline rounded-card border border-hairline">

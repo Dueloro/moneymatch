@@ -1,9 +1,8 @@
 import { formatCurrency, formatSignedCurrency } from '../../lib/format';
 
 /**
- * Signed money with the design's coloring (02-design §10 Wallet): a win/positive
- * is green, a plain credit is white, a debit/negative is gray. `signed` shows an
- * explicit + on positives (ledger rows); off for plain balances.
+ * `signed` shows an explicit + on positives (ledger rows); off for plain
+ * balances.
  */
 export function AmountText({
   cents,

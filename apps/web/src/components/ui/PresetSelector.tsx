@@ -1,13 +1,5 @@
 import { formatCurrency } from '../../lib/format';
 
-/**
- * Row of $-preset pills (add funds, cash out). Server-defined amounts only; the
- * client never invents a value.
- *
- * Selection is structural, a raised surface with a strong edge, so a chosen
- * amount can't be mistaken for a money *figure* (16-ui-revamp-plan §2). For the
- * entry amount inside a contest card, use `Segmented` instead.
- */
 export function PresetSelector({
   presetsCents,
   selectedCents,

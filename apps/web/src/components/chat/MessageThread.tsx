@@ -28,7 +28,6 @@ function dayLabel(iso: string): string {
   });
 }
 
-/** True when this message starts a new visual run (new sender, or 5+ min gap). */
 function startsRun(message: ChatMessage, previous: ChatMessage | undefined): boolean {
   if (!previous || previous.sender_id !== message.sender_id) return true;
   const gap =
@@ -36,13 +35,11 @@ function startsRun(message: ChatMessage, previous: ChatMessage | undefined): boo
   return gap > 5 * 60 * 1000;
 }
 
-/** The open conversation: header, scrolling transcript, and the typing bar. */
 export function MessageThread({
   conversationId,
   onBack,
 }: {
   conversationId: string;
-  /** Mobile: return to the conversation list. */
   onBack: () => void;
 }) {
   const { data, isLoading } = useThread(conversationId);
@@ -55,14 +52,11 @@ export function MessageThread({
   const peerName = conversation?.title ?? 'Conversation';
   const unread = conversation?.unread ?? 0;
 
-  // Opening a thread (or receiving into an open one) clears its badge.
   useEffect(() => {
     if (unread > 0) markRead.mutate(conversationId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, unread]);
 
-  // Pin to the newest message as the transcript grows. (jsdom has no
-  // scrollIntoView, hence the guard — tests render the same component.)
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ block: 'end' });
   }, [messages.length, conversationId]);

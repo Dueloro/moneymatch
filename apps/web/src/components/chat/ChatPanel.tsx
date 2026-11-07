@@ -9,15 +9,6 @@ import { ConversationList, type Selection } from './ConversationList';
 import { MessageThread } from './MessageThread';
 import { NewMessageSheet } from './NewMessageSheet';
 
-/**
- * The Inbox: a two-pane messaging surface. The left rail lists the pinned
- * Notifications feed, the Support thread, and every friend DM; the right pane
- * shows whichever is selected. On mobile it's one pane at a time (list → thread,
- * with a back arrow), which is how a phone chat app is expected to behave.
- *
- * `?dm=<user_id>` deep-links straight into a friend's thread (e.g. from the
- * Friends tab).
- */
 export function ChatPanel() {
   const [params, setParams] = useSearchParams();
   const { data, isLoading } = useConversations();
@@ -26,16 +17,12 @@ export function ChatPanel() {
 
   const [selection, setSelection] = useState<Selection>({ type: 'notifications' });
   const [showPicker, setShowPicker] = useState(false);
-  // Why a thread couldn't be opened — a deep link from Friends can land after
-  // the friendship ended, and silence there reads as a broken button.
   const [openError, setOpenError] = useState<string | null>(null);
-  // Mobile shows one pane at a time; desktop shows both.
   const [mobilePane, setMobilePane] = useState<'list' | 'detail'>('list');
 
   const conversations = data?.conversations ?? [];
   const deepLinkUser = params.get('dm');
 
-  // Deep link: open (or create) the DM for `?dm=<user_id>`, once.
   useEffect(() => {
     if (!deepLinkUser || open.isPending) return;
     void open.mutateAsync({ userId: deepLinkUser }).then(
@@ -45,7 +32,6 @@ export function ChatPanel() {
         setMobilePane('detail');
       },
       (err: Error) => {
-        // Stay on the list (it still works) but say why nothing opened.
         setOpenError(err.message);
       },
     );
@@ -76,7 +62,7 @@ export function ChatPanel() {
       select({ type: 'conversation', id: conversation.id });
       setShowPicker(false);
     } catch (err) {
-      setOpenError((err as Error).message); // shown on the sheet, which stays open
+      setOpenError((err as Error).message);
     }
   }
 
@@ -88,8 +74,6 @@ export function ChatPanel() {
       : 'Match, challenge, and payout updates';
 
   return (
-    // Mobile keeps clearance for the bottom tab bar (dvh so browser chrome
-    // counts); desktop takes the taller surface.
     <div
       data-testid="chat-panel"
       className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:grid md:h-[calc(100vh-11rem)] md:min-h-[36rem] md:grid-cols-[20rem_minmax(0,1fr)]"

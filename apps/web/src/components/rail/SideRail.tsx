@@ -14,20 +14,6 @@ import { ClearBar } from '../ui/ClearBar';
 import { PillButton } from '../ui/PillButton';
 import { SectionHeader } from '../ui/SectionHeader';
 
-/**
- * The persistent right rail (16-ui-revamp-plan §5).
- *
- * The inventory found roughly 60% of a 1920px viewport empty on the browse
- * pages, with a 576px column stranded mid-screen on Friends. The fix is not
- * wider cards, it is giving a returning player the four things they actually
- * open the app for: what they have and what they have running right now.
- *
- * Every number here comes from a hook that already exists. The in-play list
- * reads `useActivity` (one 10s poll, already the Activity page's source) rather
- * than the three per-mode status endpoints, so mounting the rail app-wide costs
- * one request, not three at 2.5s.
- */
-
 const IN_PLAY = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT', 'OPEN', 'LOCKED']);
 
 function RailSection({
@@ -66,8 +52,6 @@ function title(item: ActivityItem): string {
   return `vs ${item.opponent_username ?? 'opponent'}`;
 }
 
-/** One in-flight contest. A pool shows the clear bar, because the bar is the
- * whole contest; everything else shows its live line. */
 function InPlayCard({ item }: { item: ActivityItem }) {
   const live = item.live;
   const pool =
@@ -108,12 +92,6 @@ function InPlayCard({ item }: { item: ActivityItem }) {
   );
 }
 
-/**
- * The pool you have in flight. It sits in the rail rather than above the browse
- * grid so a formed room stops pushing the cards you are still reading down the
- * page. PoolsPage keeps a copy inline below `xl`, where there is no rail.
- */
-/** You are in a queue and nothing has formed yet. */
 function QueuingCard({
   label,
   hint,
@@ -149,7 +127,6 @@ function QueuingCard({
   );
 }
 
-/** The pool you are actually in, once a room has formed. */
 function RoomFormed() {
   const { data: status } = usePoolStatus();
 
@@ -217,9 +194,6 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
   const leavePool = useLeavePool();
   const leaveTournament = useLeaveTournament();
 
-  // Undefined (not `?? 0`) while loading, so AnimatedBalance shows a placeholder
-  // rather than flashing $0 and firing a phantom gain on refresh. Held at its
-  // pre-settlement value while a win/loss overlay is up (see useDisplayBalance).
   const available = useDisplayBalance();
   const inPlayCents = wallet?.escrow_cents ?? 0;
 
@@ -228,9 +202,6 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
   const queuing = searchingPool || searchingTournament;
   const formedPool = poolStatus?.status === 'formed' ? poolStatus.pool : null;
 
-  // A formed pool is also an OPEN/LOCKED row in the activity feed, so it would
-  // otherwise render twice: once as the rich room card, once as a generic
-  // in-play card. The room card wins (it carries the bar and the play cue).
   const inPlay = (activity?.items ?? [])
     .filter((i) => IN_PLAY.has(i.state) && i.id !== formedPool?.id)
     .slice(0, 3);
@@ -259,10 +230,6 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
         </Card>
       )}
 
-      {/* Two states, two labels. Waiting for a room is not the same as being in
-       * one, and calling both "In play" left you unable to tell whether you
-       * were still matching or already playing. A contest appears under
-       * Queuing, then moves to In play the moment it forms. */}
       {queuing && (
         <RailSection title="Queuing">
           <div className="flex flex-col gap-2">

@@ -5,22 +5,17 @@ import { subscribeToasts, type ToastMessage } from '../../lib/toast';
 const DURATION_MS = 4000;
 
 const DOT: Record<ToastMessage['kind'], string> = {
-  // Green, so a success toast agrees with the green status controls it is
-  // usually confirming. `action` is the brand accent and reads as "a thing to
-  // click", not "that worked".
   success: 'bg-green',
   error: 'bg-red',
   info: 'bg-live',
 };
 
-/** Global toast host. Mounted once at the root; sits above the mobile tab bar. */
 export function Toaster() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const unsubscribe = subscribeToasts((message) => {
-      // Keep the last few so a burst never fills the screen.
       setToasts((prev) => [...prev, message].slice(-3));
       const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== message.id));

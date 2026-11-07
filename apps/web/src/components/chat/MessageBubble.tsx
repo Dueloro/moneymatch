@@ -9,18 +9,12 @@ function clockTime(iso: string): string {
   });
 }
 
-/**
- * One line in the thread. Yours sits right and lime; theirs sits left on a
- * raised panel; a platform `system` line is a centered, quiet note. Invite
- * cards render as themselves rather than as a bubble.
- */
 export function MessageBubble({
   message,
   showAvatar,
   peerName,
 }: {
   message: ChatMessage;
-  /** First message of a run from the same sender, so only then show the avatar. */
   showAvatar: boolean;
   peerName: string;
 }) {
