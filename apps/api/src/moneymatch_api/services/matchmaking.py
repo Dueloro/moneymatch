@@ -49,7 +49,6 @@ from . import (
     notifications_service,
     pairing,
     skill_rating,
-    test_opponents,
 )
 from .feature_flags import get_boolean_flags
 from .markets import MarketDef
@@ -737,12 +736,7 @@ async def list_waiting(
     if game is not None:
         conds.append(QueueTicket.game == game)
     rows = await session.scalars(
-        # Practice opponents never appear as real activity, on the waiting list
-        # or in the ticker it feeds (services/test_opponents.py).
-        select(QueueTicket)
-        .join(User, User.id == QueueTicket.user_id)
-        .where(and_(*conds, test_opponents.test_user_filter()))
-        .order_by(QueueTicket.created_at.asc())
+        select(QueueTicket).where(and_(*conds)).order_by(QueueTicket.created_at.asc())
     )
     return list(rows)
 

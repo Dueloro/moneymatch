@@ -56,7 +56,6 @@ from ..models.pools import SoloEntry, SoloPool
 from ..models.skill import MetricModel
 from ..models.user import User
 from . import (
-    demo_mode,
     fairness,
     geo_service,
     limits_service,
@@ -555,13 +554,9 @@ async def enqueue(
     await geo_service.assert_can_enter(session, user.residence_state)
 
     link = await _require_link(session, user.id, game)
-    # Sandbagging block (metric wagers) — with the personal-bar feature. Skipped
-    # for the synthetic demo account: the detector polls real host history, which
-    # doesn't exist for a demo handle (the host API 400s on it).
-    if not demo_mode.is_demo_user(user):
-        await sandbagging_service.assert_not_sandbagging(
-            session, user, game, metric, link.host_account_id
-        )
+    await sandbagging_service.assert_not_sandbagging(
+        session, user, game, metric, link.host_account_id
+    )
 
     existing = await _current_pool_for_user(session, user.id)
     if existing is not None:
@@ -577,28 +572,6 @@ async def enqueue(
     )
     if pool is not None:
         return PoolEnqueueResult(status="formed", pool=pool)
-
-    # Demo: never sit in "forming your room…". Escrow the entry and form a room
-    # of one against the personal bar so the click-through lands straight on
-    # "room formed · go play".
-    #
-    # This runs *after* the real matcher, not instead of it: when practice
-    # opponents are waiting the demo gets a genuine multi-player room with a
-    # real pot, and only falls back to a room of one when there is nobody at
-    # all. Never fires for real accounts.
-    if demo_mode.is_demo_user(user):
-        demo_room = await _form_room(
-            session,
-            [ticket],
-            game,
-            metric,
-            difficulty,
-            entry_cents,
-            bar,
-            now,
-            min_entrants=1,
-        )
-        return PoolEnqueueResult(status="formed", pool=demo_room)
 
     return PoolEnqueueResult(status="searching", ticket=ticket)
 
@@ -635,14 +608,6 @@ async def cancel(session: AsyncSession, user: User) -> bool:
         ticket.state = "canceled"
         await session.flush()
         return True
-    # Demo: a formed room's money is committed and isn't cancelable for real
-    # accounts, but the demo user can dismiss it — refund the entry and free the
-    # queue so the pool click-through is replayable.
-    if demo_mode.is_demo_user(user):
-        pool = await _current_pool_for_user(session, user.id)
-        if pool is not None and pool.state == "LOCKED":
-            await cancel_pool(session, pool, reason="demo reset")
-            return True
     return False
 
 

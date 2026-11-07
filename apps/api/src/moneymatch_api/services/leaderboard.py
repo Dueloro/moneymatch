@@ -33,7 +33,6 @@ from .. import clock
 from ..constants import LEADERBOARD_MIN_CONTESTS, LEADERBOARD_WINDOW_DAYS
 from ..models.user import User
 from ..models.wallet import LedgerEntry, Wallet
-from . import test_opponents
 
 _CONTEST_REFS = ("match", "solo_pool", "tournament")
 _MAX_ROWS = 100
@@ -104,8 +103,6 @@ async def compute(
             LedgerEntry.ref_type.in_(_CONTEST_REFS),
             LedgerEntry.created_at >= since,
             User.username.isnot(None),
-            # Practice opponents never rank (services/test_opponents.py).
-            test_opponents.test_user_filter(),
         )
         .group_by(User.id, User.username)
     )

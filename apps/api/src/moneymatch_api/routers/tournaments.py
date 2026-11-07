@@ -42,7 +42,6 @@ from ..schemas.tournaments import (
 from ..services import (
     aggregate_metrics,
     linking_service,
-    test_opponents,
     tournament_engine,
 )
 from ..services.tournament_engine import TournamentEnqueueResult
@@ -224,19 +223,6 @@ async def enter(
         entry_cents=body.entry_preset_cents,
     )
 
-    # --- practice opponents (scaffolding, delete before launch) ------------- #
-    # With one real account nothing ever forms, so the whole fetch/grade/settle
-    # path is untestable. The demo account fills the bucket and re-polls, so the
-    # contest forms on this same request. Real signups never take this branch.
-    if test_opponents.is_enabled(user):
-        await test_opponents.fill_tournament(
-            session,
-            user,
-            game=body.game,
-            metric=body.metric,
-            entry_cents=body.entry_preset_cents,
-        )
-        result = await tournament_engine.poll_status(session, user)
     return await _status_view(session, result, user)
 
 

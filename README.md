@@ -138,7 +138,6 @@ flag queue. Every admin mutation writes an `admin_audit` row.
 | Task                        | Command                                                            |
 | --------------------------- | ------------------------------------------------------------------ |
 | Grant admin (audited)       | `cd apps/api && uv run python ../../scripts/grant_admin.py <user>` |
-| Seed a demoable environment | `cd apps/api && uv run python ../../scripts/seed_demo.py`          |
 
 `GET /api/v1/health` reports the settlement worker's health (`worker.stale`
 reddens if the worker hasn't cycled in > 2 min). The same signal shows on the

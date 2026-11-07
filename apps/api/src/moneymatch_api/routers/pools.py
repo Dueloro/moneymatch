@@ -39,7 +39,7 @@ from ..schemas.pools import (
     PoolStatusResponse,
     PoolView,
 )
-from ..services import live_activity_service, money_math, pool_engine, test_opponents
+from ..services import live_activity_service, money_math, pool_engine
 from ..services.pool_engine import PoolEnqueueResult
 
 router = APIRouter(prefix="/pools", tags=["pools"])
@@ -178,20 +178,6 @@ async def enter_pool(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> PoolStatusResponse:
-    # Practice opponents join *first* (scaffolding, delete before launch). The
-    # matcher can only build a room out of tickets that already exist, so
-    # filling afterwards would leave them stranded while you formed a room of
-    # one. Demo account only; a real signup never takes this branch.
-    if test_opponents.is_enabled(user):
-        await test_opponents.fill_pool(
-            session,
-            user,
-            game=body.game,
-            metric=body.metric,
-            difficulty=body.difficulty,
-            entry_cents=body.entry_preset_cents,
-        )
-
     result = await pool_engine.enqueue(
         session,
         user,

@@ -2,7 +2,7 @@
 # Env comes from the repo-root .env (copy .env.example → .env first).
 .DEFAULT_GOAL := help
 .PHONY: help install db down migrate api web dev test test-api test-web \
-        lint typecheck gen-api seed worker e2e
+        lint typecheck gen-api worker e2e
 
 # Source the repo-root .env into a recipe (api/migrate need DATABASE_URL etc).
 # $(CURDIR) anchors to the Makefile dir so it works after `cd apps/api`.
@@ -52,9 +52,6 @@ test-web: ## Run web tests
 e2e: ## Run the Playwright H2H e2e (needs the stack up — see apps/web/e2e/README.md)
 	pnpm --filter @moneymatch/web exec playwright install --with-deps chromium
 	pnpm --filter @moneymatch/web test:e2e
-
-seed: ## Seed a demoable environment (users, tickets, a pool, a tournament)
-	cd apps/api && $(LOADENV) uv run python ../../scripts/seed_demo.py
 
 lint: ## Lint everything
 	cd apps/api && uv run ruff check src tests ../../scripts \

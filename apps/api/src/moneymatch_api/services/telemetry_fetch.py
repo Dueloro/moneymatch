@@ -17,7 +17,6 @@ Window-boundary matches are excluded (strict `[starts, ends]` containment).
 
 from __future__ import annotations
 
-import math
 import uuid
 from typing import Any
 
@@ -27,15 +26,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
 from ..constants import (
-    METRIC_BAR_INCREMENT,
     lower_is_better,
     metric_floor,
+    rated_only_game,
     requires_win,
 )
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
-from . import aggregate_metrics, demo_mode, raw_payload_service, test_opponents
+from . import aggregate_metrics, raw_payload_service
 from .pool_engine import PoolGrade
 from .tournament_engine import TournamentGrade
 
@@ -54,10 +53,8 @@ async def _window_games(
     ends_ms = int(ends.timestamp() * 1000)
     adapter = registry.get(game)
     try:
-        # Rated only for real accounts: a casual game must never move a pool bar
-        # or a tournament score, and on Lichess a brokered duel is itself
-        # casual, so this also stops a money duel feeding the stats it was
-        # quoted from. The demo account opts in to casual games (demo_mode).
+        # A casual game must never move a pool bar or tournament score; a
+        # brokered duel is itself casual, so it can't feed its own stats.
         games = await adapter.poll_eligible_games(
             host_account_id, starts_ms, GameFilters(rated_only=rated_only)
         )
@@ -84,52 +81,18 @@ def _evidence(
     }
 
 
-def _clearing_value(metric: str, bar: float) -> float:
-    """A believable score for the opponent built to clear `bar`.
-
-    Snapped up to the metric's own increment, because the number goes on the
-    results card next to yours. Kills come in whole units, and an opponent
-    credited with 18.4 kills reads as a bug in the thing holding your money.
-    Rounding up rather than to nearest also keeps it strictly past the bar, so
-    the score shown always agrees with the grade awarded.
-    """
-    increment = METRIC_BAR_INCREMENT.get(metric, 0.01)
-    return round(math.ceil(bar * 1.15 / increment) * increment, 2)
-
-
 async def grade_pool(
     session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
 ) -> dict[uuid.UUID, PoolGrade]:
     """Grade every entry's first qualifying in-window match against `room_bar`."""
     grades: dict[uuid.UUID, PoolGrade] = {}
     for entry in entries:
-        # Practice opponents never play, so they are graded rather than looked
-        # up. Most miss and forfeit their entry: without that they would grade
-        # as unverifiable and be refunded, and a test pool would pay nobody.
-        #
-        # One is built to clear (`CLEARING_HANDLES`), because a pool where only
-        # you can win never exercises the rule that decides the money — clearers
-        # *split* the pot. With a clearing opponent in the room, clearing your
-        # bar splits it and missing yours hands it over, which is the real
-        # behaviour a single real player otherwise cannot reach.
-        if test_opponents.is_practice_opponent(entry.host_account_id):
-            cleared = test_opponents.clears_its_bar(entry.host_account_id)
-            grades[entry.user_id] = PoolGrade(
-                cleared=cleared,
-                telemetry={
-                    pool.metric: _clearing_value(pool.metric, float(pool.room_bar))
-                    if cleared
-                    else None,
-                    "practice_opponent": True,
-                },
-            )
-            continue
         games = await _window_games(
             pool.game,
             entry.host_account_id,
             pool.window_starts_at,
             pool.window_ends_at,
-            await demo_mode.rated_only_for(session, entry.user_id, pool.game),
+            rated_only_game(pool.game),
         )
         if games is None or not games:
             grades[entry.user_id] = PoolGrade(cleared=None)  # unverifiable → refund
@@ -196,25 +159,12 @@ async def grade_tournament(
     n = tournament.score_matches
     grades: dict[uuid.UUID, TournamentGrade] = {}
     for entry in entries:
-        # A practice opponent has no real host account, so ask its adapter
-        # nothing: the username does not resolve and the call would be wasted.
-        # It forfeits — a participant that played nothing, ranked last and paid
-        # nothing — so `settle_tournament` still counts it toward the field and a
-        # lone real entrant's contest settles instead of cancelling.
-        if test_opponents.graded_as_failed(entry.host_account_id):
-            grades[entry.id] = TournamentGrade(
-                values=[],
-                score=None,
-                counted=0,
-                telemetry={metric: None, "practice_opponent": True},
-            )
-            continue
         games = await _window_games(
             tournament.game,
             entry.host_account_id,
             tournament.window_starts_at,
             tournament.window_ends_at,
-            await demo_mode.rated_only_for(session, entry.user_id, tournament.game),
+            rated_only_game(tournament.game),
         )
         if games is None:
             grades[entry.id] = TournamentGrade(values=None)  # host outage → refund
@@ -269,25 +219,12 @@ async def live_standings(
 
     rows: list[dict[str, Any]] = []
     for entry in entries:
-        # A practice opponent forfeits (see grade_tournament): show it unranked
-        # rather than polling a host id that cannot resolve, so the live view
-        # matches how it settles.
-        if test_opponents.graded_as_failed(entry.host_account_id):
-            rows.append(
-                {
-                    "user_id": str(entry.user_id),
-                    "username": usernames.get(entry.user_id),
-                    "score": None,
-                    "matches": 0,
-                }
-            )
-            continue
         games = await _window_games(
             tournament.game,
             entry.host_account_id,
             tournament.window_starts_at,
             tournament.window_ends_at,
-            await demo_mode.rated_only_for(session, entry.user_id, tournament.game),
+            rated_only_game(tournament.game),
         )
         spec = aggregate_metrics.get(metric)
         if spec is not None:
