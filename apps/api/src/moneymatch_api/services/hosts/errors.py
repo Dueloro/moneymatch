@@ -18,13 +18,6 @@ class HostError(Exception):
         self.host = host
         self.message = message
         #: The upstream HTTP status, where there was one.
-        #:
-        #: Most callers only need "did this fail". Valve's share-code chain
-        #: needs more: 412 means the cursor is not this player's and must never
-        #: be retried, 403 means their auth code is dead and they have to be
-        #: told, 429 means back off. Those are three different actions, and
-        #: recovering them by parsing an error string would be a decision about
-        #: money made by substring match.
         self.status_code = status_code
 
 

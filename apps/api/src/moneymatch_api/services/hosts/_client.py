@@ -44,11 +44,8 @@ def _slow_host_ms() -> int:
     return get_settings().slow_host_ms
 
 
-# Host error messages are ASCII on purpose. They travel into structlog, which
-# prints them, and a Windows console is cp1252: a single "→" in an error
-# string raises UnicodeEncodeError *inside the logger*, turning a handled 400
-# into a crashed request. Steam answering 400 for a private profile is the
-# normal case, so this was every CS2 link failing locally.
+# Host error messages are ASCII on purpose: a non-ASCII char can raise
+# UnicodeEncodeError inside the logger on a cp1252 console.
 
 
 async def request_json(
