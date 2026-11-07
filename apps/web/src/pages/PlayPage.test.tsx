@@ -233,20 +233,52 @@ describe('PlayPage', () => {
     expect(screen.getByText('Blitz 5+0 · 1,000 pts')).toBeInTheDocument();
   });
 
-  it('shows the searching state with a cancel affordance', () => {
+  it('searching shows the waited time and your current range on the ruler', () => {
     mockStatus({
       status: 'searching',
       match: null,
-      waited_seconds: 12,
+      waited_seconds: 30,
+      can_cancel: true,
+    });
+    window.localStorage.setItem(
+      'mm.h2h.ticket.anon',
+      JSON.stringify({
+        speed: 'blitz',
+        entry_cents: 2500,
+        rating: 1712,
+        at: Date.now(),
+      }),
+    );
+    renderWithProviders(<PlayPage />);
+    expect(screen.getByText('Searching')).toBeInTheDocument();
+    expect(screen.getByText('Blitz 5+0 · 2,500 pts stake')).toBeInTheDocument();
+    expect(screen.getByTestId('waited')).toHaveTextContent('0:30');
+    expect(screen.getByTestId('band-range')).toHaveTextContent('1252–2172');
+    expect(screen.getByTestId('skill-band-ruler')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
+  });
+
+  it('searching without a remembered ticket shows the band width only', () => {
+    mockStatus({
+      status: 'searching',
+      match: null,
+      waited_seconds: 0,
       can_cancel: true,
     });
     renderWithProviders(<PlayPage />);
-    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    expect(screen.getByTestId('band-range')).toHaveTextContent('±100');
+  });
+
+  it('finding a match remembers the ticket for the searching recap', () => {
+    renderWithProviders(<PlayPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Find match · 1,000 pts' }));
     expect(
-      screen.getByText('Matching you with someone at your skill level…'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Waiting 12s')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
+      JSON.parse(window.localStorage.getItem('mm.h2h.ticket.anon')!),
+    ).toMatchObject({
+      speed: 'blitz',
+      entry_cents: 1000,
+      rating: 1712,
+    });
   });
 
   it('links to the Lichess game once the match is on', () => {

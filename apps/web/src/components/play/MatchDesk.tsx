@@ -46,7 +46,7 @@ export function MatchDesk({
   profile: ProfileSnapshot | null | undefined;
   username: string | null | undefined;
   joining: boolean;
-  onFind: (choice: { speed?: string; entry: number }) => void;
+  onFind: (choice: { speed?: string; entry: number; rating: number | null }) => void;
 }) {
   const [saved] = useState(readChoice);
   const speeds = market.requires_speed ? market.speeds : [];
@@ -163,7 +163,7 @@ export function MatchDesk({
           className="mm-glow md:min-w-64"
           size="lg"
           disabled={joining || entry == null}
-          onClick={() => onFind({ speed, entry })}
+          onClick={() => onFind({ speed, entry, rating: rating?.rating ?? null })}
         >
           {joining ? (
             'Finding…'

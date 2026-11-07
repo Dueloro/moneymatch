@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 
+import { useAuth } from '../auth/useAuth';
 import { PlayHeader } from '../components/PlayHeader';
 import { LinkLichessDesk, MatchDesk } from '../components/play/MatchDesk';
 import { PlaySlip } from '../components/play/PlaySlip';
@@ -13,6 +14,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { useLinks } from '../hooks/useLinks';
 import { formatPoints } from '../lib/format';
 import { CHESS } from '../lib/games';
+import { recallTicket, rememberTicket } from '../lib/h2hTicket';
 import { timeControlLabel } from '../lib/timeControl';
 import {
   useJoinQueue,
@@ -34,6 +36,8 @@ export function PlayPage() {
     isError: marketsError,
     refetch: refetchMarkets,
   } = useMarkets(CHESS);
+  const { session } = useAuth();
+  const userId = session?.user.id;
   const { data: links } = useLinks();
   const chessLink = links?.games.find((g) => g.game === CHESS);
 
@@ -81,7 +85,10 @@ export function PlayPage() {
       ) : !linked ? (
         <LinkLichessDesk />
       ) : inFlight ? (
-        <PlaySlip status={status} />
+        <PlaySlip
+          status={status}
+          ticket={status?.status === 'searching' ? recallTicket(userId) : null}
+        />
       ) : market && presets.length > 0 ? (
         <MatchDesk
           market={market}
@@ -89,14 +96,20 @@ export function PlayPage() {
           profile={chessLink?.profile}
           username={chessLink?.host_username}
           joining={join.isPending}
-          onFind={({ speed, entry }) =>
+          onFind={({ speed, entry, rating }) => {
+            rememberTicket(userId, {
+              speed: speed ?? null,
+              entry_cents: entry,
+              rating,
+              at: Date.now(),
+            });
             join.mutate({
               game: CHESS,
               market: market.key,
               speed,
               entry_preset_cents: entry,
-            })
-          }
+            });
+          }}
         />
       ) : (
         <EmptyState

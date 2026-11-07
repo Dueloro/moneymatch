@@ -1,5 +1,9 @@
 import { PillButton } from '../ui/PillButton';
+import { SkillBandRuler } from './SkillBandRuler';
 import { VersusCard } from './VersusCard';
+import { useWaitedSeconds } from '../../hooks/useWaitedSeconds';
+import type { QueuedTicket } from '../../lib/h2hTicket';
+import { bandAt, bandRange, formatWaited, MAX_BAND } from '../../lib/skillBand';
 import { dashless, formatPoints } from '../../lib/format';
 import { timeControlLabel } from '../../lib/timeControl';
 import {
@@ -11,12 +15,18 @@ import {
   type QueueStatus,
 } from '../../hooks/useMatchmaking';
 
-export function PlaySlip({ status }: { status: QueueStatus | undefined }) {
+export function PlaySlip({
+  status,
+  ticket = null,
+}: {
+  status: QueueStatus | undefined;
+  ticket?: QueuedTicket | null;
+}) {
   if (status?.status === 'matched' && status.match) {
     return <MatchedSlip match={status.match} />;
   }
   if (status?.status === 'searching') {
-    return <SearchingSlip status={status} />;
+    return <SearchingSlip status={status} ticket={ticket} />;
   }
   return null;
 }
@@ -49,29 +59,68 @@ function RakeLine({
   );
 }
 
-function SearchingSlip({ status }: { status: QueueStatus }) {
+function SearchingSlip({
+  status,
+  ticket,
+}: {
+  status: QueueStatus;
+  ticket: QueuedTicket | null;
+}) {
   const leave = useLeaveQueue();
+  const seconds = useWaitedSeconds(status.waited_seconds);
+  const rating = ticket?.rating ?? null;
+  const band = bandAt(seconds);
+  const recap = ticket
+    ? [timeControlLabel(ticket.speed), `${formatPoints(ticket.entry_cents)} stake`]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
 
   return (
     <SlipShell>
-      <div className="flex items-center gap-3">
-        <span
-          className="h-3 w-3 animate-pulse rounded-full bg-live"
-          data-testid="searching-dot"
-        />
-        <p className="text-sm font-semibold text-text">Searching…</p>
-      </div>
-      <p className="mt-2 text-xs text-text-secondary">
-        Matching you with someone at your skill level…
-      </p>
-      {status.waited_seconds != null && (
-        <p className="mt-1 text-xs tabular-nums text-text-secondary">
-          Waiting {status.waited_seconds}s
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="h-2 w-2 animate-pulse rounded-full bg-live"
+              data-testid="searching-dot"
+            />
+            <p className="text-sm font-semibold text-text">Searching</p>
+          </div>
+          {recap && <p className="mt-1 text-xs text-text-secondary">{recap}</p>}
+        </div>
+        <p
+          className="num text-sm text-text-secondary"
+          aria-label={`Waited ${seconds} seconds`}
+          data-testid="waited"
+        >
+          {formatWaited(seconds)}
         </p>
-      )}
-      <div className="mt-5">
+      </div>
+
+      <div className="mt-6">
+        <p className="num text-2xl font-semibold text-text" data-testid="band-range">
+          {rating != null ? bandRange(rating, seconds).join('–') : `±${band}`}
+        </p>
+        <p className="label-neutral mt-0.5">
+          {band >= MAX_BAND ? 'Widest range' : 'Your range'}
+          {rating != null ? ` · ±${band}` : ''}
+        </p>
+      </div>
+
+      <div className="mt-4">
+        <SkillBandRuler rating={rating} seconds={seconds} />
+      </div>
+
+      <div className="mt-6 flex items-center justify-between gap-4 border-t border-hairline pt-4">
+        <p className="text-xs text-text-tertiary">
+          {band >= MAX_BAND
+            ? 'Matched with the closest rating in range'
+            : `Widens as you wait, up to ±${MAX_BAND}`}
+        </p>
         <PillButton
           variant="text"
+          className="shrink-0 whitespace-nowrap"
           onClick={() => leave.mutate()}
           disabled={leave.isPending}
         >
@@ -119,6 +168,7 @@ function MatchedSlip({ match }: { match: MatchView }) {
           ) : (
             <PillButton
               fullWidth
+              size="lg"
               onClick={() => confirm.mutate(match.id)}
               disabled={confirm.isPending}
             >

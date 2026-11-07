@@ -60,9 +60,9 @@ Two hard constraints when extending the palette:
    single job.
 
 **Cyan (`live`) is deliberately underused** — dots, one-word labels, and the 25%
-wash in the clear bar only. It never fills a shape or runs across a sentence. It
-is the intended candidate if a second main colour is ever promoted, because its
-meaning ("happening now") is already established.
+wash in the clear bar and the skill-band ruler only. It never fills a shape or
+runs across a sentence. It is the intended candidate if a second main colour is
+ever promoted, because its meaning ("happening now") is already established.
 
 **The chess accent** (`#e6c65c` gold, `lib/games.tsx`) appears only on the
 linked-game row and on chat invite cards. It is not used on browse cards.
@@ -172,6 +172,11 @@ primitive rather than a one-off.
   TAKES` in lime with the fee figure in red, and "Find match · 1,000 pts". The
   last choice is remembered per browser. Unlinked, the same frame holds one
   "Link Lichess" action. Searching, matched and confirm replace it in place.
+- **`SkillBandRuler`** — the searching state's one visual. A ±800 Elo ruler
+  centred on your rating (white tick), the pairing band shaded in the cyan 25%
+  wash and widening once a second (`lib/skillBand.ts` mirrors the server's
+  ±100 + 12/s, capped at ±800). Above it: the range ("1612–1812") and the waited
+  clock. The width eases linearly only under `motion-safe`.
 - **`ExpandableCard`** / **`ListRow`** — the expandable and flat row primitives.
 - **`FilterBar`** — pill toggle with a hamburger, "Filters", and a paper
   active-count badge; opens a `Card` of chip rows.
