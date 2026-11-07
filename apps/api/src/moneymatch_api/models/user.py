@@ -23,7 +23,7 @@ USER_STATUSES = ("active", "frozen", "self_excluded")
 # + protocol exist so real KYC is an additive integration.
 KYC_STATUSES = ("none", "pending", "verified", "failed")
 
-# SQL backfill/backstop for `friend_code` (mirrors migration 0006); Python owns
+# SQL backfill/backstop for `friend_code` (mirrors the baseline migration); Python owns
 # new rows via the `default` below. Postgres normalizes this function expression
 # on read, so `alembic check` skips its server-default comparison (migrations/env.py).
 _FRIEND_CODE_SERVER_DEFAULT = (

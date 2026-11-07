@@ -3,7 +3,7 @@
 `wallets` holds the **cached** balances (available / escrow / lifetime-net);
 they are only ever mutated by `wallet_service` inside the same transaction that
 appends the authoritative `ledger_entries` row. `ledger_entries` is append-only
-(a DB trigger blocks UPDATE/DELETE — see migration 0002); every row records the
+(a DB trigger blocks UPDATE/DELETE — see the baseline migration); every row records the
 `balance_after_cents` so any point-in-time balance is a range query.
 
 `platform_ledger` is the wallet-less chart of accounts (`platform:promo`,
@@ -115,7 +115,7 @@ class Wallet(Base, TimestampMixin):
 
 class LedgerEntry(Base):
     """Append-only wallet mutation. No `updated_at`: rows are immutable (the DB
-    trigger in migration 0002 rejects UPDATE/DELETE)."""
+    trigger in the baseline migration rejects UPDATE/DELETE)."""
 
     __tablename__ = "ledger_entries"
     __table_args__ = (

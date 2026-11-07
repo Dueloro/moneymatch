@@ -40,11 +40,10 @@ async def test_every_declared_game_flag_has_a_seeded_row(session):
     missing = declared_games - seeded
     assert not missing, (
         f"declared in DEFAULT_FLAGS but never seeded: {sorted(missing)}. "
-        "Add a migration seeding each, following 0020/0025."
+        "Seed each in a migration."
     )
 
 
-@pytest.mark.skip(reason="re-enabled by the migration squash")
 async def test_no_seeded_flag_is_unknown_to_the_code(session):
     seeded = await _seeded_keys(session)
     unknown = seeded - set(DEFAULT_FLAGS) - SEEDED_WITHOUT_A_CODE_DEFAULT
