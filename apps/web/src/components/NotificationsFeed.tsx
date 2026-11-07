@@ -6,7 +6,8 @@ import {
   useNotifications,
   type NotificationItem,
 } from '../hooks/useNotifications';
-import { formatRelativeTime } from '../lib/format';
+import { formatPoints, formatRelativeTime } from '../lib/format';
+import { formatMetric } from '../lib/metrics';
 import { PoolDetail, TournamentDetail } from './notifications/ContestDetail';
 import { EmptyState } from './ui/EmptyState';
 import { ExpandableCard } from './ui/ExpandableCard';
@@ -37,6 +38,16 @@ export function NotificationsFeed() {
   );
 }
 
+const NOUN: Record<string, string> = { pool: 'pool', tournament: 'tournament' };
+const CONTEXT: Record<string, string> = {
+  pool: 'in a pool',
+  tournament: 'in a tournament',
+};
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function describe(note: NotificationItem): string {
   const p = note.payload;
   const name = (p.from_username as string) || (p.by_username as string) || 'Someone';
@@ -51,12 +62,25 @@ function describe(note: NotificationItem): string {
         : `${name} sent you a friend request`;
     case 'match_found':
       return 'You have a match. Confirm to play';
-    case 'room_filled':
-      return 'Your pool room filled';
-    case 'settled':
-      return 'A contest settled';
-    case 'refund':
-      return 'A contest was refunded';
+    case 'room_filled': {
+      const parts = ['Your pool room filled'];
+      if (typeof p.difficulty === 'string') parts.push(cap(p.difficulty));
+      if (typeof p.room_bar === 'number' && typeof p.metric === 'string')
+        parts.push(formatMetric(p.metric, p.room_bar));
+      return parts.join(' · ');
+    }
+    case 'settled': {
+      const won = typeof p.payout_cents === 'number' ? p.payout_cents : 0;
+      if (won > 0)
+        return `You won ${formatPoints(won)} ${CONTEXT[p.kind as string] ?? ''}`.trim();
+      return `Your ${NOUN[p.kind as string] ?? 'result'} settled`;
+    }
+    case 'refund': {
+      const amt = typeof p.payout_cents === 'number' && p.payout_cents > 0;
+      return amt
+        ? `${formatPoints(p.payout_cents as number)} stake refunded`
+        : 'Your stake was refunded';
+    }
     case 'system':
       if (p.event === 'challenge_declined') return 'Your challenge was declined';
       if (p.event === 'challenge_expired') return 'Your challenge expired';
@@ -110,7 +134,7 @@ function NotificationRow({ note }: { note: NotificationItem }) {
         challengeId ? (
           <div className="flex items-center gap-2">
             <PillButton onClick={onAccept} disabled={accept.isPending}>
-              Respond
+              Accept
             </PillButton>
             <PillButton
               variant="text"

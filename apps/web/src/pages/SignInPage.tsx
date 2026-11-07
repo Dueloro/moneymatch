@@ -610,7 +610,7 @@ function BackToSignIn({ onBack }: { onBack: () => void }) {
 
 function LegalFooter() {
   return (
-    <p className="mt-5 whitespace-nowrap text-center text-micro text-text-tertiary">
+    <p className="mt-5 text-balance text-center text-micro text-text-tertiary">
       By continuing you agree to our{' '}
       <LegalLink href="https://www.dueloro.com/terms">Terms</LegalLink>
       {' · '}
@@ -630,7 +630,7 @@ function LegalLink({ href, children }: { href: string; children: React.ReactNode
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="underline hover:text-text-secondary"
+      className="whitespace-nowrap underline hover:text-text-secondary"
     >
       {children}
     </a>

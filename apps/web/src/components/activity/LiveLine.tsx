@@ -1,47 +1,49 @@
 import type { LiveInfo } from '../../hooks/useActivity';
+import { formatMetric } from '../../lib/metrics';
 
 type Tone = 'live' | 'good' | 'bad' | 'muted';
 
-function fmtVal(v: number | null | undefined): string {
-  if (v == null) return '-';
-  return Number.isInteger(v) ? String(v) : v.toFixed(2);
-}
-
-function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
-  const label = live.label ?? 'stat';
+// The live payload carries the winner but not how the game ended, so a result
+// line never names checkmate, resignation or time.
+function liveDescriptor(
+  live: LiveInfo,
+  metric: string,
+): { text: string; tone: Tone } | null {
+  const fm = (v: number | null | undefined) => formatMetric(metric, v);
   if (live.kind === 'pool') {
     switch (live.status) {
       case 'cleared':
         return {
-          text: `${label} ${fmtVal(live.current)} · cleared ${fmtVal(live.target)}`,
+          text: `cleared · ${fm(live.current)}, bar ${fm(live.target)}`,
           tone: 'good',
         };
       case 'missed':
         return {
-          text: `${label} ${fmtVal(live.current)} · target ${fmtVal(live.target)}`,
+          text: `missed · ${fm(live.current)}, bar ${fm(live.target)}`,
           tone: 'bad',
         };
       case 'unavailable':
-        return { text: `can't read the host right now`, tone: 'muted' };
+        return { text: `can't reach Lichess right now`, tone: 'muted' };
       default:
-        return { text: `waiting for your next match`, tone: 'muted' };
+        return { text: `waiting for your next game`, tone: 'muted' };
     }
   }
   if (live.kind === 'tournament') {
     if (live.status === 'scoring')
       return {
-        text: `#${live.rank ?? '-'} of ${live.field ?? '-'} · ${label} ${fmtVal(live.score)}`,
+        text: `#${live.rank ?? '-'} of ${live.field ?? '-'} · ${fm(live.score)}`,
         tone: 'live',
       };
-    return { text: `waiting for your first match`, tone: 'muted' };
+    return { text: `waiting for your first game`, tone: 'muted' };
   }
   if (live.format === 'chess') {
     if (live.status === 'waiting')
       return { text: `game not started yet`, tone: 'muted' };
     if (live.status === 'finished') {
-      if (live.result === 'you') return { text: `checkmate · you won`, tone: 'good' };
-      if (live.result === 'opp') return { text: `game over · you lost`, tone: 'bad' };
-      return { text: `game over · draw`, tone: 'muted' };
+      if (live.result === 'you') return { text: `you won`, tone: 'good' };
+      if (live.result === 'opp') return { text: `you lost`, tone: 'bad' };
+      if (live.result === 'draw') return { text: `draw`, tone: 'muted' };
+      return { text: `game over`, tone: 'muted' };
     }
     const whose =
       live.turn === 'you' ? 'your move' : live.turn === 'opp' ? "opponent's move" : '';
@@ -66,8 +68,8 @@ const TONE_TEXT: Record<Tone, string> = {
   muted: 'text-text-secondary',
 };
 
-export function LiveLine({ live }: { live: LiveInfo }) {
-  const d = liveDescriptor(live);
+export function LiveLine({ live, metric = '' }: { live: LiveInfo; metric?: string }) {
+  const d = liveDescriptor(live, metric);
   if (!d) return null;
   return (
     <div className="flex items-center gap-2 text-xs">

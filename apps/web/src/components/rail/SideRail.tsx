@@ -6,7 +6,7 @@ import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
 import { useLeaveTournament, useTournamentStatus } from '../../hooks/useTournaments';
 import { useWallet } from '../../hooks/useWallet';
 import { formatPoints } from '../../lib/format';
-import { barPhrase, isLowerBetter } from '../../lib/metrics';
+import { barPhrase, formatMetric, isLowerBetter, metricUnit } from '../../lib/metrics';
 import { LiveLine } from '../activity/LiveLine';
 import { AnimatedBalance } from '../ui/AnimatedBalance';
 import { Card } from '../ui/Card';
@@ -77,14 +77,15 @@ function InPlayCard({ item }: { item: ActivityItem }) {
             size="sm"
             current={pool.current}
             target={pool.target}
-            label={live?.label ?? 'you'}
+            label="you"
             lowerIsBetter={isLowerBetter(item.market)}
+            format={(n) => formatMetric(item.market, n)}
           />
         </div>
       ) : (
         live && (
           <div className="mt-2">
-            <LiveLine live={live} />
+            <LiveLine live={live} metric={item.market} />
           </div>
         )
       )}
@@ -132,13 +133,15 @@ function RoomFormed() {
 
   const pool = status?.status === 'formed' ? status.pool : null;
   if (!pool) return null;
+  const fm = (n: number) => formatMetric(pool.metric, n);
 
   return (
     <Card className="p-3" data-testid="rail-room-card">
       <div className="flex items-center gap-2">
         <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-live" />
-        <p className="min-w-0 flex-1 truncate text-sm font-medium capitalize text-text">
-          {pool.difficulty} {pool.metric_label}
+        <p className="min-w-0 flex-1 truncate text-sm font-medium text-text">
+          {pool.difficulty.charAt(0).toUpperCase() + pool.difficulty.slice(1)} ·{' '}
+          {pool.metric_label}
         </p>
       </div>
       <p className="mt-0.5 text-xs text-text-secondary">
@@ -151,28 +154,27 @@ function RoomFormed() {
           current={pool.your_bar}
           target={pool.room_bar}
           lowerIsBetter={isLowerBetter(pool.metric)}
+          format={fm}
         />
       </div>
-      <p className="mt-1 text-xs text-text-tertiary">Room bar {pool.room_bar}</p>
+      <p className="mt-1 text-xs text-text-tertiary">
+        Room bar · {pool.room_bar}
+        {metricUnit(pool.metric) ? ` ${metricUnit(pool.metric)}` : ''}{' '}
+        {isLowerBetter(pool.metric) ? 'or fewer' : 'or better'}
+      </p>
       {pool.your_cleared === true ? (
         <p className="mt-3 text-xs font-medium text-green" data-testid="rail-room-live">
-          Cleared ✓
+          Cleared
           {pool.your_current != null && (
-            <span className="text-text-secondary">
-              {' '}
-              · your {pool.metric_label} {pool.your_current}
-            </span>
+            <span className="text-text-secondary"> · {fm(pool.your_current)}</span>
           )}{' '}
           · settling now.
         </p>
       ) : pool.your_cleared === false ? (
         <p className="mt-3 text-xs text-text" data-testid="rail-room-live">
-          Not over the bar yet
+          Not cleared yet
           {pool.your_current != null && (
-            <span className="text-text-secondary">
-              {' '}
-              · your {pool.metric_label} {pool.your_current}
-            </span>
+            <span className="text-text-secondary"> · {fm(pool.your_current)}</span>
           )}
           . Play again to {barPhrase(pool.metric, pool.room_bar)}.
         </p>
@@ -259,8 +261,8 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
         {nothingRunning ? (
           <p className="text-xs text-text-tertiary">
             {queuing
-              ? 'Nothing running yet. Your contest lands here once it forms.'
-              : 'Nothing running. Join a pool to get started.'}
+              ? 'Nothing running yet. It shows here once it forms.'
+              : 'Nothing running.'}
           </p>
         ) : (
           <div className="flex flex-col gap-2">

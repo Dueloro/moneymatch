@@ -1,3 +1,5 @@
+import { formatMetricNumber } from '../../lib/metrics';
+
 export function ClearRate({ rate }: { rate: number }) {
   const pct = Math.max(0, Math.min(100, Math.round(rate * 100)));
   return (
@@ -9,7 +11,7 @@ export function ClearRate({ rate }: { rate: number }) {
         />
       </div>
       <p className="mt-2 text-xs text-text-secondary">
-        <span className="text-text">{pct}%</span> of your recent matches clear it
+        <span className="text-text">{pct}%</span> of your recent games clear it
       </p>
     </div>
   );
@@ -22,6 +24,7 @@ export function ClearBar({
   cleared,
   lowerIsBetter = false,
   size = 'md',
+  format = formatMetricNumber,
 }: {
   current: number | null | undefined;
   target: number;
@@ -29,6 +32,8 @@ export function ClearBar({
   cleared?: boolean;
   lowerIsBetter?: boolean;
   size?: 'sm' | 'md';
+  /** Formats a value with its unit, e.g. `(n) => formatMetric(metric, n)`. */
+  format?: (n: number) => string;
 }) {
   const span = Math.max(target, current ?? 0) || 1;
   const scale = (v: number) => Math.max(0, Math.min(100, (v / (span * 1.28)) * 100));
@@ -42,7 +47,7 @@ export function ClearBar({
   const gapWidth = Math.abs(targetPct - currentPct);
 
   const trackH = size === 'sm' ? 'h-1' : 'h-1.5';
-  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  const fmt = format;
 
   return (
     <div>

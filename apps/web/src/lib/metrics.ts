@@ -12,6 +12,32 @@ export function requiresWin(metric: string): boolean {
 
 const UNITS: Record<string, string> = { chess_moves: 'moves' };
 
+type Unit = { one: string; many: string } | { suffix: string };
+
+const METRIC_UNITS: Record<string, Unit> = {
+  chess_moves: { one: 'move', many: 'moves' },
+  chess_fastest_win: { one: 'move', many: 'moves' },
+  chess_wins: { one: 'win', many: 'wins' },
+  chess_win_streak: { one: 'in a row', many: 'in a row' },
+  chess_accuracy: { suffix: '%' },
+};
+
+/** A metric value as a bare number: integers stay integers, others trim to 1 dp. */
+export function formatMetricNumber(value: number): string {
+  if (Number.isInteger(value)) return value.toLocaleString('en-US');
+  return String(Math.round(value * 10) / 10);
+}
+
+/** "31 moves", "4 wins", "3 in a row", "86.4%"; a bare number if unknown. */
+export function formatMetric(metric: string, value: number | null | undefined): string {
+  if (value == null) return '-';
+  const n = formatMetricNumber(value);
+  const unit = METRIC_UNITS[metric];
+  if (!unit) return n;
+  if ('suffix' in unit) return `${n}${unit.suffix}`;
+  return `${n} ${value === 1 ? unit.one : unit.many}`;
+}
+
 export function metricUnit(metric: string): string | undefined {
   return UNITS[metric];
 }

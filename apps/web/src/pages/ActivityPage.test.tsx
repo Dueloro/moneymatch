@@ -92,7 +92,7 @@ describe('ActivityPage', () => {
       item({ id: 'a', state: 'ACTIVE', net_cents: null }),
     ]);
     renderWithProviders(<ActivityPage />);
-    expect(screen.getByText(/Push · refunded/)).toBeInTheDocument();
+    expect(screen.getByText(/Draw · refunded/)).toBeInTheDocument();
     expect(screen.getByText(/In progress/)).toBeInTheDocument();
     expect(screen.getByText('1,000 pts in play')).toBeInTheDocument();
   });
@@ -127,6 +127,7 @@ describe('ActivityPage', () => {
       item({
         type: 'pool',
         id: 'poolLive',
+        market: 'chess_moves',
         title: 'Moves to win · Medium pool',
         state: 'LOCKED',
         net_cents: null,
@@ -143,7 +144,26 @@ describe('ActivityPage', () => {
       }),
     ]);
     renderWithProviders(<ActivityPage />);
-    expect(screen.getByText(/Moves to win 24 · cleared 30/)).toBeInTheDocument();
+    expect(screen.getByText('cleared · 24 moves, bar 30 moves')).toBeInTheDocument();
+  });
+
+  it('states a finished game as a plain result, never a termination it does not know', () => {
+    mockItems([
+      item({
+        state: 'AWAITING_RESULT',
+        net_cents: null,
+        live: {
+          kind: 'match',
+          format: 'chess',
+          status: 'finished',
+          moves: 31,
+          result: 'you',
+        },
+      }),
+    ]);
+    renderWithProviders(<ActivityPage />);
+    expect(screen.getByText('you won')).toBeInTheDocument();
+    expect(screen.queryByText(/checkmate/)).not.toBeInTheDocument();
   });
 
   it('pops a settlement toast when a match newly resolves', () => {

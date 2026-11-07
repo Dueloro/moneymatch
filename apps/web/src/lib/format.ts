@@ -29,8 +29,15 @@ export function formatPct(prob: number): string {
   return `${Math.round(prob * 100)}%`;
 }
 
-export function formatStat(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+/** "2h 14m", "14m", "under a minute" until `iso`; null once it has passed. */
+export function formatTimeLeft(iso: string, now: Date = new Date()): string | null {
+  const minutes = Math.floor((new Date(iso).getTime() - now.getTime()) / 60000);
+  if (Number.isNaN(minutes) || minutes < 0) return null;
+  if (minutes < 1) return 'under a minute';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 export function formatRelativeTime(iso: string, now: Date = new Date()): string {

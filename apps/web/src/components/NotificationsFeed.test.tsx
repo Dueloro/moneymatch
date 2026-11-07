@@ -100,7 +100,7 @@ describe('NotificationsFeed', () => {
     } as unknown as ReturnType<typeof useDeclineChallenge>);
   });
 
-  it('renders a challenge notification with Respond and marks read on view', () => {
+  it('renders a challenge notification with Accept and marks read on view', () => {
     vi.mocked(useNotifications).mockReturnValue({
       data: {
         unread: 1,
@@ -118,7 +118,7 @@ describe('NotificationsFeed', () => {
     renderWithProviders(<NotificationsFeed />);
 
     expect(screen.getByText(/jordn_cs challenged you/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Respond' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
     expect(markMutate).toHaveBeenCalledWith(undefined);
 
     fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
@@ -174,15 +174,29 @@ describe('NotificationsFeed', () => {
       }),
     );
     renderWithProviders(<NotificationsFeed />);
-    fireEvent.click(screen.getByRole('button', { name: /A contest settled/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Your pool settled/ }));
 
-    expect(screen.getByText(/in 8 · bar 12/)).toBeInTheDocument();
+    expect(screen.getByText(/in 8 moves · bar 12 moves/)).toBeInTheDocument();
     expect(screen.getByText('Cleared')).toBeInTheDocument();
     expect(screen.getByText('Missed')).toBeInTheDocument();
     expect(screen.getByText(pts('+9,000 pts'))).toBeInTheDocument();
 
     const rows = screen.getAllByText(/player \(you\)|testbot_ada/);
     expect(rows[0]).toHaveTextContent('player');
+  });
+
+  it('names the amount won in a settled notification', () => {
+    feed([
+      {
+        ...TOURNAMENT_NOTE,
+        payload: { ...TOURNAMENT_NOTE.payload, payout_cents: 11250 },
+      },
+    ]);
+    vi.mocked(useTournament).mockReturnValue({
+      isPending: true,
+    } as unknown as ReturnType<typeof useTournament>);
+    renderWithProviders(<NotificationsFeed />);
+    expect(screen.getByText('You won 11,250 pts in a tournament')).toBeInTheDocument();
   });
 
   it('opens a tournament to show the ranking', () => {
@@ -220,11 +234,11 @@ describe('NotificationsFeed', () => {
       isError: false,
     } as unknown as ReturnType<typeof useTournament>);
     renderWithProviders(<NotificationsFeed />);
-    fireEvent.click(screen.getByRole('button', { name: /A contest settled/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Your tournament settled/ }));
 
     expect(screen.getByText('#1 player (you)')).toBeInTheDocument();
     expect(screen.getByText('#2 testbot_ada')).toBeInTheDocument();
-    expect(screen.getByText('3 · 3 matches')).toBeInTheDocument();
+    expect(screen.getByText('3 wins · 3 games')).toBeInTheDocument();
     expect(screen.getByText(pts('+11,250 pts'))).toBeInTheDocument();
   });
 

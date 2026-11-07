@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { humanizeIds } from '../../lib/labels';
+import { formatMetric, formatMetricNumber } from '../../lib/metrics';
 import { toast } from '../../lib/toast';
 import { formatPoints, formatRelativeTime } from '../../lib/format';
 import {
@@ -35,7 +37,7 @@ function stateLabel(item: ActivityItem): string {
     case 'LOCKED':
       return 'In progress';
     case 'PUSHED':
-      return 'Push · refunded';
+      return 'Draw · refunded';
     case 'CANCELED':
       return 'Refunded';
     case 'SETTLED':
@@ -61,8 +63,12 @@ function title(item: ActivityItem): string {
 }
 
 function fmt(v: number | string): string {
-  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2);
-  return v;
+  return typeof v === 'number' ? formatMetricNumber(v) : v;
+}
+
+function statLabel(key: string): string {
+  const s = humanizeIds(key).replace(/_/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function StatCompare({ detail }: { detail: ActivityDetail }) {
@@ -86,7 +92,7 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
             key={k}
             className="grid grid-cols-3 border-t border-hairline px-3 py-1.5 text-sm"
           >
-            <span className="text-text-secondary">{k}</span>
+            <span className="text-text-secondary">{statLabel(k)}</span>
             <span
               className={`text-right ${better && y > o ? 'font-semibold text-text' : 'text-text-secondary'}`}
             >
@@ -149,7 +155,7 @@ function DetailBody({ item }: { item: ActivityItem }) {
           {d.host_game_id ? (
             <Fact
               label="Game"
-              value={d.host_game_id}
+              value="View on Lichess ↗"
               href={`https://lichess.org/${d.host_game_id}`}
             />
           ) : null}
@@ -160,11 +166,16 @@ function DetailBody({ item }: { item: ActivityItem }) {
 
   const facts: Array<[string, string]> = [];
   if (d.metric_label) facts.push(['Metric', d.metric_label]);
-  if (d.difficulty) facts.push(['Difficulty', d.difficulty]);
-  if (d.room_bar != null) facts.push(['Room bar', fmt(d.room_bar)]);
-  if (d.personal_bar != null) facts.push(['Your bar', fmt(d.personal_bar)]);
+  if (d.difficulty)
+    facts.push([
+      'Difficulty',
+      d.difficulty.charAt(0).toUpperCase() + d.difficulty.slice(1),
+    ]);
+  const m = item.market;
+  if (d.room_bar != null) facts.push(['Room bar', formatMetric(m, d.room_bar)]);
+  if (d.personal_bar != null) facts.push(['Your bar', formatMetric(m, d.personal_bar)]);
   if (d.your_rank != null) facts.push(['Your rank', `#${d.your_rank}`]);
-  if (d.your_score != null) facts.push(['Your score', fmt(d.your_score)]);
+  if (d.your_score != null) facts.push(['Your score', formatMetric(m, d.your_score)]);
   if (d.field_size != null) facts.push(['Field', `${d.field_size} players`]);
   if (d.room_size != null) facts.push(['Room', `${d.room_size} players`]);
   if (d.entry_cents != null) facts.push(['Entry', formatPoints(d.entry_cents)]);
@@ -192,10 +203,10 @@ function ContestSection({ item }: { item: ActivityItem }) {
   if (item.dispute_status) {
     const label =
       item.dispute_status === 'open'
-        ? 'Contested · under review'
+        ? 'Reported · under review'
         : item.dispute_status === 'resolved'
-          ? 'Contest resolved'
-          : 'Contest reviewed · result stands';
+          ? 'Report resolved'
+          : 'Reviewed · result stands';
     return (
       <div className="mt-3 rounded-inset bg-panel-raised px-3 py-2 text-xs text-text-secondary">
         {label}
@@ -211,11 +222,11 @@ function ContestSection({ item }: { item: ActivityItem }) {
         ref_id: item.id,
         reason: reason.trim(),
       });
-      toast.success('Contest submitted. Support will review it.');
+      toast.success('Report sent. Support will review it.');
       setOpen(false);
       setReason('');
     } catch (err) {
-      toast.error((err as Error)?.message ?? 'Could not submit your contest.');
+      toast.error((err as Error)?.message ?? 'Could not send your report.');
     }
   }
 
@@ -249,7 +260,7 @@ function ContestSection({ item }: { item: ActivityItem }) {
         </div>
       ) : (
         <PillButton variant="outline" onClick={() => setOpen(true)}>
-          Contest this result
+          Report a problem
         </PillButton>
       )}
     </div>
@@ -314,7 +325,9 @@ export function ActivityCard({
           </span>
         )
       }
-      footer={item.live ? <LiveLine live={item.live} /> : undefined}
+      footer={
+        item.live ? <LiveLine live={item.live} metric={item.market} /> : undefined
+      }
     >
       <DetailBody item={item} />
       <div className="mt-3 flex items-center gap-2">

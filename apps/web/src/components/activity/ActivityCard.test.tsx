@@ -45,7 +45,7 @@ describe('ActivityCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /details/i }));
 
-    expect(screen.getByRole('link', { name: 'abcd1234' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'View on Lichess ↗' })).toHaveAttribute(
       'href',
       'https://lichess.org/abcd1234',
     );
@@ -53,14 +53,14 @@ describe('ActivityCard', () => {
     expect(screen.getByText('88')).toBeInTheDocument();
     expect(screen.getByText('74')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Contest this result' }),
+      screen.getByRole('button', { name: 'Report a problem' }),
     ).toBeInTheDocument();
   });
 
   it('opens the contest form when the action is clicked', () => {
     renderWithProviders(<ActivityCard item={match()} />);
     fireEvent.click(screen.getByRole('button', { name: /details/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Contest this result' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report a problem' }));
     expect(screen.getByPlaceholderText(/my game wasn't counted/i)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Submit for review' }),
@@ -70,9 +70,9 @@ describe('ActivityCard', () => {
   it('shows the review status once contested', () => {
     renderWithProviders(<ActivityCard item={match({ dispute_status: 'open' })} />);
     fireEvent.click(screen.getByRole('button', { name: /details/i }));
-    expect(screen.getByText('Contested · under review')).toBeInTheDocument();
+    expect(screen.getByText('Reported · under review')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Contest this result' }),
+      screen.queryByRole('button', { name: 'Report a problem' }),
     ).not.toBeInTheDocument();
   });
 });

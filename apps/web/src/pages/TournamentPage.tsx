@@ -14,8 +14,8 @@ import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
-import { formatPoints } from '../lib/format';
-import { tournamentRule } from '../lib/metrics';
+import { formatPoints, formatTimeLeft } from '../lib/format';
+import { formatMetric, tournamentRule } from '../lib/metrics';
 import { platformFeeNote, rakeOnPot } from '../lib/rake';
 import {
   useEnterTournament,
@@ -81,6 +81,10 @@ export function TournamentPage() {
   const openMetrics = markets?.metrics.filter((m) => !m.provisional) ?? [];
   const fieldSize = markets?.field_size ?? 16;
   const busy = status?.status === 'searching' || status?.status === 'formed';
+  const split = markets?.prize_split ?? [];
+  const splitTotal = split.reduce((a, b) => a + b, 0);
+  const firstPlace = (pot: number) =>
+    splitTotal > 0 ? Math.floor(((pot - rakeOnPot(pot)) * split[0]) / splitTotal) : 0;
 
   const filteredMetrics = openMetrics.filter(
     (m) => metricFilter === ALL || m.metric === metricFilter,
@@ -148,8 +152,8 @@ export function TournamentPage() {
                     title={m.label}
                     subtitle={tournamentRule(m.metric, m.label)}
                     entryOptions={presets}
-                    payoutFor={(entry) => entry * fieldSize}
-                    payoutLabel="Pot if full"
+                    payoutFor={(entry) => firstPlace(entry * fieldSize)}
+                    payoutLabel="1st place if full"
                     // Rake is taken off the full pot before the top places
                     // split it (money_math.split_by_weights).
                     feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
@@ -210,6 +214,11 @@ function TournamentStatusBanner({
   );
 }
 
+function closesIn(endsAt: string): string {
+  const left = formatTimeLeft(endsAt);
+  return left ? `closes in ${left}` : 'closing now';
+}
+
 function StandingsPanel({ tournament }: { tournament: TournamentView }) {
   const settled = tournament.state === 'SETTLED';
   return (
@@ -243,7 +252,7 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
             }
             subline={
               row.score != null
-                ? `${Number.isInteger(row.score) ? row.score : row.score.toFixed(2)} · ${row.matches} ${row.matches === 1 ? 'game' : 'games'}`
+                ? `${formatMetric(tournament.metric, row.score)} · ${row.matches} ${row.matches === 1 ? 'game' : 'games'}`
                 : 'No qualifying game yet'
             }
             right={
@@ -255,7 +264,8 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
         ))}
       </div>
       <p className="mt-3 text-xs text-text-secondary">
-        Pot {formatPoints(tournament.pot_cents)} · the window closes automatically.
+        Pot {formatPoints(tournament.pot_cents)}
+        {!settled && ` · ${closesIn(tournament.window_ends_at)}`}
       </p>
     </Card>
   );

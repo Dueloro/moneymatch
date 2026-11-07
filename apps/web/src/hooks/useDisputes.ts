@@ -21,7 +21,7 @@ export function useFileDispute() {
   return useMutation({
     mutationFn: async (vars: ContestVars) => {
       const { data, error } = await api.POST('/api/v1/disputes', { body: vars });
-      if (error) throw new Error(messageOf(error, 'Could not submit your contest.'));
+      if (error) throw new Error(messageOf(error, 'Could not send your report.'));
       return data;
     },
     onSuccess: (_data, vars) => {

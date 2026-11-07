@@ -11,7 +11,7 @@ export function LeaderboardPanel() {
     return (
       <EmptyState
         title="Nobody is ranked yet"
-        subline={`Settle ${data.min_contests} contests inside ${data.window_days} days and you are on the board.`}
+        subline={`Finish ${data.min_contests} matches, pools or tournaments in ${data.window_days} days to get on the board.`}
       />
     );
   }
@@ -32,7 +32,7 @@ export function LeaderboardPanel() {
               {row.is_you ? ' (you)' : ''}
             </span>
           }
-          subline={`${row.contests} contests`}
+          subline={`${row.contests} played`}
           right={
             <span className={row.roi_bps >= 0 ? 'text-green' : 'text-text-secondary'}>
               {formatRoi(row.roi_bps)}
@@ -42,8 +42,7 @@ export function LeaderboardPanel() {
       ))}
       {!data.you.qualified && (
         <p className="mt-4 text-xs text-text-secondary">
-          You are not ranked yet. Settle {data.you.contests_needed} more contest
-          {data.you.contests_needed === 1 ? '' : 's'} to qualify.
+          You are not ranked yet. Finish {data.you.contests_needed} more to qualify.
         </p>
       )}
     </div>

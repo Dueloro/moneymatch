@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../test/testUtils';
+import { pts, renderWithProviders } from '../test/testUtils';
 import { TournamentPage } from './TournamentPage';
 
 vi.mock('../auth/useAuth', () => ({
@@ -69,6 +69,9 @@ describe('TournamentPage', () => {
     renderWithProviders(<TournamentPage />);
     expect(screen.getAllByRole('button', { name: 'Join tournament' })).toHaveLength(1);
     expect(screen.getByText('top 3 paid')).toBeInTheDocument();
+    // 10 x 1,000 pot, minus the 10% fee, times the 50/100 first-place share.
+    expect(screen.getByText('1st place if full')).toBeInTheDocument();
+    expect(screen.getByText(pts('4,500 pts'))).toBeInTheDocument();
     expect(
       screen.getByText('Most wins across your games in the window ranks first.'),
     ).toBeInTheDocument();
@@ -102,7 +105,7 @@ describe('TournamentPage', () => {
         field_size: 10,
         state: 'LOCKED',
         window_starts_at: new Date().toISOString(),
-        window_ends_at: new Date().toISOString(),
+        window_ends_at: new Date(Date.now() + 2 * 3600e3 + 14.5 * 60e3).toISOString(),
         field_mu_low: 1500,
         field_mu_high: 1600,
         standings: [
@@ -124,12 +127,12 @@ describe('TournamentPage', () => {
     renderWithProviders(<TournamentPage />);
     expect(screen.getByTestId('standings-panel')).toBeInTheDocument();
     expect(screen.getByText(/#1 you/)).toBeInTheDocument();
-    expect(screen.getByText('3 · 5 games')).toBeInTheDocument();
+    expect(screen.getByText('3 wins · 5 games')).toBeInTheDocument();
     expect(
       screen.getAllByText('Most wins across your games in the window ranks first.')
         .length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText(/Pot 10,000 pts/)).toBeInTheDocument();
+    expect(screen.getByText('Pot 10,000 pts · closes in 2h 14m')).toBeInTheDocument();
   });
 
   it('the filter menu is collapsed until the hamburger toggle is clicked', () => {

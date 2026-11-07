@@ -70,9 +70,9 @@ describe('SideRail', () => {
     mockStatus(FORMED);
     renderWithProviders(<SideRail />);
     const card = screen.getByTestId('rail-room-card');
-    expect(card).toHaveTextContent('medium Moves to win');
-    expect(card).toHaveTextContent('Room bar 32');
-    expect(card).toHaveTextContent('need −2');
+    expect(card).toHaveTextContent('Medium · Moves to win');
+    expect(card).toHaveTextContent('Room bar · 32 moves or fewer');
+    expect(card).toHaveTextContent('need −2 moves');
     expect(card).toHaveTextContent('4 players · pot 4,000 pts');
     expect(screen.getByTestId('rail-room-play-cue')).toHaveTextContent(
       /play your next game on lichess/i,
@@ -85,7 +85,9 @@ describe('SideRail', () => {
       pool: { ...FORMED.pool, your_cleared: true, your_current: 28 },
     });
     renderWithProviders(<SideRail />);
-    expect(screen.getByTestId('rail-room-live')).toHaveTextContent(/Cleared/);
+    expect(screen.getByTestId('rail-room-live')).toHaveTextContent(
+      'Cleared · 28 moves · settling now.',
+    );
     expect(screen.queryByTestId('rail-room-play-cue')).not.toBeInTheDocument();
   });
 
@@ -120,7 +122,7 @@ describe('SideRail', () => {
       'Finding your pool room',
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(screen.getByText(/lands here once it forms/)).toBeInTheDocument();
+    expect(screen.getByText(/shows here once it forms/)).toBeInTheDocument();
   });
 
   it('drops the Queuing section once the room has formed', () => {

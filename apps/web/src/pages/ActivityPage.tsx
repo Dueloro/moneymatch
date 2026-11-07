@@ -53,7 +53,10 @@ export function ActivityPage() {
 
   return (
     <div>
-      <SectionHeader level="page" hint="Every contest you have played, newest first.">
+      <SectionHeader
+        level="page"
+        hint="Your matches, pools and tournaments, newest first."
+      >
         Activity
       </SectionHeader>
 
@@ -67,8 +70,8 @@ export function ActivityPage() {
         <SkeletonList rows={5} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No contests yet"
-          subline="Play a match and your results land here automatically."
+          title="Nothing played yet"
+          subline="Your results land here automatically after each game."
           action={
             <Link to="/play">
               <PillButton>Start playing</PillButton>

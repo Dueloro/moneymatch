@@ -1,7 +1,7 @@
 import { usePool, type PoolMember } from '../../hooks/usePools';
 import { useTournament } from '../../hooks/useTournaments';
-import { formatPoints, formatStat as stat } from '../../lib/format';
-import { isLowerBetter } from '../../lib/metrics';
+import { formatPoints } from '../../lib/format';
+import { formatMetric, isLowerBetter } from '../../lib/metrics';
 import { AmountText } from '../ui/AmountText';
 import { ListRow } from '../ui/ListRow';
 
@@ -17,6 +17,7 @@ export function PoolDetail({ poolId }: { poolId: string }) {
 
   const settled = pool.state === 'SETTLED' || pool.state === 'CANCELED';
   const lower = isLowerBetter(pool.metric);
+  const stat = (n: number | null | undefined) => formatMetric(pool.metric, n);
 
   const members: PoolMember[] = settled
     ? [...pool.members].sort((a, b) => rankOf(a) - rankOf(b))
@@ -40,7 +41,7 @@ export function PoolDetail({ poolId }: { poolId: string }) {
                 {m.is_you ? ' (you)' : ''}
               </span>
             }
-            subline={memberSubline(m, settled, lower)}
+            subline={memberSubline(m, settled, lower, stat)}
             right={
               settled ? (
                 <span className="flex items-center gap-2">
@@ -74,11 +75,16 @@ function rankOf(m: PoolMember): number {
   return 2;
 }
 
-function memberSubline(m: PoolMember, settled: boolean, lower: boolean): string {
+function memberSubline(
+  m: PoolMember,
+  settled: boolean,
+  lower: boolean,
+  stat: (n: number) => string,
+): string {
   const bar = `bar ${stat(m.personal_bar)}`;
   if (!settled) return bar;
   if (m.result_value == null) {
-    return m.status === 'REFUNDED' ? `${bar} · no qualifying match` : bar;
+    return m.status === 'REFUNDED' ? `${bar} · no qualifying game` : bar;
   }
   const verb = lower ? 'in' : 'hit';
   return `${verb} ${stat(m.result_value)} · ${bar}`;
@@ -109,6 +115,7 @@ export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
   if (isError || !t) return <Line>Could not load this tournament.</Line>;
 
   const settled = t.state === 'SETTLED' || t.state === 'CANCELED';
+  const stat = (n: number) => formatMetric(t.metric, n);
 
   return (
     <div>
@@ -130,9 +137,9 @@ export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
             subline={
               row.score != null
                 ? `${stat(row.score)} · ${row.matches} ${
-                    row.matches === 1 ? 'match' : 'matches'
+                    row.matches === 1 ? 'game' : 'games'
                   }`
-                : 'No qualifying match'
+                : 'No qualifying game yet'
             }
             right={
               row.payout_cents > 0 ? (

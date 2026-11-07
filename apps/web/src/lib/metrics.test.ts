@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { barPhrase, barTitle, tournamentRule } from './metrics';
+import { barPhrase, barTitle, formatMetric, tournamentRule } from './metrics';
 
 describe('barPhrase / barTitle', () => {
   it('words moves-to-win as a win in that many moves or fewer', () => {
@@ -29,5 +29,22 @@ describe('tournamentRule', () => {
     expect(tournamentRule('new_metric', 'New Metric')).toBe(
       'Ranked by new metric in the window.',
     );
+  });
+});
+
+describe('formatMetric', () => {
+  it('puts each metric unit on the value', () => {
+    expect(formatMetric('chess_moves', 31)).toBe('31 moves');
+    expect(formatMetric('chess_fastest_win', 1)).toBe('1 move');
+    expect(formatMetric('chess_wins', 4)).toBe('4 wins');
+    expect(formatMetric('chess_wins', 1)).toBe('1 win');
+    expect(formatMetric('chess_win_streak', 3)).toBe('3 in a row');
+    expect(formatMetric('chess_accuracy', 86.44)).toBe('86.4%');
+  });
+
+  it('never pads an integer metric with decimals', () => {
+    expect(formatMetric('chess_moves', 23.0)).toBe('23 moves');
+    expect(formatMetric('unknown_metric', 12)).toBe('12');
+    expect(formatMetric('chess_moves', null)).toBe('-');
   });
 });

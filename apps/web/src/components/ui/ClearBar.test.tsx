@@ -1,12 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { formatMetric } from '../../lib/metrics';
 import { ClearBar } from './ClearBar';
 
 describe('ClearBar, higher is better', () => {
   it('shows the gap to reach the bar', () => {
     render(<ClearBar current={1.5} target={1.8} />);
-    expect(screen.getByText('need +0.30')).toBeInTheDocument();
+    expect(screen.getByText('need +0.3')).toBeInTheDocument();
   });
 
   it('says clear once at or over the bar', () => {
@@ -20,6 +21,19 @@ describe('ClearBar, lower is better (moves to win)', () => {
     render(<ClearBar current={34} target={30} lowerIsBetter />);
     expect(screen.getByText('need −4')).toBeInTheDocument();
     expect(screen.queryByText(/need \+/)).not.toBeInTheDocument();
+  });
+
+  it('puts the unit on every number when given a formatter', () => {
+    render(
+      <ClearBar
+        current={31}
+        target={23}
+        lowerIsBetter
+        format={(n) => formatMetric('chess_moves', n)}
+      />,
+    );
+    expect(screen.getByText('31 moves')).toBeInTheDocument();
+    expect(screen.getByText('need −8 moves')).toBeInTheDocument();
   });
 
   it('says how far under the bar you are', () => {

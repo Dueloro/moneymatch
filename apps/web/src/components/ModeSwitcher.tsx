@@ -10,7 +10,7 @@ export function ModeSwitcher() {
 
   return (
     <Segmented
-      ariaLabel="Contest type"
+      ariaLabel="Play mode"
       options={PLAY_MODES.map((m) => ({ value: m.to, label: m.label }))}
       value={value}
       onChange={(to) => navigate(to)}

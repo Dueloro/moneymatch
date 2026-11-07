@@ -1,13 +1,18 @@
 import { useState } from 'react';
 
 import { useCreateChallenge } from '../hooks/useChallenges';
-import { useMarkets, type MarketRow } from '../hooks/useMatchmaking';
+import { prizeForEntry, useMarkets, type MarketRow } from '../hooks/useMatchmaking';
 import { formatPoints } from '../lib/format';
 import { CHESS } from '../lib/games';
 import { Card } from './ui/Card';
 import { RadioRow } from './ui/Field';
 import { PillButton } from './ui/PillButton';
 import { PresetSelector } from './ui/PresetSelector';
+
+function feeLine(entry: number, multiplierBps: number): string {
+  const prize = prizeForEntry(entry, multiplierBps);
+  return `Both stake ${formatPoints(entry)} · winner takes ${formatPoints(prize)} · fee ${formatPoints(entry * 2 - prize)}`;
+}
 
 /** The server owns entry cents and the friendly/pair-cap decision. */
 export function ChallengeDialog({
@@ -180,8 +185,7 @@ export function ChallengeDialog({
 
             {ready && market && (
               <p className="mt-3 text-xs text-text-secondary">
-                Both stake {formatPoints(entryCents!)} · winner takes the pot minus the
-                platform fee.
+                {feeLine(entryCents!, market.multiplier_bps)}
               </p>
             )}
           </>
