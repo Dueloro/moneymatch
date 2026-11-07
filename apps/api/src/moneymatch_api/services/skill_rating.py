@@ -7,7 +7,7 @@ a payout line. Rake is not here anymore: it's config on each `MarketDef`
 (`services/markets.py`) computed in integer basis points (`services/money_math`).
 
 Chess `win_h2h` uses this Elo band as its forecast (Elo already *is* the
-forecast); stat duels use the duel-forecast normal model in `services/pairing.py`.
+forecast).
 """
 
 from __future__ import annotations

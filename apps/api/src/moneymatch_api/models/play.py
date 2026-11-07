@@ -99,7 +99,7 @@ class QueueTicket(Base, TimestampMixin):
     # Pools only (Phase 4); reserved here.
     difficulty: Mapped[str | None] = mapped_column(String(16), nullable=True)
     entry_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    # Rating used for the chess Elo band (null for stat duels).
+    # Rating used for the chess Elo band.
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Frozen metric-model values used for pairing (μ/σ/n per metric + rating).
     baseline_snapshot: Mapped[dict[str, Any]] = mapped_column(
@@ -244,5 +244,5 @@ class MatchPlayer(Base, TimestampMixin):
     payout_cents: Mapped[int] = mapped_column(
         BigInteger, default=0, server_default="0", nullable=False
     )
-    # Graded stat line for the Activity UI (stat-race markets).
+    # Graded stat line for the Activity UI.
     stat_line: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

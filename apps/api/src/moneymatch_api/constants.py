@@ -102,8 +102,7 @@ GAME_RATE_METRICS: dict[str, tuple[str, ...]] = {
 # EWMA recency weighting expressed as a half-life in matches.
 METRIC_EWMA_HALF_LIFE = 10
 
-# Below this per-metric sample size a Head-to-Head **stat duel** is provisional
-# (challenge-engine proposal §3/§6).
+# Below this per-metric sample size a metric is provisional.
 METRIC_PROVISIONAL_MIN_N = 10
 
 # Solo pools / tournaments no longer gate on a "play more matches to unlock"
@@ -112,8 +111,7 @@ METRIC_PROVISIONAL_MIN_N = 10
 # a stat you've never produced simply isn't offered — that's math, not a rule.)
 STAT_BASELINE_MIN_N = 1
 
-# Per-game finished-history floor. An account below it gets H2H `win` markets
-# only (no stat duels), regardless of any single metric's n.
+# Per-game finished-history floor for metric-based contests.
 GAME_HISTORY_FLOOR: dict[str, int] = {
     GAME_CHESS_LICHESS: 20,  # rated games
 }

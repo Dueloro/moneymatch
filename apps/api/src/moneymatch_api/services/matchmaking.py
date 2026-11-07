@@ -201,8 +201,8 @@ async def can_pair(
     """Whether two waiting tickets are allowed to be paired (anti-collusion).
 
     Rejects: the same platform user, the same linked host account, a re-pair of
-    the same two accounts within the cooldown, and (stat races) a provisional
-    metric on either frozen baseline.
+    the same two accounts within the cooldown, and (metric baselines) a
+    provisional metric on either side.
 
     `require_established_metric` is the head-to-head rule: a duel is settled by
     comparing two stat lines, so a barely-sampled baseline cannot back one.
