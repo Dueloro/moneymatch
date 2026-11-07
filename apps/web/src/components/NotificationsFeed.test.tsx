@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../test/testUtils';
+import { renderWithProviders, pts } from '../test/testUtils';
 import { NotificationsFeed } from './NotificationsFeed';
 
 vi.mock('../hooks/useNotifications', () => ({
@@ -179,7 +179,7 @@ describe('NotificationsFeed', () => {
     expect(screen.getByText(/in 8 · bar 12/)).toBeInTheDocument();
     expect(screen.getByText('Cleared')).toBeInTheDocument();
     expect(screen.getByText('Missed')).toBeInTheDocument();
-    expect(screen.getByText('+9,000 pts')).toBeInTheDocument();
+    expect(screen.getByText(pts('+9,000 pts'))).toBeInTheDocument();
 
     const rows = screen.getAllByText(/player \(you\)|testbot_ada/);
     expect(rows[0]).toHaveTextContent('player');
@@ -225,7 +225,7 @@ describe('NotificationsFeed', () => {
     expect(screen.getByText('#1 player (you)')).toBeInTheDocument();
     expect(screen.getByText('#2 testbot_ada')).toBeInTheDocument();
     expect(screen.getByText('3 · 3 matches')).toBeInTheDocument();
-    expect(screen.getByText('+11,250 pts')).toBeInTheDocument();
+    expect(screen.getByText(pts('+11,250 pts'))).toBeInTheDocument();
   });
 
   it('leaves a non-contest notification unexpandable', () => {

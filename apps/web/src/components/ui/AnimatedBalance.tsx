@@ -81,10 +81,8 @@ function LoadedBalance({
         className={`num transition-colors duration-300 ${tint}`}
         data-direction={delta === null ? 'none' : up ? 'up' : 'down'}
       >
-        {formatPointsValue(shown)}{' '}
-        <span className="font-sans text-[max(0.45em,0.6875rem)] font-medium tracking-normal opacity-60">
-          pts
-        </span>
+        {formatPointsValue(shown)}
+        <span className="pts-unit text-[max(0.45em,0.6875rem)]"> pts</span>
       </span>
 
       {delta !== null && (

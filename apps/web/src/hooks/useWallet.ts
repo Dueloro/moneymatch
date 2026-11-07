@@ -94,20 +94,3 @@ export function usePlayMoneyDeposit() {
     },
   });
 }
-
-export function usePlayMoneyWithdrawal() {
-  const invalidate = useWalletInvalidation();
-  return useMutation({
-    mutationFn: async (amountCents: number): Promise<Wallet> => {
-      const { data, error } = await api.POST('/api/v1/wallet/demo-withdrawal', {
-        body: { amount_cents: amountCents },
-      });
-      if (error) throw new Error('Withdrawal failed');
-      return data as Wallet;
-    },
-    onSuccess: (_data, amountCents) => {
-      invalidate();
-      toast.success(`Cashed out ${formatPoints(amountCents)}`);
-    },
-  });
-}

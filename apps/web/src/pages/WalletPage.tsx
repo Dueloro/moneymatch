@@ -1,4 +1,7 @@
-import { AmountText } from '../components/ui/AmountText';
+import { useState } from 'react';
+
+import { AmountText, PointsFigure } from '../components/ui/AmountText';
+import { AnimatedBalance } from '../components/ui/AnimatedBalance';
 import { Card } from '../components/ui/Card';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ExpandableCard } from '../components/ui/ExpandableCard';
@@ -8,31 +11,14 @@ import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { formatPoints, formatRelativeTime } from '../lib/format';
-import { humanizeIds } from '../lib/labels';
+import { ledgerLabel } from '../lib/labels';
 import {
   DEPOSIT_PRESETS_CENTS,
   usePlayMoneyDeposit,
-  usePlayMoneyWithdrawal,
   useWallet,
   useWalletLedger,
   type LedgerEntry,
 } from '../hooks/useWallet';
-
-const ENTRY_LABELS: Record<string, string> = {
-  demo_deposit: 'Added funds',
-  demo_withdrawal: 'Cashed out',
-  escrow_hold: 'Entry held',
-  escrow_release: 'Entry settled',
-  payout: 'Winnings',
-  rake: 'Platform fee',
-  refund: 'Refund',
-  adjustment: 'Adjustment',
-};
-
-function ledgerLabel(entry: LedgerEntry): string {
-  if (entry.memo) return humanizeIds(entry.memo);
-  return ENTRY_LABELS[entry.entry_type] ?? entry.entry_type;
-}
 
 function LedgerDot({ entry }: { entry: LedgerEntry }) {
   const color =
@@ -49,18 +35,22 @@ export function WalletPage() {
   const { data: wallet, isLoading, isError, refetch } = useWallet();
   const ledger = useWalletLedger();
   const deposit = usePlayMoneyDeposit();
-  const withdraw = usePlayMoneyWithdrawal();
+  const [pick, setPick] = useState<number | null>(null);
 
   const available = wallet?.available_cents ?? 0;
   const escrow = wallet?.escrow_cents ?? 0;
   const lifetime = wallet?.lifetime_net_cents ?? 0;
 
   const rows = ledger.data?.pages.flatMap((p) => p.entries) ?? [];
-  const busy = deposit.isPending || withdraw.isPending;
+
+  const confirmAdd = () => {
+    if (pick == null) return;
+    deposit.mutate(pick, { onSuccess: () => setPick(null) });
+  };
 
   return (
     <div className="flex h-full flex-col">
-      <SectionHeader level="page" hint="Play money until full launch.">
+      <SectionHeader level="page" hint="Points have no cash value.">
         Wallet
       </SectionHeader>
 
@@ -83,37 +73,52 @@ export function WalletPage() {
            * its context. */}
           <Card className="p-5">
             <p className="label-money">Available</p>
-            <p className="mt-1 text-3xl font-semibold">
-              <AmountText cents={available} signed={false} money />
+            <p className="mt-1 text-3xl font-semibold text-green">
+              <AnimatedBalance cents={available} testId="wallet-balance" />
             </p>
             <p className="mt-2 text-xs text-text-secondary">
-              {formatPoints(escrow)} in play ·{' '}
-              <AmountText cents={lifetime} win={lifetime > 0} /> all time
+              In play{' '}
+              <span className="num text-text">
+                <PointsFigure cents={escrow} />
+              </span>
+              <span className="mx-1.5 text-text-tertiary">·</span>
+              Net all time <AmountText cents={lifetime} win={lifetime > 0} />
             </p>
           </Card>
 
           <section className="mt-8">
-            <SectionHeader level="sub">Add funds</SectionHeader>
-            <PresetSelector
-              presetsCents={DEPOSIT_PRESETS_CENTS}
-              onSelect={(cents) => deposit.mutate(cents)}
-              disabled={busy}
-            />
-          </section>
-
-          <section className="mt-6">
-            <SectionHeader level="sub">Cash out</SectionHeader>
-            {available === 0 ? (
-              <p className="text-xs text-text-tertiary">
-                Nothing to cash out yet. Win a contest and it lands here.
-              </p>
-            ) : (
+            <SectionHeader level="sub" hint="Free top-ups, any time.">
+              Add points
+            </SectionHeader>
+            <div
+              className="flex flex-wrap items-center gap-x-4 gap-y-3"
+              data-testid="deposit-presets"
+            >
               <PresetSelector
-                presetsCents={DEPOSIT_PRESETS_CENTS.filter((c) => c <= available)}
-                onSelect={(cents) => withdraw.mutate(cents)}
-                disabled={busy}
+                presetsCents={DEPOSIT_PRESETS_CENTS}
+                selectedCents={pick}
+                onSelect={(cents) => setPick(cents === pick ? null : cents)}
+                disabled={deposit.isPending}
               />
-            )}
+              <div className="flex items-center gap-1">
+                <PillButton
+                  variant="primary"
+                  onClick={confirmAdd}
+                  disabled={pick == null || deposit.isPending}
+                >
+                  {deposit.isPending
+                    ? 'Adding…'
+                    : pick == null
+                      ? 'Add points'
+                      : `Add ${formatPoints(pick)}`}
+                </PillButton>
+                {pick != null && !deposit.isPending && (
+                  <PillButton variant="text" onClick={() => setPick(null)}>
+                    Cancel
+                  </PillButton>
+                )}
+              </div>
+            </div>
           </section>
 
           <section className="mt-8 flex min-h-0 flex-1 flex-col">
@@ -122,10 +127,10 @@ export function WalletPage() {
             </SectionHeader>
             {rows.length === 0 ? (
               <p className="text-xs text-text-tertiary">
-                Nothing yet. Add funds and join a contest to start the ledger.
+                Nothing yet. Join a match and it shows up here.
               </p>
             ) : (
-              <div className="min-h-[9rem] flex-1 space-y-2 overflow-y-auto pb-1 pr-2">
+              <div className="space-y-2 pb-1 md:min-h-[9rem] md:flex-1 md:overflow-y-auto md:pr-2">
                 {rows.map((entry) => (
                   <ExpandableCard
                     key={entry.id}

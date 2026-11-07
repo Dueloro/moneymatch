@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Toaster } from '../components/ui/Toaster';
-import { renderWithProviders } from '../test/testUtils';
+import { renderWithProviders, pts } from '../test/testUtils';
 import { ActivityPage } from './ActivityPage';
 
 vi.mock('../hooks/useActivity', async () => {
@@ -60,7 +60,7 @@ describe('ActivityPage', () => {
     renderWithProviders(<ActivityPage />);
     expect(screen.getByText('vs kvem_ · Win the game')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
-    expect(screen.getByText('+800 pts')).toBeInTheDocument();
+    expect(screen.getByText(pts('+800 pts'))).toBeInTheDocument();
   });
 
   it('renders a settled pool row from its title, not an opponent', () => {
@@ -78,7 +78,7 @@ describe('ActivityPage', () => {
     renderWithProviders(<ActivityPage />);
     expect(screen.getByText('Moves to win · Medium pool')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
-    expect(screen.getByText('+800 pts')).toBeInTheDocument();
+    expect(screen.getByText(pts('+800 pts'))).toBeInTheDocument();
   });
 
   it('labels a push as refunded and an in-flight match as in play', () => {

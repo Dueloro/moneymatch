@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../test/testUtils';
+import { renderWithProviders, pts } from '../test/testUtils';
 import { PoolsPage } from './PoolsPage';
 
 vi.mock('../auth/useAuth', () => ({
@@ -88,7 +88,7 @@ describe('PoolsPage', () => {
       screen.getAllByText('Wins only. A loss or a draw does not count.'),
     ).toHaveLength(3);
     expect(screen.getByText('20%')).toBeInTheDocument();
-    expect(screen.getAllByText('3,600 pts').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(pts('3,600 pts')).length).toBeGreaterThan(0);
   });
 
   it('confirms in the card before joining, using the selected entry', () => {

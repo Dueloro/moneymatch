@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../test/testUtils';
+import { renderWithProviders, pts } from '../test/testUtils';
 import { PlayPage } from './PlayPage';
 
 vi.mock('../hooks/useWallet', () => ({
@@ -123,7 +123,7 @@ describe('PlayPage', () => {
   it('renders one 1v1 card per market with the derived payout inside it', () => {
     renderWithProviders(<PlayPage />);
     expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
-    expect(screen.getByText('1,800 pts')).toBeInTheDocument();
+    expect(screen.getByText(pts('1,800 pts'))).toBeInTheDocument();
   });
 
   it('joining a card finds a match with the entry selected inside it', () => {
