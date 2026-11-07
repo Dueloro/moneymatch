@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,9 +8,12 @@ import { SignInPage } from './SignInPage';
 
 vi.mock('../auth/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
+vi.mock('../components/LinkGames', () => ({ LinkGames: () => null }));
+vi.mock('../lib/api', () => ({ api: { PATCH: vi.fn() } }));
 
 import { useAuth } from '../auth/useAuth';
 import { useMe } from '../hooks/useMe';
+import { api } from '../lib/api';
 
 const mockUseAuth = vi.mocked(useAuth);
 const mockUseMe = vi.mocked(useMe);
@@ -175,5 +179,66 @@ describe('SignInPage', () => {
     await userEvent.type(screen.getByLabelText(/new password/i), 'brandnew1');
     await userEvent.click(screen.getByRole('button', { name: /update password/i }));
     expect(setNewPassword).toHaveBeenCalledWith('brandnew1');
+  });
+
+  describe('a new invitee finishing setup', () => {
+    let needsOnboarding: boolean;
+
+    beforeEach(() => {
+      sessionStorage.clear();
+      needsOnboarding = true;
+      mockUseAuth.mockReturnValue({
+        session: { user: { id: 'u1' } } as never,
+        loading: false,
+        isPasswordRecovery: false,
+      } as unknown as ReturnType<typeof useAuth>);
+      mockUseMe.mockImplementation(
+        () =>
+          ({
+            data: { needs_onboarding: needsOnboarding, user: { username: null } },
+            isLoading: false,
+            isError: false,
+          }) as unknown as ReturnType<typeof useMe>,
+      );
+      vi.mocked(api.PATCH).mockImplementation(async () => {
+        needsOnboarding = false;
+        return { data: {}, error: undefined } as never;
+      });
+    });
+
+    function renderFlow() {
+      renderWithProviders(
+        <Routes>
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/i/:token" element={<p>invite preview</p>} />
+          <Route path="/play" element={<p>play page</p>} />
+        </Routes>,
+        { route: '/signin' },
+      );
+    }
+
+    async function finishProfileAndEnter() {
+      await userEvent.type(screen.getByPlaceholderText('player_name'), 'new_player');
+      await userEvent.selectOptions(screen.getByRole('combobox'), 'NY');
+      await userEvent.click(screen.getByRole('checkbox'));
+      await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Enter Money Match' }),
+      );
+    }
+
+    it('lands back on the invite it came from, once', async () => {
+      sessionStorage.setItem('mm.returnTo', '/i/tok123');
+      renderFlow();
+      await finishProfileAndEnter();
+      expect(await screen.findByText('invite preview')).toBeInTheDocument();
+      expect(sessionStorage.getItem('mm.returnTo')).toBeNull();
+    });
+
+    it('goes to Play when there is no pending invite', async () => {
+      renderFlow();
+      await finishProfileAndEnter();
+      expect(await screen.findByText('play page')).toBeInTheDocument();
+    });
   });
 });

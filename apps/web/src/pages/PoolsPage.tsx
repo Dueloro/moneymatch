@@ -304,7 +304,12 @@ function RoomBanner({ pool }: { pool: PoolView }) {
           </p>
         </div>
         <div className="w-full max-w-xs">
-          <ClearBar current={pool.your_bar} target={pool.room_bar} label="your avg" />
+          <ClearBar
+            current={pool.your_bar}
+            target={pool.room_bar}
+            label="your bar"
+            lowerIsBetter={isLowerBetter(pool.metric)}
+          />
         </div>
       </div>
       <p className="mt-4 text-sm text-text" data-testid="room-play-cue">

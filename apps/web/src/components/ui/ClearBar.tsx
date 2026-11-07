@@ -2,8 +2,8 @@
  * The clear bar: this product's signature object (16-ui-revamp-plan §6).
  *
  * MoneyMatch's whole idea is "here is a number quoted from your own baseline,
- * now beat it". This renders exactly that: your average sits on a track, the
- * target sits to the right of it, and the gap you have to cover is shaded. It
+ * now beat it". This renders exactly that: your number sits on a track
+ * against the target tick, and the gap you have to cover is shaded. It
  * replaces the sentence "Clears ≈ 20% of the time" with a picture, and it
  * encodes difficulty spatially, so a harder pool is visibly a longer reach.
  *
@@ -43,16 +43,20 @@ export function ClearBar({
   target,
   label,
   cleared,
+  lowerIsBetter = false,
   size = 'md',
 }: {
   /** Your baseline, or your live value once a contest is running. */
   current: number | null | undefined;
   /** The number you have to beat. */
   target: number;
-  /** Unit caption under the left end, e.g. "your avg". */
+  /** Unit caption under the left end, e.g. "your bar". */
   label?: string;
   /** Once known: true paints the covered track in money lime. */
   cleared?: boolean;
+  /** True when a smaller number wins (moves to win): the gap is what you are
+   * over the bar by, not what you are short of it. */
+  lowerIsBetter?: boolean;
   size?: 'sm' | 'md';
 }) {
   // Scale so the target sits at 78% of the track, which leaves the overshoot
@@ -61,8 +65,13 @@ export function ClearBar({
   const scale = (v: number) => Math.max(0, Math.min(100, (v / (span * 1.28)) * 100));
   const targetPct = scale(target);
   const currentPct = current == null ? 0 : scale(current);
-  const short = current != null && current < target;
-  const gap = current == null ? null : target - current;
+  const short =
+    current != null && (lowerIsBetter ? current > target : current < target);
+  // Distance still to cover: positive means not there yet.
+  const gap =
+    current == null ? null : lowerIsBetter ? current - target : target - current;
+  const gapLeft = lowerIsBetter ? targetPct : currentPct;
+  const gapWidth = Math.abs(targetPct - currentPct);
 
   const trackH = size === 'sm' ? 'h-1' : 'h-1.5';
   const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
@@ -81,8 +90,9 @@ export function ClearBar({
         {/* The gap you still have to cover, hatched in the live tone. */}
         {short && !cleared && (
           <div
+            data-testid="clear-gap"
             className="absolute inset-y-0 rounded-pill bg-live/25"
-            style={{ left: `${currentPct}%`, width: `${targetPct - currentPct}%` }}
+            style={{ left: `${gapLeft}%`, width: `${gapWidth}%` }}
           />
         )}
         {/* The target: a full-height tick you have to get past. */}
@@ -95,13 +105,21 @@ export function ClearBar({
 
       <div className="mt-2 flex items-baseline justify-between gap-3 text-xs">
         <span className="text-text-secondary">
-          {label ?? 'your avg'}{' '}
+          {label ?? 'your bar'}{' '}
           <span className="text-text">{current == null ? '-' : fmt(current)}</span>
         </span>
         {gap != null && gap > 0 && (
-          <span className="text-text-tertiary">need +{fmt(gap)}</span>
+          <span className="text-text-tertiary">
+            need {lowerIsBetter ? '−' : '+'}
+            {fmt(gap)}
+          </span>
         )}
-        {gap != null && gap <= 0 && <span className="text-green">clear</span>}
+        {gap != null && gap < 0 && lowerIsBetter && (
+          <span className="text-green">{fmt(-gap)} under</span>
+        )}
+        {gap != null && (gap === 0 || (gap < 0 && !lowerIsBetter)) && (
+          <span className="text-green">clear</span>
+        )}
       </div>
     </div>
   );

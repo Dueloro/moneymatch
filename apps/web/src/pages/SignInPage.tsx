@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
@@ -11,6 +11,7 @@ import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
 import { useMe } from '../hooks/useMe';
 import { api } from '../lib/api';
+import { clearReturnTo, peekReturnTo, takeReturnTo } from '../lib/returnTo';
 import { emailToUsername } from '../lib/usernameAuth';
 import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
@@ -76,12 +77,9 @@ export function SignInPage() {
 /** After auth + onboarding, resume an invite-link accept if one was pending
  * (the acquisition funnel), otherwise land on Solo Pools (the default mode). */
 function PostAuthRedirect() {
-  const returnTo = sessionStorage.getItem('mm.returnTo');
-  if (returnTo) {
-    sessionStorage.removeItem('mm.returnTo');
-    return <Navigate to={returnTo} replace />;
-  }
-  return <Navigate to="/play" replace />;
+  const to = peekReturnTo() ?? '/play';
+  useEffect(() => clearReturnTo(), []);
+  return <Navigate to={to} replace />;
 }
 
 /** Browser had a session the API rejects (stale / wrong signing scheme). Clear
@@ -563,7 +561,8 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Onboarding step: link Lichess to start playing. */
+/** Onboarding step: link Lichess to start playing, then resume a pending
+ * invite if there is one. */
 function LinkGameStep() {
   const navigate = useNavigate();
   return (
@@ -576,7 +575,11 @@ function LinkGameStep() {
         <LinkGames />
       </div>
       <div className="mt-8">
-        <PillButton variant="primary" fullWidth onClick={() => navigate('/play')}>
+        <PillButton
+          variant="primary"
+          fullWidth
+          onClick={() => navigate(takeReturnTo() ?? '/play')}
+        >
           Enter Money Match
         </PillButton>
       </div>

@@ -7,6 +7,7 @@ import { PillButton } from '../components/ui/PillButton';
 import { useAcceptInvite, useInvitePreview } from '../hooks/useChallenges';
 import { useMe } from '../hooks/useMe';
 import { formatCurrency } from '../lib/format';
+import { setReturnTo } from '../lib/returnTo';
 import { track } from '../lib/telemetry';
 
 /**
@@ -27,7 +28,7 @@ export function InvitePage() {
   }, [preview]);
 
   function goSignIn() {
-    if (token) sessionStorage.setItem('mm.returnTo', `/i/${token}`);
+    if (token) setReturnTo(`/i/${token}`);
     navigate('/signin');
   }
 

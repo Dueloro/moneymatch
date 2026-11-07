@@ -76,6 +76,8 @@ describe('SideRail', () => {
     const card = screen.getByTestId('rail-room-card');
     expect(card).toHaveTextContent('medium Moves to win');
     expect(card).toHaveTextContent('Room bar 32');
+    // Fewer moves wins: 34 against a bar of 32 is two moves over, not short.
+    expect(card).toHaveTextContent('need −2');
     expect(card).toHaveTextContent('4 players · pot $40.00');
     expect(screen.getByTestId('rail-room-play-cue')).toHaveTextContent(
       /play your next game on lichess/i,

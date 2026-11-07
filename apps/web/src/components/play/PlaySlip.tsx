@@ -52,15 +52,8 @@ function RakeLine({
   );
 }
 
-const WIDEN_AFTER_SECONDS = 30;
-
 function SearchingSlip({ status }: { status: QueueStatus }) {
   const leave = useLeaveQueue();
-  // The rating band starts tight and widens the longer you wait.
-  const bandCopy =
-    (status.waited_seconds ?? 0) < WIDEN_AFTER_SECONDS
-      ? 'Matching you on skill…'
-      : 'Widening the search for a fair match…';
 
   return (
     <SlipShell>
@@ -71,7 +64,9 @@ function SearchingSlip({ status }: { status: QueueStatus }) {
         />
         <p className="text-sm font-semibold text-text">Searching…</p>
       </div>
-      <p className="mt-2 text-xs text-text-secondary">{bandCopy}</p>
+      <p className="mt-2 text-xs text-text-secondary">
+        Matching you with someone at your skill level…
+      </p>
       {status.waited_seconds != null && (
         <p className="mt-1 text-xs text-text-secondary">
           Waiting {status.waited_seconds}s

@@ -155,6 +155,9 @@ describe('PoolsPage', () => {
     renderWithProviders(<PoolsPage />);
     expect(screen.getByTestId('room-card')).toBeInTheDocument();
     expect(screen.getByText(/Win in 30 moves or fewer/)).toBeInTheDocument();
+    // Your bar of 28 is already under the room's 30 moves.
+    expect(screen.getByTestId('room-card')).toHaveTextContent('your bar 28');
+    expect(screen.getByText('2 under')).toBeInTheDocument();
     expect(screen.getByText(/4 players · pot \$40.00/)).toBeInTheDocument();
     expect(screen.getByTestId('room-play-cue')).toHaveTextContent(
       /play your next game on lichess and win in 30 moves or fewer/i,

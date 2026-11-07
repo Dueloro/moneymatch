@@ -6,7 +6,7 @@ import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
 import { useLeaveTournament, useTournamentStatus } from '../../hooks/useTournaments';
 import { useWallet } from '../../hooks/useWallet';
 import { formatCurrency } from '../../lib/format';
-import { barPhrase } from '../../lib/metrics';
+import { barPhrase, isLowerBetter } from '../../lib/metrics';
 import { LiveLine } from '../activity/LiveLine';
 import { AnimatedBalance } from '../ui/AnimatedBalance';
 import { Card } from '../ui/Card';
@@ -94,6 +94,7 @@ function InPlayCard({ item }: { item: ActivityItem }) {
             current={pool.current}
             target={pool.target}
             label={live?.label ?? 'you'}
+            lowerIsBetter={isLowerBetter(item.market)}
           />
         </div>
       ) : (
@@ -168,7 +169,12 @@ function RoomFormed() {
         {formatCurrency(pool.pot_cents)}
       </p>
       <div className="mt-3">
-        <ClearBar size="sm" current={pool.your_bar} target={pool.room_bar} />
+        <ClearBar
+          size="sm"
+          current={pool.your_bar}
+          target={pool.room_bar}
+          lowerIsBetter={isLowerBetter(pool.metric)}
+        />
       </div>
       <p className="mt-1 text-xs text-text-tertiary">Room bar {pool.room_bar}</p>
       {pool.your_cleared === true ? (

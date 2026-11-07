@@ -148,21 +148,11 @@ describe('PlayPage', () => {
     });
     renderWithProviders(<PlayPage />);
     expect(screen.getByText('Searching…')).toBeInTheDocument();
-    expect(screen.getByText('Matching you on skill…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
-  });
-
-  it('says the search is widening after a longer wait', () => {
-    mockStatus({
-      status: 'searching',
-      match: null,
-      waited_seconds: 45,
-      can_cancel: true,
-    });
-    renderWithProviders(<PlayPage />);
     expect(
-      screen.getByText('Widening the search for a fair match…'),
+      screen.getByText('Matching you with someone at your skill level…'),
     ).toBeInTheDocument();
+    expect(screen.getByText('Waiting 12s')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
   });
 
   it('links to the Lichess game once the match is on', () => {
