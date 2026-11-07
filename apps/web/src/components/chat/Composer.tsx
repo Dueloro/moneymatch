@@ -78,7 +78,7 @@ export function Composer({
                 data-testid="invite-menu"
                 className="absolute bottom-14 left-0 z-20 w-64 overflow-hidden rounded-card border border-hairline bg-panel-raised shadow-overlay"
               >
-                <p className="label-money border-b border-hairline px-4 pb-2 pt-3">
+                <p className="label-neutral border-b border-hairline px-4 pb-2 pt-3">
                   Invite to
                 </p>
                 {INVITE_OPTIONS.map((opt) => (

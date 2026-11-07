@@ -75,7 +75,9 @@ linked-game row and on chat invite cards. It is not used on browse cards.
 ## 2. Type
 
 **Inter**, loaded from Google Fonts at 400/500/600/700 with `display=swap`.
-`font-variant-numeric: tabular-nums` is on globally so money never jitters.
+Tabular figures are **scoped, not global**: `tabular-nums` sits on the amount
+primitives, badges, timers and standings lists. On `body` it made Inter set
+hyphens at digit width ("Skill - based").
 
 One scale (overrides Tailwind defaults). There are no arbitrary sizes.
 
@@ -94,7 +96,8 @@ Headings tighten letter-spacing as they grow (−0.006em at 18px → −0.022em 
 30px). **One mono label survives**, `.label-money`: 11px, uppercase, 0.08em
 tracking, tertiary grey — used *only* as the caption directly above a currency
 figure (`ENTRY`, `POT`, `BALANCE`, `EST. WIN`). Its scarcity is what makes it
-read as "this is a number."
+read as "this is a number." Every other caption (Inbox, Direct messages, a match
+status, a fact label) uses `.label-neutral`: 12px, medium, sentence case, tertiary.
 
 ---
 
@@ -152,7 +155,8 @@ primitive rather than a one-off.
 - **`EmptyState`** — a dashed hairline box (title, grey line, usually a button).
   **`ErrorState`** is the same with a red-tinted dashed border + "Try again".
 - **`Skeleton`** / **`SkeletonList`** — `panel-raised` pulses at 8px radius. The
-  only loading treatment in the app.
+  only loading treatment in the app (`inline` for a figure inside text, e.g. the
+  loading balance; never a dash).
 - **Form controls** (`TextInput`, `TextArea`, `Select`, `Checkbox`, `RadioRow`)
   share one treatment: pill-shaped, `panel-raised` fill, hairline that lightens
   on hover. No native browser control is ever visible.

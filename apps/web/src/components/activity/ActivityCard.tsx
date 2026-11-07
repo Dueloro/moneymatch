@@ -107,9 +107,7 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
 function Fact({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="rounded-inset bg-panel-raised px-3 py-2">
-      <div className="text-micro uppercase tracking-wide text-text-secondary">
-        {label}
-      </div>
+      <div className="label-neutral">{label}</div>
       {href ? (
         <a
           href={href}

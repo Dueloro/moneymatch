@@ -117,7 +117,7 @@ export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
         {formatCurrency(t.entry_cents)} each · {settled ? 'final' : 'live'} standings
       </Line>
 
-      <div className="mt-2">
+      <div className="mt-2 tabular-nums">
         {t.standings.map((row) => (
           <ListRow
             key={row.user_id}

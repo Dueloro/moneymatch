@@ -24,8 +24,8 @@ export function VersusCard({
   return (
     <div className="animate-rise rounded-card border border-hairline bg-panel-raised p-5">
       <div className="flex items-center justify-between">
-        <span className="label-money">{status ?? 'Opponent found'}</span>
-        <span className="label-money">{marketLabel}</span>
+        <span className="label-neutral">{status ?? 'Opponent found'}</span>
+        <span className="label-neutral">{marketLabel}</span>
       </div>
 
       <div className="mt-4 flex items-stretch gap-3">

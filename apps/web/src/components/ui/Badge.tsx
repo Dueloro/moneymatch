@@ -10,7 +10,7 @@ export function Badge({
     <span
       className={[
         'inline-flex min-w-[1.25rem] items-center justify-center rounded-pill',
-        'bg-action px-1.5 text-micro font-semibold text-bg',
+        'bg-action px-1.5 text-micro font-semibold tabular-nums text-bg',
         className,
       ].join(' ')}
     >

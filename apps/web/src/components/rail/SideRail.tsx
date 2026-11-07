@@ -66,7 +66,7 @@ function InPlayCard({ item }: { item: ActivityItem }) {
     <Card className="p-3">
       <div className="flex items-baseline justify-between gap-2">
         <p className="truncate text-sm font-medium text-text">{title(item)}</p>
-        <p className="shrink-0 text-xs text-text-tertiary">
+        <p className="shrink-0 text-xs tabular-nums text-text-tertiary">
           {formatCurrency(item.entry_cents)}
         </p>
       </div>

@@ -64,7 +64,7 @@ function SearchingSlip({ status }: { status: QueueStatus }) {
         Matching you with someone at your skill level…
       </p>
       {status.waited_seconds != null && (
-        <p className="mt-1 text-xs text-text-secondary">
+        <p className="mt-1 text-xs tabular-nums text-text-secondary">
           Waiting {status.waited_seconds}s
         </p>
       )}

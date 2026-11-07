@@ -240,7 +240,7 @@ function StandingsPanel({ tournament }: { tournament: TournamentView }) {
       <p className="mt-1 text-xs text-text-secondary">
         {tournamentRule(tournament.metric, tournament.metric_label)}
       </p>
-      <div className="mt-3">
+      <div className="mt-3 tabular-nums">
         {tournament.standings.map((row) => (
           <ListRow
             key={row.user_id}

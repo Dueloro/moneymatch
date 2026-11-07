@@ -84,7 +84,7 @@ export function InviteCard({ message }: { message: ChatMessage }) {
           >
             <meta.Icon className="h-4 w-4" />
           </span>
-          <span className="label-money !text-micro">{meta.label}</span>
+          <span className="label-neutral">{meta.label}</span>
           {!pending && (
             <span
               className={[

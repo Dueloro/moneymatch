@@ -1,8 +1,19 @@
-export function Skeleton({ className = '' }: { className?: string }) {
+/** `inline` renders a span so it can sit inside text (a loading figure). */
+export function Skeleton({
+  className = '',
+  inline = false,
+  testId,
+}: {
+  className?: string;
+  inline?: boolean;
+  testId?: string;
+}) {
+  const Tag = inline ? 'span' : 'div';
   return (
-    <div
+    <Tag
       aria-hidden
-      className={`animate-pulse rounded-inset bg-panel-raised ${className}`}
+      data-testid={testId}
+      className={`animate-pulse rounded-inset bg-panel-raised ${inline ? 'inline-block' : ''} ${className}`}
     />
   );
 }

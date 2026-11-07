@@ -79,7 +79,7 @@ export function InviteSheet({
 
         {kind === 'pool' && (
           <>
-            <p className="label-money mb-2.5">Difficulty</p>
+            <p className="label-neutral mb-2.5">Difficulty</p>
             <div className="mb-6 flex flex-wrap gap-2">
               {DIFFICULTIES.map((d) => (
                 <button

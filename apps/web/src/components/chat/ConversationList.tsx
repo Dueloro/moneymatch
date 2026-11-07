@@ -91,7 +91,7 @@ export function ConversationList({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-hairline px-4 pb-3.5 pt-4">
-        <h2 className="label-money !text-xs">Inbox</h2>
+        <h2 className="label-neutral">Inbox</h2>
         <button
           type="button"
           onClick={onNewMessage}
@@ -154,7 +154,7 @@ export function ConversationList({
           }
         />
 
-        <p className="label-money px-4 pb-1.5 pt-5">Direct messages</p>
+        <p className="label-neutral px-4 pb-1.5 pt-5">Direct messages</p>
         {dms.length === 0 ? (
           <p className="px-4 py-2 text-xs text-text-secondary">
             No conversations yet. Start one with a friend.

@@ -10,10 +10,19 @@ describe('AnimatedBalance', () => {
     expect(screen.queryByTestId('bal-delta')).not.toBeInTheDocument();
   });
 
-  it('shows a placeholder while the balance is still loading', () => {
+  it('shows a skeleton, not a dash, while the balance is still loading', () => {
     render(<AnimatedBalance cents={undefined} testId="bal" />);
-    expect(screen.getByTestId('bal')).toHaveTextContent('—');
+    expect(screen.getByTestId('bal')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('bal-skeleton')).toBeInTheDocument();
+    expect(screen.getByTestId('bal')).not.toHaveTextContent('—');
     expect(screen.queryByTestId('bal-delta')).not.toBeInTheDocument();
+  });
+
+  it('tints a gain in lime (money), not cyan', () => {
+    const { rerender } = render(<AnimatedBalance cents={10_000} testId="bal" />);
+    act(() => rerender(<AnimatedBalance cents={14_500} testId="bal" />));
+    expect(screen.getByTestId('bal-delta')).toHaveClass('text-green');
+    expect(screen.getByTestId('bal-delta')).not.toHaveClass('text-live');
   });
 
   it('does not fire a gain when the balance first loads (loading → value)', () => {

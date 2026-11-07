@@ -61,8 +61,6 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Tabular figures by default: money is everywhere. */
-  font-variant-numeric: tabular-nums;
 }
 
 /* Thin, visible scrollbars. */
@@ -114,13 +112,11 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Legacy label; new code uses .label-money or SectionHeader. */
-.label-mono {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
-  line-height: 16px;
+/* Neutral caption for everything that isn't money (Inbox, Direct messages, statuses). */
+.label-neutral {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
   color: var(--text-tertiary);
 }
 

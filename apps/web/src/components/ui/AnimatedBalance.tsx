@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useCountUp } from '../../hooks/useCountUp';
 import { formatCurrency } from '../../lib/format';
+import { Skeleton } from './Skeleton';
 
 const DELTA_MS = 2200;
 
@@ -22,11 +23,13 @@ export function AnimatedBalance({
 }) {
   if (cents == null) {
     return (
-      <span
-        className={`tabular-nums text-text-tertiary ${className}`}
-        data-testid={testId}
-      >
-        —
+      <span className={`inline-block ${className}`} data-testid={testId} aria-busy>
+        <span className="sr-only">Loading balance</span>
+        <Skeleton
+          inline
+          className="h-[0.8em] w-[7ch] rounded-[0.25em] align-[-0.05em]"
+          testId={testId ? `${testId}-skeleton` : undefined}
+        />
       </span>
     );
   }
@@ -70,7 +73,7 @@ function LoadedBalance({
   }, [delta]);
 
   const up = (delta ?? 0) > 0;
-  const tint = tinted ? (up ? 'text-live' : 'text-red') : '';
+  const tint = tinted ? (up ? 'text-green' : 'text-red') : '';
 
   return (
     <span className={`relative inline-block ${className}`} data-testid={testId}>
@@ -86,7 +89,7 @@ function LoadedBalance({
           aria-hidden
           data-testid={testId ? `${testId}-delta` : undefined}
           className={`animate-money-delta pointer-events-none absolute -top-4 left-1/2 whitespace-nowrap text-xs font-semibold ${
-            up ? 'text-live' : 'text-red'
+            up ? 'text-green' : 'text-red'
           }`}
         >
           {up ? '+' : '−'}

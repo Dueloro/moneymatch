@@ -68,7 +68,7 @@ export function ClearBar({
         />
       </div>
 
-      <div className="mt-2 flex items-baseline justify-between gap-3 text-xs">
+      <div className="mt-2 flex items-baseline justify-between gap-3 text-xs tabular-nums">
         <span className="text-text-secondary">
           {label ?? 'your bar'}{' '}
           <span className="text-text">{current == null ? '-' : fmt(current)}</span>
