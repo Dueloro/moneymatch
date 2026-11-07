@@ -38,6 +38,21 @@ def test_sandbag_z_flags_a_tanked_recent_window():
 
 
 @pytest.mark.nodb
+def test_sandbag_z_flips_for_lower_is_better():
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    slower = [55.0] * 10
+    faster = [20.0] * 10
+    z_slow = sandbagging_service.sandbag_z(
+        slower + baseline, recent_n=10, lower_is_better=True
+    )
+    z_fast = sandbagging_service.sandbag_z(
+        faster + baseline, recent_n=10, lower_is_better=True
+    )
+    assert z_slow is not None and z_slow < -1.5
+    assert z_fast is not None and z_fast > 0
+
+
+@pytest.mark.nodb
 def test_sandbag_z_steady_form_not_flagged():
     values = [1.5, 1.4, 1.6, 1.5, 1.55, 1.45] * 4
     z = sandbagging_service.sandbag_z(values, recent_n=10)
@@ -53,8 +68,8 @@ class _FakeAdapter:
                 speed="blitz",
                 rated=True,
                 created_at_ms=i,
-                moves=0,
-                won=None,
+                moves=int(v),
+                won=True,
                 drawn=False,
                 metrics={METRIC: v},
             )
@@ -70,9 +85,9 @@ async def test_evaluate_writes_flag_and_blocks(session, monkeypatch):
     await create_linked_account(
         session, user, CHESS, host_account_id="host_tank", profile=chess_profile("tank")
     )
-    # Oldest-first: steady baseline then a tanked recent tail.
-    baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
-    recent_tanked = [0.6] * 10
+    # Oldest-first: a ~35-move baseline, then a recent tail of slow ~55-move wins.
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    recent_tanked = [55.0, 54.0, 56.0, 55.0, 53.0, 57.0, 55.0, 54.0, 56.0, 55.0]
     monkeypatch.setattr(
         registry, "get", lambda g: _FakeAdapter(baseline + recent_tanked)
     )
@@ -112,9 +127,31 @@ async def test_steady_player_not_blocked(session, monkeypatch):
         host_account_id="host_clean",
         profile=chess_profile("clean"),
     )
-    steady = [1.5, 1.4, 1.6, 1.5, 1.55, 1.45] * 4
+    steady = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0] * 4
     monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(steady))
     # No raise.
     await sandbagging_service.assert_not_sandbagging(
         session, user, CHESS, METRIC, "host_clean"
     )
+
+
+async def test_improving_player_not_blocked(session, monkeypatch):
+    """Winning in fewer moves than the baseline is improvement, not tanking."""
+    user = await create_user(session, username="improver")
+    await create_linked_account(
+        session,
+        user,
+        CHESS,
+        host_account_id="host_improver",
+        profile=chess_profile("improver"),
+    )
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    recent_faster = [20.0, 21.0, 19.0, 20.0, 22.0, 18.0, 20.0, 21.0, 19.0, 20.0]
+    monkeypatch.setattr(
+        registry, "get", lambda g: _FakeAdapter(baseline + recent_faster)
+    )
+    await sandbagging_service.assert_not_sandbagging(
+        session, user, CHESS, METRIC, "host_improver"
+    )
+    flag = await session.scalar(select(RiskFlag).where(RiskFlag.user_id == user.id))
+    assert flag is None

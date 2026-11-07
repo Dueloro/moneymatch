@@ -29,7 +29,7 @@ class _FakeAdapter:
                 speed="blitz",
                 rated=True,
                 created_at_ms=i,
-                moves=0,
+                moves=int(v),
                 won=True,
                 drawn=False,
                 metrics={METRIC: v},
@@ -48,8 +48,8 @@ async def test_run_nightly_refreshes_models_and_flags_sandbagger(session, monkey
     )
     await session.commit()  # visible to run_nightly's own sessions
 
-    baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
-    recent_tanked = [0.6] * 10
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    recent_tanked = [55.0, 54.0, 56.0, 55.0, 53.0, 57.0, 55.0, 54.0, 56.0, 55.0]
     history = baseline + recent_tanked
     monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(history))
 
