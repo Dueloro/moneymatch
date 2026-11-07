@@ -25,7 +25,7 @@ class InsufficientFundsError(WalletError):
     def __init__(self, available_cents: int, requested_cents: int) -> None:
         super().__init__(
             "insufficient_funds",
-            "Not enough available balance for this operation.",
+            "Not enough points.",
             status_code=422,
             detail={
                 "available_cents": available_cents,

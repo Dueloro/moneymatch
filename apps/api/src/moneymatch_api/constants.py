@@ -61,7 +61,7 @@ STAT_BASELINE_MIN_N = 1  # graded matches needed to quote a bar
 
 
 # Server-defined entry presets (no arbitrary client stakes — the client sends a preset
-# choice; the server owns the cents). $5 / $10 / $25.
+# choice; the server owns the cents). 500 / 1,000 / 2,500 points.
 ENTRY_PRESETS_CENTS: tuple[int, ...] = (500, 1_000, 2_500)
 
 QUEUE_TICKET_TTL_SECONDS = 600  # a waiting ticket expires after 10 min

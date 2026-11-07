@@ -111,7 +111,7 @@ async def demo_deposit(
     if body.amount_preset_cents not in DEMO_DEPOSIT_PRESETS_CENTS:
         raise APIError(
             "invalid_deposit_preset",
-            "Deposit amount must be one of the offered presets.",
+            "Choose one of the offered amounts.",
             status_code=422,
             detail={"allowed": list(DEMO_DEPOSIT_PRESETS_CENTS)},
         )
@@ -122,7 +122,7 @@ async def demo_deposit(
         session,
         user.id,
         body.amount_preset_cents,
-        memo="Add funds",
+        memo="Points added",
     )
     return await get_wallet(user, session)
 
@@ -136,7 +136,7 @@ async def demo_withdrawal(
     if body.amount_cents < CAPS.withdrawal_min_cents:
         raise APIError(
             "withdrawal_below_min",
-            f"Minimum withdrawal is {CAPS.withdrawal_min_cents} cents.",
+            f"The minimum is {CAPS.withdrawal_min_cents:,} points.",
             status_code=422,
             detail={"withdrawal_min_cents": CAPS.withdrawal_min_cents},
         )
@@ -150,13 +150,13 @@ async def demo_withdrawal(
     ):
         raise APIError(
             "withdrawal_velocity_exceeded",
-            f"At most {DEMO_WITHDRAWAL_DAILY_LIMIT} withdrawals per day.",
+            f"At most {DEMO_WITHDRAWAL_DAILY_LIMIT} per day.",
             status_code=429,
         )
     await get_payment_provider().payout(
         session,
         user.id,
         body.amount_cents,
-        memo="Withdrawal",
+        memo="Points removed",
     )
     return await get_wallet(user, session)

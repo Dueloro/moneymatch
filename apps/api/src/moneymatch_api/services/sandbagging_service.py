@@ -32,7 +32,7 @@ class SandbaggingBlockedError(APIError):
     def __init__(self, game: str, metric: str) -> None:
         super().__init__(
             "sandbagging_flagged",
-            "Your recent form on this stat dropped sharply — metric wagers are "
+            "Your recent form on this stat dropped sharply — staking on it is "
             "paused for review. This protects the personalized-bar fairness.",
             status_code=409,
             detail={"game": game, "metric": metric},

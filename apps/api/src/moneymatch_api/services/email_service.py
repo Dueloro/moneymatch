@@ -79,7 +79,7 @@ def _render_html(body: str, url: str | None) -> str:
         f"{button}{fallback}"
         "</table></td></tr>"
         '<tr><td style="background:#0B0B0C;padding:16px 28px;font-size:12px;'
-        'color:#9ca3af">Money Match · peer-to-peer skill wagering<br>'
+        'color:#9ca3af">Money Match · chess for points, no cash value<br>'
         "Need help? Contact Dueloro Support.</td></tr>"
         "</table></div>"
     )

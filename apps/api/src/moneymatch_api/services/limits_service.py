@@ -177,7 +177,7 @@ async def assert_can_deposit(
     """
     now = now or datetime.now(UTC)
     if amount_cents <= 0:
-        raise StakeBlockedError("invalid_amount", "Deposit must be positive.")
+        raise StakeBlockedError("invalid_amount", "Amount must be positive.")
 
     limit = await get_or_create_limits(session, user.id)
     promote_pending(limit, now=now)
@@ -204,7 +204,7 @@ async def assert_can_deposit(
     if deposited + amount_cents > limit.daily_deposit_cap_cents:
         raise StakeBlockedError(
             "daily_deposit_cap_exceeded",
-            "This deposit would exceed your daily deposit cap.",
+            "This would exceed your daily top-up cap.",
             {
                 "cap_cents": limit.daily_deposit_cap_cents,
                 "used_cents": deposited,
@@ -255,7 +255,7 @@ async def assert_can_stake(
     if wallet.available_cents < amount_cents:
         raise StakeBlockedError(
             "insufficient_funds",
-            "Not enough available balance.",
+            "Not enough points.",
             {
                 "available_cents": wallet.available_cents,
                 "requested_cents": amount_cents,

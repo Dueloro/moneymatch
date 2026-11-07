@@ -38,7 +38,7 @@ class DemoProvider:
             session,
             user_id,
             amount_cents,
-            memo=memo or "Add funds",
+            memo=memo or "Points added",
             created_by=str(user_id),
         )
         return DepositIntent(
@@ -61,7 +61,7 @@ class DemoProvider:
             session,
             user_id,
             amount_cents,
-            memo=memo or "Withdrawal",
+            memo=memo or "Points removed",
             created_by=str(user_id),
         )
         return PayoutResult(
