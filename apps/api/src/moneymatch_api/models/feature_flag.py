@@ -1,7 +1,5 @@
-"""Feature flags (00-README §3.10).
-
-Admin-flippable without a deploy. `payload` carries structured config for
-non-boolean flags (e.g. `geo_config` holds the excluded-state list).
+"""Feature flags. `payload` carries structured config for non-boolean flags (e.g.
+`geo_config` holds the excluded-state list).
 """
 
 from __future__ import annotations

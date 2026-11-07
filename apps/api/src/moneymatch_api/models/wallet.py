@@ -1,17 +1,6 @@
-"""Money aggregates (01-architecture §2 · Money).
-
-`wallets` holds the **cached** balances (available / escrow / lifetime-net);
-they are only ever mutated by `wallet_service` inside the same transaction that
-appends the authoritative `ledger_entries` row. `ledger_entries` is append-only
-(a DB trigger blocks UPDATE/DELETE — see the baseline migration); every row records the
-`balance_after_cents` so any point-in-time balance is a range query.
-
-`platform_ledger` is the wallet-less chart of accounts (`platform:promo`,
-`platform:rake`): promo funds every demo/signup credit so demo money never
-appears from nowhere, and rake is booked here so both the per-contest invariant
-`sum(payouts) + rake == sum(entries)` and the global solvency invariant
-`sum(user available + escrow) == promo funding − rake` are checkable from the DB
-alone. All money is integer cents (`BIGINT`); floats never touch a balance.
+"""Money aggregates. `wallets` holds the **cached** balances (available / escrow /
+lifetime-net); they are only ever mutated by `wallet_service` inside the same
+transaction that appends the authoritative `ledger_entries` row.
 """
 
 from __future__ import annotations
@@ -38,11 +27,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ..caps import CAPS
 from ..db.base import Base, TimestampMixin, uuid_pk
 
-# Currencies. Only DEMO exists at MVP; CASH/GEMS reserve the column shape.
 CURRENCIES = ("DEMO", "CASH", "GEMS")
 
-# Ledger entry types (01-architecture §2). `amount_cents` applies to available,
-# `escrow_delta_cents` to escrow; both signed.
 ENTRY_TYPES = (
     "demo_deposit",
     "demo_withdrawal",
@@ -54,31 +40,22 @@ ENTRY_TYPES = (
     "adjustment",
 )
 
-# What a ledger row points at (the contest or rail that caused it).
 REF_TYPES = ("match", "solo_pool", "tournament", "admin", "demo_rail")
 
-# Chart of accounts for the wallet-less platform ledger.
 PLATFORM_ACCOUNTS = ("platform:rake", "platform:promo")
 
-# Default per-user staking limits. Sourced from the single Phase-1 caps table
-# (caps.py) so the `limits` server-defaults and that table can never drift.
-DEFAULT_DAILY_LOSS_CAP_CENTS = CAPS.daily_loss_cap_cents  # $200.00
-DEFAULT_DAILY_ENTRY_CAP_CENTS = CAPS.daily_entry_cap_cents  # $500.00
-DEFAULT_DAILY_DEPOSIT_CAP_CENTS = CAPS.daily_deposit_cap_cents  # $1,000.00
+DEFAULT_DAILY_LOSS_CAP_CENTS = CAPS.daily_loss_cap_cents
+DEFAULT_DAILY_ENTRY_CAP_CENTS = CAPS.daily_entry_cap_cents
+DEFAULT_DAILY_DEPOSIT_CAP_CENTS = CAPS.daily_deposit_cap_cents
 DEFAULT_MAX_CONCURRENT_CONTESTS = CAPS.max_concurrent_contests
 
-# Demo signup credit, booked as a real ledger row funded from platform:promo —
-# not a magic starting balance (04-phase-1 · deliverable 3). The grant is a
-# platform gift, so it's excluded from the responsible-gaming deposit-velocity
-# cap (which meters the player's *own* funding).
-SIGNUP_GRANT_CENTS = 100_000  # $1,000.00
+# Demo signup credit, booked as a real ledger row funded from platform:promo — not a
+# magic starting balance.
+SIGNUP_GRANT_CENTS = 100_000
 SIGNUP_GRANT_MEMO = "signup grant"
 
-# Server-defined "Add funds" presets (no arbitrary client amounts — 04-phase-1
-# design rules). $10 / $25 / $50 / $100.
 DEMO_DEPOSIT_PRESETS_CENTS = (1_000, 2_500, 5_000, 10_000)
 
-# Demo withdrawals are velocity-capped (04-phase-1 · deliverable 4).
 DEMO_WITHDRAWAL_DAILY_LIMIT = 5
 
 
@@ -114,8 +91,7 @@ class Wallet(Base, TimestampMixin):
 
 
 class LedgerEntry(Base):
-    """Append-only wallet mutation. No `updated_at`: rows are immutable (the DB
-    trigger in the baseline migration rejects UPDATE/DELETE)."""
+    """Append-only wallet mutation."""
 
     __tablename__ = "ledger_entries"
     __table_args__ = (
@@ -128,7 +104,6 @@ class LedgerEntry(Base):
             "ref_type IN ('match', 'solo_pool', 'tournament', 'admin', 'demo_rail')",
             name="ck_ledger_ref_type",
         ),
-        # Contest money-trail lookups (admin, reconciliation) hit (ref_type, ref_id).
         Index("ix_ledger_entries_ref", "ref_type", "ref_id"),
     )
 
@@ -140,9 +115,7 @@ class LedgerEntry(Base):
         index=True,
     )
     entry_type: Mapped[str] = mapped_column(String(24), nullable=False)
-    # Signed. Applied to the wallet's available balance.
     amount_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    # Signed. Applied to the wallet's escrow balance.
     escrow_delta_cents: Mapped[int] = mapped_column(
         BigInteger, default=0, server_default="0", nullable=False
     )
@@ -150,13 +123,9 @@ class LedgerEntry(Base):
     ref_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), nullable=True
     )
-    # Available balance after this row applied — makes any statement a range query.
     balance_after_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    # clock_timestamp() (not now()) so every append gets its true insertion
-    # instant — appends within one transaction stay totally ordered for audit
-    # and cursor pagination.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.clock_timestamp(),
@@ -182,8 +151,8 @@ class PlatformLedgerEntry(Base):
 
     id = uuid_pk()
     account: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    # Signed, from the account's perspective: promo goes negative as it funds
-    # user credits; rake goes positive as it collects fees.
+    # Signed, from the account's perspective: promo goes negative as it funds user
+    # credits; rake goes positive as it collects fees.
     amount_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
     balance_after_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
     ref_type: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -192,9 +161,6 @@ class PlatformLedgerEntry(Base):
     )
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    # clock_timestamp() (not now()) so every append gets its true insertion
-    # instant — appends within one transaction stay totally ordered for audit
-    # and cursor pagination.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.clock_timestamp(),
@@ -204,9 +170,7 @@ class PlatformLedgerEntry(Base):
 
 
 class Limit(Base, TimestampMixin):
-    """Per-user staking limits, enforced server-side at escrow time. Raising a
-    protective cap is delayed (`pending_*` + `effective_at`, promoted lazily);
-    lowering is instant."""
+    """Per-user staking limits, enforced server-side at escrow time."""
 
     __tablename__ = "limits"
 
@@ -241,13 +205,9 @@ class Limit(Base, TimestampMixin):
         server_default=str(DEFAULT_MAX_CONCURRENT_CONTESTS),
         nullable=False,
     )
-    # Self-imposed cool-off: staking is refused until this time (a protective
-    # "take a break"; can be extended, never shortened). Null = no timeout.
     timeout_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # A raise awaiting its 24h cooldown; promoted into the live caps once
-    # `pending_effective_at` has passed (01-architecture §4 · PATCH /me).
     pending_limits: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     pending_effective_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

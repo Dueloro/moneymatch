@@ -1,8 +1,4 @@
-"""FastAPI application factory.
-
-Wires config → logging → Sentry → middleware → routers. The API is a stateless,
-long-running service (00-README §2); nothing durable lives in process memory.
-"""
+"""FastAPI application factory."""
 
 from __future__ import annotations
 
@@ -54,11 +50,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
 
     if settings.env == "prod":
-        # The geo-fence is the one gate that decides whether a stake may be
-        # taken at all, and it lives in a database row rather than in code. A
-        # fresh, half-restored or hand-edited database can therefore come up
-        # with no fence and nothing anywhere errors. Check it once, at boot, and
-        # refuse the deploy rather than serve with a hole in it.
+        # The geo-fence is the one gate that decides whether a stake may be taken at
+        # all, and it lives in a database row rather than in code.
         from .db.session import get_sessionmaker
         from .services import geo_service
 
@@ -82,18 +75,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.0.0",
         lifespan=lifespan,
     )
-    # The lifespan reads settings off app.state (it only receives the app instance).
     app.state.settings = settings
 
-    # Middleware wrap inner→outer in add order (last added = outermost). The
-    # target chain, outer→inner, is: CORS → security headers → rate limit →
-    # body-size cap → request log → exception envelope → app, so every response
-    # (including an early 413/429) still carries CORS + security headers
-    # (10-phase-7 §2). The exception envelope is innermost so an unhandled error
-    # is re-shaped into a JSON 500 that still flows back out through logging, the
-    # security headers, and CORS — otherwise Starlette's ServerErrorMiddleware
-    # (outside CORS) returns a raw 500 with no CORS header and the browser sees
-    # only "Failed to fetch".
+    # The target chain, outer→inner, is: CORS → security headers → rate limit → body-
+    # size cap → request log → exception envelope → app, so every response (including an
+    # early 413/429) still carries CORS + security headers.
     app.add_middleware(ExceptionEnvelopeMiddleware)
     app.add_middleware(RequestLogMiddleware)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_bytes)
@@ -128,16 +114,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(notifications.router, prefix=API_V1_PREFIX)
     app.include_router(admin.router, prefix=API_V1_PREFIX)
 
-    # Dev/e2e sign-in bypass — mounted only outside prod and only when explicitly
-    # enabled (backlog · "Browser e2e test-auth seam"). Absent entirely otherwise.
     if settings.e2e_auth_enabled and settings.env != "prod":
         from .routers import dev
 
         app.include_router(dev.router, prefix=API_V1_PREFIX)
-        log.warning("api.e2e_auth_enabled")  # loud: this must never fire in prod
+        log.warning("api.e2e_auth_enabled")
 
     return app
 
 
-# Module-level app for `uvicorn moneymatch_api.main:app`.
 app = create_app()

@@ -52,7 +52,6 @@ async def compute(
     now = now or clock.now()
     since = now - timedelta(days=LEADERBOARD_WINDOW_DAYS)
 
-    # Windowed contest ledger, one aggregate row per real user.
     released_delta = case(
         (LedgerEntry.entry_type == "escrow_release", LedgerEntry.escrow_delta_cents),
         else_=0,

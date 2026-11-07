@@ -1,15 +1,4 @@
-"""The GameAdapter interface plus the shared, host-agnostic value types.
-
-Ported from `poc-reference/api/_lib/adapters/base.py` (11-migration-map §1), with
-`TelemetrySample` moved here (05-phase-2 · deliverable 1). A normalized
-`NormGame` is the lowest common denominator every adapter produces, so the
-shared metric/settlement logic never sees host-specific JSON.
-
-Phase 2 uses the identity/profile/history surface (`link_account`,
-`fetch_profile`, `poll_eligible_games`). Match brokering and result grading are
-Phase-3 concerns; the seams are declared here and implemented per-adapter as they
-land, so nothing about the Phase-1 PoC `Contract` schema leaks into the port.
-"""
+"""The GameAdapter interface plus the shared, host-agnostic value types."""
 
 from __future__ import annotations
 
@@ -27,10 +16,10 @@ class NormGame:
     speed: str
     rated: bool
     created_at_ms: int
-    moves: int  # full moves played (chess)
-    won: bool | None  # True/False for the linked user; None if unknown/draw
+    moves: int
+    won: bool | None
     drawn: bool
-    metrics: dict[str, float] = field(default_factory=dict)  # per-match rate stats
+    metrics: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -42,10 +31,7 @@ class GameFilters:
 
 @dataclass
 class TelemetrySample:
-    """Server-fetched per-match telemetry for solo/pool grading (Phase 4).
-
-    Rate metrics only; never raw totals or self-report.
-    """
+    """Server-fetched per-match telemetry for solo/pool grading."""
 
     game: str
     metrics: dict[str, float]
@@ -70,22 +56,17 @@ class GameAdapter(abc.ABC):
     ) -> list[NormGame]:
         """Return the user's finished, eligible games since ``since_ms``."""
 
-    # --- Phase-3 brokering/settlement seams (implemented per-adapter later) ---
-
     async def create_match(self, speed: str, users: list[str]) -> dict | None:
         """Broker a game between two players, restricting the seats to ``users``
-        (their host handles). Brokered adapters only (Phase 3)."""
+        (their host handles).
+        """
         raise NotImplementedError
 
     async def match_winner(self, game_id: str, players: list[str]) -> str | None:
         """For a brokered game id, return the winning ``player_id`` once finished,
-        ``""`` for a draw, or ``None`` while unfinished / unverifiable (Phase 3)."""
+        ``""`` for a draw, or ``None`` while unfinished / unverifiable.
+        """
         raise NotImplementedError
 
     async def live_match(self, game_id: str, players: list[str]) -> dict | None:
-        """Best-effort mid-game snapshot for the Activity live view.
-
-        Brokered adapters (chess) return whose turn it is, plies played, and the
-        result once finished; ``None`` means "nothing live to show" and is the
-        default for adapters whose host has no in-progress feed."""
         return None

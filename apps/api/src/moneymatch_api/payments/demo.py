@@ -1,12 +1,6 @@
-"""`DemoProvider` — the only `PaymentProvider` implementation at MVP.
-
-Demo money flows through the *same real ledger* as everything else (00-README
-§1): a demo deposit is promo-funded, a demo withdrawal returns money to promo.
-The rail settles synchronously — there is no external processor and therefore no
-webhook — so `create_deposit_intent` books the credit inline and returns a
-`SUCCEEDED` intent. This is exactly what Phase 1's demo rails do; the provider
-just puts them behind the `PaymentProvider` seam so swapping in real rails is a
-provider change, not a router change.
+"""`DemoProvider` — the only `PaymentProvider` implementation at MVP. Demo money
+flows through the *same real ledger* as everything else: a demo deposit is promo-
+funded, a demo withdrawal returns money to promo.
 """
 
 from __future__ import annotations
@@ -52,7 +46,7 @@ class DemoProvider:
             reference=str(entry.id),
             amount_cents=amount_cents,
             status=PaymentStatus.SUCCEEDED,
-            client_action=None,  # no redirect: demo settles inline
+            client_action=None,
         )
 
     async def payout(
@@ -78,6 +72,4 @@ class DemoProvider:
         )
 
     def parse_webhook(self, headers: dict[str, str], body: bytes) -> list[LedgerEffect]:
-        # The demo rail has no external processor, so it can never receive a
-        # webhook. A real provider translates a signed event here.
         raise WebhookError("demo provider has no external webhook")

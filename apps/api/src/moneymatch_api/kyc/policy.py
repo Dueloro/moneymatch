@@ -1,14 +1,4 @@
-"""KYC policy hook + guarded provider resolver (10-phase-7 §1).
-
-`kyc_required` is the single decision point asked at every money boundary
-(deposit, withdrawal, stake). At MVP it returns False for everyone because
-`kyc_live` is False — but the call sites exist and are tested, so real KYC is an
-additive integration: register a provider, flip `kyc_live`, and this starts
-gating past the configured cumulative-entry threshold (caps.py).
-
-`get_kyc_provider` guards the flag in code: `kyc_live=true` with no live provider
-compiled in raises, so a config flip alone can never begin gating on real KYC.
-"""
+"""KYC policy hook + guarded provider resolver."""
 
 from __future__ import annotations
 
@@ -53,12 +43,7 @@ def kyc_required(
     cumulative_entries_cents: int | None = None,
     settings: Settings | None = None,
 ) -> bool:
-    """Does `action` require the user to be KYC-verified first?
-
-    Always False at MVP (`kyc_live` is False). When a real integration flips the
-    flag: an already-verified user is never re-gated; a withdrawal or a stake
-    that crosses the cumulative-entry threshold requires verification.
-    """
+    """Does `action` require the user to be KYC-verified first?"""
     settings = settings or get_settings()
     if not settings.kyc_live:
         return False
@@ -100,6 +85,6 @@ def get_kyc_provider(settings: Settings | None = None) -> KycProvider:
         raise KycMisconfiguredError(
             "kyc_live=true but no live KycProvider is compiled in. Enabling real "
             "KYC is a code change (register a provider) AND a config flip — "
-            "never the flag alone (10-phase-7 §1)."
+            "never the flag alone."
         )
     return DemoKycProvider()

@@ -1,8 +1,4 @@
-"""Adapter registry. Callers resolve adapters by game id, never by import.
-
-Whether a game is linkable is decided at runtime by its `game:<id>` feature flag;
-flags are passed in by the caller so the registry stays pure.
-"""
+"""Adapter registry. Callers resolve adapters by game id, never by import."""
 
 from __future__ import annotations
 
@@ -31,16 +27,11 @@ def all_ids() -> list[str]:
 
 
 def is_enabled(game_id: str, flags: dict[str, bool]) -> bool:
-    """Whether a game is currently linkable (its `game:<id>` flag is on).
-
-    Unknown / unset flag defaults to enabled — the migration seeds every game
-    flag on, so an absent key means "not explicitly disabled".
-    """
+    """Whether a game is currently linkable (its `game:<id>` flag is on)."""
     if game_id not in _ADAPTERS:
         return False
     return flags.get(game_flag_key(game_id), True)
 
 
 def enabled_ids(flags: dict[str, bool]) -> list[str]:
-    """Built adapter ids whose feature flag is enabled."""
     return [gid for gid in _ADAPTERS if is_enabled(gid, flags)]

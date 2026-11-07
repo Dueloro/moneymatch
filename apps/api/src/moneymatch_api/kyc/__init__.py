@@ -1,4 +1,4 @@
-"""KYC readiness seam (10-phase-7 §1)."""
+"""KYC readiness seam."""
 
 from __future__ import annotations
 

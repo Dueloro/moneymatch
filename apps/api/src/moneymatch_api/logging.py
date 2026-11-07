@@ -11,15 +11,14 @@ from .config import Settings
 
 
 def configure_logging(settings: Settings) -> None:
-    """Configure stdlib + structlog once at startup."""
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
         level=logging.INFO,
     )
 
-    # httpx logs full URLs (query strings may carry secrets); our own
-    # `host.request` event logs method, host, status and latency instead.
+    # httpx logs full URLs (query strings may carry secrets); our own `host.request`
+    # event logs method, host, status and latency instead.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 

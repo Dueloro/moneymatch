@@ -1,14 +1,4 @@
-"""Live-snapshot cache for the Activity feed (in-flight contests).
-
-The settlement worker computes a best-effort "what's happening right now" view
-for each in-flight pool and head-to-head match on a slow cadence and upserts it
-here; the `/activity` request path only *reads* this table, so no external host
-call ever happens while serving a page (same posture as the tournament
-`standings_cache`). Tournaments keep their own richer cache and are not stored
-here.
-
-`data` is host-shaped, best-effort JSON — never money, never client input.
-"""
+"""Live-snapshot cache for the Activity feed (in-flight contests)."""
 
 from __future__ import annotations
 
@@ -23,7 +13,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base
 
-# The contest kinds we cache a live view for.
 LIVE_REF_TYPES = ("pool", "match")
 
 
@@ -35,7 +24,6 @@ class LiveSnapshot(Base):
         ),
     )
 
-    # (ref_type, ref_id) is the natural key — one live view per contest.
     ref_type: Mapped[str] = mapped_column(String(16), primary_key=True)
     ref_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
     data: Mapped[dict[str, Any]] = mapped_column(

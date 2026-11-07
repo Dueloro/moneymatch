@@ -41,7 +41,6 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency yielding a session, committing on success."""
     async with get_sessionmaker()() as session:
         try:
             yield session

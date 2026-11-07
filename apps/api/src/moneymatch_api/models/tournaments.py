@@ -1,18 +1,4 @@
-"""Tournament aggregates (01-architecture §2 · Play; 07-phase-4).
-
-A **tournament** is a matchmade single-metric field (~10 similar-stat players
-formed under a μ-dispersion cap): everyone plays their normal matches during the
-window, the server records the **mean of the metric over the first N qualifying
-matches**, and the top 3 split `pot − rake` per a declared `prize_split`
-(50/30/20). Ties split combined slices with remainder cents to the earlier
-enqueue; zero-match entrants rank below all who played; too few ranked → cancel
-+ refund. No house, no odds — the prize is entrants' pooled entries only.
-
-`prize_split` is stored as integer relative **weights** (e.g. `[50, 30, 20]`);
-the settlement math normalizes them, so no float split factor is ever persisted.
-`standings_cache` holds the live, server-computed standings refreshed on a slow
-cadence during the window (cheap reads for the standings panel).
-"""
+"""Tournament aggregates."""
 
 from __future__ import annotations
 
@@ -57,7 +43,6 @@ class Tournament(Base, TimestampMixin):
     ranking_metric: Mapped[str] = mapped_column(String(48), nullable=False)
     entry_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
     rake_bps: Mapped[int] = mapped_column(Integer, nullable=False)
-    # Integer relative weights, e.g. [50, 30, 20]. Normalized at settlement.
     prize_split: Mapped[list[int]] = mapped_column(JSONB, nullable=False)
     field_size: Mapped[int] = mapped_column(Integer, nullable=False)
     min_field: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -81,7 +66,6 @@ class Tournament(Base, TimestampMixin):
     window_ends_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
-    # Cheap live standings for the panel (server-computed; refreshed on a cadence).
     standings_cache: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     standings_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -131,7 +115,6 @@ class TournamentEntry(Base, TimestampMixin):
     enqueued_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    # First-N-average of the ranking metric; null until scored / if no matches.
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     matches_counted: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False

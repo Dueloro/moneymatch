@@ -158,9 +158,6 @@ async def _activate(
     )
 
 
-# Cancel / decline / expiry (PENDING) — refund whoever escrowed, no rake.
-
-
 async def cancel_pending(session: AsyncSession, match: Match, *, reason: str) -> Match:
     """Decline or expire a PENDING match: refund every confirmed seat, zero rake."""
     if match_states.is_terminal(match.state):

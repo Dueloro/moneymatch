@@ -1,12 +1,4 @@
-"""Supabase JWT verification.
-
-The API trusts nothing but a valid Supabase token. Two verification modes:
-- HS256 with the project JWT secret (`SUPABASE_JWT_SECRET`), or
-- asymmetric via JWKS (`resolved_jwks_url`), keys cached by PyJWT.
-
-Verified claims become an `AuthedIdentity`; the DB user row is provisioned from
-it (see `services.user_service`). No client-supplied identity is ever trusted.
-"""
+"""Supabase JWT verification."""
 
 from __future__ import annotations
 
@@ -72,9 +64,7 @@ def verify_token(token: str, settings: Settings | None = None) -> AuthedIdentity
     except jwt.ExpiredSignatureError as exc:
         raise AuthError("Token expired") from exc
     except (jwt.InvalidTokenError, jwt.PyJWKClientError) as exc:
-        # PyJWKClientError is *not* an InvalidTokenError — a stale HS256 / kid-less
-        # token used to 500 here, which left the SPA stuck on "Loading…" (CORS
-        # dropped on the unhandled exception, so the client never got a 401).
+        # PyJWKClientError is not an InvalidTokenError; it must map to 401, not 500.
         raise AuthError("Invalid token") from exc
 
     sub = claims.get("sub")

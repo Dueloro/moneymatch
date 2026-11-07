@@ -1,9 +1,4 @@
-"""Web Push subscriptions — a browser endpoint + keys we push notifications to.
-
-One row per (user, browser endpoint). The `endpoint` is globally unique (it's the
-push service URL for that browser install), so re-subscribing upserts. A 404/410
-from the push service on send means the subscription is dead and is pruned.
-"""
+"""Web Push subscriptions — a browser endpoint + keys we push notifications to."""
 
 from __future__ import annotations
 
@@ -26,8 +21,6 @@ class PushSubscription(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    # The push service URL for this browser install (globally unique).
     endpoint: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    # The subscription's public key + auth secret (base64url), from the browser.
     p256dh: Mapped[str] = mapped_column(String(255), nullable=False)
     auth: Mapped[str] = mapped_column(String(255), nullable=False)

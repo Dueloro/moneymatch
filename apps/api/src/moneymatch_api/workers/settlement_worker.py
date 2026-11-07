@@ -1,19 +1,4 @@
-"""The settlement worker (01-architecture §3.3) — a separate process, same codebase.
-
-Every cycle, each unit of work in its **own transaction**, claimed with
-`FOR UPDATE SKIP LOCKED` so multiple workers are safe and a crash between claim
-and settle leaves the row re-claimable:
-
-1. Due `matches` (ACTIVE / AWAITING_RESULT) → `grading.grade` → settle, or extend
-   the window on a host outage, or CANCEL + refund at the hard ceiling.
-2. PENDING matches past their confirm window → cancel + refund whoever escrowed.
-3. Waiting `queue_tickets` past their TTL → expired (no escrow was held).
-4. Kill switches: `settlement_paused` halts the loop (fail closed); `queue_paused`
-   drains the waiting queue into clean cancels.
-
-A post-settle reconciliation breach raises `ReconciliationError`; the worker
-sets `settlement_paused` and stops — money never commits against a broken book.
-"""
+"""The settlement worker — a separate process, same codebase."""
 
 from __future__ import annotations
 
@@ -107,8 +92,6 @@ async def _set_flag(
 
 
 async def _write_heartbeat(sm: async_sessionmaker[AsyncSession], now: datetime) -> None:
-    """Record the worker's liveness (`feature_flags.worker_heartbeat`) each cycle;
-    /health and the admin reconciliation view redden when it goes stale."""
     from ..services import feature_flags
 
     async with sm() as session:
@@ -121,19 +104,12 @@ async def _write_heartbeat(sm: async_sessionmaker[AsyncSession], now: datetime) 
         await session.commit()
 
 
-# --------------------------------------------------------------------------- #
-# One match at a time, each in its own claimed transaction.
-# --------------------------------------------------------------------------- #
-
-
 async def resolve_match(session: AsyncSession, match: Match, now: datetime) -> str:
-    """Public entry to the grade+settle path for one match (admin re-settle reuses
-    the exact worker logic — 09-phase-6 · "force re-settle re-runs the worker path")."""
+    """Public entry to the grade+settle path for one match."""
     return await _resolve_match(session, match, now)
 
 
 async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> str:
-    """Grade + settle (or extend/expire) one claimed ACTIVE/AWAITING_RESULT match."""
     seats = await match_lifecycle.players(session, match.id)
     outcome = await grading.grade(match, seats, now)
 
@@ -153,14 +129,12 @@ async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> 
             )
             return "canceled"
         if outcome.host_error:
-            # Outage doesn't consume the window: push the deadline out by a cycle.
             _extend_window(match, now)
         if match.state == ACTIVE:
             match.state = AWAITING_RESULT
         await session.flush()
         return "pending"
 
-    # Terminal grade → persist the evidence, then settle through the lifecycle.
     payload = await raw_payload_service.persist(
         session,
         f"grade:{match.game}",
@@ -192,7 +166,6 @@ async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> 
 
 
 def _extend_window(match: Match, now: datetime) -> None:
-    """Extend the resolution window by one cycle, capped at the hard ceiling."""
     if match.matched_at is None or match.window_ends_at is None:
         return
     ceiling = match.matched_at + timedelta(seconds=MATCH_MAX_LIFETIME_SECONDS)
@@ -230,19 +203,12 @@ async def _process_due_matches(
                 raise SettlementHalted from exc
             _tally(report, result)
             if result in ("settled", "pushed"):
-                # Settlement-time metric refresh (backlog · Phase B): recompute the
-                # two players' models now that a host game finished. Isolated from
-                # the settlement txn — best-effort, never blocks money; nightly is
-                # the backstop.
                 await _refresh_after_settle(sm, match_id)
 
 
 async def _refresh_after_settle(
     sm: async_sessionmaker[AsyncSession], match_id: uuid.UUID
 ) -> None:
-    """Best-effort per-settlement metric refresh for both players. Runs in its own
-    transaction and swallows every error — a refresh hiccup must never affect a
-    committed settlement (bootstrap is a no-op for win-only games like chess)."""
     try:
         async with sm() as session:
             match = await session.get(Match, match_id)
@@ -278,11 +244,6 @@ def _tally(report: CycleReport, result: str) -> None:
         report.canceled += 1
     elif result == "pending":
         report.pending += 1
-
-
-# --------------------------------------------------------------------------- #
-# PENDING expiry, ticket TTL, kill-switch drains.
-# --------------------------------------------------------------------------- #
 
 
 async def _expire_pending_matches(
@@ -339,19 +300,10 @@ async def _drain_queue_if_paused(
             await session.commit()
 
 
-# --------------------------------------------------------------------------- #
-# Pool & tournament window settlement (server-fetched telemetry).
-# --------------------------------------------------------------------------- #
-
-
 async def _process_due_pools(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
     async with sm() as session:
-        # Due at window end, OR flagged ready early: every entrant's result is in,
-        # so the outcome is already final (see `_refresh_live_snapshots`). Settling
-        # now moves the contest out of "In play" / "Room formed" the moment it is
-        # decided instead of stranding it until the window closes.
         ids = list(
             await session.scalars(
                 select(SoloPool.id).where(
@@ -378,10 +330,9 @@ async def _process_due_pools(
                 )
             )
             grades = await telemetry_fetch.grade_pool(session, pool, entries)
-            # Early path: only settle if the authoritative grade confirms every
-            # entry is verified. If the live flag was optimistic (a grade still
-            # comes back unverifiable), leave the pool for a later cycle / the
-            # window-end path, which refunds the unverifiable entries correctly.
+            # If the live flag was optimistic (a grade still comes back unverifiable),
+            # leave the pool for a later cycle / the window-end path, which refunds the
+            # unverifiable entries correctly.
             window_over = pool.window_ends_at <= now
             all_verified = bool(grades) and all(
                 g.cleared is not None for g in grades.values()
@@ -440,7 +391,6 @@ async def _process_due_tournaments(
 async def _refresh_tournament_standings(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
-    """Refresh live standings for in-window tournaments on a slow cadence."""
     async with sm() as session:
         ids = list(
             await session.scalars(
@@ -506,12 +456,6 @@ async def _upsert_live(
 async def _refresh_live_snapshots(
     sm: async_sessionmaker[AsyncSession], now: datetime, report: CycleReport
 ) -> None:
-    """Refresh the under-the-card live view for in-flight pools & H2H matches.
-
-    One host read per participant on a slow cadence, cached in `live_snapshots`;
-    the `/activity` request path reads the cache only. A host outage on any one
-    contest is swallowed (the builder returns an "unavailable" cell) so the loop
-    never halts settlement."""
     async with sm() as session:
         pool_ids = list(
             await session.scalars(
@@ -534,8 +478,6 @@ async def _refresh_live_snapshots(
                 session, pool, entries
             )
             await _upsert_live(session, "pool", pid, snapshot, now)
-            # Flag a fully-decided pool so `_process_due_pools` settles it early
-            # (next cycle) rather than waiting for the window to close.
             if live_activity_service.pool_all_decided(snapshot):
                 pool.outcome_detail = {
                     **(pool.outcome_detail or {}),
@@ -601,23 +543,16 @@ async def _halt_on_breach(
     report.paused = True
 
 
-# --------------------------------------------------------------------------- #
-# The cycle + the loop.
-# --------------------------------------------------------------------------- #
-
-
 async def run_cycle(
     sm: async_sessionmaker[AsyncSession] | None = None,
     *,
     now: datetime | None = None,
 ) -> CycleReport:
-    """One full worker pass. Returns a report (used by tests + ops logging)."""
+    """One full worker pass."""
     sm = sm or get_sessionmaker()
     now = now or clock.now()
     report = CycleReport()
 
-    # Liveness first — the worker is alive even when settlement is paused, so the
-    # heartbeat is written before the pause short-circuit (09-phase-6 · d.4).
     await _write_heartbeat(sm, now)
 
     async with sm() as session:
@@ -641,7 +576,6 @@ async def run_cycle(
 
 
 async def _nightly_due(sm: async_sessionmaker[AsyncSession], now: datetime) -> bool:
-    """Whether a nightly pass is due (never run, or older than the interval)."""
     async with sm() as session:
         flag = await session.scalar(
             select(FeatureFlag).where(FeatureFlag.key == FLAG_NIGHTLY_LAST_RUN)
@@ -670,9 +604,7 @@ async def _mark_nightly_ran(
 async def maybe_run_nightly(
     sm: async_sessionmaker[AsyncSession], now: datetime | None = None
 ) -> bool:
-    """Run the nightly pass if due, then stamp the last-run flag. Returns whether
-    it ran. Lives in the loop (not `run_cycle`) so the money cycle stays untouched
-    and its tests are unaffected."""
+    """Run the nightly pass if due, then stamp the last-run flag."""
     now = now or clock.now()
     if not await _nightly_due(sm, now):
         return False
@@ -684,7 +616,6 @@ async def maybe_run_nightly(
 
 
 async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
-    """Poll forever. `settlement_paused` idles the loop rather than exiting it."""
     sm = get_sessionmaker()
     log.info("settlement_worker.start", interval=interval)
     while True:
@@ -692,7 +623,6 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
             report = await run_cycle(sm)
             if report.settled or report.pushed or report.canceled or report.paused:
                 log.info("settlement_worker.cycle", **report.__dict__)
-            # The heavier nightly pass is self-throttled to once per interval.
             await maybe_run_nightly(sm)
         except Exception:  # noqa: BLE001 — never let the loop die on one bad cycle
             log.exception("settlement_worker.cycle_failed")

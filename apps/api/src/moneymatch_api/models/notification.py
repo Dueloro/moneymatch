@@ -1,8 +1,5 @@
-"""Notifications (01-architecture §2 · Social & ops).
-
-Phase 3 **writes** rows (`match_found`, `settled`, `refund`) inside the
-transition that causes them; Phase 5's Inbox screen consumes them. Rows are
-mutable only in `read_at` (marking read), so no append-only trigger here.
+"""Notifications. Rows are mutable only in `read_at` (marking read), so no append-
+only trigger here.
 """
 
 from __future__ import annotations
@@ -18,8 +15,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, uuid_pk
 
-# Every lifecycle event fans out to one of these (08-phase-5 · deliverable 7).
-# Phase 3 wrote match_found/settled/refund; Phase 5 adds the social kinds.
 NOTIFICATION_KINDS = (
     "match_found",
     "settled",
@@ -58,8 +53,6 @@ class Notification(Base):
     read_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Which out-of-band channels have been dispatched (email/push are post-MVP;
-    # the schema carries the flag now — 08-phase-5 · deliverable 7).
     channel_sent: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=dict, server_default="{}", nullable=False
     )

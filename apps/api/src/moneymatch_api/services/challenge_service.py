@@ -43,9 +43,6 @@ class ChallengeError(APIError):
     """A challenge-flow failure (RFC-7807 via APIError)."""
 
 
-# Pair rake-cap → friendly.
-
-
 async def _pair_rake_count(
     session: AsyncSession, a: uuid.UUID, b: uuid.UUID, since: datetime
 ) -> int:
