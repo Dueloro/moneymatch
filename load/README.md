@@ -15,8 +15,8 @@ staging env and real host APIs).
 ## Prerequisites
 
 - [k6](https://k6.io/docs/get-started/installation/) installed.
-- A staging deployment (`api` + `worker` + Postgres) seeded via
-  `scripts/seed_demo.py`.
+- A staging deployment (`api` + `worker` + Postgres) with at least 50 onboarded
+  users, each with a linked Lichess account.
 - One Supabase JWT per virtual user. Until the dev/e2e sign-in bypass lands
   (see `docs/implementation-guide/BACKLOG.md` · "Browser e2e test-auth seam"),
   mint these out of band from the staging Supabase project.

@@ -134,9 +134,9 @@ switches (`queue_paused`, `settlement_paused`, per-game enable, `geo_config`)
 without a deploy, run reconciliation on demand, and work the risk / sandbagging
 flag queue. Every admin mutation writes an `admin_audit` row.
 
-| Task                        | Command                                                            |
-| --------------------------- | ------------------------------------------------------------------ |
-| Grant admin (audited)       | `cd apps/api && uv run python ../../scripts/grant_admin.py <user>` |
+| Task                  | Command                                                            |
+| --------------------- | ------------------------------------------------------------------ |
+| Grant admin (audited) | `cd apps/api && uv run python ../../scripts/grant_admin.py <user>` |
 
 `GET /api/v1/health` reports the settlement worker's health (`worker.stale`
 reddens if the worker hasn't cycled in > 2 min). The same signal shows on the
