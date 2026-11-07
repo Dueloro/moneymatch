@@ -364,6 +364,33 @@ The design system (`docs/design-guidelines.md`, tokens in `apps/web/src/styles/i
 
 ---
 
+
+### Phase 6.2 — approved scope (2026-11-07)
+
+Audit: session scratchpad `ui-audit.md`. The user approved all top-10 items, all smaller bugs, and all bigger ideas, with these specs:
+- "How it works": only on the first visit, small, never covering content. Minimal hand-holding overall.
+- Points instead of USD: no `$`/USD anywhere in the product. 1 point = 1 internal cent unit (integers, no decimals); backend money math is unchanged.
+- Wallet: free "Add points" top-ups; no cash-out in the UI.
+- Invites stay friends-only.
+- Keep "Dueloro Support"; every user message to support emails support@dueloro.com (Resend).
+- Domain: app at `app.dueloro.com`, API at `api.dueloro.com`; the marketing site (`Dueloro/web`) stays separate.
+
+Tasks, in order:
+1. Domain: email logo URLs → app.dueloro.com, redirect moneymatch-beta → app.dueloro.com, runbook.
+2. Admin theme fix + global type fixes + numeric display face for money.
+3. Points currency everywhere (web formatting/copy, API email/push/notification text), wallet top-up only.
+4. How-it-works: first-visit only, minimal.
+5. Units/copy pass (`formatMetric`, games not matches, no "checkmate" claims, fee amounts) + pool card.
+6. Lichess OAuth: ownership-verified linking (PKCE); investigate Sign in with Lichess vs Supabase.
+7. First run (link step, checklist in shell, one home `/play`).
+8. Match desk on /play + skill-band ruler.
+9. Match stage + result card + settlement moment ("Settled from Lichess in Ns").
+10. Live board (moves → position, clocks).
+11. Challenge dialog (labels/defaults, real copy, focus trap/Escape, shared dialog).
+12. Inbox seen-at (badge clears on opening Social).
+13. Support email alerts.
+14. Smaller bugs: Respond button, wallet confirm + ledger labels, 44px targets, loading states, 768 layout.
+
 ## Phase 7 — Deployment
 
 ### Task 7.1: Run the worker as its own service
