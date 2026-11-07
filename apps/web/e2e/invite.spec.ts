@@ -1,71 +1,53 @@
 import { expect, test } from '@playwright/test';
 
 import { e2eAuthConfigured, signInAs } from './auth';
+import { createInviteLink, lichessConfigured, linkedA, linkedB } from './fixtures';
 
 /**
- * Phase-5 required e2e (08-phase-5) + exit criterion #2:
- * user A mints an invite link → user B (a **fresh** signup) opens the public
- * preview, signs in, links their game, and accepts → a PENDING match forms →
- * both confirm → the fixture settles → both inboxes are correct.
+ * Invite link: A mints a $10 blitz challenge link, B opens the public preview,
+ * accepts, both confirm, and both get the Lichess game set up for them.
  *
- * Prerequisites (see e2e/README.md): a running stack with a stubbed host adapter
- * and the test-auth seam (`E2E_AUTH=1`). A is a seeded, CS2-linked user; B is a
- * brand-new `auth_id` that has never signed in, so minting a token for it yields
- * a fresh, un-onboarded user and exercises the full funnel.
+ * B is prepared by the fixture (onboarded + linked) because a Lichess handle
+ * binds to one account, so a fresh signup per run cannot link the same handle
+ * again. Settlement needs the game played on Lichess and is not driven here.
  */
 
-const CHALLENGER = process.env.E2E_AUTH_ID_A ?? 'seed_player1';
-// A never-before-seen auth_id → provisioned fresh (no username, no linked game).
-const FRESH = process.env.E2E_FRESH_AUTH_ID ?? 'e2e_fresh_invitee';
-
-test('invite link → fresh signup accepts → both confirm → settle → inboxes correct', async ({
+test('invite link → preview → accept → both confirm → game link', async ({
   browser,
 }) => {
   test.skip(!e2eAuthConfigured(), 'Set E2E_AUTH=1 and run the stack with the seam on.');
+  test.skip(
+    !lichessConfigured(),
+    'Set E2E_LICHESS_A and E2E_LICHESS_B to link players.',
+  );
 
-  // --- A mints an invite link for a $10 K/D challenge. --------------------- //
-  const pageA = await signInAs(browser, CHALLENGER);
-  await pageA.goto('/tournament');
-  await pageA.getByRole('tab', { name: 'Friends' }).click();
-  // (Challenge dialog is reachable from a friend row or the invite entry point;
-  // here we drive the invite-link creation and read back the copied URL.)
-  await pageA
-    .getByRole('button', { name: /Invite|Copy invite link/ })
-    .first()
-    .click();
-  await pageA.getByRole('button', { name: 'CS2' }).click();
-  await pageA.getByText('K/D ratio').click();
-  await pageA.getByRole('button', { name: '$10.00' }).click();
-  await pageA.getByRole('button', { name: 'Copy invite link' }).click();
-  const inviteUrl = await pageA.getByRole('textbox').inputValue();
-  expect(inviteUrl).toContain('/i/');
+  const a = await linkedA();
+  const b = await linkedB();
+  const invitePath = await createInviteLink(a, { speed: 'blitz', entryCents: 1000 });
+  expect(invitePath).toContain('/i/');
 
-  // --- B (fresh) opens the public preview → funnel. ------------------------ //
-  const pageB = await signInAs(browser, FRESH);
-  await pageB.goto(new URL(inviteUrl).pathname);
-  await expect(pageB.getByText(/challenged you/)).toBeVisible(); // public preview
-
-  // Finish setup (username + attestation + link CS2), then accept.
-  await pageB.getByRole('button', { name: /accept/i }).click();
-  await expect(pageB).toHaveURL(/\/signin|\/i\//);
-  // ... onboarding + link steps happen here (seam-dependent) ...
+  // --- B opens the preview and accepts. ------------------------------------ //
+  const pageB = await signInAs(browser, b.authId, { path: invitePath });
+  await expect(pageB.getByText(`${a.username} challenged you`)).toBeVisible();
+  await expect(pageB.getByText('$10.00')).toBeVisible();
   await pageB.getByRole('button', { name: 'Accept challenge' }).click();
+  await expect(pageB).toHaveURL(/\/play\?match=/);
 
-  // --- Both confirm → fixture settles. ------------------------------------ //
-  await expect(pageA.getByText(/K\/D ratio/).first()).toBeVisible();
-  await pageA.goto('/play');
-  await pageA.getByRole('button', { name: /Confirm & stake/ }).click();
-  await pageB.getByRole('button', { name: /Confirm & stake/ }).click();
+  // --- Both confirm → the match goes live with a game link. ---------------- //
+  const confirm = { name: /Confirm & stake \$10\.00/ };
+  await pageB.getByRole('button', confirm).click();
 
-  // Both inboxes reflect the outcome.
-  await pageA.goto('/inbox');
-  await expect(pageA.getByText(/accepted|settled/i).first()).toBeVisible({
-    timeout: 30_000,
-  });
-  await pageB.goto('/inbox');
-  await expect(pageB.getByText(/settled|match/i).first()).toBeVisible({
-    timeout: 30_000,
-  });
+  // A challenge match is not in the queue status, so A opens it by id.
+  const matchPath = new URL(pageB.url()).pathname + new URL(pageB.url()).search;
+  const pageA = await signInAs(browser, a.authId, { path: matchPath });
+  await pageA.getByRole('button', confirm).click();
+
+  for (const page of [pageA, pageB]) {
+    await expect(page.getByRole('link', { name: /Go play your game/ })).toHaveAttribute(
+      'href',
+      /lichess\.org\//,
+    );
+  }
 
   await pageA.context().close();
   await pageB.context().close();

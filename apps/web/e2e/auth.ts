@@ -4,7 +4,7 @@ import { request, type Browser, type Page } from '@playwright/test';
  * Shared e2e sign-in via the local test-auth seam (backlog · "Browser e2e
  * test-auth seam"). Instead of injecting a live Supabase session, each context
  * authenticates with a short-lived token minted by the API's `/dev/e2e/token`
- * route for a seeded `auth_id`, written to the localStorage key the web app
+ * route for an `auth_id` (see `fixtures.ts` for building the player), written to the localStorage key the web app
  * reads when built with `VITE_E2E_AUTH=true` (see web `src/lib/e2eAuth.ts`).
  *
  * Enable the suite by running the stack with the seam on and setting `E2E_AUTH`:
@@ -14,7 +14,7 @@ import { request, type Browser, type Page } from '@playwright/test';
  */
 
 const E2E_TOKEN_KEY = 'mm.e2e.access_token';
-const API_BASE = process.env.E2E_API_BASE_URL ?? 'http://localhost:8000';
+export const API_BASE = process.env.E2E_API_BASE_URL ?? 'http://localhost:8000';
 
 /** True when the run is configured for the bypass; specs skip otherwise so they
  * never silently pass. */
@@ -22,7 +22,7 @@ export function e2eAuthConfigured(): boolean {
   return process.env.E2E_AUTH === '1' || process.env.E2E_AUTH === 'true';
 }
 
-/** Mint an access token for a seeded user through the API's dev/e2e route. */
+/** Mint an access token for an `auth_id` through the API's dev/e2e route. */
 export async function mintToken(authId: string, email?: string): Promise<string> {
   const ctx = await request.newContext();
   try {
@@ -42,7 +42,7 @@ export async function mintToken(authId: string, email?: string): Promise<string>
   }
 }
 
-/** Open an authenticated page for a seeded user in a fresh browser context. */
+/** Open an authenticated page for an `auth_id` in a fresh browser context. */
 export async function signInAs(
   browser: Browser,
   authId: string,
