@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { ModeSwitcher } from '../components/ModeSwitcher';
+import { PlayHeader } from '../components/PlayHeader';
 import { AmountText } from '../components/ui/AmountText';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
-import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
@@ -42,18 +41,10 @@ export function TournamentPage() {
   const places = markets?.prize_split.length ?? 3;
 
   const header = (
-    <div className="mb-6 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <ModeSwitcher />
-        <div className="ml-auto">
-          <HowItWorks id="tournament">
-            A field of similar-skill players chase the same stat. Every rated Lichess
-            game you finish inside the window counts automatically, and the top {places}{' '}
-            split the pot. No reporting, no brackets, just play.
-          </HowItWorks>
-        </div>
-      </div>
-    </div>
+    <PlayHeader
+      id="tournament"
+      how={`Every rated Lichess game you finish in the window counts. The top ${places} split the pot.`}
+    />
   );
 
   if (marketsError) {

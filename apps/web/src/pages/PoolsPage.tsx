@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { GettingStarted } from '../components/GettingStarted';
-import { ModeSwitcher } from '../components/ModeSwitcher';
+import { PlayHeader } from '../components/PlayHeader';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
 import { ClearBar } from '../components/ui/ClearBar';
-import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
@@ -76,19 +75,10 @@ export function PoolsPage() {
   const hasResults = filteredMetrics.length > 0 && presets.length > 0;
 
   const header = (
-    <div className="mb-6 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <ModeSwitcher />
-        <div className="ml-auto">
-          <HowItWorks id="pools">
-            Three or four similar-skill players each get a personal bar from their own
-            baseline: a number of moves. Win your next Lichess game in that many moves
-            or fewer and you take a share of the pot. You are playing the number, not
-            the other players.
-          </HowItWorks>
-        </div>
-      </div>
-    </div>
+    <PlayHeader
+      id="pools"
+      how="You get a bar set from your own recent games. Win your next Lichess game inside it to take a share of the pot."
+    />
   );
 
   if (marketsError) {

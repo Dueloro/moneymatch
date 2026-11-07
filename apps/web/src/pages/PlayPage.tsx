@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
-import { ModeSwitcher } from '../components/ModeSwitcher';
+import { PlayHeader } from '../components/PlayHeader';
 import { PlaySlip } from '../components/play/PlaySlip';
 import { CardGrid } from '../components/ui/CardGrid';
-import { HowItWorks } from '../components/ui/Disclosure';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ListRow } from '../components/ui/ListRow';
@@ -78,18 +77,10 @@ export function PlayPage() {
   const hasResults = openMarkets.length > 0 && presets.length > 0;
 
   const header = (
-    <div className="mb-6 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <ModeSwitcher />
-        <div className="ml-auto">
-          <HowItWorks id="play">
-            You play one game of chess on Lichess against an opponent at your skill
-            level, for the same stake. We read the result from Lichess and the winner
-            takes the pot. A draw refunds both stakes.
-          </HowItWorks>
-        </div>
-      </div>
-    </div>
+    <PlayHeader
+      id="play"
+      how="One Lichess game against a player at your level. Winner takes the pot, draws are refunded."
+    />
   );
 
   return (

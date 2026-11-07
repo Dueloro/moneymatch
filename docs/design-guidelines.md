@@ -159,6 +159,11 @@ primitive rather than a one-off.
 - **`CardGrid`** — caps columns by card count (1 → 384px single column, 2 → 768px
   two-col, 3+ → responsive 1/2/3) so a single contest never sits alone in a wide
   grid looking like an error.
+- **`PlayHeader`** — the mode switcher plus a small "How it works" trigger
+  (`HowItWorks`, closed by default, compact `w-72` popover). Each user sees the
+  explainer once, inline under the switcher (`HowItWorksNote`, "Got it"), on
+  the first play page they open; it never covers content. Explainers are at most
+  two short sentences.
 - **`ExpandableCard`** / **`ListRow`** — the expandable and flat row primitives.
 - **`FilterBar`** — pill toggle with a hamburger, "Filters", and a paper
   active-count badge; opens a `Card` of chip rows.
@@ -205,7 +210,7 @@ sit outside it.
 ## 6. The `WagerCard`, top to bottom
 
 The card is self-evident by design, so browse pages don't need an explainer
-paragraph (the "How it works" prose lives in a dismissible disclosure instead).
+paragraph (the "How it works" prose lives in a disclosure instead).
 
 1. Metric / field size in 12px grey (left) + optional `panel-raised` tag pill
    (right): difficulty, "top 3 paid", "BLITZ".
