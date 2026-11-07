@@ -17,22 +17,60 @@ Don't push money through.
 Admin endpoints below are under `/api/v1/admin` and need an admin user's
 token. The `/admin` web pages call the same endpoints.
 
-## First-time Render setup
+## First-time setup
+
+Order: Vercel project, Render Blueprint, custom domain, first admin. `WEB_ORIGIN`
+is entered at Blueprint creation and must be the exact Vercel production
+origin; the API refuses to boot in prod if it is localhost.
+
+### 1. Vercel project
+
+- Root Directory `apps/web`, Framework Preset Vite. Keep "Include files outside
+  the root directory" on (the `packages/api-client` workspace dep needs it).
+- Env vars: `VITE_API_BASE_URL=https://api.dueloro.com`, `VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_ANON_KEY` (all required), optional `VITE_POSTHOG_*` and
+  `VITE_SENTRY_DSN`. Never set `VITE_E2E_AUTH` in prod.
+- The CSP in `apps/web/vercel.json` hardcodes `https://api.dueloro.com` and the
+  Supabase project `bxjzxvujyveucyfvmmto`. If your Supabase project differs,
+  update `connect-src` first or auth calls are blocked.
+
+### 2. Render Blueprint
 
 1. Render → New → Blueprint → pick this repo. It reads `render.yaml`.
-2. Fill the `sync: false` secrets **for each service** (API and worker each
-   have their own list): `SUPABASE_URL`, `SUPABASE_JWT_SECRET` (empty to use
-   JWKS), `WEB_ORIGIN` (exact Vercel origin, no trailing slash), `SENTRY_DSN`,
-   `POSTHOG_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `VAPID_PUBLIC_KEY`,
-   `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. `DATABASE_URL` is wired from the
-   database automatically. Edit later in each service's Environment tab.
+2. `sync: false` secrets are prompted only at creation, per service (give the
+   API and the worker the same values): `SUPABASE_URL`, `SUPABASE_JWT_SECRET`,
+   `WEB_ORIGIN`, `SENTRY_DSN`, `POSTHOG_API_KEY`, `RESEND_API_KEY`,
+   `EMAIL_FROM`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+   `DATABASE_URL` is wired from the database. Edit later in each service's
+   Environment tab.
+   - `SUPABASE_URL` and a non-localhost `WEB_ORIGIN` are required on both.
+   - `EMAIL_FROM` = `Money Match <noreply@send.dueloro.com>`.
+   - Blank `SUPABASE_JWT_SECRET` means verify via JWKS. Blank `SENTRY_DSN`,
+     `POSTHOG_API_KEY` or `VAPID_*` just disables that feature.
 3. Region: every service and the database must be in the same region as the
    Supabase project (`ohio` in `render.yaml`). Change all of them together.
-4. Custom domain: in your DNS, add a CNAME `api` → the API service's
-   `*.onrender.com` host. Render issues the certificate once it resolves.
-5. Vercel: set `VITE_API_BASE_URL=https://api.dueloro.com` plus the
-   `VITE_SUPABASE_*`, `VITE_POSTHOG_*`, `VITE_SENTRY_DSN` values. If the API or
-   Supabase host changes, update `connect-src` in `apps/web/vercel.json`.
+
+### 3. Custom domain
+
+API service → Settings → Custom Domains → add `api.dueloro.com`. At your DNS
+provider add a CNAME `api` → the service's `*.onrender.com` host, then click
+Verify and wait for the certificate. On Cloudflare, keep the record DNS-only
+until the certificate is issued.
+
+### 4. First admin
+
+Sign up on the web app, then run the script under Granting admin against the
+database's external URL (Render's default allow-list accepts external
+connections). Rewrite the scheme to `postgresql+asyncpg://` and add
+`?ssl=require`; `SUPABASE_URL` is required because the config loads on import.
+
+### Google sign-in
+
+The web offers Google via Supabase. Create a Google OAuth client with
+authorized redirect `https://<supabase-ref>.supabase.co/auth/v1/callback`.
+In Supabase enable Auth → Providers → Google with its client ID and secret,
+and add the web origin under Auth → URL Configuration (Site URL and Redirect
+URLs).
 
 ### Supabase email (via Resend)
 
@@ -80,13 +118,22 @@ config loads on import.
 
 ## Rollback
 
-- Render: each service → Events → pick the last good deploy → Rollback. Do the
-  API and the worker.
-- Vercel: promote the previous deployment.
+- Render: each service → Deploys → pick the last good deploy → Rollback →
+  Rollback to this deploy. This turns off auto-deploy for that service;
+  re-enable it in Settings once fixed. Roll back the API and the worker
+  together.
+- Vercel: Project → Instant Rollback → choose the deployment → Confirm. New
+  pushes stop going live until you Undo Rollback (or promote a deployment).
+  Hobby plans can only roll back to the previous deployment.
 - Migrations don't roll back. Keep schema changes additive so old code still
   runs on the new schema. If a deploy ran a destructive migration, pause
   settlement first and restore the database with Render's point-in-time
   recovery instead of rolling back blindly.
+- Point-in-time recovery: available on paid Render Postgres, 3-day window on
+  Hobby workspaces and 7 days on Pro+; you can't restore to within the last 10
+  minutes. It creates a NEW database, so set `DATABASE_URL` on the API and the
+  worker to the new internal URL, and update `render.yaml`'s `fromDatabase`
+  name so a Blueprint sync doesn't point back at the old DB.
 
 ## Worker health
 
@@ -112,7 +159,9 @@ config loads on import.
 ## Kill switches
 
 `PUT /api/v1/admin/flags/{key}` with `{"enabled": true|false}`, or the admin
-Flags tab. Takes effect on the next request or cycle, no deploy.
+Flags tab. Takes effect on the next request or cycle, no deploy. The body takes
+`enabled` and/or `payload`; for `geo_config`:
+`{"payload": {"excluded_states": ["AZ", "AR", ...]}}`.
 
 | Flag | Effect |
 |---|---|
@@ -120,6 +169,11 @@ Flags tab. Takes effect on the next request or cycle, no deploy.
 | `queue_paused` | No new queueing; the worker cancels waiting tickets (no escrow is held) |
 | `game:chess.lichess` | Off = no new chess contests |
 | `geo_config` | Payload `excluded_states` lists blocked states |
+
+In prod the API refuses to boot if `geo_config` excludes fewer than the 14
+seeded states (`GEO_REQUIRED_EXCLUDED_STATES` in `constants.py`). You can add
+states by flag, but un-excluding one is a code change and deploy (or setting
+`GEO_ENFORCE_SEEDED_FLOOR=false` on both services, and recording why).
 
 Real-money rails (`PAYMENTS_LIVE`, `KYC_LIVE`) are not flags. They are env
 config plus code guards and stay off.

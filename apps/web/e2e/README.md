@@ -32,9 +32,12 @@ not in the unit-test CI job; it needs the whole stack and real browsers.
 ## Run
 
 ```bash
-E2E_AUTH_ENABLED=true make dev        # api mints tokens; web built with VITE_E2E_AUTH=true
+E2E_AUTH_ENABLED=true VITE_E2E_AUTH=true make dev   # api mints tokens; web reads them
 E2E_AUTH=1 E2E_LICHESS_A=<handle> E2E_LICHESS_B=<handle> make e2e
 ```
+
+`SUPABASE_JWT_SECRET` must be an HS256 secret locally, or `/dev/e2e/token`
+returns `e2e_auth_unavailable`.
 
 `E2E_LICHESS_A` / `E2E_LICHESS_B` are two real Lichess accounts (linking
 verifies them live). A handle binds to one Money Match account for good, so keep

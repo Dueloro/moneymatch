@@ -54,7 +54,7 @@ cd apps/api && uv run pytest --lf -x -q   # rerun last failures
 Run the full suite before pushing. Money and settlement changes need a test
 that would fail if an amount were wrong.
 
-Other checks CI runs: `make lint`, `make typecheck`.
+CI runs the same checks (see `.github/workflows/ci.yml`).
 
 ## API client
 
@@ -85,7 +85,8 @@ Contests only form with real opponents, so you need two players.
 2. Sign in as two different users in two browser profiles (one can be
    private/incognito).
 3. Each user links a different Lichess account under Profile. Pick accounts
-   within 800 rating points so they pair.
+   close in rating: the band starts at ±100 Elo and widens 12/s to ±800, so
+   accounts far apart pair only after about a minute.
 4. Both open Play → Head-to-head and queue the same speed and stake. Both
    confirm the match.
 5. Both open the Lichess game link and play it out.
