@@ -2,13 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens (16-ui-revamp-plan §2). The ground is neutral ink rather than a
- * green-cast near-black, so lime reads as an accent instead of as the room's
- * ambient colour, and page / card / raised / overlay are genuinely distinct.
- *
- * Lime means ONE thing: money. Primary actions are paper, live states are cyan,
- * selection is structural. Tailwind colour names map to these vars, so the
- * existing class vocabulary keeps working. */
+/* Design tokens. Lime means money only; tailwind colour names map to these vars. */
 :root {
   /* Surfaces, dark to light. */
   --bg: #0b0c0f; /* page */
@@ -18,13 +12,12 @@
   --hairline: #23272f; /* default 1px line */
   --line-strong: #333945; /* hover line, overlay edge */
 
-  /* Text. Both secondary and tertiary are contrast-checked against --panel:
-   * 7.2:1 and 5.0:1, so both clear AA for body copy. */
+  /* Text: both secondary and tertiary clear AA against --panel (7.2:1, 5.0:1). */
   --text: #eef0f4;
   --text-secondary: #9aa2b1;
   --text-tertiary: #7c8593;
 
-  /* Semantics. One job each. */
+  /* Semantics. */
   --green: #c6f440; /* MONEY ONLY: currency, gains, balance */
   --green-dim: #3d4a18; /* dim lime for money-adjacent rules */
   --action: #f2f5ef; /* primary action fill (ink text on top) */
@@ -34,22 +27,18 @@
   --warn: #f5b93c; /* pending, caution */
   --focus: #a8c7ff; /* focus ring only, never decorative */
 
-  /* Shape: a hierarchy, not four competing values. Anything sitting on the page
-   * is `card`; anything nested inside a card is `inset`; controls are `pill`. */
+  /* Shape: `card` on the page, `inset` inside a card, `pill` for controls. */
   --radius-card: 12px;
   --radius-inset: 8px;
   --radius-pill: 999px;
 
-  /* Elevation: exactly one shadow, used only by overlays. Cards separate by
-   * border and surface value, never by shadow. */
+  /* One shadow, overlays only. */
   --shadow-overlay:
     0 16px 48px -24px rgb(0 0 0 / 0.85), 0 2px 8px -2px rgb(0 0 0 / 0.45);
 
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Motion: two durations and one easing, so interactive feedback stays in the
-   * sub-300ms band (emilkowal.ski/ui/you-dont-need-animations) instead of each
-   * call site picking its own. Frequent/interactive → fast; entrances → base. */
+  /* Motion: two durations and one easing. */
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -72,13 +61,11 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Money is everywhere in this product, so lining tabular figures are the
-   * default rather than something each component opts into. */
+  /* Tabular figures by default: money is everywhere. */
   font-variant-numeric: tabular-nums;
 }
 
-/* Scrollbars are thin and visible rather than hidden. A scroll container with no
- * affordance looks fine in a screenshot and feels broken in use. */
+/* Thin, visible scrollbars. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--hairline) transparent;
@@ -101,8 +88,7 @@ body {
   background-clip: content-box;
 }
 
-/* Kept for the marquee, which is decorative and must not show a gutter. Not for
- * real scroll containers. */
+/* Marquee only; not for real scroll containers. */
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -112,15 +98,13 @@ body {
   height: 0;
 }
 
-/* One focus treatment for everything interactive. `:focus-visible` so a mouse
- * click doesn't ring, but every keyboard path does. */
+/* `:focus-visible` so mouse clicks don't ring but keyboard paths do. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
-/* The one surviving mono label, and it has one job: the tiny caption above a
- * money figure (Entry, Pot, Balance). Not a heading style. */
+/* The tiny caption above a money figure (Entry, Pot, Balance). */
 .label-money {
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -130,8 +114,7 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Retained so any surface still referencing the old label keeps rendering; new
- * code should use .label-money or a SectionHeader. */
+/* Legacy label; new code uses .label-money or SectionHeader. */
 .label-mono {
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -149,7 +132,7 @@ body {
   font-size: 11px;
 }
 
-/* Lime highlight marker for key words in headlines. */
+/* Lime highlight for headline words. */
 .mark {
   background: var(--green);
   color: #000;
@@ -159,20 +142,13 @@ body {
   -webkit-box-decoration-break: clone;
 }
 
-/* Selection is structural: a raised surface and a strong edge, no hue, so it
- * never competes with money or with the primary action. */
+/* Selection is structural: no hue, so it never competes with money. */
 .is-selected {
   border-color: var(--line-strong) !important;
   background-color: var(--panel-raised);
 }
 
-/* --- Moderate "arena" gaming cues. Structural, not colourful: they never
- * introduce a hue that competes with money (lime), live (cyan) or focus (blue).
- * --- */
-
-/* A faint grid, the contest-surface texture. Sits under content on hero panels
- * (sign-in, the play/pools side rail, the wallet header). Kept low-contrast so
- * it reads as material, not as a chart. */
+/* Faint grid texture for hero panels. */
 .mm-grid-surface {
   background-image:
     linear-gradient(to right, rgba(51, 57, 69, 0.22) 1px, transparent 1px),
@@ -180,10 +156,7 @@ body {
   background-size: 32px 32px;
 }
 
-/* A restrained halo for the single loudest CTA on a screen (Find match, Join
- * pool). Paper-coloured so it never masquerades as money or a live state; only
- * on hover, only for a pointer, and gone under reduced motion via the global
- * transition kill-switch. */
+/* Hover-only halo for the loudest CTA; disabled by the reduced-motion kill-switch. */
 .mm-glow {
   transition: box-shadow var(--dur-base) var(--ease-standard);
 }
@@ -193,7 +166,7 @@ body {
     0 10px 30px -12px rgba(242, 245, 239, 0.28);
 }
 
-/* Marquee crawl for the live ticker. Content is duplicated, so -50% loops. */
+/* Ticker crawl; content is duplicated so -50% loops. */
 @keyframes marquee {
   from {
     transform: translateX(0);
@@ -209,7 +182,7 @@ body {
   animation-play-state: paused;
 }
 
-/* Rise-in entrance for the matched / VS card. */
+/* Entrance for the matched / VS card. */
 @keyframes rise {
   from {
     opacity: 0;
@@ -224,9 +197,7 @@ body {
   animation: rise 0.28s ease-out;
 }
 
-/* The change in a balance after a wager settles: drifts up and fades out.
- * Carries its own horizontal centring, because a transform utility class would
- * be overridden by the animation the moment it started. */
+/* Balance delta after settle; carries its own centring so the animation doesn't override a transform class. */
 @keyframes money-delta {
   0% {
     opacity: 0;
@@ -254,8 +225,7 @@ body {
   .animate-rise {
     animation: none;
   }
-  /* Still shown, just not moving: the amount you won or lost is information,
-   * not decoration, so it must not be animated away to nothing. */
+  /* Reduced motion: keep the delta visible; it is information. */
   .animate-money-delta {
     animation: none;
     opacity: 1;

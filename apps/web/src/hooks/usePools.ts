@@ -4,9 +4,6 @@ import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 import { CHESS } from '../lib/games';
 
-// Wire types mirror `schemas/pools.py`. Every bar / room bar / payout is
-// server-derived; the client only sends metric + difficulty + a preset choice.
-
 export interface DifficultyCard {
   difficulty: string;
   bar: number;
@@ -35,7 +32,6 @@ export interface PoolMember {
   status: string;
   payout_cents: number;
   is_you: boolean;
-  /** What they scored on the graded match. Null while the window is open. */
   result_value?: number | null;
 }
 
@@ -48,8 +44,6 @@ export interface PoolView {
   room_bar: number;
   your_bar: number | null;
   bar_delta: number | null;
-  // Live result while the window runs: did your played match clear the room bar,
-  // and the value it hit. Null until you've played (or on a host outage).
   your_cleared: boolean | null;
   your_current: number | null;
   entry_cents: number;
@@ -73,7 +67,6 @@ export interface PoolStatus {
   waited_seconds: number | null;
 }
 
-/** Estimated share-of-pool prize for a given entry: entry × multiplier (display). */
 export function estPrize(entryCents: number, multiplierBps: number): number {
   return Math.floor((entryCents * multiplierBps) / 10000);
 }
@@ -103,9 +96,6 @@ export function usePoolStatus() {
   return useQuery({
     queryKey: ['pool-status', session?.user.id],
     enabled: !!session,
-    // The rail mounts this app-wide, so only poll hard while a room is actually
-    // forming. Idle and formed both change off the back of something that
-    // already invalidates the key (a join, a leave, a settlement).
     refetchInterval: (query) =>
       query.state.data?.status === 'searching' ? 2500 : 10_000,
     queryFn: async (): Promise<PoolStatus> => {
@@ -116,20 +106,11 @@ export function usePoolStatus() {
   });
 }
 
-/**
- * One settled or in-flight room, by id.
- *
- * Used by the notification feed, where a row is opened to see who is in the
- * room and how it finished. `enabled` is what makes it lazy: the row only
- * mounts this when the card is expanded, so the feed costs nothing to render.
- */
 export function usePool(poolId: string | null) {
   const { session } = useAuth();
   return useQuery({
     queryKey: ['pool', poolId],
     enabled: !!session && !!poolId,
-    // A room's roster and result do not change once settled, and while it is
-    // live the rail is already polling status.
     staleTime: 30_000,
     queryFn: async (): Promise<PoolView> => {
       const { data, error } = await api.GET('/api/v1/pools/{pool_id}', {

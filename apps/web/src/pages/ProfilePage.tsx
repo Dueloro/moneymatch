@@ -116,12 +116,6 @@ export function ProfilePage() {
   );
 }
 
-/**
- * Change the account password via Supabase. A "Change password" button opens a
- * two-step flow: confirm the current password, then set + confirm the new one.
- * Accounts sign in by username (no email on file), so there is no email-based
- * reset; this only re-auths and sets the new password on the signed-in account.
- */
 function ChangePassword() {
   const { verifyCurrentPassword, changePassword } = useAuth();
   const [step, setStep] = useState<'closed' | 'current' | 'new'>('closed');
@@ -254,9 +248,6 @@ function ChangePassword() {
   );
 }
 
-/** Editable protective caps. Lowering applies instantly; raising is staged 24 h
- * server-side and surfaced here as a pending note. Max-concurrent is
- * system-owned, shown read-only. */
 function LimitsEditor({ limits }: { limits: Limits }) {
   const update = useUpdateLimits();
   const [loss, setLoss] = useState('');
@@ -265,7 +256,6 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Seed the dollar inputs from the live caps whenever they change.
   useEffect(() => {
     setLoss(dollars(limits.daily_loss_cap_cents));
     setEntry(dollars(limits.daily_entry_cap_cents));
@@ -355,7 +345,6 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   );
 }
 
-/** A self-imposed break: staking is refused until it ends (extend-only). */
 function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
   const update = useUpdateLimits();
   const [confirming, setConfirming] = useState<number | null>(null);
@@ -443,12 +432,10 @@ function PendingNote({ cents, at }: { cents: number; at: string }) {
   );
 }
 
-/** Dollars string (no trailing .00 for whole amounts) from integer cents. */
 function dollars(cents: number): string {
   return (cents / 100).toFixed(2).replace(/\.00$/, '');
 }
 
-/** Parse a dollar input to integer cents; null when not a positive number. */
 function toCents(value: string): number | null {
   const n = Number(value.trim());
   if (!Number.isFinite(n) || n <= 0) return null;

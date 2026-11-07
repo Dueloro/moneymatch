@@ -2,8 +2,6 @@
    the gameMeta helper alongside internal icon components. */
 import type { FC } from 'react';
 
-/** Per-game presentation: a clean display name, an accent color, and a small
- * icon. Keyed by the host game id. */
 export interface GameMeta {
   id: string;
   name: string;
@@ -24,7 +22,6 @@ const DotIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-/** The game every surface plays today. */
 export const CHESS = 'chess.lichess';
 
 const GAMES: Record<string, GameMeta> = {
@@ -36,8 +33,6 @@ const GAMES: Record<string, GameMeta> = {
   },
 };
 
-/** Presentation for a game id. Falls back to a passed-in display name (with the
- * host suffix stripped) for any game not in the map. */
 export function gameMeta(id: string, fallbackName?: string): GameMeta {
   const known = GAMES[id];
   if (known) return known;

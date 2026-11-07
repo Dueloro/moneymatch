@@ -1,5 +1,3 @@
-// Inline styles for the admin surface. Deliberately plain and dense — the admin
-// tools do NOT follow the consumer design system (09-phase-6 · deliverable 2).
 import type { CSSProperties } from 'react';
 
 export const styles: Record<string, CSSProperties> = {

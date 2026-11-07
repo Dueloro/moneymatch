@@ -30,14 +30,10 @@ const ENTRY_LABELS: Record<string, string> = {
 };
 
 function ledgerLabel(entry: LedgerEntry): string {
-  // Memos are server free-text that embed raw metric/market ids
-  // ("chess_accuracy easy pool entry"); humanize them so no snake_case
-  // identifier reaches the player.
   if (entry.memo) return humanizeIds(entry.memo);
   return ENTRY_LABELS[entry.entry_type] ?? entry.entry_type;
 }
 
-/** A small semantic dot leading each ledger row: money in, fee, or hold. */
 function LedgerDot({ entry }: { entry: LedgerEntry }) {
   const color =
     entry.entry_type === 'rake'
@@ -63,9 +59,6 @@ export function WalletPage() {
   const busy = deposit.isPending || withdraw.isPending;
 
   return (
-    // A column the height of the viewport: the balance and the two preset rows
-    // stay put and only the ledger scrolls, so the page stops growing with the
-    // number of entries.
     <div className="flex h-full flex-col">
       <SectionHeader level="page" hint="Play money until full launch.">
         Wallet
@@ -86,8 +79,8 @@ export function WalletPage() {
         </div>
       ) : (
         <>
-          {/* One hero figure rather than three equal cells. Available is the
-           * number you came for; escrow and lifetime are its context. */}
+          {/* Available is the number you came for; escrow and lifetime are
+           * its context. */}
           <Card className="p-5">
             <p className="label-money">Available</p>
             <p className="mt-1 text-3xl font-semibold text-green">
@@ -132,8 +125,6 @@ export function WalletPage() {
                 Nothing yet. Add funds and join a contest to start the ledger.
               </p>
             ) : (
-              // `min-h` keeps the ledger from being squeezed to nothing on a
-              // short window; past that the outer column takes over scrolling.
               <div className="min-h-[9rem] flex-1 space-y-2 overflow-y-auto pb-1 pr-2">
                 {rows.map((entry) => (
                   <ExpandableCard

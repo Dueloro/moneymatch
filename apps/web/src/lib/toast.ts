@@ -1,7 +1,3 @@
-// Tiny framework-agnostic toast bus. Any module (including the React Query
-// client, which lives outside the component tree) can call `toast.*`; the
-// <Toaster /> mounted once at the root subscribes and renders the messages.
-
 export type ToastKind = 'success' | 'error' | 'info';
 
 export interface ToastMessage {
@@ -26,7 +22,6 @@ export const toast = {
   info: (text: string) => emit('info', text),
 };
 
-/** Subscribe to toast emissions. Returns an unsubscribe function. */
 export function subscribeToasts(listener: Listener): () => void {
   listeners.add(listener);
   return () => {

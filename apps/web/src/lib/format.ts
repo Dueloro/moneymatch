@@ -1,8 +1,5 @@
-// Display formatters. Ported from poc-reference/utils/format.ts and switched to
-// integer cents (the server owns every number as cents — 04-phase-1 design
-// rules). No odds anywhere: we show entries, pots, prizes, and rake.
+// No odds anywhere: we show entries, pots, prizes, and rake.
 
-/** Format integer cents as USD, e.g. 102394 → "$1,023.94". Exact integer math. */
 export function formatCurrency(cents: number): string {
   const sign = cents < 0 ? '-' : '';
   const abs = Math.abs(Math.trunc(cents));
@@ -11,18 +8,11 @@ export function formatCurrency(cents: number): string {
   return `${sign}$${dollars}.${remainder}`;
 }
 
-/** Like `formatCurrency` but always shows the sign, e.g. 1800 → "+$18.00". */
 export function formatSignedCurrency(cents: number): string {
   if (cents > 0) return `+${formatCurrency(cents)}`;
-  return formatCurrency(cents); // negative already carries "-", zero is "$0.00"
+  return formatCurrency(cents);
 }
 
-/**
- * Strip em and en dashes out of server-provided display strings (game display
- * names, market resolution notes, forecast labels). The client owns
- * presentation, and the copy rules ban the em dash outright, so this normalises
- * at the render boundary rather than asking every caller to remember.
- */
 export function dashless(text: string): string {
   return text
     .replace(/\s*[—–]\s*/g, ' · ')
@@ -30,17 +20,14 @@ export function dashless(text: string): string {
     .trim();
 }
 
-/** Format a probability / share (0..1) as a whole-number percentage. */
 export function formatPct(prob: number): string {
   return `${Math.round(prob * 100)}%`;
 }
 
-/** Format a metric stat: whole numbers stay whole, else two decimals. */
 export function formatStat(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-/** Compact relative time for ledger rows, e.g. "just now", "5m ago", "3d ago". */
 export function formatRelativeTime(iso: string, now: Date = new Date()): string {
   const seconds = Math.round((now.getTime() - new Date(iso).getTime()) / 1000);
   if (seconds < 45) return 'just now';

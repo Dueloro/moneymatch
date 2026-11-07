@@ -10,11 +10,9 @@ export interface Limits {
   max_concurrent_contests: number;
   pending_limits: Record<string, number> | null;
   pending_effective_at: string | null;
-  /** Self-imposed cool-off end (ISO); staking is refused until it passes. */
   timeout_until: string | null;
 }
 
-/** First-match funnel progress — drives the getting-started checklist. */
 export interface GettingStarted {
   linked_game: boolean;
   placed_wager: boolean;
@@ -32,18 +30,15 @@ export interface Me {
     role: string;
     status: string;
     member_since: string;
-    /** Catalog game ids whose getting-started checklist was dismissed. */
     dismissed_checklists: string[];
   };
   needs_onboarding: boolean;
   limits: Limits | null;
   unread_notifications: number;
   getting_started: GettingStarted | null;
-  /** Games the player has entered a contest for (per-game checklist progress). */
   contested_games: string[];
 }
 
-/** Fetches `/me` once the user is authenticated. Provisions the row server-side. */
 export function useMe() {
   const { session } = useAuth();
   return useQuery({
@@ -57,7 +52,6 @@ export function useMe() {
   });
 }
 
-/** Irreversibly self-exclude (freeze staking). Refreshes `/me` on success. */
 export function useSelfExclude() {
   const qc = useQueryClient();
   const { session } = useAuth();
@@ -71,21 +65,8 @@ export function useSelfExclude() {
 }
 
 /**
- * Dismiss a getting-started checklist. Server-side so the dismissal survives
- * reload and follows the player across devices (never localStorage).
- *
- * Two things make the X actually work, not just fire a request:
- *
- * 1. **Optimistic** — the card hides the instant you click, before the network
- *    round-trip. Without this the card lingers until a PATCH *and* a `/me`
- *    refetch both return; on a slow link that lag reads as "the X does nothing".
- * 2. **Race-safe** — the full list PATCHed to the server is computed from the
- *    freshest cache each time, not a value closed over at render. Dismissing a
- *    second card before the first settles no longer drops the first dismissal
- *    (the old code sent `[game]` built from a stale `dismissed_checklists`).
- *
- * On error we roll back to the pre-click snapshot; on settle we invalidate so
- * the server stays the source of truth.
+ * Server-side so the dismissal survives reload and follows the player across
+ * devices (never localStorage).
  */
 export function useSetDismissedChecklists() {
   const qc = useQueryClient();
@@ -119,11 +100,6 @@ export function useSetDismissedChecklists() {
   });
 }
 
-/**
- * Update the player's protective staking caps (daily loss / entry, in cents).
- * The server applies a lowering instantly and defers a raise 24 h, so the fresh
- * `/me` reflects either the new cap or a `pending_limits` entry.
- */
 export function useUpdateLimits() {
   const qc = useQueryClient();
   const { session } = useAuth();

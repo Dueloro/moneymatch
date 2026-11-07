@@ -13,7 +13,6 @@ import { formatCurrency } from '../lib/format';
 import { toast } from '../lib/toast';
 import { useActivity, type ActivityItem } from '../hooks/useActivity';
 
-/** A newly-settled contest → a one-line toast summarizing the outcome. */
 function toastFor(item: ActivityItem): string {
   const what =
     item.type === 'match'
@@ -34,8 +33,6 @@ export function ActivityPage() {
   const { data, isLoading, isError, refetch } = useActivity();
   const items = useMemo(() => data?.items ?? [], [data]);
 
-  // Settlement toast: track which resolved matches we've already shown, seeding
-  // from the first load so we only pop for transitions that happen live.
   const seen = useRef<Set<string> | null>(null);
 
   useEffect(() => {
@@ -51,14 +48,9 @@ export function ActivityPage() {
     }
   }, [items]);
 
-  // The newest contest that has actually finished. `items` is newest first, so
-  // the first resolved row is the one you just played.
   const newestFinished = items.find((i) => i.resolved_at != null);
 
   return (
-    // Spans the column rather than capping at the reading measure: the rail
-    // already balances the page, so a 640px cap only stranded ~160px of dead
-    // column between the list and the rail.
     <div>
       <SectionHeader level="page" hint="Every contest you have played, newest first.">
         Activity
@@ -88,9 +80,6 @@ export function ActivityPage() {
             <ActivityCard
               key={item.id}
               item={item}
-              // Your latest finished contest opens on arrival, so the stat line
-              // you actually came to check is on screen without a click. Every
-              // older row stays collapsed.
               defaultOpen={item.id === newestFinished?.id}
             />
           ))}

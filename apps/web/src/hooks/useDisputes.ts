@@ -16,9 +16,6 @@ function messageOf(error: unknown, fallback: string): string {
   return typeof msg === 'string' && msg ? msg : fallback;
 }
 
-/** File a dispute ("contest") against any settled contest — match, pool, or
- * tournament. On success the Activity feed refetches so the card flips to
- * "Contested · under review". */
 export function useFileDispute() {
   const qc = useQueryClient();
   return useMutation({

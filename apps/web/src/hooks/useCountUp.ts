@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * Animate an integer toward `target` whenever it changes (e.g. a balance after a
- * win or deposit). No animation on first mount, and it respects reduced-motion.
- */
 export function useCountUp(target: number, durationMs = 600): number {
   const [value, setValue] = useState(target);
   const prev = useRef(target);

@@ -28,19 +28,15 @@ import {
   type QueueStatus,
 } from '../hooks/useMatchmaking';
 
-/** The market's headline resolution note (the part before the first separator). */
 function marketHeadline(market: MarketRow): string {
   return dashless(market.resolution_note).split('·')[0]?.trim() ?? '';
 }
 
-/** Default speed for a speed-gated market: the middle option if present. */
 function defaultSpeed(market: MarketRow): string | undefined {
   if (!market.requires_speed) return undefined;
   return market.speeds[1] ?? market.speeds[0] ?? undefined;
 }
 
-// States where the slip should show the confirm/active card for a deep-linked
-// match; a terminal match falls through to the normal slip (reachable via Activity).
 const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
 
 export function PlayPage() {
@@ -52,8 +48,6 @@ export function PlayPage() {
     refetch: refetchMarkets,
   } = useMarkets(CHESS);
 
-  // Inbox "Respond" lands here as /play?match=<id>; open that match's slip
-  // directly (it isn't in the viewer's queue status when it came from a challenge).
   const [searchParams] = useSearchParams();
   const deepLinkMatchId = searchParams.get('match') ?? undefined;
   const { data: deepLinkMatch } = useMatch(deepLinkMatchId);
@@ -78,7 +72,6 @@ export function PlayPage() {
   const linked = markets?.linked ?? false;
   const gameName = gameMeta(CHESS).name;
   const presets = markets?.entry_presets_cents ?? [];
-  // A match is in flight: surface the slip and freeze new joins.
   const inFlight = status?.status === 'searching' || status?.status === 'matched';
 
   const openMarkets = markets?.markets ?? [];
@@ -156,8 +149,6 @@ export function PlayPage() {
                         entryOptions={presets}
                         payoutFor={(entry) => prizeForEntry(entry, m.multiplier_bps)}
                         payoutLabel="You win"
-                        // Pot is both stakes (1v1); the fee is what the winner
-                        // doesn't take. Matches PlaySlip's confirm-step RakeLine.
                         feeNote={(entry) =>
                           platformFeeNote(
                             entry * 2 - prizeForEntry(entry, m.multiplier_bps),

@@ -4,9 +4,6 @@ import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 import { CHESS } from '../lib/games';
 
-// Wire types mirror `schemas/tournaments.py`. Scores, ranks, and payouts are all
-// server-computed; the client only picks a metric + a preset entry.
-
 export interface TournamentMetric {
   metric: string;
   label: string;
@@ -86,9 +83,6 @@ export function useTournamentStatus() {
   return useQuery({
     queryKey: ['tournament-status', session?.user.id],
     enabled: !!session,
-    // The rail mounts this app-wide, so only poll hard while a field is
-    // actually forming. Idle and formed both change off the back of something
-    // that already invalidates the key (a join, a leave, a settlement).
     refetchInterval: (query) =>
       query.state.data?.status === 'searching' ? 2500 : 10_000,
     queryFn: async (): Promise<TournamentStatus> => {
@@ -109,7 +103,6 @@ function useInvalidate() {
   };
 }
 
-/** One tournament by id, for the notification feed's expanded standings. */
 export function useTournament(tournamentId: string | null) {
   const { session } = useAuth();
   return useQuery({

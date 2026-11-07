@@ -35,13 +35,10 @@ interface LedgerPage {
   next_cursor: string | null;
 }
 
-// Server presets ($10/$25/$50/$100). The server re-validates; this only drives
-// which pills render (04-phase-1 · deposits are presets, never client amounts).
 export const DEPOSIT_PRESETS_CENTS = [1000, 2500, 5000, 10000] as const;
 
 const walletKey = (userId?: string) => ['wallet', userId];
 
-/** Balances + recent ledger. Shared by the Wallet screen and the Play header. */
 export function useWallet() {
   const { session } = useAuth();
   return useQuery({
@@ -55,7 +52,6 @@ export function useWallet() {
   });
 }
 
-/** Cursor-paginated ledger for the full "Recent" list ("Load more"). */
 export function useWalletLedger() {
   const { session } = useAuth();
   return useInfiniteQuery({

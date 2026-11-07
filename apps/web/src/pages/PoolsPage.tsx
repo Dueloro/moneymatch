@@ -33,7 +33,6 @@ import {
   type PoolView,
 } from '../hooks/usePools';
 
-// Difficulty chips read easiest to hardest regardless of API order.
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'];
 
 export function PoolsPage() {
@@ -47,9 +46,6 @@ export function PoolsPage() {
   const { data: status } = usePoolStatus();
   const enter = useEnterPool();
 
-  // Filters trim the metric × difficulty grid. Entry is no longer a filter
-  // dimension: it lives inside each card as a control, so filtering by it would
-  // hide contests rather than narrow them.
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
   const [difficultyFilter, setDifficultyFilter] = useState<string>(ALL);
 
@@ -125,7 +121,6 @@ export function PoolsPage() {
     );
   }
 
-  // One pool in flight at a time, so joins freeze while searching or formed.
   const busy = status?.status === 'searching' || status?.status === 'formed';
 
   return (
@@ -134,9 +129,6 @@ export function PoolsPage() {
 
       <GettingStarted />
 
-      {/* From xl up the rail's "Room formed" section owns this, so a formed room
-       * stops pushing the grid down. Below xl there is no rail, so keep it here
-       * — it is the only place to see the room or leave the queue. */}
       {status && (status.status === 'searching' || status.status === 'formed') && (
         <div className="xl:hidden">
           <PoolStatusBanner status={status} />
@@ -200,8 +192,6 @@ export function PoolsPage() {
                   <SectionHeader level="section">{m.label}</SectionHeader>
                 )}
                 <CardGrid count={m.cards.length}>
-                  {/* One card per bar. Entry is a control inside it, so a
-                   * three-difficulty metric is three cards, not nine. */}
                   {m.cards.map((c) => {
                     const key = `${m.metric}:${c.difficulty}`;
                     return (
@@ -252,7 +242,6 @@ export function PoolsPage() {
   );
 }
 
-/** Compact top banner for an in-flight pool: forming (with cancel) or formed. */
 function PoolStatusBanner({
   status,
 }: {

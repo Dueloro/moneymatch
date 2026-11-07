@@ -20,7 +20,6 @@ const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 export function SignInPage() {
   const { session, loading, isPasswordRecovery } = useAuth();
   const me = useMe();
-  // After auth the user creates a profile, then links Lichess.
   const [postStep, setPostStep] = useState<'idle' | 'link'>('idle');
 
   if (loading || (session && me.isLoading && !me.isError)) {
@@ -74,16 +73,13 @@ export function SignInPage() {
   );
 }
 
-/** After auth + onboarding, resume an invite-link accept if one was pending
- * (the acquisition funnel), otherwise land on Solo Pools (the default mode). */
 function PostAuthRedirect() {
   const to = peekReturnTo() ?? '/play';
   useEffect(() => clearReturnTo(), []);
   return <Navigate to={to} replace />;
 }
 
-/** Browser had a session the API rejects (stale / wrong signing scheme). Clear
- * it and offer a clean sign-in. */
+/** Browser had a session the API rejects (stale / wrong signing scheme). */
 function StaleSessionStep() {
   const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -318,11 +314,10 @@ function CheckEmailNotice({ email }: { email: string }) {
           type="button"
           className="text-text-secondary underline hover:text-text"
           onClick={async () => {
-            // Re-issuing signUp for an unconfirmed address re-sends the link.
             try {
               await signUpWithEmail(email, crypto.randomUUID());
             } catch {
-              /* already-registered / rate-limit are fine here */
+              // already-registered / rate-limit are fine here.
             }
             setResent(true);
           }}
@@ -424,7 +419,6 @@ function ResetPasswordStep() {
     setBusy(true);
     try {
       await setNewPassword(password);
-      // On success isPasswordRecovery clears and the normal flow resumes.
     } catch (err) {
       setError((err as Error)?.message || 'Could not update your password.');
       setBusy(false);
@@ -458,8 +452,6 @@ function ResetPasswordStep() {
 function OnboardingStep({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const { session } = useAuth();
-  // The handle was chosen at sign-up; recover it from the synthetic email so it
-  // survives across sessions (e.g. an account that signed up but didn't finish).
   const derived = emailToUsername(session?.user.email);
   const [username, setUsername] = useState(derived ?? '');
   const [state, setState] = useState('');
@@ -561,8 +553,6 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Onboarding step: link Lichess to start playing, then resume a pending
- * invite if there is one. */
 function LinkGameStep() {
   const navigate = useNavigate();
   return (
@@ -587,8 +577,6 @@ function LinkGameStep() {
   );
 }
 
-/** Left-aligned title + optional subtitle shared by every auth step, so the
- * whole suite (sign-in, reset, onboarding) reads as one screen family. */
 function AuthHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="text-center">
@@ -598,7 +586,6 @@ function AuthHeading({ title, subtitle }: { title: string; subtitle?: string }) 
   );
 }
 
-/** "OR" rule separating the primary form from social sign-in. */
 function Divider() {
   return (
     <div className="my-5 flex items-center gap-3 text-xs text-text-tertiary">
@@ -609,7 +596,6 @@ function Divider() {
   );
 }
 
-/** Left-aligned "← Back to sign in" used by the reset / code sub-forms. */
 function BackToSignIn({ onBack }: { onBack: () => void }) {
   return (
     <button
@@ -637,8 +623,6 @@ function LegalFooter() {
   );
 }
 
-/** A legal/marketing link that lives on the dueloro.com site, so it opens in a
- * new tab rather than routing inside the app. */
 function LegalLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a
@@ -652,8 +636,10 @@ function LegalLink({ href, children }: { href: string; children: React.ReactNode
   );
 }
 
-/** Google's four-colour "G" mark. Inlined so the button needs no icon library
- * and no external asset (which a strict CSP would have to allow). */
+/**
+ * Inlined so the button needs no icon library and no external asset (which a
+ * strict CSP would have to allow).
+ */
 function GoogleMark({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" aria-hidden="true">

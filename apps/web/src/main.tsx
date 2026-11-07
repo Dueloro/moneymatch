@@ -16,7 +16,6 @@ if (env.sentryDsn) {
     dsn: env.sentryDsn,
     dataCollection: {
       // Collect user info (IP, email) and HTTP request bodies.
-      // To opt out: set userInfo: false and httpBodies: []
     },
   });
 }

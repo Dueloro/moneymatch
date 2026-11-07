@@ -2,9 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../lib/api';
 
-// Dense operator types (mirrors schemas/admin.py). The admin surface is plain and
-// boring by design (09-phase-6 · deliverable 2) — not the consumer design system.
-
 export interface FlagItem {
   key: string;
   enabled: boolean;
@@ -37,8 +34,6 @@ export interface AdminContestListItem {
   resolved_at: string | null;
 }
 
-// --- Flags ----------------------------------------------------------------- //
-
 export function useAdminFlags() {
   return useQuery({
     queryKey: ['admin', 'flags'],
@@ -67,8 +62,6 @@ export function useUpdateFlag() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'flags'] }),
   });
 }
-
-// --- Users ----------------------------------------------------------------- //
 
 export function useAdminUsers(q: string) {
   return useQuery({
@@ -136,8 +129,6 @@ export function useAdjustUser(userId: string | null) {
   });
 }
 
-// --- Contests -------------------------------------------------------------- //
-
 export function useAdminContests(filters: { state?: string; game?: string }) {
   return useQuery({
     queryKey: ['admin', 'contests', filters],
@@ -193,8 +184,6 @@ export function useVoidMatch() {
   });
 }
 
-// --- Queue / Reconciliation / Risk ---------------------------------------- //
-
 export function useAdminQueue() {
   return useQuery({
     queryKey: ['admin', 'queue'],
@@ -242,11 +231,9 @@ export function useClearFlag() {
   });
 }
 
-// --- Disputes -------------------------------------------------------------- //
-
 export interface AdminDispute {
   id: string;
-  ref_type: string; // match | pool | tournament
+  ref_type: string;
   ref_id: string;
   user_id: string;
   reason: string;
@@ -256,7 +243,6 @@ export interface AdminDispute {
   resolved_at: string | null;
 }
 
-/** Open, user-filed contest disputes awaiting admin review. */
 export function useAdminDisputes() {
   return useQuery({
     queryKey: ['admin', 'disputes'],

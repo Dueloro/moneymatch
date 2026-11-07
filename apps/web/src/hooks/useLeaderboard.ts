@@ -28,7 +28,6 @@ export interface LeaderboardResponse {
   min_contests: number;
 }
 
-/** ROI-ranked real users over a rolling window (design p.7). */
 export function useLeaderboard() {
   const { session } = useAuth();
   return useQuery({
@@ -43,7 +42,6 @@ export function useLeaderboard() {
   });
 }
 
-/** ROI basis points → "+31.2%". */
 export function formatRoi(bps: number): string {
   const pct = bps / 100;
   const sign = pct > 0 ? '+' : '';

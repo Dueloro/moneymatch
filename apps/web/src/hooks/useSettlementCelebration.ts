@@ -4,68 +4,17 @@ import type { ActivityItem } from './useActivity';
 import { useActivity } from './useActivity';
 
 /**
- * Notices the moment one of your contests settles, so the result can be shown
- * rather than merely appearing in a list.
- *
- * `/events/stream` pushes a bare ping and the client refetches, so the
- * transition is detected by diffing successive Activity snapshots. That fires
- * for any route to settlement (worker, admin resettle, a dispute resolution).
- *
- * Two properties that make it trustworthy:
- *
- * - **A contest is announced once, ever.** Ids that have been shown are kept in
- *   `localStorage`, so a refresh, a second tab, or a returning visit does not
- *   replay results you have already seen.
- * - **A result that landed while you were away is still shown**, provided it is
- *   recent and has not been announced before. You play on lichess.org, so you
- *   are usually not looking at Money Match when your contest settles.
- * - **Nothing is announced to a tab nobody is looking at.** `useEventStream` invalidates `['activity']` the
- *   instant the worker settles, and an explicit invalidation refetches whether
- *   or not the tab is in front. So a backgrounded tab would detect the
- *   settlement, play the whole sequence to nobody, mark the contest announced
- *   and never show it again — the result was *consumed* while you were on
- *   lichess.org. Detection is therefore held, along with the announced-marking
- *   it implies, until the tab is visible (`visibilityState !== 'hidden'`)
- *   rather than backgrounded.
- *
- * Everything terminal but older than `RECENT_MS` is recorded silently, so
- * opening the app after a week does not replay your history at you.
- */
-
-/**
- * Bumped from v1: the previous behaviour marked contests announced from a
- * backgrounded tab, so any browser that ran it is carrying ids for results it
- * never actually showed. Those would stay suppressed forever. A new key
- * releases them; the `RECENT_MS` window on first load keeps that from turning
- * into a replay of your whole history.
+ * A new key releases them; the `RECENT_MS` window on first load keeps that
+ * from turning into a replay of your whole history.
  */
 const STORAGE_KEY = 'mm.announced-settlements.v2';
 
-/** Terminal states, matching `ActivityCard`'s own set. */
 const TERMINAL = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 
-/** Cap the stored id list so it cannot grow without bound. */
 const MAX_REMEMBERED = 400;
 
-/**
- * Most sequences played back-to-back from a single batch.
- *
- * A tab left open for a long weekend can come back to a pile of settled
- * contests, and every sequence is a full-screen takeover: twelve of them is
- * twenty-odd seconds of hijacked screen. Older ones are still marked announced,
- * they just are not performed.
- */
 const MAX_BURST = 3;
 
-/**
- * How recently a contest must have resolved to be worth announcing on arrival.
- *
- * This has to cover *playing an entire game elsewhere with this tab closed*,
- * which sets the floor much higher than it first appears: a classical chess
- * game can run well past half an hour. An hour covers a full session and is still unambiguously "just now";
- * yesterday's history stays silent either way. Compared against the browser
- * clock, so it is deliberately generous about skew.
- */
 const RECENT_MS = 60 * 60 * 1000;
 
 export type SettlementOutcome = 'win' | 'loss' | 'push' | 'refund';
@@ -76,16 +25,12 @@ export interface Settlement {
   netCents: number;
   title: string;
   game: string;
-  /** `pool` | `tournament` | `match` — drives the wording. */
   type: ActivityItem['type'];
 }
 
 /**
- * Which of the four results this is.
- *
  * `CANCELED` is a refund rather than a loss: it means nothing could be graded,
- * and the entry came back. Telling a player they lost when they were refunded
- * would be worse than saying nothing.
+ * and the entry came back.
  */
 export function outcomeOf(item: ActivityItem): SettlementOutcome {
   if (item.state === 'CANCELED') return 'refund';
@@ -103,8 +48,6 @@ function loadAnnounced(): Set<string> {
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? new Set(parsed.map(String)) : new Set();
   } catch {
-    // A corrupt or unavailable store must not break the app. Worst case a
-    // result is announced twice, which is far better than a crash on load.
     return new Set();
   }
 }
@@ -114,33 +57,10 @@ function saveAnnounced(ids: Set<string>): void {
     const trimmed = Array.from(ids).slice(-MAX_REMEMBERED);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
   } catch {
-    // Private mode / quota. Nothing to do; the in-memory set still holds for
-    // this session, which is the case that matters.
+    // Private mode / quota.
   }
 }
 
-/**
- * Whether the tab is on screen, so a result drawn now would actually be seen.
- *
- * The one case worth holding for is the tab you *left* — backgrounded or
- * minimised while you go play the game elsewhere — and `visibilityState`
- * reports exactly that: `hidden`. A visible tab is on screen and can be shown
- * to.
- *
- * An earlier version also required `document.hasFocus()`, meaning to also hold
- * a visible-but-unfocused tab (say, one sitting behind the window you are
- * playing in). In practice that check is too sharp and fails the common case:
- * `hasFocus()` is false whenever the page is not the OS-frontmost surface — the
- * devtools pane is focused, another app is in front, the tab is embedded in a
- * webview. Settlement usually lands while you are doing precisely one of those
- * (you leave this app to play), so gating on focus held the result forever and
- * the sequence never played. Visibility is the honest signal; a rare overlay
- * shown to a visible tab you happen not to be staring at is a far smaller cost
- * than never showing it at all.
- *
- * `focus`/`blur` are still listened to: they are cheap re-check triggers for
- * the browsers that fire them alongside a visibility change.
- */
 function useHasAttention(): boolean {
   const read = () =>
     typeof document === 'undefined' || document.visibilityState !== 'hidden';
@@ -153,7 +73,6 @@ function useHasAttention(): boolean {
     document.addEventListener('visibilitychange', sync);
     window.addEventListener('focus', sync);
     window.addEventListener('blur', sync);
-    // The state can have moved between first render and this effect running.
     sync();
     return () => {
       document.removeEventListener('visibilitychange', sync);
@@ -177,12 +96,6 @@ export function useSettlementCelebration(): {
 
   useEffect(() => {
     if (!data) return;
-    // Hold everything — including marking contests announced — until this tab
-    // is the one being looked at. Detecting a settlement in a background tab
-    // would spend the result on an empty room: the sequence plays out, the id
-    // is recorded as shown, and the one moment worth showing is gone. Whatever
-    // arrived while away is still in `data` when attention returns, so nothing
-    // is lost by waiting.
     if (!attentive) return;
     const items: ActivityItem[] = data.items ?? [];
     if (announced.current === null) announced.current = loadAnnounced();
@@ -190,8 +103,6 @@ export function useSettlementCelebration(): {
 
     const terminal = items.filter((i) => TERMINAL.has(i.state));
 
-    // First snapshot: anything that resolved *just now* is still worth showing —
-    // you were away playing the game. Everything older is recorded silently.
     if (!seeded.current) {
       seeded.current = true;
       const now = Date.now();
@@ -219,8 +130,6 @@ export function useSettlementCelebration(): {
       for (const item of items_) seen_.add(item.id);
       saveAnnounced(seen_);
 
-      // Oldest first, so a burst is shown in the order the contests resolved,
-      // keeping the most recent few if a long absence produced a pile.
       const ordered = [...items_]
         .sort((a, b) => (a.resolved_at ?? '').localeCompare(b.resolved_at ?? ''))
         .slice(-MAX_BURST);

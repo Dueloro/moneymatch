@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useAdminFlags, useUpdateFlag } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
 
-/** Kill switches + config. Toggling is live (server reads flags per-request). */
 export function AdminFlagsPage() {
   const flags = useAdminFlags();
   const update = useUpdateFlag();

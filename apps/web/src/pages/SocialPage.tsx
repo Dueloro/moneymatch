@@ -11,11 +11,6 @@ import { InboxPage } from './InboxPage';
 type SocialTab = 'inbox' | 'leaderboard' | 'friends';
 const TABS: SocialTab[] = ['inbox', 'leaderboard', 'friends'];
 
-/** The Social section: Inbox, Leaderboard, and Friends under one nav entry.
- * Inbox leads and is the default tab — messages and notifications are what you
- * come here to check; the leaderboard is a browse. The notification bell
- * deep-links here via `?tab=inbox`; Friends' Message button adds
- * `&dm=<user_id>` to land in a specific thread. */
 export function SocialPage() {
   usePageTitle('Social');
   const [params] = useSearchParams();
@@ -25,8 +20,6 @@ export function SocialPage() {
   );
   const inboxUnread = useInboxUnread();
 
-  // Follow later `?tab=` changes too (the page stays mounted when another
-  // surface links across, e.g. Friends → Message).
   useEffect(() => {
     if (TABS.includes(initial as SocialTab)) setTab(initial as SocialTab);
   }, [initial]);

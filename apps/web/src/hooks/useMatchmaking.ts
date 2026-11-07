@@ -4,9 +4,6 @@ import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 import { toast } from '../lib/toast';
 
-// Wire types mirror the FastAPI `schemas/play.py` responses. The server owns
-// every number; the client only sends intents (market + preset choice + ids).
-
 export interface MarketRow {
   key: string;
   label: string;
@@ -82,7 +79,7 @@ export interface WaitingRow {
   waited_seconds: number;
 }
 
-/** Derived "You'd win" figure: entry × 2 × (1 − rake). Exact integer cents. */
+/** Derived "You'd win" figure: entry × 2 × (1 − rake). */
 export function prizeForEntry(entryCents: number, multiplierBps: number): number {
   return Math.floor((entryCents * multiplierBps) / 10000);
 }
@@ -91,8 +88,6 @@ function messageOf(error: unknown, fallback: string): string {
   const msg = (error as { message?: string } | undefined)?.message;
   return typeof msg === 'string' && msg ? msg : fallback;
 }
-
-// --- reads ---------------------------------------------------------------- //
 
 export function useMarkets(game: string | undefined) {
   const { session } = useAuth();
@@ -109,7 +104,6 @@ export function useMarkets(game: string | undefined) {
   });
 }
 
-/** The viewer's live queue standing. Polls every 2 s (design: queue status 2 s). */
 export function useQueueStatus() {
   const { session } = useAuth();
   return useQuery({
@@ -124,9 +118,6 @@ export function useQueueStatus() {
   });
 }
 
-/** A single match by id — backs the Inbox "Respond" deep-link (`/play?match=`),
- * where the accepted challenge's match isn't in the viewer's queue status. Polls
- * every 2 s so the confirm card follows the opponent's confirm live. */
 export function useMatch(matchId: string | undefined) {
   const { session } = useAuth();
   return useQuery({
@@ -158,8 +149,6 @@ export function useWaiting(game: string | undefined) {
     },
   });
 }
-
-// --- mutations ------------------------------------------------------------ //
 
 function useQueueInvalidation() {
   const qc = useQueryClient();

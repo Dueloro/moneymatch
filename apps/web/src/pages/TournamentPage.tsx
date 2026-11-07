@@ -26,7 +26,6 @@ import {
   type TournamentView,
 } from '../hooks/useTournaments';
 
-/** The Tournament section: browse joinable skill fields as cards. */
 export function TournamentPage() {
   usePageTitle('Tournament');
   const {
@@ -160,8 +159,8 @@ export function TournamentPage() {
                     entryOptions={presets}
                     payoutFor={(entry) => entry * fieldSize}
                     payoutLabel="Pot if full"
-                    // Rake is taken off the full pot before the top places split
-                    // it (money_math.split_by_weights).
+                    // Rake is taken off the full pot before the top places
+                    // split it (money_math.split_by_weights).
                     feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
                     buttonLabel="Join tournament"
                     disabled={busy}
@@ -184,7 +183,6 @@ export function TournamentPage() {
   );
 }
 
-/** In-flight tournament: forming banner (with cancel) or live/final standings. */
 function TournamentStatusBanner({
   status,
 }: {

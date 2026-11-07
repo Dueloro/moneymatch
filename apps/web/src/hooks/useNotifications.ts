@@ -16,7 +16,6 @@ export interface NotificationsResponse {
   items: NotificationItem[];
 }
 
-/** The Inbox feed. Polls every 15 s (bell dot also comes from /me). */
 export function useNotifications() {
   const { session } = useAuth();
   return useQuery({

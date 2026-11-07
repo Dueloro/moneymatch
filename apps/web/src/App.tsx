@@ -40,7 +40,6 @@ export function App() {
           <Route path="inbox" element={<Navigate to="/social?tab=inbox" replace />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
-        {/* Admin tree: separate, dense layout (not the consumer design system). */}
         <Route element={<RequireAdmin />}>
           <Route path="admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/users" replace />} />
@@ -59,10 +58,6 @@ export function App() {
   );
 }
 
-/**
- * The bare domain has no marketing page: send visitors straight into the app.
- * Authenticated → Solo Pools (the default mode); everyone else → sign-in.
- */
 function RootRedirect() {
   const { session, loading } = useAuth();
   if (loading) return <Loader />;

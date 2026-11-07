@@ -8,10 +8,6 @@ function read(key: string): boolean {
   }
 }
 
-/**
- * Remembers a one-time dismissal, so a returning player never pays the tax of
- * scrolling past an explainer they read on their first visit.
- */
 export function useDismissed(key: string): [boolean, () => void] {
   const storageKey = `mm.dismissed.${key}`;
   const [dismissed, setDismissed] = useState(() => read(storageKey));
@@ -19,7 +15,7 @@ export function useDismissed(key: string): [boolean, () => void] {
     try {
       window.localStorage.setItem(storageKey, '1');
     } catch {
-      /* private mode: the note just comes back next visit */
+      // private mode: the note just comes back next visit.
     }
     setDismissed(true);
   }, [storageKey]);

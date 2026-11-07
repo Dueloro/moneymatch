@@ -4,9 +4,6 @@ import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 import { track } from '../lib/telemetry';
 
-// Mirrors schemas/social.py. The server owns entry cents, expiry, and matching;
-// the client sends only a username/code or ids.
-
 export interface FriendItem {
   friendship_id: string;
   user_id: string;
@@ -26,7 +23,6 @@ function messageOf(error: unknown, fallback: string): string {
   return typeof msg === 'string' && msg ? msg : fallback;
 }
 
-/** Friends list + pending requests. Polls slowly for presence (green dot). */
 export function useFriends() {
   const { session } = useAuth();
   return useQuery({

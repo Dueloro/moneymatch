@@ -35,7 +35,6 @@ export interface GameLink {
   host_username: string | null;
   linked_at: string | null;
   profile: ProfileSnapshot | null;
-  /** Current consecutive-win streak on this game (0 = none; losses reset it). */
   win_streak: number;
 }
 
@@ -45,7 +44,6 @@ export interface LinksResponse {
 
 const linksKey = (userId?: string) => ['links', userId];
 
-/** Read: one row per registered game with the viewer's LINKED/BLOCKED/UNLINKED state. */
 export function useLinks() {
   const { session } = useAuth();
   return useQuery({
@@ -59,7 +57,6 @@ export function useLinks() {
   });
 }
 
-/** Surface the server's error message (RFC-7807 `message`) to the UI. */
 function messageOf(error: unknown, fallback: string): string {
   const msg = (error as { message?: string } | undefined)?.message;
   return typeof msg === 'string' && msg ? msg : fallback;
@@ -73,7 +70,6 @@ function useLinksInvalidation() {
   };
 }
 
-/** Bind a host account. The server verifies via the adapter; the client only names it. */
 export function useCreateLink() {
   const invalidate = useLinksInvalidation();
   return useMutation({
@@ -89,7 +85,6 @@ export function useCreateLink() {
   });
 }
 
-/** Re-fetch a linked account's snapshot (ratings/stats) from the host. */
 export function useRefreshLink() {
   const invalidate = useLinksInvalidation();
   return useMutation({

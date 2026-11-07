@@ -10,11 +10,6 @@ import { formatCurrency } from '../lib/format';
 import { setReturnTo } from '../lib/returnTo';
 import { track } from '../lib/telemetry';
 
-/**
- * Public invite-link landing (`/i/:token`) — the acquisition funnel's front door
- * (08-phase-5 · deliverable 3). Preview is public; accepting requires sign-in +
- * a linked game. Every step emits a telemetry event (exit criterion 2).
- */
 export function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const { session } = useAuth();
@@ -48,8 +43,6 @@ export function InvitePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm text-center">
-        {/* The same mark as the shell and sign-in. This page used to carry a
-         * second, unrelated logo treatment. */}
         <div className="mx-auto mb-6 flex justify-center">
           <TriangleMark className="h-11 w-11" />
         </div>
