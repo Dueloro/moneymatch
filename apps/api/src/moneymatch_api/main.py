@@ -6,8 +6,6 @@ long-running service (00-README §2); nothing durable lives in process memory.
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -82,23 +80,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with get_sessionmaker()() as session:
             await geo_service.assert_configured_for_production(session)
 
-    worker_task: asyncio.Task[None] | None = None
-    if settings.run_worker_in_process:
-        # Run the settlement loop as a background task in this process (no separate
-        # worker service). Import lazily so this module stays importable without the
-        # worker's deps in every context.
-        from .workers.settlement_worker import run_forever
-
-        worker_task = asyncio.create_task(run_forever())
-        log.info("api.worker_in_process_started")
-
     try:
         yield
     finally:
-        if worker_task is not None:
-            worker_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await worker_task
         await dispose_engine()
         log.info("api.shutdown")
 

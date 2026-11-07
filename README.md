@@ -86,8 +86,7 @@ Browser (React SPA) ──HTTPS──▶ FastAPI service ──▶ Postgres (led
 
 ```
 apps/web            React + Vite SPA (talks only to the API)
-apps/api            FastAPI service (owns every number; verifies Supabase JWTs)
-apps/worker         Settlement worker entrypoint
+apps/api            FastAPI service + settlement worker (moneymatch_api.workers)
 packages/api-client Generated TypeScript client (OpenAPI → TS)
 docs/               Implementation summary, decisions, design guidelines,
                     data model, product, legal, business
