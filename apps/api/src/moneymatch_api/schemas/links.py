@@ -19,6 +19,15 @@ class CreateLinkRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=128)
 
 
+class LichessOAuthStartResponse(BaseModel):
+    authorize_url: str
+
+
+class LichessOAuthCallbackRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=1024)
+    state: str = Field(..., min_length=1, max_length=128)
+
+
 class GameLink(BaseModel):
     """One game's row on Profile: linked snapshot or an empty/blocked slot."""
 

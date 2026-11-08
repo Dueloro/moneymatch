@@ -7,6 +7,7 @@ from .admin_audit import AdminAudit
 from .chat import Conversation, ConversationMember, Message
 from .dispute import Dispute
 from .feature_flag import FeatureFlag
+from .lichess_oauth import LichessOAuthState
 from .linked_account import LinkedAccount
 from .live import LiveSnapshot
 from .notification import Notification
@@ -33,6 +34,7 @@ __all__ = [
     "LedgerEntry",
     "PlatformLedgerEntry",
     "Limit",
+    "LichessOAuthState",
     "LinkedAccount",
     "LiveSnapshot",
     "MetricModel",

@@ -147,3 +147,49 @@ async def get_live_game(game_id: str) -> dict | None:
         return response.json()
     except (HostError, ValueError):
         return None
+
+
+LICHESS_OAUTH_AUTHORIZE = "https://lichess.org/oauth"
+
+
+async def exchange_oauth_code(
+    code: str, code_verifier: str, redirect_uri: str, client_id: str
+) -> str:
+    """Trade an authorization code (PKCE) for an access token."""
+    response = await request_json(
+        HOST,
+        "POST",
+        f"{LICHESS_BASE}/token",
+        headers=HEADERS,
+        data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "code_verifier": code_verifier,
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+        },
+    )
+    token = response.json().get("access_token")
+    if not isinstance(token, str) or not token:
+        raise HostError(HOST, "token response had no access_token")
+    return token
+
+
+async def get_account(token: str) -> dict:
+    """The account the token belongs to."""
+    response = await request_json(
+        HOST,
+        "GET",
+        f"{LICHESS_BASE}/account",
+        headers={**HEADERS, "Authorization": f"Bearer {token}"},
+    )
+    return response.json()
+
+
+async def revoke_token(token: str) -> None:
+    await request_json(
+        HOST,
+        "DELETE",
+        f"{LICHESS_BASE}/token",
+        headers={**HEADERS, "Authorization": f"Bearer {token}"},
+    )

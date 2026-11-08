@@ -1,8 +1,13 @@
-"""/links endpoints — link/refresh/unlink flow, conflicts, and flag blocking."""
+"""/links endpoints — link/refresh/unlink flow, conflicts, and flag blocking.
+
+Typed-username linking (`POST /links`) is only open under E2E auth, so these tests run
+with it enabled; the OAuth path is covered in `test_lichess_oauth`.
+"""
 
 from __future__ import annotations
 
 import httpx
+import pytest
 import respx
 from sqlalchemy import text
 
@@ -10,6 +15,12 @@ from .conftest import auth_headers
 
 CHESS = "chess.lichess"
 LI = "https://lichess.org/api/user"
+
+
+@pytest.fixture(autouse=True)
+def _e2e_auth(app, monkeypatch) -> None:
+    settings = app.state.settings.model_copy(update={"e2e_auth_enabled": True})
+    monkeypatch.setattr(app.state, "settings", settings)
 
 
 def _lichess_user(username="magnus", rating=2800):

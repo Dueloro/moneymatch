@@ -62,6 +62,9 @@ class Settings(BaseSettings):
 
     rate_limit_writes_per_minute: int = Field(default=60)
 
+    # Lichess OAuth needs no app registration; the client id is any stable identifier.
+    lichess_oauth_client_id: str = Field(default="moneymatch")
+
     # When true AND env != prod, a `/dev/e2e/token` route mints a short-lived HS256 JWT
     # for a given auth_id so Playwright can authenticate seeded users headless without a
     # live Supabase project.
