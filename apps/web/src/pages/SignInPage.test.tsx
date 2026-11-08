@@ -8,8 +8,12 @@ import { SignInPage } from './SignInPage';
 
 vi.mock('../auth/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
-vi.mock('../components/LinkGames', () => ({ LinkGames: () => null }));
-vi.mock('../hooks/useLinks', () => ({ useLinks: () => ({ data: { games: [] } }) }));
+const connectMutate = vi.fn();
+let linkedGames: { status: string }[] = [];
+vi.mock('../hooks/useLinks', () => ({
+  useLinks: () => ({ data: { games: linkedGames } }),
+  useConnectLichess: () => ({ mutate: connectMutate, isPending: false, error: null }),
+}));
 vi.mock('../lib/api', () => ({ api: { PATCH: vi.fn() } }));
 
 import { useAuth } from '../auth/useAuth';
@@ -74,9 +78,9 @@ describe('SignInPage', () => {
     expect(signInWithGoogle).toHaveBeenCalledOnce();
   });
 
-  it('shows the 3-step progress bar', () => {
+  it('shows no step progress on the sign-in form', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
-    expect(screen.getByLabelText(/step 1 of 3/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/step \d of/i)).not.toBeInTheDocument();
   });
 
   it('has no email-code option (removed in favour of password / Google)', () => {
@@ -86,11 +90,15 @@ describe('SignInPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the reworded tagline', () => {
+  it('pitches skill matching and API settlement', () => {
     renderWithProviders(<SignInPage />, { route: '/signin' });
     expect(
-      screen.getByText(/skill-based chess contests, settled from lichess/i),
+      screen.getByText(/matched with someone at your skill level/i),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no screenshots, no reviewers, no waiting/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Points have no cash value.')).toBeInTheDocument();
   });
 
   it('links the legal footer to dueloro.com in a new tab', () => {
@@ -187,6 +195,8 @@ describe('SignInPage', () => {
 
     beforeEach(() => {
       sessionStorage.clear();
+      connectMutate.mockClear();
+      linkedGames = [];
       needsOnboarding = true;
       mockUseAuth.mockReturnValue({
         session: { user: { id: 'u1' } } as never,
@@ -218,15 +228,39 @@ describe('SignInPage', () => {
       );
     }
 
-    async function finishProfileAndEnter() {
+    async function finishProfile() {
+      expect(screen.getByLabelText(/step 1 of 2/i)).toBeInTheDocument();
       await userEvent.type(screen.getByPlaceholderText('player_name'), 'new_player');
       await userEvent.selectOptions(screen.getByRole('combobox'), 'NY');
       await userEvent.click(screen.getByRole('checkbox'));
       await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    }
+
+    async function finishProfileAndEnter() {
+      await finishProfile();
       await userEvent.click(
         await screen.findByRole('button', { name: 'Skip for now' }),
       );
     }
+
+    it('makes Connect Lichess the one action and carries the invite through', async () => {
+      sessionStorage.setItem('mm.returnTo', '/i/tok123');
+      window.history.replaceState(null, '', '/signin');
+      renderFlow();
+      await finishProfile();
+      expect(await screen.findByLabelText(/step 2 of 2/i)).toBeInTheDocument();
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Connect Lichess' }));
+      expect(connectMutate).toHaveBeenCalledWith('/i/tok123');
+      window.history.replaceState(null, '', '/');
+    });
+
+    it('skips the link step when Lichess is already linked', async () => {
+      linkedGames = [{ status: 'LINKED' }];
+      renderFlow();
+      await finishProfile();
+      expect(await screen.findByText('play page')).toBeInTheDocument();
+    });
 
     it('lands back on the invite it came from, once', async () => {
       sessionStorage.setItem('mm.returnTo', '/i/tok123');

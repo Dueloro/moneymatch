@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
-import { LinkGames } from '../components/LinkGames';
+import { ConnectLichessButton, NotAffiliated } from '../components/ConnectLichess';
 import { TriangleMark } from '../components/ui/brand';
 import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
 import { Loader } from '../components/ui/Loader';
@@ -33,9 +33,8 @@ export function SignInPage() {
     return (
       <div className="mm-grid-surface flex min-h-screen items-center justify-center bg-bg px-4">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex flex-col items-center gap-4">
+          <div className="mb-8 flex flex-col items-center">
             <TriangleMark className="h-11 w-11" />
-            <StepProgress step={1} />
           </div>
           <StaleSessionStep />
         </div>
@@ -48,14 +47,11 @@ export function SignInPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-2">
           <TriangleMark className="h-11 w-11" />
-          <StepProgress step={!session ? 1 : me.data?.needs_onboarding ? 2 : 3} />
-          <p className="text-xs text-text-secondary">
-            {!session
-              ? 'Create account'
-              : me.data?.needs_onboarding
-                ? 'Your profile'
-                : 'Link Lichess'}
-          </p>
+          {session &&
+            !isPasswordRecovery &&
+            (me.data?.needs_onboarding || postStep === 'link') && (
+              <StepProgress step={me.data?.needs_onboarding ? 1 : 2} total={2} />
+            )}
         </div>
 
         {isPasswordRecovery ? (
@@ -205,10 +201,14 @@ function CredentialsForm({
 
   return (
     <div>
-      <AuthHeading
-        title={mode === 'signin' ? 'Sign in' : 'Create your account'}
-        subtitle="Skill-based chess contests, settled from Lichess"
-      />
+      <AuthHeading title={mode === 'signin' ? 'Sign in' : 'Create your account'} />
+      <div className="mt-2 text-balance text-center text-sm text-text-secondary">
+        <p>Chess, matched with someone at your skill level.</p>
+        <p>
+          Settles from Lichess in under a minute. No screenshots, no reviewers, no
+          waiting.
+        </p>
+      </div>
 
       <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
         <Field label="Email">
@@ -488,10 +488,7 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
 
   return (
     <div>
-      <AuthHeading
-        title="Create your profile"
-        subtitle="A couple of details and you're in."
-      />
+      <AuthHeading title="Your profile" />
 
       <form
         className="mt-6 flex flex-col gap-4"
@@ -502,14 +499,11 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
         }}
       >
         {derived ? (
-          <Field label="Username" hint="Your public handle, chosen at sign-up.">
-            <TextInput value={username} readOnly disabled />
-          </Field>
+          <p className="text-center text-sm text-text-secondary">
+            Playing as <span className="font-medium text-text">{username}</span>
+          </p>
         ) : (
-          <Field
-            label="Username"
-            hint="3 to 20 characters: lowercase letters, numbers, underscore."
-          >
+          <Field label="Username" hint="3 to 20 lowercase letters, numbers or _.">
             <TextInput
               value={username}
               onChange={(e) => setUsername(e.target.value.toLowerCase())}
@@ -519,10 +513,10 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
         )}
 
         <Field
-          label="Residence state"
+          label="State of residence"
           hint={
             isExcludedState(state)
-              ? `Staked matches aren't available in ${stateName(state)} yet. You can still sign up and play every match for free.`
+              ? `Staked matches aren't available in ${stateName(state)} yet. Free matches are.`
               : undefined
           }
         >
@@ -558,23 +552,27 @@ function LinkGameStep() {
   const navigate = useNavigate();
   const links = useLinks();
   const linked = links.data?.games.some((g) => g.status === 'LINKED') ?? false;
+
+  if (linked) return <PostAuthRedirect />;
+
   return (
     <div>
       <AuthHeading
-        title="Link your Lichess account"
-        subtitle="Your matches settle from its games. You can also do this later from your profile."
+        title="Connect Lichess"
+        subtitle="Your matches settle from your Lichess games."
       />
-      <div className="mt-6">
-        <LinkGames />
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <ConnectLichessButton size="lg" fullWidth />
+        <NotAffiliated />
       </div>
-      <div className="mt-8">
-        <PillButton
-          variant={linked ? 'primary' : 'text'}
-          fullWidth
+      <div className="mt-6 text-center">
+        <button
+          type="button"
+          className="inline-flex touch:min-h-11 items-center text-sm text-text-secondary underline-offset-4 hover:text-text hover:underline"
           onClick={() => navigate(takeReturnTo() ?? '/play')}
         >
-          {linked ? 'Enter Money Match' : 'Skip for now'}
-        </PillButton>
+          Skip for now
+        </button>
       </div>
     </div>
   );

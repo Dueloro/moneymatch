@@ -21,6 +21,7 @@ function renderAt(route: string) {
       <Route path="/link/lichess/callback" element={<LichessCallbackPage />} />
       <Route path="/pools" element={<p>pools page</p>} />
       <Route path="/play" element={<p>play page</p>} />
+      <Route path="/i/:token" element={<p>invite preview</p>} />
     </Routes>,
     { route },
   );
@@ -57,6 +58,16 @@ describe('LichessCallbackPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('pools page')).toBeInTheDocument();
     expect(sessionStorage.getItem('mm.linkReturnTo')).toBeNull();
+  });
+
+  it('finishes onboarding on the pending invite, once', async () => {
+    sessionStorage.setItem('mm.returnTo', '/i/tok123');
+    sessionStorage.setItem('mm.linkReturnTo', '/i/tok123');
+    complete = { isSuccess: true, isError: false, data: { games: [] } };
+    renderAt('/link/lichess/callback?code=c&state=s');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('invite preview')).toBeInTheDocument();
+    expect(sessionStorage.getItem('mm.returnTo')).toBeNull();
   });
 
   it('ignores an off-site return path', async () => {
