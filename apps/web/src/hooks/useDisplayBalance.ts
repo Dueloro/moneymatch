@@ -9,5 +9,5 @@ export function useDisplayBalance(): number | undefined {
 
   const celebrating = current != null && surfaceOf(current) === 'overlay';
   if (!celebrating || live == null) return live;
-  return live - current.netCents;
+  return live - current.balanceDeltaCents;
 }

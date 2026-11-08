@@ -24,6 +24,8 @@ export interface Settlement {
   id: string;
   outcome: SettlementOutcome;
   netCents: number;
+  amountCents: number;
+  balanceDeltaCents: number;
   title: string;
   game: string;
   type: ActivityItem['type'];
@@ -48,10 +50,18 @@ export function surfaceOf(s: Settlement): 'overlay' | 'toast' {
 export function outcomeOf(item: ActivityItem): SettlementOutcome {
   if (item.state === 'CANCELED') return 'refund';
   if (item.state === 'PUSHED') return 'push';
+  if (item.type === 'tournament') return tournamentPrize(item) > 0 ? 'win' : 'loss';
   const net = item.net_cents ?? 0;
   if (net > 0) return 'win';
   if (net < 0) return 'loss';
   return 'push';
+}
+
+function tournamentPrize(item: ActivityItem): number {
+  return (
+    item.detail?.prize_cents ??
+    Math.max(0, (item.net_cents ?? 0) + item.entry_cents)
+  );
 }
 
 function loadAnnounced(): Set<string> {
@@ -157,6 +167,14 @@ export function useSettlementCelebration(): {
           id: item.id,
           outcome: outcomeOf(item),
           netCents: item.net_cents ?? 0,
+          amountCents:
+            item.type === 'tournament'
+              ? tournamentPrize(item)
+              : Math.abs(item.net_cents ?? 0),
+          balanceDeltaCents:
+            item.type === 'tournament'
+              ? tournamentPrize(item)
+              : (item.net_cents ?? 0),
           title: item.title ?? item.market_label,
           game: item.game,
           type: item.type,

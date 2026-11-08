@@ -137,6 +137,27 @@ describe('SettlementCelebration', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/You won 9,000 points/);
   });
 
+  it('treats a paid tournament place as a win and celebrates the prize', () => {
+    setActivity([item({ id: 'a', type: 'tournament', state: 'LOCKED' })]);
+    const { rerender } = render(<Cel />);
+
+    act(() => {
+      setActivity([
+        item({
+          id: 'a',
+          type: 'tournament',
+          state: 'SETTLED',
+          net_cents: -250,
+          detail: { kind: 'tournament', prize_cents: 2_250 },
+        }),
+      ]);
+      rerender(<Cel />);
+    });
+
+    expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/You won 2,250 points/);
+  });
+
   it('tells you about a loss in a calm toast, not a takeover', () => {
     const toasts: string[] = [];
     const off = subscribeToasts((t) => toasts.push(`${t.kind}:${t.text}`));

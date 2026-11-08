@@ -19,6 +19,8 @@ function settle(over: Partial<Settlement>): Settlement {
     id: 's1',
     outcome: 'win',
     netCents: 9_000,
+    amountCents: 9_000,
+    balanceDeltaCents: 9_000,
     title: 'Kills · Easy pool',
     game: 'chess.lichess',
     type: 'pool',
@@ -44,6 +46,17 @@ describe('useDisplayBalance — holds the tick until the overlay closes', () => 
   it('holds at the pre-win balance while a win overlay is up', () => {
     wallet.data = { available_cents: 109_000 };
     settlement.current = settle({ outcome: 'win', netCents: 9_000 });
+    expect(renderHook(() => useDisplayBalance()).result.current).toBe(100_000);
+  });
+
+  it('backs a tournament win out by its prize rather than its net profit', () => {
+    wallet.data = { available_cents: 102_250 };
+    settlement.current = settle({
+      type: 'tournament',
+      netCents: 250,
+      amountCents: 2_250,
+      balanceDeltaCents: 2_250,
+    });
     expect(renderHook(() => useDisplayBalance()).result.current).toBe(100_000);
   });
 

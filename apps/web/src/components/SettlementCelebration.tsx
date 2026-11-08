@@ -26,7 +26,7 @@ export function SettlementCelebration() {
 
   const [target, setTarget] = useState(0);
   const amount = useCountUp(target, 850);
-  useEffect(() => setTarget(show ? Math.abs(show.netCents) : 0), [show]);
+  useEffect(() => setTarget(show ? show.amountCents : 0), [show]);
 
   useEffect(() => {
     if (!current || show) return;
@@ -63,7 +63,7 @@ export function SettlementCelebration() {
       data-outcome={show.outcome}
     >
       <span className="sr-only">
-        You won {formatPoints(show.netCents, { long: true })} on {show.title}
+        You won {formatPoints(show.amountCents, { long: true })} on {show.title}
       </span>
       <div className="mm-result-glow animate-rise relative w-full max-w-sm overflow-hidden rounded-card border border-line-strong bg-overlay px-6 py-6 text-center shadow-overlay">
         <div aria-hidden="true">
