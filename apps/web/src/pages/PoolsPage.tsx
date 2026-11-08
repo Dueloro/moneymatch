@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 
-import { GettingStarted } from '../components/GettingStarted';
 import { PlayHeader } from '../components/PlayHeader';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
@@ -112,8 +111,6 @@ export function PoolsPage() {
   return (
     <div>
       {header}
-
-      <GettingStarted />
 
       {status && (status.status === 'searching' || status.status === 'formed') && (
         <div className="xl:hidden">

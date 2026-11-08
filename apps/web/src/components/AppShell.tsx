@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 
 import { useEventStream } from '../hooks/useEventStream';
+import { ConnectPrompt } from './ConnectPrompt';
 import { SettlementCelebration } from './SettlementCelebration';
 import { SettlementProvider } from './SettlementProvider';
 import { useMe } from '../hooks/useMe';
@@ -27,6 +28,7 @@ export function AppShell() {
             <EligibilityBanner />
             <div className="grid grid-cols-1 gap-8 md:min-h-0 md:flex-1 xl:grid-cols-[minmax(0,1fr)_20rem]">
               <div className="min-w-0 md:overflow-y-auto md:pr-3">
+                <ConnectPrompt />
                 <Outlet />
               </div>
               <aside

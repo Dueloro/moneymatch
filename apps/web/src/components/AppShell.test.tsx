@@ -7,6 +7,7 @@ import { renderWithProviders } from '../test/testUtils';
 import { AppShell } from './AppShell';
 
 vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
+vi.mock('./ConnectPrompt', () => ({ ConnectPrompt: () => null }));
 vi.mock('./ui/Ticker', () => ({ Ticker: () => null }));
 vi.mock('./rail/SideRail', () => ({ SideRail: () => null }));
 // The SSE listener needs the auth + query context the shell test doesn't
