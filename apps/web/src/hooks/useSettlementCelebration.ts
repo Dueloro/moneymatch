@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ActivityItem } from './useActivity';
 import { useActivity } from './useActivity';
+import type { Termination } from './useMatchmaking';
 
 /**
  * A new key releases them; the `RECENT_MS` window on first load keeps that
@@ -26,6 +27,18 @@ export interface Settlement {
   title: string;
   game: string;
   type: ActivityItem['type'];
+  entryCents?: number;
+  prizeCents?: number;
+  opponent?: string | null;
+  termination?: Termination | null;
+}
+
+/**
+ * Only a pool or tournament win takes the screen (a light card). Head to head has
+ * its result card on the match stage; everything else is a quiet toast.
+ */
+export function surfaceOf(s: Settlement): 'overlay' | 'toast' {
+  return s.outcome === 'win' && s.type !== 'match' ? 'overlay' : 'toast';
 }
 
 /**
@@ -87,12 +100,15 @@ function useHasAttention(): boolean {
 export function useSettlementCelebration(): {
   current: Settlement | null;
   dismiss: () => void;
+  claim: (id: string) => () => void;
 } {
   const { data } = useActivity();
   const attentive = useHasAttention();
   const [queue, setQueue] = useState<Settlement[]>([]);
   const announced = useRef<Set<string> | null>(null);
   const seeded = useRef(false);
+  // Contests a screen is already showing the result of (the match stage).
+  const claimed = useRef(new Set<string>());
 
   useEffect(() => {
     if (!data) return;
@@ -130,7 +146,8 @@ export function useSettlementCelebration(): {
       for (const item of items_) seen_.add(item.id);
       saveAnnounced(seen_);
 
-      const ordered = [...items_]
+      const ordered = items_
+        .filter((i) => !claimed.current.has(i.id))
         .sort((a, b) => (a.resolved_at ?? '').localeCompare(b.resolved_at ?? ''))
         .slice(-MAX_BURST);
 
@@ -143,12 +160,23 @@ export function useSettlementCelebration(): {
           title: item.title ?? item.market_label,
           game: item.game,
           type: item.type,
+          entryCents: item.entry_cents,
+          prizeCents: item.detail?.prize_cents,
+          opponent: item.opponent_username,
+          termination: item.detail?.termination ?? null,
         })),
       ]);
     }
   }, [data, attentive]);
 
   const dismiss = useCallback(() => setQueue((q) => q.slice(1)), []);
+  const claim = useCallback((id: string) => {
+    claimed.current.add(id);
+    setQueue((q) => (q.some((s) => s.id === id) ? q.filter((s) => s.id !== id) : q));
+    return () => {
+      claimed.current.delete(id);
+    };
+  }, []);
 
-  return { current: queue[0] ?? null, dismiss };
+  return { current: queue[0] ?? null, dismiss, claim };
 }

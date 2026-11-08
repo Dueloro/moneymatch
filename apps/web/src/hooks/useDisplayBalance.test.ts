@@ -47,10 +47,16 @@ describe('useDisplayBalance — holds the tick until the overlay closes', () => 
     expect(renderHook(() => useDisplayBalance()).result.current).toBe(100_000);
   });
 
-  it('holds at the pre-loss balance while a loss overlay is up', () => {
+  it('does not hold for a loss (a toast, no overlay)', () => {
     wallet.data = { available_cents: 97_500 };
     settlement.current = settle({ outcome: 'loss', netCents: -2_500 });
-    expect(renderHook(() => useDisplayBalance()).result.current).toBe(100_000);
+    expect(renderHook(() => useDisplayBalance()).result.current).toBe(97_500);
+  });
+
+  it('does not hold for a head-to-head win (the match stage shows it)', () => {
+    wallet.data = { available_cents: 109_000 };
+    settlement.current = settle({ type: 'match', netCents: 9_000 });
+    expect(renderHook(() => useDisplayBalance()).result.current).toBe(109_000);
   });
 
   it('reveals the new balance once the overlay is dismissed', () => {

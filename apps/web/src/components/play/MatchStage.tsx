@@ -4,6 +4,7 @@ import { useCreateChallenge } from '../../hooks/useChallenges';
 import { useCountUp } from '../../hooks/useCountUp';
 import { formatClock, useLiveClocks } from '../../hooks/useLiveClocks';
 import type { MatchLive, MatchPlayerView, MatchView } from '../../hooks/useMatchmaking';
+import { useClaimSettlement } from '../../hooks/useSettlement';
 import { formatPoints } from '../../lib/format';
 import {
   formatDuration,
@@ -65,6 +66,7 @@ export function MatchStage({
   clocks?: SpeedClock[];
   onPlayAgain: () => void;
 }) {
+  useClaimSettlement(match.id);
   const outcome = matchOutcome(match);
   const settled = outcome != null;
   const state = boardState(match, settled);

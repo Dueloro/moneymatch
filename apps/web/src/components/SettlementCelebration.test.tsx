@@ -1,18 +1,23 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ActivityItem } from '../hooks/useActivity';
 import { outcomeOf } from '../hooks/useSettlementCelebration';
+import { useClaimSettlement } from '../hooks/useSettlement';
+import { subscribeToasts } from '../lib/toast';
 import { SettlementCelebration } from './SettlementCelebration';
 import { SettlementProvider } from './SettlementProvider';
 
 function Cel() {
   return (
-    <SettlementProvider>
-      <SettlementCelebration />
-    </SettlementProvider>
+    <MemoryRouter>
+      <SettlementProvider>
+        <SettlementCelebration />
+      </SettlementProvider>
+    </MemoryRouter>
   );
 }
 
@@ -132,7 +137,9 @@ describe('SettlementCelebration', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/You won 9,000 points/);
   });
 
-  it('announces a loss without dressing it up as anything else', () => {
+  it('tells you about a loss in a calm toast, not a takeover', () => {
+    const toasts: string[] = [];
+    const off = subscribeToasts((t) => toasts.push(`${t.kind}:${t.text}`));
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
     const { rerender } = render(<Cel />);
 
@@ -141,10 +148,72 @@ describe('SettlementCelebration', () => {
       rerender(<Cel />);
     });
 
-    expect(screen.getByText('You lost…')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/You lost/);
-    expect(screen.getByRole('status')).not.toHaveTextContent('2,500 pts');
-    expect(screen.queryByTestId('settlement-amount')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
+    expect(toasts).toEqual(['neutral:Lost 2,500 pts']);
+    off();
+  });
+
+  it('gives draws and refunds feedback too, wherever you are', () => {
+    const toasts: string[] = [];
+    const off = subscribeToasts((t) => toasts.push(t.text));
+    setActivity([
+      item({ id: 'm', type: 'match', state: 'ACTIVE', opponent_username: 'bob' }),
+      item({ id: 'p', state: 'LOCKED' }),
+    ]);
+    const { rerender } = render(<Cel />);
+
+    act(() => {
+      setActivity([
+        item({
+          id: 'm',
+          type: 'match',
+          state: 'PUSHED',
+          net_cents: 0,
+          entry_cents: 1_000,
+          opponent_username: 'bob',
+          resolved_at: '2026-08-25T11:00:00Z',
+        }),
+        item({
+          id: 'p',
+          state: 'CANCELED',
+          net_cents: 0,
+          resolved_at: '2026-08-25T12:00:00Z',
+        }),
+      ]);
+      rerender(<Cel />);
+    });
+
+    expect(toasts).toEqual([
+      'Draw vs bob · 1,000 pts refunded',
+      '2,500 pts refunded · Kills · Easy pool',
+    ]);
+    off();
+  });
+
+  it('never takes the screen for head to head; the match stage owns that moment', () => {
+    const toasts: string[] = [];
+    const off = subscribeToasts((t) => toasts.push(t.text));
+    setActivity([item({ id: 'm', type: 'match', state: 'ACTIVE' })]);
+    const { rerender } = render(<Cel />);
+
+    act(() => {
+      setActivity([
+        item({
+          id: 'm',
+          type: 'match',
+          state: 'SETTLED',
+          net_cents: 800,
+          entry_cents: 1_000,
+          opponent_username: 'bob',
+          detail: { kind: 'match', prize_cents: 1_800, termination: 'time' },
+        }),
+      ]);
+      rerender(<Cel />);
+    });
+
+    expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
+    expect(toasts).toEqual(['You won 1,800 pts vs bob · on time']);
+    off();
   });
 
   it('shows no overlay for a refund, and never calls it a loss', () => {
@@ -170,6 +239,31 @@ describe('SettlementCelebration', () => {
     });
 
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
+  });
+
+  it('stays quiet about a result the match stage is already showing', () => {
+    const toasts: string[] = [];
+    const off = subscribeToasts((t) => toasts.push(t.text));
+    function Stage() {
+      useClaimSettlement('m');
+      return null;
+    }
+    const tree = () => (
+      <MemoryRouter>
+        <SettlementProvider>
+          <Stage />
+          <SettlementCelebration />
+        </SettlementProvider>
+      </MemoryRouter>
+    );
+    setActivity([item({ id: 'm', type: 'match', state: 'ACTIVE' })]);
+    const { rerender } = render(tree());
+    act(() => {
+      setActivity([item({ id: 'm', type: 'match', state: 'PUSHED', net_cents: 0 })]);
+      rerender(tree());
+    });
+    expect(toasts).toEqual([]);
+    off();
   });
 
   it('still classifies a refund as a refund, ready to re-enable', () => {
@@ -263,7 +357,7 @@ describe('SettlementCelebration', () => {
         item({
           id: 'b',
           state: 'SETTLED',
-          net_cents: -2_500,
+          net_cents: 2_500,
           title: 'Second',
           resolved_at: '2026-08-25T12:00:00Z',
         }),
@@ -306,7 +400,7 @@ describe('SettlementCelebration', () => {
     expect(status).toHaveTextContent(/You won 9,000 points/);
   });
 
-  it('takes the screen, and gives it back within two seconds', () => {
+  it('holds a win for three seconds, then gives the screen back', () => {
     vi.useFakeTimers();
     setActivity([item({ id: 'a', state: 'LOCKED' })]);
     const { rerender } = render(<Cel />);
@@ -318,12 +412,12 @@ describe('SettlementCelebration', () => {
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(1_800);
+      vi.advanceTimersByTime(2_900);
     });
     expect(screen.getByTestId('settlement-celebration')).toBeInTheDocument();
 
     act(() => {
-      vi.advanceTimersByTime(200);
+      vi.advanceTimersByTime(100);
     });
     expect(screen.queryByTestId('settlement-celebration')).not.toBeInTheDocument();
   });
@@ -345,7 +439,7 @@ describe('SettlementCelebration', () => {
       setActivity([item({ id: 'b', state: 'SETTLED', net_cents: -2_500 })]);
       second.rerender(<Cel />);
     });
-    expect(screen.getByText('You lost…')).toBeInTheDocument();
+    expect(screen.queryByText(/You lost/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('settlement-amount')).not.toBeInTheDocument();
   });
 });

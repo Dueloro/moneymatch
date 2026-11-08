@@ -115,7 +115,14 @@ re-claimable and nothing double-settles. `run_cycle`:
 2. Stop here if `settlement_paused` is on.
 3. Grade and settle due matches, pools, tournaments. A Lichess outage extends
    the window; past the hard ceiling the contest cancels and refunds.
-4. Refresh tournament standings and live snapshots.
+4. Refresh tournament standings and live snapshots. A brokered chess match
+   needs no extra call: grading reads the Lichess export with moves and clocks
+   (`/game/export/{id}?moves=true&clocks=true`) and writes the board to
+   `live_snapshots` from that same response, so the board refreshes every cycle
+   at one Lichess call per active match. Lichess shares ongoing games 3 moves
+   late. Settlement stores the termination and the game's end time
+   (`lastMoveAt`) in `outcome_detail`; `MatchView` exposes them with
+   `resolved_at` and the viewer's board (withheld once older than 90 s).
 5. Expire unconfirmed matches (refunding whoever escrowed), stale tickets,
    and old challenges.
 6. If `queue_paused` is on, cancel all waiting tickets.

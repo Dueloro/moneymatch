@@ -62,7 +62,7 @@ Two hard constraints when extending the palette:
    single job.
 
 **Cyan (`live`) is deliberately underused** — dots, one-word labels, and the 25%
-wash in the clear bar and the skill-band ruler only. It never fills a shape or
+wash in the clear bar, the skill-band ruler and the live board's last move only. It never fills a shape or
 runs across a sentence. It is the intended candidate if a second main colour is
 ever promoted, because its meaning ("happening now") is already established.
 
@@ -129,7 +129,9 @@ status, a fact label) uses `.label-neutral`: 12px, medium, sentence case, tertia
 - **Motion.** Four animations only, all disabled under `prefers-reduced-motion`
   (which also clamps transitions to 0.01ms): the ticker marquee, the 0.28s rise
   on a matched card, `animate-pulse` on live dots/skeletons, and the money-delta
-  flash on a balance change. The balance counts up rather than snapping.
+  flash on a balance change. The balance counts up rather than snapping. The
+  settlement moment adds three, all off under reduced motion: the result rises,
+  the win check draws in, and the "Settled from Lichess in 38s" line arrives last.
 - **Focus.** One global rule: `:focus-visible` draws a 2px `focus` ring with 2px
   offset on every interactive element. Mouse clicks don't ring; every keyboard
   path does.
@@ -183,6 +185,25 @@ TAKES` in lime with the fee figure in red, and "Find match · 1,000 pts". The
   wash and widening once a second (`lib/skillBand.ts` mirrors the server's
   ±100 + 12/s, capped at ±800). Above it: the range ("1612–1812") and the waited
   clock. The width eases linearly only under `motion-safe`.
+- **`MatchStage`** — head to head from both confirms to the result, in the desk's
+  column. Header: status dot + one word (Match on, Live, Settling, Final) and the
+  time-control chip. Board column: opponent strip, the view-only board (lazy
+  chunk: `chess.js` + Cburnett pieces, slate `--board-light/--board-dark`
+  squares, your colour at the bottom), your strip; each strip carries a clock
+  that ticks locally, the running one raised with a cyan dot. Side column:
+  `WINNER TAKES` in lime, the fee in red, the move line, the last moves, and the
+  primary "Open game on Lichess ↗". No board data: the side column alone. On
+  phones the side column comes first so the link is above the fold.
+- **Result card** — the stage's side column once settled; the board freezes and
+  the loser's strip dims. Win: lime check, "You won", the winnings in lime
+  counting up, pot and red fee. Loss: a grey bar, "You lost", the stake in grey,
+  no red wash. Draw: "Draw · Both stakes refunded · no fee". Each names the real
+  ending ("by resignation", "on time") only when Lichess said so, and "Settled
+  from Lichess in 38s" only when the game's end time is known. Then Play again,
+  Rematch, View game on Lichess. **One moment per result:** head to head never
+  takes the screen; away from the stage, every result (draws and refunds too) is
+  a toast with a View link. A pool or tournament win gets a light centred result
+  card for 3s.
 - **`ExpandableCard`** / **`ListRow`** — the expandable and flat row primitives.
 - **`FilterBar`** — pill toggle with a hamburger, "Filters", and a paper
   active-count badge; opens a `Card` of chip rows.
