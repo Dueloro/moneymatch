@@ -59,8 +59,7 @@ export function outcomeOf(item: ActivityItem): SettlementOutcome {
 
 function tournamentPrize(item: ActivityItem): number {
   return (
-    item.detail?.prize_cents ??
-    Math.max(0, (item.net_cents ?? 0) + item.entry_cents)
+    item.detail?.prize_cents ?? Math.max(0, (item.net_cents ?? 0) + item.entry_cents)
   );
 }
 
@@ -172,9 +171,7 @@ export function useSettlementCelebration(): {
               ? tournamentPrize(item)
               : Math.abs(item.net_cents ?? 0),
           balanceDeltaCents:
-            item.type === 'tournament'
-              ? tournamentPrize(item)
-              : (item.net_cents ?? 0),
+            item.type === 'tournament' ? tournamentPrize(item) : (item.net_cents ?? 0),
           title: item.title ?? item.market_label,
           game: item.game,
           type: item.type,
