@@ -23,7 +23,7 @@ export function PresetSelector({
             aria-pressed={active}
             onClick={() => onSelect(cents)}
             className={[
-              'num rounded-pill border px-4 py-2 text-sm font-semibold transition-colors',
+              'num rounded-pill border px-4 py-2 text-sm touch:min-h-11 font-semibold transition-colors',
               'disabled:cursor-not-allowed disabled:opacity-40',
               active
                 ? 'border-line-strong bg-panel-raised text-text'

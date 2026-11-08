@@ -45,7 +45,7 @@ export function LinkGames() {
         <p className="text-sm text-red">Couldn't load your linked account.</p>
         <button
           type="button"
-          className="text-sm text-text-secondary underline hover:text-text"
+          className="inline-flex touch:min-h-11 items-center text-sm text-text-secondary underline hover:text-text"
           onClick={() => void links.refetch()}
         >
           Try again
@@ -143,7 +143,7 @@ function GameRow({ link }: { link: GameLink }) {
                 type="button"
                 onClick={() => refresh.mutate(link.game)}
                 disabled={refresh.isPending}
-                className="text-xs text-text-secondary hover:text-text disabled:opacity-40"
+                className="inline-flex touch:min-h-11 items-center text-xs text-text-secondary hover:text-text disabled:opacity-40"
               >
                 {refresh.isPending ? 'Refreshing…' : 'Refresh'}
               </button>

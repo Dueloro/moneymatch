@@ -39,7 +39,7 @@ function ChecklistCard({ steps, onDismiss }: { steps: Step[]; onDismiss: () => v
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss checklist"
-        className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full text-text-tertiary transition hover:bg-panel hover:text-text focus-visible:outline-none focus-visible:ring-2"
+        className="absolute right-3 top-3 grid h-6 w-6 touch:right-0 touch:top-0 touch:h-11 touch:w-11 place-items-center rounded-full text-text-tertiary transition hover:bg-panel hover:text-text focus-visible:outline-none focus-visible:ring-2"
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
           <path

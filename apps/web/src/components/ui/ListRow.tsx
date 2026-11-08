@@ -24,7 +24,11 @@ export function ListRow({
             <div className="truncate text-xs text-text-secondary">{subline}</div>
           )}
         </div>
-        {right && <div className="shrink-0 text-sm">{right}</div>}
+        {right && (
+          <div className="flex shrink-0 items-center text-sm touch:min-h-11">
+            {right}
+          </div>
+        )}
       </div>
       {footer && <div className="mt-2 pl-[1.375rem]">{footer}</div>}
     </div>

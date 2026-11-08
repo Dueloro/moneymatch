@@ -18,7 +18,12 @@ export function AdminUsersPage() {
     <div style={styles.page}>
       <h1 style={styles.h1}>Users</h1>
       <input
-        style={{ ...styles.input, width: 320 }}
+        style={{
+          ...styles.input,
+          width: 320,
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+        }}
         placeholder="search username / email / friend code / id"
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -39,7 +44,9 @@ export function AdminUsersPage() {
           <tbody>
             {(users.data ?? []).map((u) => (
               <tr key={u.id}>
-                <td style={styles.td}>{u.username ?? '—'}</td>
+                <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                  {u.username ?? '—'}
+                </td>
                 <td style={styles.td}>{u.email ?? '—'}</td>
                 <td style={styles.td}>{u.role}</td>
                 <td style={styles.td}>

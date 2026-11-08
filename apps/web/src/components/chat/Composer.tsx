@@ -146,7 +146,7 @@ export function Composer({
           aria-label="Send"
           disabled={disabled || !text.trim() || send.isPending}
           onClick={() => void submit()}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-action text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none "
+          className="grid h-10 w-10 touch:h-11 touch:w-11 shrink-0 place-items-center rounded-full bg-action text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none "
         >
           <SendIcon className="h-5 w-5" />
         </button>

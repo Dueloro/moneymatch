@@ -55,5 +55,8 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    ({ addVariant }) =>
+      addVariant('touch', ['@media (pointer: coarse)', '@media (max-width: 767px)']),
+  ],
 };

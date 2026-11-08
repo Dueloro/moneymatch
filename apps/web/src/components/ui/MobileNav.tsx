@@ -21,7 +21,7 @@ export function MobileTopBar() {
       <div className="flex items-center gap-2">
         <NavLink
           to="/wallet"
-          className="rounded-pill bg-panel px-3 py-1.5 text-xs font-semibold text-green"
+          className="inline-flex min-h-11 items-center rounded-pill bg-panel px-3 text-xs font-semibold text-green"
         >
           <AnimatedBalance cents={available} testId="mobile-balance" />
         </NavLink>
@@ -40,9 +40,11 @@ export function MobileTopBar() {
         <NavLink
           to="/profile"
           aria-label="Profile"
-          className="grid h-9 w-9 place-items-center rounded-full bg-panel-raised text-xs font-semibold"
+          className="grid h-11 w-11 place-items-center"
         >
-          {username.slice(0, 1).toUpperCase()}
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-panel-raised text-xs font-semibold">
+            {username.slice(0, 1).toUpperCase()}
+          </span>
         </NavLink>
       </div>
     </header>

@@ -90,14 +90,14 @@ export function ProfilePage() {
               type="button"
               onClick={() => selfExclude.mutate()}
               disabled={selfExclude.isPending}
-              className="text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
+              className="inline-flex touch:min-h-11 items-center text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
             >
               {selfExclude.isPending ? 'Excluding…' : 'Yes, self-exclude'}
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="text-sm text-text-secondary hover:text-text"
+              className="inline-flex touch:min-h-11 items-center text-sm text-text-secondary hover:text-text"
             >
               Cancel
             </button>
@@ -106,7 +106,7 @@ export function ProfilePage() {
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="text-sm font-semibold text-red hover:opacity-80"
+            className="inline-flex touch:min-h-11 items-center text-sm font-semibold text-red hover:opacity-80"
           >
             Self-exclude
           </button>
@@ -374,14 +374,14 @@ function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
                     type="button"
                     onClick={() => start(days)}
                     disabled={update.isPending}
-                    className="text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
+                    className="inline-flex touch:min-h-11 items-center text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
                   >
                     Confirm {days}-day break
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirming(null)}
-                    className="text-sm text-text-secondary hover:text-text"
+                    className="inline-flex touch:min-h-11 items-center text-sm text-text-secondary hover:text-text"
                   >
                     Cancel
                   </button>

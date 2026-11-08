@@ -24,8 +24,8 @@ export function Segmented<T extends string | number>({
   renderBadge?: (badge: number) => ReactNode;
 }) {
   const pad = {
-    sm: 'px-2.5 py-1 text-xs',
-    md: 'px-3.5 py-1.5 text-sm',
+    sm: 'px-2.5 py-1 text-xs touch:min-h-11',
+    md: 'px-3.5 py-1.5 text-sm touch:min-h-11',
     lg: 'min-h-11 px-2 py-2 text-sm sm:px-4',
   }[size];
   return (

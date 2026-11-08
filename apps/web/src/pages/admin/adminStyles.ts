@@ -15,8 +15,13 @@ export const styles: Record<string, CSSProperties> = {
   },
   page: { padding: 16, fontSize: 13 },
   h1: { fontSize: 16, fontWeight: 700, margin: '0 0 12px', color: INK },
-  scroll: { overflowX: 'auto', maxWidth: '100%' },
-  table: { width: '100%', borderCollapse: 'collapse', color: INK },
+  scroll: { overflowX: 'auto', maxWidth: '100%', WebkitOverflowScrolling: 'touch' },
+  table: {
+    width: '100%',
+    minWidth: 'max-content',
+    borderCollapse: 'collapse',
+    color: INK,
+  },
   th: {
     textAlign: 'left',
     borderBottom: '1px solid #71717a',
