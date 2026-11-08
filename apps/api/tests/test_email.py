@@ -97,7 +97,9 @@ async def test_send_swallows_provider_error(session, monkeypatch):
 async def test_html_uses_hybrid_brand(session, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "resend_api_key", "re_test_key")
-    monkeypatch.setattr(settings, "web_origin", "https://app.dueloro.com,https://other.example")
+    monkeypatch.setattr(
+        settings, "web_origin", "https://app.dueloro.com,https://other.example"
+    )
     user = await _make_user(session, email="real@example.com")
     with respx.mock:
         route = respx.post(email_service._RESEND_ENDPOINT).mock(
