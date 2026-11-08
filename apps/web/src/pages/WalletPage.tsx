@@ -1,4 +1,7 @@
-import { AmountText } from '../components/ui/AmountText';
+import { useState } from 'react';
+
+import { AmountText, PointsFigure } from '../components/ui/AmountText';
+import { AnimatedBalance } from '../components/ui/AnimatedBalance';
 import { Card } from '../components/ui/Card';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ExpandableCard } from '../components/ui/ExpandableCard';
@@ -7,37 +10,16 @@ import { PresetSelector } from '../components/ui/PresetSelector';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
-import { formatCurrency, formatRelativeTime } from '../lib/format';
-import { humanizeIds } from '../lib/labels';
+import { formatPoints, formatRelativeTime } from '../lib/format';
+import { ledgerLabel } from '../lib/labels';
 import {
-  DEMO_DEPOSIT_PRESETS_CENTS,
-  useDemoDeposit,
-  useDemoWithdrawal,
+  DEPOSIT_PRESETS_CENTS,
+  usePlayMoneyDeposit,
   useWallet,
   useWalletLedger,
   type LedgerEntry,
 } from '../hooks/useWallet';
 
-const ENTRY_LABELS: Record<string, string> = {
-  demo_deposit: 'Added funds',
-  demo_withdrawal: 'Cashed out',
-  escrow_hold: 'Entry held',
-  escrow_release: 'Entry settled',
-  payout: 'Winnings',
-  rake: 'Platform fee',
-  refund: 'Refund',
-  adjustment: 'Adjustment',
-};
-
-function ledgerLabel(entry: LedgerEntry): string {
-  // Memos are server free-text that embed raw metric/market ids
-  // ("chess_accuracy easy pool entry"); humanize them so no snake_case
-  // identifier reaches the player.
-  if (entry.memo) return humanizeIds(entry.memo);
-  return ENTRY_LABELS[entry.entry_type] ?? entry.entry_type;
-}
-
-/** A small semantic dot leading each ledger row: money in, fee, or hold. */
 function LedgerDot({ entry }: { entry: LedgerEntry }) {
   const color =
     entry.entry_type === 'rake'
@@ -52,22 +34,23 @@ export function WalletPage() {
   usePageTitle('Wallet');
   const { data: wallet, isLoading, isError, refetch } = useWallet();
   const ledger = useWalletLedger();
-  const deposit = useDemoDeposit();
-  const withdraw = useDemoWithdrawal();
+  const deposit = usePlayMoneyDeposit();
+  const [pick, setPick] = useState<number | null>(null);
 
   const available = wallet?.available_cents ?? 0;
   const escrow = wallet?.escrow_cents ?? 0;
   const lifetime = wallet?.lifetime_net_cents ?? 0;
 
   const rows = ledger.data?.pages.flatMap((p) => p.entries) ?? [];
-  const busy = deposit.isPending || withdraw.isPending;
+
+  const confirmAdd = () => {
+    if (pick == null) return;
+    deposit.mutate(pick, { onSuccess: () => setPick(null) });
+  };
 
   return (
-    // A column the height of the viewport: the balance and the two preset rows
-    // stay put and only the ledger scrolls, so the page stops growing with the
-    // number of entries.
     <div className="flex h-full flex-col">
-      <SectionHeader level="page" hint="Play money until full launch.">
+      <SectionHeader level="page" hint="Points have no cash value.">
         Wallet
       </SectionHeader>
 
@@ -86,41 +69,56 @@ export function WalletPage() {
         </div>
       ) : (
         <>
-          {/* One hero figure rather than three equal cells. Available is the
-           * number you came for; escrow and lifetime are its context. */}
+          {/* Available is the number you came for; escrow and lifetime are
+           * its context. */}
           <Card className="p-5">
             <p className="label-money">Available</p>
             <p className="mt-1 text-3xl font-semibold text-green">
-              {formatCurrency(available)}
+              <AnimatedBalance cents={available} testId="wallet-balance" />
             </p>
             <p className="mt-2 text-xs text-text-secondary">
-              {formatCurrency(escrow)} in play ·{' '}
-              <AmountText cents={lifetime} win={lifetime > 0} /> all time
+              In play{' '}
+              <span className="num text-text">
+                <PointsFigure cents={escrow} />
+              </span>
+              <span className="mx-1.5 text-text-tertiary">·</span>
+              Net all time <AmountText cents={lifetime} win={lifetime > 0} />
             </p>
           </Card>
 
           <section className="mt-8">
-            <SectionHeader level="sub">Add funds</SectionHeader>
-            <PresetSelector
-              presetsCents={DEMO_DEPOSIT_PRESETS_CENTS}
-              onSelect={(cents) => deposit.mutate(cents)}
-              disabled={busy}
-            />
-          </section>
-
-          <section className="mt-6">
-            <SectionHeader level="sub">Cash out</SectionHeader>
-            {available === 0 ? (
-              <p className="text-xs text-text-tertiary">
-                Nothing to cash out yet. Win a contest and it lands here.
-              </p>
-            ) : (
+            <SectionHeader level="sub" hint="Free top-ups, any time.">
+              Add points
+            </SectionHeader>
+            <div
+              className="flex flex-wrap items-center gap-x-4 gap-y-3"
+              data-testid="deposit-presets"
+            >
               <PresetSelector
-                presetsCents={DEMO_DEPOSIT_PRESETS_CENTS.filter((c) => c <= available)}
-                onSelect={(cents) => withdraw.mutate(cents)}
-                disabled={busy}
+                presetsCents={DEPOSIT_PRESETS_CENTS}
+                selectedCents={pick}
+                onSelect={(cents) => setPick(cents === pick ? null : cents)}
+                disabled={deposit.isPending}
               />
-            )}
+              <div className="flex items-center gap-1">
+                <PillButton
+                  variant="primary"
+                  onClick={confirmAdd}
+                  disabled={pick == null || deposit.isPending}
+                >
+                  {deposit.isPending
+                    ? 'Adding…'
+                    : pick == null
+                      ? 'Add points'
+                      : `Add ${formatPoints(pick)}`}
+                </PillButton>
+                {pick != null && !deposit.isPending && (
+                  <PillButton variant="text" onClick={() => setPick(null)}>
+                    Cancel
+                  </PillButton>
+                )}
+              </div>
+            </div>
           </section>
 
           <section className="mt-8 flex min-h-0 flex-1 flex-col">
@@ -129,12 +127,10 @@ export function WalletPage() {
             </SectionHeader>
             {rows.length === 0 ? (
               <p className="text-xs text-text-tertiary">
-                Nothing yet. Add funds and join a contest to start the ledger.
+                Nothing yet. Join a match and it shows up here.
               </p>
             ) : (
-              // `min-h` keeps the ledger from being squeezed to nothing on a
-              // short window; past that the outer column takes over scrolling.
-              <div className="min-h-[9rem] flex-1 space-y-2 overflow-y-auto pb-1 pr-2">
+              <div className="space-y-2 pb-1 md:min-h-[9rem] md:flex-1 md:overflow-y-auto md:pr-2">
                 {rows.map((entry) => (
                   <ExpandableCard
                     key={entry.id}

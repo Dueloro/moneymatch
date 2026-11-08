@@ -15,7 +15,6 @@ from .factories import create_limit, create_user, create_wallet
 
 
 async def _lose(session, user, amount):
-    """Realize a loss of `amount`: hold then consume the stake."""
     ref = uuid.uuid4()
     await ws.escrow_hold(session, user.id, amount, ref_type="match", ref_id=ref)
     await ws.escrow_release(session, user.id, amount, ref_type="match", ref_id=ref)
@@ -24,7 +23,7 @@ async def _lose(session, user, amount):
 async def test_defaults_created_and_stake_allowed(session):
     user = await create_user(session)
     await create_wallet(session, user, available_cents=100_00)
-    await ls.assert_can_stake(session, user, 10_00)  # no raise
+    await ls.assert_can_stake(session, user, 10_00)
     limit = await ls.get_or_create_limits(session, user.id)
     assert limit.daily_loss_cap_cents == 20_000
     assert limit.daily_entry_cap_cents == 50_000
@@ -52,7 +51,6 @@ async def test_daily_entry_cap_at_boundary(session):
     user = await create_user(session)
     await create_wallet(session, user, available_cents=1_000_00)
     await create_limit(session, user, daily_entry_cap_cents=100_00)
-    # Already entered $80; $20 more sits exactly on the cap (allowed).
     await ws.escrow_hold(session, user.id, 80_00, ref_type="match", ref_id=uuid.uuid4())
     await ls.assert_can_stake(session, user, 20_00)
     # One cent over the cap is blocked.
@@ -65,7 +63,7 @@ async def test_daily_loss_cap_at_boundary(session):
     user = await create_user(session)
     await create_wallet(session, user, available_cents=1_000_00)
     await create_limit(session, user, daily_loss_cap_cents=50_00)
-    await _lose(session, user, 30_00)  # $30 realized loss → $20 headroom
+    await _lose(session, user, 30_00)
     await ls.assert_can_stake(session, user, 20_00)
     with pytest.raises(ls.StakeBlockedError) as ei:
         await ls.assert_can_stake(session, user, 20_01)
@@ -77,9 +75,7 @@ async def test_winnings_offset_loss_headroom(session):
     await create_wallet(session, user, available_cents=1_000_00)
     await create_limit(session, user, daily_loss_cap_cents=50_00)
     await _lose(session, user, 40_00)
-    # A payout in the window nets down the realized loss, restoring headroom.
     await ws.payout(session, user.id, 30_00, ref_type="match", ref_id=uuid.uuid4())
-    # Net loss now $10 → $40 headroom; a $40 stake is allowed.
     await ls.assert_can_stake(session, user, 40_00)
 
 
@@ -105,7 +101,7 @@ async def test_released_contest_frees_a_slot(session):
     with pytest.raises(ls.StakeBlockedError):
         await ls.assert_can_stake(session, user, 1_00)
     await ws.refund(session, user.id, 5_00, ref_type="match", ref_id=ref)
-    await ls.assert_can_stake(session, user, 1_00)  # slot freed
+    await ls.assert_can_stake(session, user, 1_00)
 
 
 def test_promote_pending_respects_cooldown():
@@ -117,22 +113,18 @@ def test_promote_pending_respects_cooldown():
         pending_effective_at=now + timedelta(hours=1),
     )
     ls.promote_pending(limit, now=now)
-    assert limit.daily_loss_cap_cents == 20_000  # not yet effective
+    assert limit.daily_loss_cap_cents == 20_000
     assert limit.pending_limits is not None
 
     ls.promote_pending(limit, now=now + timedelta(hours=2))
-    assert limit.daily_loss_cap_cents == 40_000  # promoted
+    assert limit.daily_loss_cap_cents == 40_000
     assert limit.pending_limits is None
     assert limit.pending_effective_at is None
-
-
-# --- responsible-gaming depth: cool-off + deposit cap ---------------------- #
 
 
 async def test_cooloff_blocks_staking_until_it_ends(session):
     user = await create_user(session)
     await create_wallet(session, user, available_cents=100_00)
-    # Start a 7-day self-imposed break.
     until = datetime.now(UTC) + timedelta(days=7)
     await ls.request_limit_change(session, user.id, timeout_until=until)
 
@@ -140,7 +132,6 @@ async def test_cooloff_blocks_staking_until_it_ends(session):
         await ls.assert_can_stake(session, user, 10_00)
     assert ei.value.code == "account_timeout"
 
-    # Once the break has passed, staking resumes (check with a past `now`).
     await ls.assert_can_stake(session, user, 10_00, now=until + timedelta(seconds=1))
 
 
@@ -149,7 +140,6 @@ async def test_cooloff_is_extend_only(session):
     far = datetime.now(UTC) + timedelta(days=30)
     near = datetime.now(UTC) + timedelta(days=1)
     await ls.request_limit_change(session, user.id, timeout_until=far)
-    # A shorter break can't shorten an active one.
     await ls.request_limit_change(session, user.id, timeout_until=near)
     limit = await ls.get_or_create_limits(session, user.id)
     assert limit.timeout_until == far
@@ -158,12 +148,10 @@ async def test_cooloff_is_extend_only(session):
 async def test_deposit_cap_blocks_over_cap(session):
     user = await create_user(session)
     await create_wallet(session, user, available_cents=0)
-    # Lower the deposit cap to $50, then a $60 deposit is refused.
     await ls.request_limit_change(session, user.id, daily_deposit_cap_cents=5_000)
     with pytest.raises(ls.StakeBlockedError) as ei:
         await ls.assert_can_deposit(session, user, 6_000)
     assert ei.value.code == "daily_deposit_cap_exceeded"
-    # A within-cap deposit passes.
     await ls.assert_can_deposit(session, user, 4_000)
 
 
@@ -171,7 +159,7 @@ async def test_deposit_cap_counts_trailing_window(session):
     user = await create_user(session)
     await create_wallet(session, user, available_cents=0)
     await ls.request_limit_change(session, user.id, daily_deposit_cap_cents=10_000)
-    await ws.demo_deposit(session, user.id, 7_000)  # already deposited $70 today
+    await ws.demo_deposit(session, user.id, 7_000)
     with pytest.raises(ls.StakeBlockedError) as ei:
-        await ls.assert_can_deposit(session, user, 4_000)  # +$40 > $100 cap
+        await ls.assert_can_deposit(session, user, 4_000)
     assert ei.value.code == "daily_deposit_cap_exceeded"

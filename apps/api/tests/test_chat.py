@@ -1,9 +1,4 @@
-"""`/chat` — friend DMs, the support thread, and invite cards.
-
-Covers the rules that matter: messaging follows friendship, unread counts are
-per-member read cursors, a chat invite is a real intent (an accepted h2h card
-forms the PENDING match), and support answers itself.
-"""
+"""`/chat` — friend DMs, the support thread, and invite cards."""
 
 from __future__ import annotations
 
@@ -16,15 +11,15 @@ from moneymatch_api.models.linked_account import LinkedAccount
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers, new_sessionmaker
+from .factories import chess_profile
 
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-GAME = "cs2.steam"
+GAME = "chess.lichess"
 
 
 async def _onboard(client, auth_id: str, name: str) -> str:
-    """Provision a user, name them, and link them to CS2 (so they can wager)."""
     await client.get(f"{V1}/me", headers=auth_headers(auth_id))
     sm = new_sessionmaker()
     async with sm() as s:
@@ -40,9 +35,9 @@ async def _onboard(client, auth_id: str, name: str) -> str:
                 LinkedAccount(
                     user_id=user.id,
                     game=GAME,
-                    host_account_id=f"steam_{name}",
+                    host_account_id=f"lichess_{name}",
                     host_username=name,
-                    profile_snapshot={"username": name, "game": GAME},
+                    profile_snapshot=chess_profile(name).model_dump(),
                 )
             )
         await s.commit()
@@ -65,7 +60,6 @@ async def _befriend(client, a_auth: str, b_auth: str, b_name: str) -> None:
 
 
 async def _pair(client):
-    """alice + bob, friends, both linked. Returns their ids."""
     alice = await _onboard(client, "chat_a", "alice")
     bob = await _onboard(client, "chat_b", "bob")
     await _befriend(client, "chat_a", "chat_b", "bob")
@@ -87,7 +81,6 @@ async def test_dm_requires_friendship(client):
 async def test_send_and_read_a_dm(client):
     _, bob = await _pair(client)
 
-    # alice opens the DM and sends a line.
     r = await client.post(
         f"{V1}/chat/conversations",
         headers=auth_headers("chat_a"),
@@ -108,10 +101,8 @@ async def test_send_and_read_a_dm(client):
     thread = r.json()
     assert [m["body"] for m in thread["messages"]] == ["run it back?"]
     assert thread["messages"][0]["mine"] is True
-    # The sender is never badged for their own message.
     assert thread["conversation"]["unread"] == 0
 
-    # bob sees it as unread, from alice.
     r = await client.get(f"{V1}/chat/conversations", headers=auth_headers("chat_b"))
     body = r.json()
     assert body["unread_total"] == 1
@@ -128,7 +119,6 @@ async def test_send_and_read_a_dm(client):
         assert r.status_code == 200
         assert r.json()["unread_total"] == 0
 
-    # bob is not a stranger to the thread: he can read and reply.
     r = await client.get(
         f"{V1}/chat/conversations/{cid}", headers=auth_headers("chat_b")
     )
@@ -175,7 +165,6 @@ async def test_empty_message_and_ambiguous_body_are_rejected(client):
         json={"body": "   "},
     )
     assert r.status_code == 422
-    # Neither a body nor an invite.
     r = await client.post(
         f"{V1}/chat/conversations/{cid}/messages",
         headers=auth_headers("chat_a"),
@@ -202,7 +191,7 @@ async def test_pool_invite_card_round_trip(client):
                 "invite_kind": "pool",
                 "game": GAME,
                 "entry_preset_cents": 1000,
-                "metric": "cs2_kd_ratio",
+                "metric": "chess_moves",
                 "difficulty": "medium",
             }
         },
@@ -213,9 +202,8 @@ async def test_pool_invite_card_round_trip(client):
     assert card["payload"]["status"] == "pending"
     assert card["payload"]["entry_cents"] == 1000
     assert card["payload"]["redirect_path"] == "/pools"
-    assert "K/D" in card["payload"]["title"]
+    assert "Moves to win" in card["payload"]["title"]
 
-    # The sender can't answer their own invite.
     r = await client.post(
         f"{V1}/chat/messages/{card['id']}/respond",
         headers=auth_headers("chat_a"),
@@ -223,7 +211,6 @@ async def test_pool_invite_card_round_trip(client):
     )
     assert r.status_code == 403
 
-    # bob accepts → the card is stamped and he's pointed at the Solo Pools tab.
     r = await client.post(
         f"{V1}/chat/messages/{card['id']}/respond",
         headers=auth_headers("chat_b"),
@@ -235,7 +222,6 @@ async def test_pool_invite_card_round_trip(client):
     assert body["redirect_path"] == "/pools"
     assert body["match_id"] is None
 
-    # Answering twice is a conflict, not a second accept.
     r = await client.post(
         f"{V1}/chat/messages/{card['id']}/respond",
         headers=auth_headers("chat_b"),
@@ -243,7 +229,6 @@ async def test_pool_invite_card_round_trip(client):
     )
     assert r.status_code == 409
 
-    # The outcome is narrated in the thread.
     thread = (
         await client.get(
             f"{V1}/chat/conversations/{cid}", headers=auth_headers("chat_a")
@@ -280,20 +265,19 @@ async def test_invite_rejects_a_non_preset_entry(client):
 async def test_a_challenge_lands_in_the_dm_and_accepting_it_there_forms_a_match(client):
     _, bob = await _pair(client)
 
-    # alice challenges bob through the normal challenge flow.
     r = await client.post(
         f"{V1}/challenges",
         headers=auth_headers("chat_a"),
         json={
             "challengee_id": bob,
             "game": GAME,
-            "market": "kd_ratio",
+            "market": "win_h2h",
+            "speed": "blitz",
             "entry_preset_cents": 1000,
         },
     )
     assert r.status_code in (200, 201), r.text
 
-    # It shows up as an invite card in their conversation, not only in the feed.
     convos = (
         await client.get(f"{V1}/chat/conversations", headers=auth_headers("chat_b"))
     ).json()["conversations"]
@@ -308,7 +292,6 @@ async def test_a_challenge_lands_in_the_dm_and_accepting_it_there_forms_a_match(
     assert card["payload"]["invite_kind"] == "h2h"
     assert card["payload"]["status"] == "pending"
 
-    # Accepting in chat forms the PENDING match, same as the Inbox pill.
     r = await client.post(
         f"{V1}/chat/messages/{card['id']}/respond",
         headers=auth_headers("chat_b"),
@@ -329,7 +312,8 @@ async def test_declining_a_challenge_elsewhere_stamps_the_chat_card(client):
             json={
                 "challengee_id": bob,
                 "game": GAME,
-                "market": "kd_ratio",
+                "market": "win_h2h",
+                "speed": "blitz",
                 "entry_preset_cents": 500,
             },
         )
@@ -349,14 +333,10 @@ async def test_declining_a_challenge_elsewhere_stamps_the_chat_card(client):
         )
     ).json()
     card = next(m for m in thread["messages"] if m["kind"] == "invite")
-    # No stale "pending" card left behind in the thread.
     assert card["payload"]["status"] == "declined"
 
 
 async def test_unfriending_closes_the_thread_to_new_messages(client):
-    """Messaging follows friendship for the life of the thread, not only when it
-    was opened — otherwise removing (or blocking) someone leaves the channel
-    wide open. History stays readable; only writes are refused."""
     _, bob = await _pair(client)
     cid = (
         await client.post(
@@ -380,7 +360,6 @@ async def test_unfriending_closes_the_thread_to_new_messages(client):
     )
     assert r.status_code == 200, r.text
 
-    # Neither side can post any more — a line or an invite.
     for headers in (auth_headers("chat_a"), auth_headers("chat_b")):
         r = await client.post(
             f"{V1}/chat/conversations/{cid}/messages",
@@ -401,7 +380,6 @@ async def test_unfriending_closes_the_thread_to_new_messages(client):
     )
     assert r.status_code == 403
 
-    # The transcript is still there for both of them.
     r = await client.get(
         f"{V1}/chat/conversations/{cid}", headers=auth_headers("chat_b")
     )
@@ -410,9 +388,6 @@ async def test_unfriending_closes_the_thread_to_new_messages(client):
 
 
 async def test_a_challenge_to_a_non_friend_opens_no_dm(client):
-    """A rematch may be against someone who was never a friend. The challenge is
-    allowed there; a chat thread is not — chat never opens a channel the
-    friendship rule would refuse."""
     from moneymatch_api.models.user import User as UserModel
     from moneymatch_api.services import chat_service
 
@@ -429,8 +404,8 @@ async def test_a_challenge_to_a_non_friend_opens_no_dm(client):
             challengee_id=uuid.UUID(bob),
             challenge_id=uuid.uuid4(),
             game=GAME,
-            market="kd_ratio",
-            market_label="K/D",
+            market="win_h2h",
+            market_label="Win the game",
             entry_cents=1000,
             friendly=False,
         )
@@ -457,7 +432,6 @@ async def test_support_thread_greets_and_acknowledges(client):
     assert support["peer_user_id"] is None
     cid = support["id"]
 
-    # Opening it twice returns the same thread (get-or-create).
     again = (
         await client.post(
             f"{V1}/chat/conversations",
@@ -474,12 +448,11 @@ async def test_support_thread_greets_and_acknowledges(client):
     )
     assert r.status_code == 200
     messages = r.json()["messages"]
-    assert messages[0]["kind"] == "system"  # greeting
+    assert messages[0]["kind"] == "system"
     assert messages[-2]["body"] == "Where is my payout?"
-    assert messages[-1]["kind"] == "system"  # auto-ack
+    assert messages[-1]["kind"] == "system"
     assert messages[-1]["sender_id"] is None
 
-    # Support takes messages but not invites.
     r = await client.post(
         f"{V1}/chat/conversations/{cid}/messages",
         headers=auth_headers("chat_a"),

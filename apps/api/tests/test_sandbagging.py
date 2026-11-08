@@ -11,16 +11,10 @@ from moneymatch_api.models.risk import RiskFlag
 from moneymatch_api.services import sandbagging_service
 from moneymatch_api.services.sandbagging_service import SandbaggingBlockedError
 
-from .factories import create_linked_account, create_user, cs2_profile
+from .factories import chess_profile, create_linked_account, create_user
 
-# No module-level `pytest.mark.asyncio`: `asyncio_mode = "auto"` in pyproject
-# already collects every async test here, so the marker was redundant — and
-# applying it to the three pure z-test functions below made pytest warn on each
-# one. Warnings in a money-relevant control are where a real warning goes to
-# hide (AUDIT_FINDINGS.md P2-1).
-
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+METRIC = "chess_moves"
 
 
 @pytest.mark.nodb
@@ -30,11 +24,25 @@ def test_sandbag_z_none_without_enough_history():
 
 @pytest.mark.nodb
 def test_sandbag_z_flags_a_tanked_recent_window():
-    # Older baseline steady ~1.5; recent 10 tanked to ~0.6 → strongly negative z.
     baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
     recent = [0.6] * 10
     z = sandbagging_service.sandbag_z(recent + baseline, recent_n=10)
     assert z is not None and z < -1.5
+
+
+@pytest.mark.nodb
+def test_sandbag_z_flips_for_lower_is_better():
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    slower = [55.0] * 10
+    faster = [20.0] * 10
+    z_slow = sandbagging_service.sandbag_z(
+        slower + baseline, recent_n=10, lower_is_better=True
+    )
+    z_fast = sandbagging_service.sandbag_z(
+        faster + baseline, recent_n=10, lower_is_better=True
+    )
+    assert z_slow is not None and z_slow < -1.5
+    assert z_fast is not None and z_fast > 0
 
 
 @pytest.mark.nodb
@@ -46,17 +54,16 @@ def test_sandbag_z_steady_form_not_flagged():
 
 class _FakeAdapter:
     def __init__(self, values_oldest_first):
-        # NormGame list is oldest-first (as adapters return).
         self._games = [
             NormGame(
                 id=str(i),
-                speed="cs2",
+                speed="blitz",
                 rated=True,
                 created_at_ms=i,
-                moves=0,
-                won=None,
+                moves=int(v),
+                won=True,
                 drawn=False,
-                metrics={KD: v},
+                metrics={METRIC: v},
             )
             for i, v in enumerate(values_oldest_first)
         ]
@@ -68,18 +75,17 @@ class _FakeAdapter:
 async def test_evaluate_writes_flag_and_blocks(session, monkeypatch):
     user = await create_user(session, username="tank")
     await create_linked_account(
-        session, user, CS2, host_account_id="host_tank", profile=cs2_profile("tank")
+        session, user, CHESS, host_account_id="host_tank", profile=chess_profile("tank")
     )
-    # Oldest-first: steady baseline then a tanked recent tail.
-    baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
-    recent_tanked = [0.6] * 10
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    recent_tanked = [55.0, 54.0, 56.0, 55.0, 53.0, 57.0, 55.0, 54.0, 56.0, 55.0]
     monkeypatch.setattr(
         registry, "get", lambda g: _FakeAdapter(baseline + recent_tanked)
     )
 
     with pytest.raises(SandbaggingBlockedError):
         await sandbagging_service.assert_not_sandbagging(
-            session, user, CS2, KD, "host_tank"
+            session, user, CHESS, METRIC, "host_tank"
         )
     flag = await session.scalar(select(RiskFlag).where(RiskFlag.user_id == user.id))
     assert flag is not None and flag.kind == "sandbagging" and flag.resolved is False
@@ -87,50 +93,53 @@ async def test_evaluate_writes_flag_and_blocks(session, monkeypatch):
 
 async def test_existing_flag_blocks_without_re_evaluating(session, monkeypatch):
     user = await create_user(session, username="flagged")
-    session.add(RiskFlag(user_id=user.id, game=CS2, metric=KD, kind="sandbagging"))
+    session.add(
+        RiskFlag(user_id=user.id, game=CHESS, metric=METRIC, kind="sandbagging")
+    )
     await session.flush()
 
-    # Adapter would raise if called — the existing flag short-circuits first.
     def _boom(_g):
         raise AssertionError("should not evaluate when already flagged")
 
     monkeypatch.setattr(registry, "get", _boom)
     with pytest.raises(SandbaggingBlockedError):
         await sandbagging_service.assert_not_sandbagging(
-            session, user, CS2, KD, "host_flagged"
+            session, user, CHESS, METRIC, "host_flagged"
         )
-
-
-async def test_assert_not_flagged_blocks_on_existing_flag_without_host_call(
-    session, monkeypatch
-):
-    """The cheap hot-path guard raises on an open flag and never touches the host."""
-    user = await create_user(session, username="cheap_flagged")
-    session.add(RiskFlag(user_id=user.id, game=CS2, metric=KD, kind="sandbagging"))
-    await session.flush()
-
-    def _boom(_g):
-        raise AssertionError("assert_not_flagged must not evaluate the adapter")
-
-    monkeypatch.setattr(registry, "get", _boom)
-    with pytest.raises(SandbaggingBlockedError):
-        await sandbagging_service.assert_not_flagged(session, user.id, CS2, KD)
-
-
-async def test_assert_not_flagged_passes_when_clean(session):
-    user = await create_user(session, username="cheap_clean")
-    # No flag → no raise (and no host call is made).
-    await sandbagging_service.assert_not_flagged(session, user.id, CS2, KD)
 
 
 async def test_steady_player_not_blocked(session, monkeypatch):
     user = await create_user(session, username="clean")
     await create_linked_account(
-        session, user, CS2, host_account_id="host_clean", profile=cs2_profile("clean")
+        session,
+        user,
+        CHESS,
+        host_account_id="host_clean",
+        profile=chess_profile("clean"),
     )
-    steady = [1.5, 1.4, 1.6, 1.5, 1.55, 1.45] * 4
+    steady = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0] * 4
     monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(steady))
-    # No raise.
     await sandbagging_service.assert_not_sandbagging(
-        session, user, CS2, KD, "host_clean"
+        session, user, CHESS, METRIC, "host_clean"
     )
+
+
+async def test_improving_player_not_blocked(session, monkeypatch):
+    user = await create_user(session, username="improver")
+    await create_linked_account(
+        session,
+        user,
+        CHESS,
+        host_account_id="host_improver",
+        profile=chess_profile("improver"),
+    )
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    recent_faster = [20.0, 21.0, 19.0, 20.0, 22.0, 18.0, 20.0, 21.0, 19.0, 20.0]
+    monkeypatch.setattr(
+        registry, "get", lambda g: _FakeAdapter(baseline + recent_faster)
+    )
+    await sandbagging_service.assert_not_sandbagging(
+        session, user, CHESS, METRIC, "host_improver"
+    )
+    flag = await session.scalar(select(RiskFlag).where(RiskFlag.user_id == user.id))
+    assert flag is None

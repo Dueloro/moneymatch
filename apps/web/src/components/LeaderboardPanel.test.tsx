@@ -66,4 +66,23 @@ describe('LeaderboardPanel', () => {
     renderWithProviders(<LeaderboardPanel />);
     expect(screen.getByText('Nobody is ranked yet')).toBeInTheDocument();
   });
+
+  it('shows a skeleton while loading', () => {
+    vi.mocked(useLeaderboard).mockReturnValue({ isLoading: true } as ReturnType<
+      typeof useLeaderboard
+    >);
+    renderWithProviders(<LeaderboardPanel />);
+    expect(screen.getByTestId('skeleton-list')).toBeInTheDocument();
+  });
+
+  it('shows an error with retry on failure', () => {
+    const refetch = vi.fn();
+    vi.mocked(useLeaderboard).mockReturnValue({
+      isError: true,
+      refetch,
+    } as unknown as ReturnType<typeof useLeaderboard>);
+    renderWithProviders(<LeaderboardPanel />);
+    screen.getByRole('button', { name: 'Try again' }).click();
+    expect(refetch).toHaveBeenCalled();
+  });
 });

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 
+import { humanizeIds } from '../../lib/labels';
+import { formatMetric, formatMetricNumber } from '../../lib/metrics';
 import { toast } from '../../lib/toast';
-import { formatCurrency, formatRelativeTime } from '../../lib/format';
+import { formatPoints, formatRelativeTime } from '../../lib/format';
 import {
   statValue,
   type ActivityDetail,
@@ -11,25 +13,17 @@ import { useCreateChallenge } from '../../hooks/useChallenges';
 import { useFileDispute, type ContestRefType } from '../../hooks/useDisputes';
 import { AmountText } from '../ui/AmountText';
 import { ExpandableCard } from '../ui/ExpandableCard';
-import { GameBadge } from '../ui/GameBadge';
 import { PillButton } from '../ui/PillButton';
 import { LiveLine } from './LiveLine';
 
 const LIVE_STATES = new Set(['ACTIVE', 'AWAITING_RESULT']);
 const TERMINAL_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
-// A settled outcome the player can contest (matches also allow PUSHED).
 const DISPUTABLE_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 
-/**
- * A win is money, so it gets lime. A contest still running is not money yet, so
- * it gets the live tone. Everything else is settled and quiet.
- */
 function dotClass(item: ActivityItem): string {
   const won = item.state === 'SETTLED' && (item.net_cents ?? 0) > 0;
   if (won) return 'bg-green';
-  // OPEN / LOCKED: a tournament taking joiners or running.
-  const live =
-    LIVE_STATES.has(item.state) || item.state === 'OPEN' || item.state === 'LOCKED';
+  const live = LIVE_STATES.has(item.state) || item.state === 'LOCKED';
   return live ? 'bg-live' : 'bg-text-tertiary';
 }
 
@@ -43,7 +37,7 @@ function stateLabel(item: ActivityItem): string {
     case 'LOCKED':
       return 'In progress';
     case 'PUSHED':
-      return 'Push · refunded';
+      return 'Draw · refunded';
     case 'CANCELED':
       return 'Refunded';
     case 'SETTLED':
@@ -54,7 +48,6 @@ function stateLabel(item: ActivityItem): string {
   }
 }
 
-/** Stat-race result line (matches only; pools and tournaments have no opponent). */
 function statLine(item: ActivityItem): string | null {
   if (item.type !== 'match') return null;
   const you = statValue(item.your_stat_line);
@@ -70,11 +63,14 @@ function title(item: ActivityItem): string {
 }
 
 function fmt(v: number | string): string {
-  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2);
-  return v;
+  return typeof v === 'number' ? formatMetricNumber(v) : v;
 }
 
-/** Side-by-side you-vs-opponent stat table for a match's expanded view. */
+function statLabel(key: string): string {
+  const s = humanizeIds(key).replace(/_/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function StatCompare({ detail }: { detail: ActivityDetail }) {
   const you = detail.your_stats ?? {};
   const opp = detail.opponent_stats ?? {};
@@ -96,7 +92,7 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
             key={k}
             className="grid grid-cols-3 border-t border-hairline px-3 py-1.5 text-sm"
           >
-            <span className="text-text-secondary">{k}</span>
+            <span className="text-text-secondary">{statLabel(k)}</span>
             <span
               className={`text-right ${better && y > o ? 'font-semibold text-text' : 'text-text-secondary'}`}
             >
@@ -114,13 +110,10 @@ function StatCompare({ detail }: { detail: ActivityDetail }) {
   );
 }
 
-/** A labelled fact chip used in the pool/tournament expanded view. */
 function Fact({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="rounded-inset bg-panel-raised px-3 py-2">
-      <div className="text-micro uppercase tracking-wide text-text-secondary">
-        {label}
-      </div>
+      <div className="label-neutral">{label}</div>
       {href ? (
         <a
           href={href}
@@ -143,7 +136,6 @@ function DetailBody({ item }: { item: ActivityItem }) {
     return <p className="text-sm text-text-secondary">No details for this one.</p>;
 
   if (d.kind === 'match') {
-    const meta = [d.map, d.mode].filter(Boolean).join(' · ');
     return (
       <div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
@@ -152,24 +144,19 @@ function DetailBody({ item }: { item: ActivityItem }) {
               Opponent <span className="text-text">{d.opponent}</span>
             </span>
           )}
-          {meta && <span>{meta}</span>}
           {item.resolved_at && <span>{formatRelativeTime(item.resolved_at)}</span>}
         </div>
         <StatCompare detail={d} />
         <div className="mt-3 flex flex-wrap gap-2">
-          <Fact label="Entry" value={formatCurrency(d.entry_cents ?? 0)} />
+          <Fact label="Entry" value={formatPoints(d.entry_cents ?? 0)} />
           {d.prize_cents ? (
-            <Fact label="Prize" value={formatCurrency(d.prize_cents)} />
+            <Fact label="Prize" value={formatPoints(d.prize_cents)} />
           ) : null}
-          {d.host_game_id && !d.host_game_id.startsWith('demo-') ? (
+          {d.host_game_id ? (
             <Fact
-              label="Match id"
-              value={d.host_game_id}
-              href={
-                item.game.startsWith('chess.')
-                  ? `https://lichess.org/${d.host_game_id}`
-                  : undefined
-              }
+              label="Game"
+              value="View on Lichess ↗"
+              href={`https://lichess.org/${d.host_game_id}`}
             />
           ) : null}
         </div>
@@ -177,18 +164,22 @@ function DetailBody({ item }: { item: ActivityItem }) {
     );
   }
 
-  // pool / tournament
   const facts: Array<[string, string]> = [];
   if (d.metric_label) facts.push(['Metric', d.metric_label]);
-  if (d.difficulty) facts.push(['Difficulty', d.difficulty]);
-  if (d.room_bar != null) facts.push(['Room bar', fmt(d.room_bar)]);
-  if (d.personal_bar != null) facts.push(['Your bar', fmt(d.personal_bar)]);
+  if (d.difficulty)
+    facts.push([
+      'Difficulty',
+      d.difficulty.charAt(0).toUpperCase() + d.difficulty.slice(1),
+    ]);
+  const m = item.market;
+  if (d.room_bar != null) facts.push(['Room bar', formatMetric(m, d.room_bar)]);
+  if (d.personal_bar != null) facts.push(['Your bar', formatMetric(m, d.personal_bar)]);
   if (d.your_rank != null) facts.push(['Your rank', `#${d.your_rank}`]);
-  if (d.your_score != null) facts.push(['Your score', fmt(d.your_score)]);
+  if (d.your_score != null) facts.push(['Your score', formatMetric(m, d.your_score)]);
   if (d.field_size != null) facts.push(['Field', `${d.field_size} players`]);
   if (d.room_size != null) facts.push(['Room', `${d.room_size} players`]);
-  if (d.entry_cents != null) facts.push(['Entry', formatCurrency(d.entry_cents)]);
-  if (d.prize_cents) facts.push(['Prize pool', formatCurrency(d.prize_cents)]);
+  if (d.entry_cents != null) facts.push(['Entry', formatPoints(d.entry_cents)]);
+  if (d.prize_cents) facts.push(['Prize pool', formatPoints(d.prize_cents)]);
   return (
     <div className="flex flex-wrap gap-2">
       {facts.map(([label, value]) => (
@@ -204,7 +195,6 @@ const REF_OF: Record<ActivityItem['type'], ContestRefType> = {
   tournament: 'tournament',
 };
 
-/** "Contest this result" files a dispute (support review) inline. */
 function ContestSection({ item }: { item: ActivityItem }) {
   const file = useFileDispute();
   const [open, setOpen] = useState(false);
@@ -213,10 +203,10 @@ function ContestSection({ item }: { item: ActivityItem }) {
   if (item.dispute_status) {
     const label =
       item.dispute_status === 'open'
-        ? 'Contested · under review'
+        ? 'Reported · under review'
         : item.dispute_status === 'resolved'
-          ? 'Contest resolved'
-          : 'Contest reviewed · result stands';
+          ? 'Report resolved'
+          : 'Reviewed · result stands';
     return (
       <div className="mt-3 rounded-inset bg-panel-raised px-3 py-2 text-xs text-text-secondary">
         {label}
@@ -232,11 +222,11 @@ function ContestSection({ item }: { item: ActivityItem }) {
         ref_id: item.id,
         reason: reason.trim(),
       });
-      toast.success('Contest submitted. Support will review it.');
+      toast.success('Report sent. Support will review it.');
       setOpen(false);
       setReason('');
     } catch (err) {
-      toast.error((err as Error)?.message ?? 'Could not submit your contest.');
+      toast.error((err as Error)?.message ?? 'Could not send your report.');
     }
   }
 
@@ -253,7 +243,7 @@ function ContestSection({ item }: { item: ActivityItem }) {
             onChange={(e) => setReason(e.target.value)}
             rows={3}
             maxLength={1000}
-            placeholder="e.g. my last round wasn't counted"
+            placeholder="e.g. my game wasn't counted"
             className="mt-1 w-full resize-none rounded-inset border border-hairline bg-bg px-3 py-2 text-sm text-text outline-none focus:border-text-secondary"
           />
           <div className="mt-2 flex items-center gap-2">
@@ -270,14 +260,13 @@ function ContestSection({ item }: { item: ActivityItem }) {
         </div>
       ) : (
         <PillButton variant="outline" onClick={() => setOpen(true)}>
-          Contest this result
+          Report a problem
         </PillButton>
       )}
     </div>
   );
 }
 
-/** One-tap rematch on a settled H2H row → challenge the same opponent. */
 function RematchButton({ item }: { item: ActivityItem }) {
   const rematch = useCreateChallenge();
   if (item.type !== 'match' || !TERMINAL_STATES.has(item.state)) return null;
@@ -304,7 +293,6 @@ export function ActivityCard({
   defaultOpen = false,
 }: {
   item: ActivityItem;
-  /** Open on mount. Used for your latest finished contest. */
   defaultOpen?: boolean;
 }) {
   const sub = statLine(item);
@@ -315,12 +303,7 @@ export function ActivityCard({
       left={
         <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${dotClass(item)}`} />
       }
-      title={
-        <span className="flex min-w-0 items-center gap-2">
-          <GameBadge game={item.game} />
-          <span className="truncate">{title(item)}</span>
-        </span>
-      }
+      title={<span className="truncate">{title(item)}</span>}
       subline={
         <>
           {stateLabel(item)}
@@ -338,11 +321,19 @@ export function ActivityCard({
           <AmountText cents={item.net_cents} win={item.net_cents > 0} />
         ) : (
           <span className="text-xs text-text-secondary">
-            {formatCurrency(item.entry_cents)} in play
+            {formatPoints(item.entry_cents)} in play
           </span>
         )
       }
-      footer={item.live ? <LiveLine live={item.live} /> : undefined}
+      footer={
+        item.live ? (
+          <LiveLine
+            live={item.live}
+            metric={item.market}
+            final={TERMINAL_STATES.has(item.state)}
+          />
+        ) : undefined
+      }
     >
       <DetailBody item={item} />
       <div className="mt-3 flex items-center gap-2">

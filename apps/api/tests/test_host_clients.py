@@ -1,9 +1,4 @@
-"""Host-client resilience: typed errors, retries, and fail-soft polls.
-
-All host APIs are respx-mocked — no live network (05-phase-2 · CI green with zero
-network access). Covers the failure-mode rows the phase requires: 5xx → typed
-error, 404 → not-found, timeout path, and the fail-soft history polls.
-"""
+"""Host-client resilience: typed errors, retries, and fail-soft polls."""
 
 from __future__ import annotations
 
@@ -11,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from moneymatch_api.services.hosts import lichess, opendota
+from moneymatch_api.services.hosts import lichess
 from moneymatch_api.services.hosts._client import request_json
 from moneymatch_api.services.hosts.errors import (
     HostError,
@@ -22,8 +17,6 @@ from moneymatch_api.services.hosts.errors import (
 
 
 def test_rate_limited_is_a_host_unavailable_subclass():
-    # So every `except HostUnavailable` (grading watchdog) treats a 429 as a
-    # transient outage that extends the window, never a wrong settle.
     assert issubclass(HostRateLimited, HostUnavailable)
 
 
@@ -34,7 +27,7 @@ async def test_429_maps_to_host_rate_limited_and_is_not_retried():
     )
     with pytest.raises(HostRateLimited):
         await request_json("example", "GET", "https://api.example.com/x")
-    assert route.call_count == 1  # not retried — retrying only burns more budget
+    assert route.call_count == 1
 
 
 @respx.mock
@@ -44,7 +37,7 @@ async def test_5xx_still_retries_as_host_unavailable():
     )
     with pytest.raises(HostUnavailable):
         await request_json("example", "GET", "https://api.example.com/y")
-    assert route.call_count == 3  # 2 retries + original
+    assert route.call_count == 3
 
 
 URL = "https://example.test/x"
@@ -62,7 +55,7 @@ async def test_request_json_5xx_retries_then_unavailable():
     route = respx.get(URL).mock(return_value=httpx.Response(503))
     with pytest.raises(HostUnavailable):
         await request_json("example", "GET", URL)
-    assert route.call_count == 3  # 1 try + 2 retries
+    assert route.call_count == 3
 
 
 @respx.mock
@@ -84,17 +77,10 @@ async def test_request_json_timeout_is_unavailable():
 
 @respx.mock
 async def test_request_json_4xx_is_typed_host_error_not_retried():
-    # A 400 (e.g. a bad player id) is a typed, non-retryable HostError — never a
-    # raw httpx exception — so `except HostError` guards degrade instead of crash.
     route = respx.get(URL).mock(return_value=httpx.Response(400))
     with pytest.raises(HostError):
         await request_json("example", "GET", URL)
-    assert route.call_count == 1  # 4xx is never retried
-
-
-# --------------------------------------------------------------------------- #
-# Lichess
-# --------------------------------------------------------------------------- #
+    assert route.call_count == 1
 
 
 @respx.mock
@@ -107,7 +93,7 @@ async def test_lichess_get_user_ok_and_missing():
     respx.get("https://lichess.org/api/user/ghost").mock(
         return_value=httpx.Response(404)
     )
-    assert await lichess.get_user("ghost") is None  # 404 → None, not an error
+    assert await lichess.get_user("ghost") is None
 
 
 @respx.mock
@@ -124,27 +110,3 @@ async def test_lichess_games_fail_soft_on_outage():
         return_value=httpx.Response(500)
     )
     assert await lichess.get_user_games("magnus", 0) == []
-
-
-# --------------------------------------------------------------------------- #
-# FaceIt
-# --------------------------------------------------------------------------- #
-
-
-# --------------------------------------------------------------------------- #
-# OpenDota
-# --------------------------------------------------------------------------- #
-
-
-@respx.mock
-async def test_opendota_private_profile_is_none():
-    respx.get("https://api.opendota.com/api/players/123").mock(
-        return_value=httpx.Response(200, json={"profile": None})
-    )
-    assert await opendota.get_player("123") is None
-
-
-@respx.mock
-async def test_opendota_recent_matches_fail_soft():
-    respx.get(url__regex=r".*/recentMatches").mock(return_value=httpx.Response(500))
-    assert await opendota.get_recent_matches("123") == []

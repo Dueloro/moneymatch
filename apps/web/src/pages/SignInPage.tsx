@@ -1,19 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/useAuth';
-import { GameSelectOverlay } from '../components/GameSelectOverlay';
-import { LinkGames } from '../components/LinkGames';
+import { ConnectLichessButton, NotAffiliated } from '../components/ConnectLichess';
 import { TriangleMark } from '../components/ui/brand';
 import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
 import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
-import { useMe, useSetActiveGames } from '../hooks/useMe';
+import { useLinks } from '../hooks/useLinks';
+import { useMe } from '../hooks/useMe';
 import { api } from '../lib/api';
-import { enterDemo as demoEnter } from '../lib/demoAuth';
-import { toast } from '../lib/toast';
+import { clearReturnTo, peekReturnTo, takeReturnTo } from '../lib/returnTo';
 import { emailToUsername } from '../lib/usernameAuth';
 import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
 
@@ -22,12 +21,7 @@ const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 export function SignInPage() {
   const { session, loading, isPasswordRecovery } = useAuth();
   const me = useMe();
-  // After auth the user creates a profile, then picks their games, then links an
-  // account. `select` is the game-selection overlay; a fresh account also lands
-  // there via its empty `active_games`, so closing the app mid-overlay re-prompts
-  // on the next sign-in rather than skipping the pick.
-  const [postStep, setPostStep] = useState<'idle' | 'select' | 'link'>('idle');
-  const activeGames = me.data?.user.active_games ?? [];
+  const [postStep, setPostStep] = useState<'idle' | 'link'>('idle');
 
   if (loading || (session && me.isLoading && !me.isError)) {
     return <Loader />;
@@ -39,9 +33,8 @@ export function SignInPage() {
     return (
       <div className="mm-grid-surface flex min-h-screen items-center justify-center bg-bg px-4">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex flex-col items-center gap-4">
+          <div className="mb-8 flex flex-col items-center">
             <TriangleMark className="h-11 w-11" />
-            <StepProgress step={1} />
           </div>
           <StaleSessionStep />
         </div>
@@ -54,14 +47,11 @@ export function SignInPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-2">
           <TriangleMark className="h-11 w-11" />
-          <StepProgress step={!session ? 1 : me.data?.needs_onboarding ? 2 : 3} />
-          <p className="text-xs text-text-secondary">
-            {!session
-              ? 'Create account'
-              : me.data?.needs_onboarding
-                ? 'Your profile'
-                : 'Link a game'}
-          </p>
+          {session &&
+            !isPasswordRecovery &&
+            (me.data?.needs_onboarding || postStep === 'link') && (
+              <StepProgress step={me.data?.needs_onboarding ? 1 : 2} total={2} />
+            )}
         </div>
 
         {isPasswordRecovery ? (
@@ -69,14 +59,9 @@ export function SignInPage() {
         ) : !session ? (
           <AuthStep />
         ) : me.data?.needs_onboarding ? (
-          <OnboardingStep onDone={() => setPostStep('select')} />
+          <OnboardingStep onDone={() => setPostStep('link')} />
         ) : postStep === 'link' ? (
           <LinkGameStep />
-        ) : postStep === 'select' || activeGames.length === 0 ? (
-          <GameSelectStep
-            initialSelected={activeGames}
-            onDone={() => setPostStep('link')}
-          />
         ) : (
           <PostAuthRedirect />
         )}
@@ -85,19 +70,13 @@ export function SignInPage() {
   );
 }
 
-/** After auth + onboarding, resume an invite-link accept if one was pending
- * (the acquisition funnel), otherwise land on Solo Pools (the default mode). */
 function PostAuthRedirect() {
-  const returnTo = sessionStorage.getItem('mm.returnTo');
-  if (returnTo) {
-    sessionStorage.removeItem('mm.returnTo');
-    return <Navigate to={returnTo} replace />;
-  }
-  return <Navigate to="/play" replace />;
+  const to = peekReturnTo() ?? '/play';
+  useEffect(() => clearReturnTo(), []);
+  return <Navigate to={to} replace />;
 }
 
-/** Browser had a session the API rejects (stale / wrong signing scheme). Clear
- * it and offer a clean sign-in / demo entry. */
+/** Browser had a session the API rejects (stale / wrong signing scheme). */
 function StaleSessionStep() {
   const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -107,34 +86,15 @@ function StaleSessionStep() {
     await signOut();
   }
 
-  async function enterDemo() {
-    setBusy(true);
-    try {
-      await demoEnter();
-    } catch (err) {
-      toast.error((err as Error)?.message || 'Could not enter the demo.');
-      setBusy(false);
-    }
-  }
-
   return (
     <div>
       <AuthHeading
         title="Session expired"
-        subtitle="Your saved sign-in is no longer valid. Sign in again or enter the demo."
+        subtitle="Your saved sign-in is no longer valid. Sign in again."
       />
       <div className="mt-6 flex flex-col gap-3">
         <PillButton
           type="button"
-          fullWidth
-          disabled={busy}
-          onClick={() => void enterDemo()}
-        >
-          Enter the demo
-        </PillButton>
-        <PillButton
-          type="button"
-          variant="outline"
           fullWidth
           disabled={busy}
           onClick={() => void clearAndStay()}
@@ -241,10 +201,14 @@ function CredentialsForm({
 
   return (
     <div>
-      <AuthHeading
-        title={mode === 'signin' ? 'Sign in' : 'Create your account'}
-        subtitle="Skill-based contests on your favourite games"
-      />
+      <AuthHeading title={mode === 'signin' ? 'Sign in' : 'Create your account'} />
+      <div className="mt-2 text-balance text-center text-sm text-text-secondary">
+        <p>Chess, matched with someone at your skill level.</p>
+        <p>
+          Settles from Lichess in under a minute. No screenshots, no reviewers, no
+          waiting.
+        </p>
+      </div>
 
       <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
         <Field label="Email">
@@ -351,11 +315,10 @@ function CheckEmailNotice({ email }: { email: string }) {
           type="button"
           className="text-text-secondary underline hover:text-text"
           onClick={async () => {
-            // Re-issuing signUp for an unconfirmed address re-sends the link.
             try {
               await signUpWithEmail(email, crypto.randomUUID());
             } catch {
-              /* already-registered / rate-limit are fine here */
+              // already-registered / rate-limit are fine here.
             }
             setResent(true);
           }}
@@ -457,7 +420,6 @@ function ResetPasswordStep() {
     setBusy(true);
     try {
       await setNewPassword(password);
-      // On success isPasswordRecovery clears and the normal flow resumes.
     } catch (err) {
       setError((err as Error)?.message || 'Could not update your password.');
       setBusy(false);
@@ -491,8 +453,6 @@ function ResetPasswordStep() {
 function OnboardingStep({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const { session } = useAuth();
-  // The handle was chosen at sign-up; recover it from the synthetic email so it
-  // survives across sessions (e.g. an account that signed up but didn't finish).
   const derived = emailToUsername(session?.user.email);
   const [username, setUsername] = useState(derived ?? '');
   const [state, setState] = useState('');
@@ -520,18 +480,15 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['me'] });
       onDone();
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
     },
     onError: (e: Error) => setError(e.message),
   });
 
   return (
     <div>
-      <AuthHeading
-        title="Create your profile"
-        subtitle="A couple of details and you're in."
-      />
+      <AuthHeading title="Your profile" />
 
       <form
         className="mt-6 flex flex-col gap-4"
@@ -542,14 +499,11 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
         }}
       >
         {derived ? (
-          <Field label="Username" hint="Your public handle, chosen at sign-up.">
-            <TextInput value={username} readOnly disabled />
-          </Field>
+          <p className="text-center text-sm text-text-secondary">
+            Playing as <span className="font-medium text-text">{username}</span>
+          </p>
         ) : (
-          <Field
-            label="Username"
-            hint="3 to 20 characters: lowercase letters, numbers, underscore."
-          >
+          <Field label="Username" hint="3 to 20 lowercase letters, numbers or _.">
             <TextInput
               value={username}
               onChange={(e) => setUsername(e.target.value.toLowerCase())}
@@ -559,10 +513,10 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
         )}
 
         <Field
-          label="Residence state"
+          label="State of residence"
           hint={
             isExcludedState(state)
-              ? `Cash play is not available in ${stateName(state)} yet. You can still sign up and play every match for free.`
+              ? `Staked matches aren't available in ${stateName(state)} yet. Free matches are.`
               : undefined
           }
         >
@@ -594,49 +548,36 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Post-profile step: pick your games (the play set that gates the whole app).
- * Production context — only Chess is selectable until the other games launch. */
-function GameSelectStep({
-  initialSelected,
-  onDone,
-}: {
-  initialSelected: string[];
-  onDone: () => void;
-}) {
-  const setGames = useSetActiveGames();
-  return (
-    <GameSelectOverlay
-      context="production"
-      initialSelected={initialSelected}
-      busy={setGames.isPending}
-      onConfirm={(games) => setGames.mutate(games, { onSuccess: onDone })}
-    />
-  );
-}
-
-/** Onboarding step: link a game to start playing. */
 function LinkGameStep() {
   const navigate = useNavigate();
+  const links = useLinks();
+  const linked = links.data?.games.some((g) => g.status === 'LINKED') ?? false;
+
+  if (linked) return <PostAuthRedirect />;
+
   return (
     <div>
       <AuthHeading
-        title="Link your games"
-        subtitle="Connect an account to start playing, or do it later from your profile."
+        title="Connect Lichess"
+        subtitle="Your matches settle from your Lichess games."
       />
-      <div className="mt-6">
-        <LinkGames onlyActive context="production" />
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <ConnectLichessButton size="lg" fullWidth />
+        <NotAffiliated />
       </div>
-      <div className="mt-8">
-        <PillButton variant="primary" fullWidth onClick={() => navigate('/play')}>
-          Enter Money Match
-        </PillButton>
+      <div className="mt-6 text-center">
+        <button
+          type="button"
+          className="inline-flex touch:min-h-11 items-center text-sm text-text-secondary underline-offset-4 hover:text-text hover:underline"
+          onClick={() => navigate(takeReturnTo() ?? '/play')}
+        >
+          Skip for now
+        </button>
       </div>
     </div>
   );
 }
 
-/** Left-aligned title + optional subtitle shared by every auth step, so the
- * whole suite (sign-in, reset, onboarding) reads as one screen family. */
 function AuthHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="text-center">
@@ -646,7 +587,6 @@ function AuthHeading({ title, subtitle }: { title: string; subtitle?: string }) 
   );
 }
 
-/** "OR" rule separating the primary form from social sign-in. */
 function Divider() {
   return (
     <div className="my-5 flex items-center gap-3 text-xs text-text-tertiary">
@@ -657,7 +597,6 @@ function Divider() {
   );
 }
 
-/** Left-aligned "← Back to sign in" used by the reset / code sub-forms. */
 function BackToSignIn({ onBack }: { onBack: () => void }) {
   return (
     <button
@@ -672,7 +611,7 @@ function BackToSignIn({ onBack }: { onBack: () => void }) {
 
 function LegalFooter() {
   return (
-    <p className="mt-5 whitespace-nowrap text-center text-micro text-text-tertiary">
+    <p className="mt-5 text-balance text-center text-micro text-text-tertiary">
       By continuing you agree to our{' '}
       <LegalLink href="https://www.dueloro.com/terms">Terms</LegalLink>
       {' · '}
@@ -681,27 +620,28 @@ function LegalFooter() {
       <LegalLink href="https://www.dueloro.com/responsible-gaming">
         Responsible Gaming
       </LegalLink>
+      <span className="mt-1 block">Points have no cash value.</span>
     </p>
   );
 }
 
-/** A legal/marketing link that lives on the dueloro.com site, so it opens in a
- * new tab rather than routing inside the app. */
 function LegalLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="underline hover:text-text-secondary"
+      className="whitespace-nowrap underline hover:text-text-secondary"
     >
       {children}
     </a>
   );
 }
 
-/** Google's four-colour "G" mark. Inlined so the button needs no icon library
- * and no external asset (which a strict CSP would have to allow). */
+/**
+ * Inlined so the button needs no icon library and no external asset (which a
+ * strict CSP would have to allow).
+ */
 function GoogleMark({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" aria-hidden="true">

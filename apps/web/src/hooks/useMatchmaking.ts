@@ -2,21 +2,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import type { SpeedClock } from '../lib/timeControl';
 import { toast } from '../lib/toast';
-
-// Wire types mirror the FastAPI `schemas/play.py` responses. The server owns
-// every number; the client only sends intents (market + preset choice + ids).
 
 export interface MarketRow {
   key: string;
   label: string;
-  kind: 'win_h2h' | 'win_next' | 'stat_race';
-  metric: string | null;
+  kind: 'win_h2h';
   requires_speed: boolean;
   speeds: string[];
+  clocks: SpeedClock[];
   multiplier_bps: number;
   queue_depth: number;
-  provisional: boolean;
   resolution_note: string;
 }
 
@@ -43,6 +40,32 @@ export interface MatchPlayerView {
   is_you: boolean;
 }
 
+export type Termination =
+  | 'checkmate'
+  | 'resignation'
+  | 'time'
+  | 'draw'
+  | 'stalemate'
+  | 'abandoned'
+  | 'aborted'
+  | 'other';
+
+/** The board as the viewer sees it. Lichess shares ongoing games a few moves late. */
+export interface MatchLive {
+  kind: 'match';
+  format: 'chess';
+  status: 'waiting' | 'live' | 'finished';
+  moves?: number;
+  your_color?: 'white' | 'black' | null;
+  turn?: 'you' | 'opp' | null;
+  result?: 'you' | 'opp' | 'draw' | null;
+  termination?: Termination | null;
+  san?: string[];
+  clocks?: { white_ms: number; black_ms: number } | null;
+  clock?: { limit: number; increment: number } | null;
+  last_move_at?: string | null;
+}
+
 export interface MatchView {
   id: string;
   game: string;
@@ -56,7 +79,6 @@ export interface MatchView {
   rake_cents: number;
   multiplier_bps: number;
   state: 'PENDING' | 'ACTIVE' | 'AWAITING_RESULT' | 'SETTLED' | 'PUSHED' | 'CANCELED';
-  brokered: boolean;
   host_game_id: string | null;
   matched_at: string | null;
   window_ends_at: string | null;
@@ -64,13 +86,27 @@ export interface MatchView {
   you_confirmed: boolean;
   your_play_url: string | null;
   forecast: Forecast | null;
+  winner_user_id?: string | null;
+  friendly?: boolean;
+  termination?: Termination | null;
+  game_ended_at?: string | null;
+  resolved_at?: string | null;
+  live?: MatchLive | null;
+}
+
+export interface QueueTicketView {
+  market: string;
+  speed: string | null;
+  clock: SpeedClock | null;
+  entry_cents: number;
+  rating: number | null;
 }
 
 export interface QueueStatus {
   status: 'idle' | 'searching' | 'matched';
   match: MatchView | null;
   waited_seconds: number | null;
-  tolerance_stage: number | null;
+  ticket?: QueueTicketView | null;
   can_cancel: boolean;
 }
 
@@ -86,7 +122,7 @@ export interface WaitingRow {
   waited_seconds: number;
 }
 
-/** Derived "You'd win" figure: entry × 2 × (1 − rake). Exact integer cents. */
+/** Derived "You'd win" figure: entry × 2 × (1 − rake). */
 export function prizeForEntry(entryCents: number, multiplierBps: number): number {
   return Math.floor((entryCents * multiplierBps) / 10000);
 }
@@ -95,8 +131,6 @@ function messageOf(error: unknown, fallback: string): string {
   const msg = (error as { message?: string } | undefined)?.message;
   return typeof msg === 'string' && msg ? msg : fallback;
 }
-
-// --- reads ---------------------------------------------------------------- //
 
 export function useMarkets(game: string | undefined) {
   const { session } = useAuth();
@@ -113,7 +147,8 @@ export function useMarkets(game: string | undefined) {
   });
 }
 
-/** The viewer's live queue standing. Polls every 2 s (design: queue status 2 s). */
+export const TERMINAL_MATCH_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
+
 export function useQueueStatus() {
   const { session } = useAuth();
   return useQuery({
@@ -128,15 +163,15 @@ export function useQueueStatus() {
   });
 }
 
-/** A single match by id — backs the Inbox "Respond" deep-link (`/play?match=`),
- * where the accepted challenge's match isn't in the viewer's queue status. Polls
- * every 2 s so the confirm card follows the opponent's confirm live. */
 export function useMatch(matchId: string | undefined) {
   const { session } = useAuth();
   return useQuery({
     queryKey: ['match', matchId],
     enabled: !!session && !!matchId,
-    refetchInterval: 2000,
+    refetchInterval: (query) =>
+      query.state.data && TERMINAL_MATCH_STATES.has(query.state.data.state)
+        ? false
+        : 2000,
     queryFn: async (): Promise<MatchView> => {
       const { data, error } = await api.GET('/api/v1/play/matches/{match_id}', {
         params: { path: { match_id: matchId! } },
@@ -162,8 +197,6 @@ export function useWaiting(game: string | undefined) {
     },
   });
 }
-
-// --- mutations ------------------------------------------------------------ //
 
 function useQueueInvalidation() {
   const qc = useQueryClient();

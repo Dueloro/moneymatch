@@ -4,10 +4,8 @@ import { MenuIcon } from './icons';
 import { PillButton } from './PillButton';
 import { Popover } from './Popover';
 
-/** Sentinel for "no filter on this dimension" across the browse pages. */
 export const ALL = 'all';
 
-/** A single row of filter chips: an "All" option plus one chip per value. */
 export function FilterChips<T extends string | number>({
   label,
   options,
@@ -23,7 +21,7 @@ export function FilterChips<T extends string | number>({
 }) {
   const chip = (active: boolean) =>
     [
-      'rounded-pill border px-3 py-1 text-xs font-semibold transition-colors',
+      'rounded-pill border px-3 py-1 text-xs font-semibold touch:min-h-11 transition-colors',
       active
         ? 'border-line-strong bg-panel-raised text-text'
         : 'border-hairline text-text-secondary hover:border-line-strong hover:text-text',
@@ -54,14 +52,6 @@ export function FilterChips<T extends string | number>({
   );
 }
 
-/**
- * A hamburger-toggled filter panel shared by the browse pages. Owns its own
- * open/closed state and renders the caller's `FilterChips` rows as children,
- * plus a "Clear filters" action when any filter is active.
- *
- * It lives in the page heading's action slot, opposite the title, and drops its
- * panel as a `Popover` — opening it used to push every card down the screen.
- */
 export function FilterBar({
   testId,
   activeCount,
@@ -87,7 +77,7 @@ export function FilterBar({
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-controls={`${testId}-panel`}
-          className="inline-flex items-center gap-2 rounded-pill border border-hairline px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-line-strong hover:text-text"
+          className="inline-flex items-center gap-2 rounded-pill border border-hairline px-3 py-1.5 touch:min-h-11 text-xs font-semibold text-text-secondary transition-colors hover:border-line-strong hover:text-text"
           data-testid={`${testId}-toggle`}
         >
           <MenuIcon className="h-4 w-4" />

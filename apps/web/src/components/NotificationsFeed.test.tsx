@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../test/testUtils';
+import { renderWithProviders, pts } from '../test/testUtils';
 import { NotificationsFeed } from './NotificationsFeed';
 
 vi.mock('../hooks/useNotifications', () => ({
@@ -59,7 +59,7 @@ function poolData(over: Record<string, unknown> = {}) {
       members: [
         {
           user_id: 'u1',
-          username: 'demo',
+          username: 'player',
           personal_bar: 12,
           status: 'LOCKED',
           payout_cents: 0,
@@ -100,7 +100,7 @@ describe('NotificationsFeed', () => {
     } as unknown as ReturnType<typeof useDeclineChallenge>);
   });
 
-  it('renders a challenge notification with Respond and marks read on view', () => {
+  it('keeps unread dots on view; opening a row or "Mark all read" clears them', () => {
     vi.mocked(useNotifications).mockReturnValue({
       data: {
         unread: 1,
@@ -118,12 +118,16 @@ describe('NotificationsFeed', () => {
     renderWithProviders(<NotificationsFeed />);
 
     expect(screen.getByText(/jordn_cs challenged you/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Respond' })).toBeInTheDocument();
-    // Mark-read fired on view (unread > 0).
-    expect(markMutate).toHaveBeenCalledWith(undefined);
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
+    expect(screen.getByLabelText('unread')).toBeInTheDocument();
+    expect(markMutate).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
     expect(declineMutate).toHaveBeenCalledWith('c1');
+    expect(markMutate).toHaveBeenCalledWith(['n1']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all read' }));
+    expect(markMutate).toHaveBeenLastCalledWith(undefined);
   });
 
   it('shows the empty state with no notifications', () => {
@@ -139,11 +143,10 @@ describe('NotificationsFeed', () => {
     vi.mocked(usePool).mockReturnValue(poolData());
     renderWithProviders(<NotificationsFeed />);
 
-    // Collapsed: the roster is not fetched or rendered yet.
     expect(screen.queryByText('testbot_ada')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Your pool room filled/ }));
-    expect(screen.getByText('demo (you)')).toBeInTheDocument();
+    expect(screen.getByText('player (you)')).toBeInTheDocument();
     expect(screen.getByText('testbot_ada')).toBeInTheDocument();
     expect(screen.getByText(/Moves to win · hard/)).toBeInTheDocument();
   });
@@ -165,7 +168,7 @@ describe('NotificationsFeed', () => {
           },
           {
             user_id: 'u1',
-            username: 'demo',
+            username: 'player',
             personal_bar: 12,
             status: 'CLEARED',
             payout_cents: 9000,
@@ -176,17 +179,29 @@ describe('NotificationsFeed', () => {
       }),
     );
     renderWithProviders(<NotificationsFeed />);
-    fireEvent.click(screen.getByRole('button', { name: /A contest settled/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Your pool settled/ }));
 
-    // The winner's own number, worded for a fewest-is-better metric.
-    expect(screen.getByText(/in 8 · bar 12/)).toBeInTheDocument();
+    expect(screen.getByText(/in 8 moves · bar 12 moves/)).toBeInTheDocument();
     expect(screen.getByText('Cleared')).toBeInTheDocument();
     expect(screen.getByText('Missed')).toBeInTheDocument();
-    expect(screen.getByText('+$90.00')).toBeInTheDocument();
+    expect(screen.getByText(pts('+9,000 pts'))).toBeInTheDocument();
 
-    // Cleared is listed above missed regardless of the order the API returned.
-    const rows = screen.getAllByText(/demo \(you\)|testbot_ada/);
-    expect(rows[0]).toHaveTextContent('demo');
+    const rows = screen.getAllByText(/player \(you\)|testbot_ada/);
+    expect(rows[0]).toHaveTextContent('player');
+  });
+
+  it('names the amount won in a settled notification', () => {
+    feed([
+      {
+        ...TOURNAMENT_NOTE,
+        payload: { ...TOURNAMENT_NOTE.payload, payout_cents: 11250 },
+      },
+    ]);
+    vi.mocked(useTournament).mockReturnValue({
+      isPending: true,
+    } as unknown as ReturnType<typeof useTournament>);
+    renderWithProviders(<NotificationsFeed />);
+    expect(screen.getByText('You won 11,250 pts in a tournament')).toBeInTheDocument();
   });
 
   it('opens a tournament to show the ranking', () => {
@@ -202,7 +217,7 @@ describe('NotificationsFeed', () => {
         standings: [
           {
             user_id: 'u1',
-            username: 'demo',
+            username: 'player',
             score: 3,
             matches: 3,
             rank: 1,
@@ -224,12 +239,12 @@ describe('NotificationsFeed', () => {
       isError: false,
     } as unknown as ReturnType<typeof useTournament>);
     renderWithProviders(<NotificationsFeed />);
-    fireEvent.click(screen.getByRole('button', { name: /A contest settled/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Your tournament settled/ }));
 
-    expect(screen.getByText('#1 demo (you)')).toBeInTheDocument();
+    expect(screen.getByText('#1 player (you)')).toBeInTheDocument();
     expect(screen.getByText('#2 testbot_ada')).toBeInTheDocument();
-    expect(screen.getByText('3 · 3 matches')).toBeInTheDocument();
-    expect(screen.getByText('+$112.50')).toBeInTheDocument();
+    expect(screen.getByText('3 wins · 3 games')).toBeInTheDocument();
+    expect(screen.getByText(pts('+11,250 pts'))).toBeInTheDocument();
   });
 
   it('leaves a non-contest notification unexpandable', () => {

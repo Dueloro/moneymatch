@@ -16,7 +16,6 @@ export interface NotificationsResponse {
   items: NotificationItem[];
 }
 
-/** The Inbox feed. Polls every 15 s (bell dot also comes from /me). */
 export function useNotifications() {
   const { session } = useAuth();
   return useQuery({
@@ -45,6 +44,7 @@ export function useMarkNotificationsRead() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications', session?.user.id] });
       qc.invalidateQueries({ queryKey: ['me', session?.user.id] });
+      qc.invalidateQueries({ queryKey: ['inbox-badge'] });
     },
   });
 }

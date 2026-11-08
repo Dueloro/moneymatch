@@ -1,4 +1,4 @@
-"""Config fail-fast behaviour (00-README §3.9)."""
+"""Config fail-fast behaviour."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from moneymatch_api.config import Settings
 
 
 def _settings(**env: str) -> Settings:
-    # `_env_file=None` isolates the test from any local .env.
     return Settings(_env_file=None, **env)  # type: ignore[call-arg]
 
 
@@ -34,13 +33,22 @@ def test_auth_requires_secret_or_jwks():
         )
 
 
-def test_async_driver_is_coerced():
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("postgresql://u:p@h:5432/db", "postgresql+asyncpg://u:p@h:5432/db"),
+        ("postgres://u:p@h:5432/db", "postgresql+asyncpg://u:p@h:5432/db"),
+        ("postgresql+asyncpg://u:p@h/db", "postgresql+asyncpg://u:p@h/db"),
+        ("sqlite+aiosqlite:///x.db", "sqlite+aiosqlite:///x.db"),
+    ],
+)
+def test_async_driver_is_coerced(given: str, expected: str):
     s = _settings(
-        database_url="postgresql://u:p@h/db",
+        database_url=given,
         supabase_url="https://x.supabase.co",
         supabase_jwt_secret="s",
     )
-    assert s.database_url.startswith("postgresql+asyncpg://")
+    assert s.database_url == expected
 
 
 def test_jwks_url_derived_when_no_secret():
@@ -62,3 +70,14 @@ def test_cors_origins_split():
         web_origin="http://a.com, http://b.com",
     )
     assert s.cors_origins == ["http://a.com", "http://b.com"]
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_blank_email_from_falls_back_to_default(blank: str):
+    s = _settings(
+        database_url="postgresql+asyncpg://u:p@h/db",
+        supabase_url="https://x.supabase.co",
+        supabase_jwt_secret="s",
+        email_from=blank,
+    )
+    assert s.email_from == "Money Match <noreply@send.dueloro.com>"

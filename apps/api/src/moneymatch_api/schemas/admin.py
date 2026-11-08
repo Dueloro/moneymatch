@@ -1,9 +1,4 @@
-"""Admin surface schemas (09-phase-6).
-
-The admin API is a plain, dense operator surface — not the consumer design
-system. These models still go through Pydantic → OpenAPI → the generated TS
-client so the admin web tables stay type-safe.
-"""
+"""Admin surface schemas."""
 
 from __future__ import annotations
 
@@ -14,10 +9,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from .wallet import LedgerEntryResponse
-
-# --------------------------------------------------------------------------- #
-# Flags
-# --------------------------------------------------------------------------- #
 
 
 class FlagItem(BaseModel):
@@ -32,15 +23,11 @@ class FlagsResponse(BaseModel):
 
 class UpdateFlagRequest(BaseModel):
     """Patch a flag: toggle `enabled` and/or replace its `payload` (e.g.
-    `geo_config`'s excluded-state list). At least one field must be present."""
+    `geo_config`'s excluded-state list).
+    """
 
     enabled: bool | None = None
     payload: dict[str, Any] | None = None
-
-
-# --------------------------------------------------------------------------- #
-# Users
-# --------------------------------------------------------------------------- #
 
 
 class AdminUserSummary(BaseModel):
@@ -117,7 +104,7 @@ class AdminUserDetail(BaseModel):
 
 
 class AdjustRequest(BaseModel):
-    """Manual ledger adjustment. Signed cents (credit/debit); reason required."""
+    """Manual ledger adjustment."""
 
     amount_cents: int = Field(..., description="Signed cents; positive credits.")
     reason: str = Field(..., min_length=1)
@@ -133,11 +120,6 @@ class ActionResult(BaseModel):
 class AdminLedgerPage(BaseModel):
     entries: list[LedgerEntryResponse]
     next_cursor: str | None
-
-
-# --------------------------------------------------------------------------- #
-# Contests
-# --------------------------------------------------------------------------- #
 
 
 class AdminContestListItem(BaseModel):
@@ -186,11 +168,6 @@ class ResettleResult(BaseModel):
     state: str
 
 
-# --------------------------------------------------------------------------- #
-# Queue
-# --------------------------------------------------------------------------- #
-
-
 class QueueDepthRow(BaseModel):
     game: str
     market: str
@@ -206,11 +183,6 @@ class QueueResponse(BaseModel):
     canceled: int
     expiry_rate: float
     depth: list[QueueDepthRow]
-
-
-# --------------------------------------------------------------------------- #
-# Reconciliation
-# --------------------------------------------------------------------------- #
 
 
 class ReconViolationRow(BaseModel):
@@ -232,11 +204,6 @@ class ReconciliationResponse(BaseModel):
     totals: dict[str, int]
     contest_violations: list[ReconViolationRow]
     worker: WorkerStatus
-
-
-# --------------------------------------------------------------------------- #
-# Risk
-# --------------------------------------------------------------------------- #
 
 
 class RiskRateRow(BaseModel):
@@ -266,74 +233,3 @@ class RiskFlagRow(BaseModel):
 class RiskResponse(BaseModel):
     rates: list[RiskRateRow]
     flags: list[RiskFlagRow]
-
-
-class AdminGameMatch(BaseModel):
-    """One stored game from the background ingester (the admin match log)."""
-
-    id: UUID
-    user_id: UUID
-    username: str | None
-    host_username: str | None
-    game: str
-    host_account_id: str
-    host_match_id: str
-    started_at: datetime
-    ended_at: datetime | None
-    mode: str | None
-    rated: bool
-    eligible: bool
-    result: str | None
-    moves: int
-    metrics: dict[str, Any]
-    detail: dict[str, Any]
-    fetched_at: datetime
-    account_last_polled_at: datetime | None
-
-
-class AdminGameMatchesResponse(BaseModel):
-    matches: list[AdminGameMatch]
-
-
-class AdminTournamentLogMatch(BaseModel):
-    """One fetched match of one entrant, as the rules judged it at settlement."""
-
-    host_match_id: str
-    game_match_id: UUID | None
-    started_at: datetime
-    ended_at: datetime | None
-    fetched_at: datetime | None
-    mode: str | None
-    result: str | None
-    reason: str
-    reason_text: str
-    counted: bool
-    value: float | None
-    metrics: dict[str, Any]
-    recorded_at: datetime
-
-
-class AdminTournamentLogEntrant(BaseModel):
-    """One entrant's final result and every match of theirs we had."""
-
-    entry_id: UUID
-    user_id: UUID
-    username: str | None
-    host_account_id: str
-    entered_at: datetime
-    score: float | None
-    matches_counted: int
-    rank: int | None
-    entry_cents: int
-    payout_cents: int
-    outcome: str
-    matches: list[AdminTournamentLogMatch]
-
-
-class AdminTournamentLogResponse(BaseModel):
-    """The permanent settlement log of one finished tournament."""
-
-    tournament_id: UUID
-    tournament_outcome: str | None
-    recorded_at: datetime | None
-    entrants: list[AdminTournamentLogEntrant]

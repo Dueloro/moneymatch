@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// Exercise the bypass with the flag ON; the OFF path is a trivial short-circuit.
 vi.mock('./env', () => ({ env: { e2eAuth: true } }));
 
 import { decodeJwtClaims, E2E_TOKEN_KEY, getE2eToken } from './e2eAuth';
@@ -12,10 +11,10 @@ function makeToken(payload: Record<string, unknown>): string {
 
 describe('decodeJwtClaims', () => {
   it('extracts sub + email from a JWT payload', () => {
-    const token = makeToken({ sub: 'seed_player1', email: 'p1@demo.test' });
+    const token = makeToken({ sub: 'seed_player1', email: 'p1@example.test' });
     expect(decodeJwtClaims(token)).toEqual({
       sub: 'seed_player1',
-      email: 'p1@demo.test',
+      email: 'p1@example.test',
     });
   });
 

@@ -1,13 +1,7 @@
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
+import { lookingFor } from '../../lib/tickerCopy';
 import { useWaiting } from '../../hooks/useMatchmaking';
 
-/**
- * Live activity crawl fed by real players currently waiting for a match (across
- * all games). Honest liveness: it renders nothing when no one is waiting, so we
- * never fabricate activity.
- *
- * The dot is the `live` cyan, not lime. Somebody queuing is not money.
- */
 export function Ticker() {
   const { data } = useWaiting(undefined);
   const items = data?.waiting ?? [];
@@ -17,8 +11,11 @@ export function Ticker() {
     <span key={key} className="mx-5 inline-flex items-center gap-2 text-xs">
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-live" aria-hidden />
       <span className="font-medium text-text">{w.username ?? 'A player'}</span>
-      <span className="text-text-secondary">wants {w.market_label}</span>
-      <span className="font-medium text-text">{formatCurrency(w.entry_cents)}</span>
+      <span className="text-text-secondary">{lookingFor(w.speed)}</span>
+      <span aria-hidden className="text-text-tertiary">
+        ·
+      </span>
+      <span className="font-medium text-text">{formatPoints(w.entry_cents)}</span>
     </span>
   );
 

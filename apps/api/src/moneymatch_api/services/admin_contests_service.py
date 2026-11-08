@@ -1,14 +1,4 @@
-"""Admin contest views + the two money-fix actions (09-phase-6 · deliverable 2).
-
-- ``list_contests`` — matches / pools / tournaments by state + game.
-- ``contest_detail`` — the complete money trail for one ref: participants, user
-  ledger rows, platform (rake/promo) rows, adapter evidence, and a live
-  reconciliation check.
-- ``resettle_match`` — re-runs the exact worker grade+settle path (idempotent:
-  a terminal match is a no-op, so it never double-pays).
-- ``void_match`` — CANCEL + full refund of the escrowed entries, zero rake, with
-  the per-ref conservation invariant asserted on the way out.
-"""
+"""Admin contest views + the two money-fix actions."""
 
 from __future__ import annotations
 
@@ -372,20 +362,11 @@ async def _tournament_detail(session: AsyncSession, tid: uuid.UUID) -> ContestDe
     )
 
 
-# --------------------------------------------------------------------------- #
-# Money-fix actions (matches).
-# --------------------------------------------------------------------------- #
-
-
 async def resettle_match(
     session: AsyncSession, match_id: uuid.UUID, *, now: datetime | None = None
 ) -> str:
-    """Re-run the worker's grade+settle path for a match, under a row lock.
-
-    Idempotent: a terminal match is a no-op (the lifecycle rejects a transition
-    out of a terminal state), so a double-fire never double-pays.
-    """
-    from ..workers import settlement_worker  # lazy: worker imports services
+    """Re-run the worker's grade+settle path for a match, under a row lock."""
+    from ..workers import settlement_worker
 
     match = await session.scalar(
         select(Match).where(Match.id == match_id).with_for_update()

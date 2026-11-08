@@ -5,8 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from './AuthProvider';
 import { useAuth } from './useAuth';
 
-// vi.mock calls are hoisted to the top of the file, so the `auth` object must
-// also be hoisted via vi.hoisted so it exists at factory-evaluation time.
 const auth = vi.hoisted(() => ({
   getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
   onAuthStateChange: vi.fn().mockReturnValue({

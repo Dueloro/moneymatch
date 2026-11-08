@@ -95,7 +95,7 @@ const THREAD = {
       payload: {
         invite_kind: 'pool' as const,
         title: 'Solo pool · medium',
-        game: 'cs2.steam',
+        game: 'chess.lichess',
         entry_cents: 1000,
         status: 'pending' as const,
         redirect_path: '/pools',
@@ -150,7 +150,6 @@ describe('InboxPage (chat)', () => {
 
   it('opens on the notification feed, with conversations listed alongside', () => {
     renderWithProviders(<InboxPage />);
-    // Notifications keep their home in the Inbox — pinned, and selected first.
     expect(screen.getByText('Everything the platform sent you')).toBeInTheDocument();
     expect(screen.getByText('jordn_cs')).toBeInTheDocument();
     expect(screen.getByText('Dueloro Support')).toBeInTheDocument();
@@ -160,13 +159,11 @@ describe('InboxPage (chat)', () => {
     renderWithProviders(<InboxPage />);
     fireEvent.click(screen.getByText('jordn_cs'));
 
-    // Scope to the thread — the list preview shows the same latest line.
     const thread = within(screen.getByLabelText('Chat with jordn_cs'));
     expect(thread.getByText('run it back?')).toBeInTheDocument();
     expect(thread.getByTestId('invite-card')).toBeInTheDocument();
     expect(thread.getByText('Solo pool · medium')).toBeInTheDocument();
     expect(thread.getByLabelText('Message')).toBeInTheDocument();
-    // Opening a thread with unread messages clears its badge.
     expect(markReadMutate).toHaveBeenCalledWith('c-1');
   });
 
@@ -182,13 +179,13 @@ describe('InboxPage (chat)', () => {
     });
   });
 
-  it('offers tournament and head-to-head invites (no solo pools) next to the typing bar', () => {
+  it('offers pool, tournament, and head-to-head invites next to the typing bar', () => {
     renderWithProviders(<InboxPage />);
     fireEvent.click(screen.getByText('jordn_cs'));
     fireEvent.click(screen.getByRole('button', { name: 'Send an invite' }));
 
     const menu = screen.getByTestId('invite-menu');
-    expect(menu).not.toHaveTextContent('Solo pool');
+    expect(menu).toHaveTextContent('Solo pool');
     expect(menu).toHaveTextContent('Tournament');
     expect(menu).toHaveTextContent('Head-to-head');
   });

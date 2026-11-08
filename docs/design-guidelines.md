@@ -1,12 +1,10 @@
-# MoneyMatch — Design Guidelines
+# Design guidelines
 
-**What this is.** The design system the product's UI follows today, written so a
-new engineer or agent can build a new screen that looks like it belongs without
-seeing the app first. It is descriptive of the current build (post-revamp) and
-prescriptive for new work: when in doubt, match what is here.
+The design system the UI follows, so a new screen looks like it belongs. When in
+doubt, match what is here.
 
-**The one rule that generates most of the others:** *fewer, better-argued
-decisions, enforced in code.* Every primitive below is a real component; new
+**The one rule that generates most of the others:** _fewer, better-argued
+decisions, enforced in code._ Every primitive below is a real component; new
 screens compose those primitives rather than inventing spacing, colour, or type.
 
 The consumer app is dark-theme only. The `/admin` surface is deliberately outside
@@ -23,53 +21,53 @@ Never hard-code a hex in a component.
 ### 1.1 Surfaces — a real luminance ramp
 
 Each step is visibly lighter than the last; that ramp is what lets a card read as
-sitting *on* the page rather than floating.
+sitting _on_ the page rather than floating.
 
-| Token | Hex | Role |
-| --- | --- | --- |
-| `bg` | `#0b0c0f` | The page. Neutral ink, faintly blue — not black, not green |
-| `panel` | `#111318` | Card surface |
-| `panel-raised` | `#171a20` | Inputs, hover, chips, the selected segment |
-| `overlay` | `#1d212a` | Dialogs and menus (float above the page) |
-| `hairline` | `#23272f` | Default 1px border on every card |
-| `line-strong` | `#333945` | Hover/selected borders, overlay edges |
+| Token          | Hex       | Role                                                       |
+| -------------- | --------- | ---------------------------------------------------------- |
+| `bg`           | `#0b0c0f` | The page. Neutral ink, faintly blue — not black, not green |
+| `panel`        | `#111318` | Card surface                                               |
+| `panel-raised` | `#171a20` | Inputs, hover, chips, the selected segment                 |
+| `overlay`      | `#1d212a` | Dialogs and menus (float above the page)                   |
+| `hairline`     | `#23272f` | Default 1px border on every card                           |
+| `line-strong`  | `#333945` | Hover/selected borders, overlay edges                      |
 
 ### 1.2 Text — all contrast-checked against `panel`
 
-| Token | Hex | Contrast | Use |
-| --- | --- | --- | --- |
-| `text` | `#eef0f4` | 16.3:1 | Primary (off-white, easier than pure white) |
-| `text-secondary` | `#9aa2b1` | 7.2:1 AAA | Sublines, labels, inactive |
-| `text-tertiary` | `#7c8593` | 5.0:1 AA | Meta, timestamps, disabled, counts |
+| Token            | Hex       | Contrast  | Use                                         |
+| ---------------- | --------- | --------- | ------------------------------------------- |
+| `text`           | `#eef0f4` | 16.3:1    | Primary (off-white, easier than pure white) |
+| `text-secondary` | `#9aa2b1` | 7.2:1 AAA | Sublines, labels, inactive                  |
+| `text-tertiary`  | `#7c8593` | 5.0:1 AA  | Meta, timestamps, disabled, counts          |
 
 ### 1.3 Semantics — one job per colour (the most important rule)
 
-| Token | Hex | Reads as | Its only job |
-| --- | --- | --- | --- |
-| `green` | `#c6f440` | Acid lime | **Money.** Currency, balances, payouts, winnings, ROI. If a number is not currency, it is not lime |
-| `action` | `#f2f5ef` | Near-white | **The primary action.** Filled buttons, send button, your own chat bubble, checked boxes, unread badges |
-| `live` | `#4fd1e0` | Cyan (the only cool hue) | **Happening now.** Presence/searching dots, in-progress states, the queue, "Linked" |
-| `red` | `#ff5f48` | Orange-red | Loss, error, destructive, the platform fee |
-| `warn` | `#f5b93c` | Amber | Pending/caution. Defined but almost unused — the free slot for a future "pending" semantic |
-| `focus` | `#a8c7ff` | Pale blue | The focus ring, and nothing else |
+| Token    | Hex       | Reads as                 | Its only job                                                                                            |
+| -------- | --------- | ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `green`  | `#c6f440` | Acid lime                | **Points** (balances, stakes, winnings). If a number is not points, it is not lime                      |
+| `action` | `#f2f5ef` | Near-white               | **The primary action.** Filled buttons, send button, your own chat bubble, checked boxes, unread badges |
+| `live`   | `#4fd1e0` | Cyan (the only cool hue) | **Happening now.** Presence/searching dots, in-progress states, the queue, "Linked"                     |
+| `red`    | `#ff5f48` | Orange-red               | Loss, error, destructive, the platform fee                                                              |
+| `warn`   | `#f5b93c` | Amber                    | Pending/caution. Defined but almost unused — the free slot for a future "pending" semantic              |
+| `focus`  | `#a8c7ff` | Pale blue                | The focus ring, and nothing else                                                                        |
+
+Tokens support Tailwind opacity modifiers (`bg-red/10`, `border-live/25`) via `color-mix` in `tailwind.config.js`.
 
 Two hard constraints when extending the palette:
 
 1. **Selection is not a colour.** A selected chip/tab/segment gets a raised
    surface + a `line-strong` border, no hue. That is what lets an entry picker
    sit two lines above a lime payout without competing.
-2. **One meaning per colour.** The revamp's whole gain was that lime stopped
-   meaning five things. Add a new colour only if it arrives with a single job.
+2. **One meaning per colour.** Add a new colour only if it arrives with a
+   single job.
 
 **Cyan (`live`) is deliberately underused** — dots, one-word labels, and the 25%
-wash in the clear bar only. It never fills a shape or runs across a sentence. It
-is the intended candidate if a second main colour is ever promoted, because its
-meaning ("happening now") is already established.
+wash in the clear bar, the skill-band ruler and the live board's last move only. It never fills a shape or
+runs across a sentence. It is the intended candidate if a second main colour is
+ever promoted, because its meaning ("happening now") is already established.
 
-**Game accents** (`#f0883e` CS2 orange, `#e8a13a` PUBG amber, `#e6c65c` chess
-gold, `#e15b4c` Dota brick) appear in only two places: the icon of the
-**selected** game tab, and chat invite cards — the two spots where more than one
-game can appear at once. They are not used on browse cards.
+**The chess accent** (`#e6c65c` gold, `lib/games.tsx`) appears only on the
+linked-game row and on chat invite cards. It is not used on browse cards.
 
 **Chat avatar accents** are five pastels picked by hashing the person's name
 (same person, same colour). They appear nowhere outside chat.
@@ -78,27 +76,40 @@ game can appear at once. They are not used on browse cards.
 
 ## 2. Type
 
-**Inter**, loaded from Google Fonts at 400/500/600/700 with `display=swap`.
-`font-variant-numeric: tabular-nums` is on globally so money never jitters.
+**Inter** for everything you read, loaded from Google Fonts at 400/500/600/700
+with `display=swap`.
+
+**Martian Mono** (semi-condensed `wdth 87.5`, 400–700) is the numeric face for
+money and score figures and their `.label-money` captions. _Why:_ a crisp,
+fixed-width scoreboard figure gives the lime number a signature Inter can't, and
+equal-width digits mean balances never jitter. It reaches the UI only through
+`AmountText`, `AnimatedBalance` and the `.num` utility (stake chips, the bar
+target, timers). A local fallback (`Menlo` / `Courier New` at `size-adjust: 108%`)
+matches its 0.65em advance, so the swap doesn't shift layout.
+
+Tabular figures are **scoped, not global**: `tabular-nums` sits on the amount
+primitives, badges, timers and standings lists. On `body` it made Inter set
+hyphens at digit width ("Skill - based").
 
 One scale (overrides Tailwind defaults). There are no arbitrary sizes.
 
-| Class | Size / line height | Use |
-| --- | --- | --- |
-| `text-micro` | 11 / 16, +0.02em | Badges, counts, the money caption |
-| `text-xs` | 12 / 18 | Sublines, meta, timestamps |
-| `text-sm` | 14 / 22 | **Body default** |
-| `text-base` | 16 / 24 | Lead paragraphs |
-| `text-lg` | 18 / 24 | Card headlines, dialog titles |
-| `text-xl` | 20 / 26 | Section headings |
-| `text-2xl` | 24 / 30 | Page titles |
-| `text-3xl` | 30 / 36 | Hero numbers: balance, the bar target |
+| Class        | Size / line height | Use                                               |
+| ------------ | ------------------ | ------------------------------------------------- |
+| `text-micro` | 11 / 16, +0.02em   | Badges, counts, the money caption                 |
+| `text-xs`    | 12 / 18            | Sublines, meta, timestamps                        |
+| `text-sm`    | 14 / 22            | **Body default**                                  |
+| `text-base`  | 16 / 24            | Lead paragraphs                                   |
+| `text-lg`    | 18 / 24            | Card headlines, dialog titles                     |
+| `text-xl`    | 20 / 26            | Section headings                                  |
+| `text-2xl`   | 24 / 30            | Page titles                                       |
+| `text-3xl`   | 30 / 36            | Hero numbers: balance, the bar target (in `.num`) |
 
 Headings tighten letter-spacing as they grow (−0.006em at 18px → −0.022em at
 30px). **One mono label survives**, `.label-money`: 11px, uppercase, 0.08em
-tracking, tertiary grey — used *only* as the caption directly above a currency
+tracking, tertiary grey — used _only_ as the caption directly above a currency
 figure (`ENTRY`, `POT`, `BALANCE`, `EST. WIN`). Its scarcity is what makes it
-read as "this is a number."
+read as "this is a number." Every other caption (Inbox, Direct messages, a match
+status, a fact label) uses `.label-neutral`: 12px, medium, sentence case, tertiary.
 
 ---
 
@@ -111,10 +122,16 @@ read as "this is a number."
   borderless panels. Overlays get 1px `line-strong`.
 - **Elevation.** Exactly one shadow token, used only by dialogs, menus, toasts.
   Cards never cast shadows — they separate by surface value and border.
+- **Dialogs.** All modals use `ui/Dialog`: focus trap, Escape/backdrop close,
+  focus restored to the trigger, body scroll lock, `aria-labelledby` title. A
+  bottom sheet below `md`, a centred panel at `md+`; transitions are `motion-safe`.
+  Mount to open. Mark the preferred first-focus control `data-autofocus`.
 - **Motion.** Four animations only, all disabled under `prefers-reduced-motion`
   (which also clamps transitions to 0.01ms): the ticker marquee, the 0.28s rise
-  on a matched card, `animate-pulse` on live dots/skeletons, and a 260ms FLIP
-  glide when game pills reorder. The balance counts up rather than snapping.
+  on a matched card, `animate-pulse` on live dots/skeletons, and the money-delta
+  flash on a balance change. The balance counts up rather than snapping. The
+  settlement moment adds three, all off under reduced motion: the result rises,
+  the win check draws in, and the "Settled from Lichess in 38s" line arrives last.
 - **Focus.** One global rule: `:focus-visible` draws a 2px `focus` ring with 2px
   offset on every interactive element. Mouse clicks don't ring; every keyboard
   path does.
@@ -143,22 +160,61 @@ primitive rather than a one-off.
 - **`Segmented`** — the one "pick one of a few" control (mode switcher, entry
   amount, sub-tabs). Recessed `panel` track + hairline, 4px padding; the selected
   option is a `panel-raised` pill with an inset `line-strong` ring. Renders as a
-  real tablist.
+  real tablist. `lg` (44px min) is for primary choices on a desk.
 - **`WagerCard`** — the joinable contest, and the most important layout in the
   product (§6). One card per **bar**, never one per stake.
 - **`ClearBar`** — the signature object (§7).
 - **`CardGrid`** — caps columns by card count (1 → 384px single column, 2 → 768px
   two-col, 3+ → responsive 1/2/3) so a single contest never sits alone in a wide
   grid looking like an error.
+- **`PlayHeader`** — the mode switcher plus a small "How it works" trigger
+  (`HowItWorks`, closed by default, compact `w-72` popover). Each user sees the
+  explainer once, inline under the switcher (`HowItWorksNote`, "Got it"), on
+  the first play page they open; it never covers content. Explainers are at most
+  two short sentences.
+- **`MatchDesk`** — head to head on `/play`: one card in a `max-w-3xl` column
+  (the page, switcher included, shares that width). Top strip: you, the promise
+  "Matched with someone at your skill level", and your Lichess rating for the
+  chosen time control (mono, white, never lime; "From blitz" when that speed has
+  no games). Then time control and stake as `lg` `Segmented`, then `WINNER
+TAKES` in lime with the fee figure in red, and "Find match · 1,000 pts". The
+  last choice is remembered per browser. Unlinked, the same frame holds one
+  "Link Lichess" action. Searching, matched and confirm replace it in place.
+- **`SkillBandRuler`** — the searching state's one visual. A ±800 Elo ruler
+  centred on your rating (white tick), the pairing band shaded in the cyan 25%
+  wash and widening once a second (`lib/skillBand.ts` mirrors the server's
+  ±100 + 12/s, capped at ±800). Above it: the range ("1612–1812") and the waited
+  clock. The width eases linearly only under `motion-safe`.
+- **`MatchStage`** — head to head from both confirms to the result, in the desk's
+  column. Header: status dot + one word (Match on, Live, Settling, Final) and the
+  time-control chip. Board column: opponent strip, the view-only board (lazy
+  chunk: `chess.js` + Cburnett pieces, slate `--board-light/--board-dark`
+  squares, your colour at the bottom), your strip; each strip carries a clock
+  that ticks locally, the running one raised with a cyan dot. Side column:
+  `WINNER TAKES` in lime, the fee in red, the move line, the last moves, and the
+  primary "Open game on Lichess ↗". No board data: the side column alone. On
+  phones the side column comes first so the link is above the fold.
+- **Result card** — the stage's side column once settled; the board freezes and
+  the loser's strip dims. Win: lime check, "You won", the winnings in lime
+  counting up, pot and red fee. Loss: a grey bar, "You lost", the stake in grey,
+  no red wash. Draw: "Draw · Both stakes refunded · no fee". Each names the real
+  ending ("by resignation", "on time") only when Lichess said so, and "Settled
+  from Lichess in 38s" only when the game's end time is known. Then Play again,
+  Rematch, View game on Lichess. **One moment per result:** head to head never
+  takes the screen; away from the stage, every result (draws and refunds too) is
+  a toast with a View link. A pool or tournament win gets a light centred result
+  card for 3s.
 - **`ExpandableCard`** / **`ListRow`** — the expandable and flat row primitives.
 - **`FilterBar`** — pill toggle with a hamburger, "Filters", and a paper
   active-count badge; opens a `Card` of chip rows.
-- **`GameTabs`** — the game switcher; selected pill gets a `panel-raised` fill, a
-  strong border, and **its icon in the game's accent**.
 - **`EmptyState`** — a dashed hairline box (title, grey line, usually a button).
   **`ErrorState`** is the same with a red-tinted dashed border + "Try again".
+- **`AmountText`** / **`AnimatedBalance`** — every money figure. Numeric face,
+  tabular; `win` is lime when positive, `money` is always lime (a balance, a
+  payout to come). Don't hand-format a hero figure with `formatPoints`.
 - **`Skeleton`** / **`SkeletonList`** — `panel-raised` pulses at 8px radius. The
-  only loading treatment in the app.
+  only loading treatment in the app (`inline` for a figure inside text, e.g. the
+  loading balance; never a dash).
 - **Form controls** (`TextInput`, `TextArea`, `Select`, `Checkbox`, `RadioRow`)
   share one treatment: pill-shaped, `panel-raised` fill, hairline that lightens
   on hover. No native browser control is ever visible.
@@ -170,15 +226,15 @@ primitive rather than a one-off.
 `AppShell` wraps every signed-in route. Sign-in, the invite landing, and admin
 sit outside it.
 
-| Width | Nav | Right rail | Balance lives | Contest grid |
-| --- | --- | --- | --- | --- |
-| < 768 | Bottom bar, 4 tabs | None | Top-bar chip | 1 column |
-| 768–1023 | Sidebar 224px | None | Sidebar footer | 2 columns |
-| 1024–1279 | Sidebar 224px | None | Sidebar footer | 3 columns |
-| 1280+ | Sidebar 224px | 320px, right | Sidebar footer + rail | 3 columns |
+| Width     | Nav                | Right rail   | Balance lives         | Contest grid |
+| --------- | ------------------ | ------------ | --------------------- | ------------ |
+| < 768     | Bottom bar, 4 tabs | None         | Top-bar chip          | 1 column     |
+| 768–1023  | Sidebar 224px      | None         | Sidebar footer        | 2 columns    |
+| 1024–1279 | Sidebar 224px      | None         | Sidebar footer        | 3 columns    |
+| 1280+     | Sidebar 224px      | 320px, right | Sidebar footer + rail | 3 columns    |
 
 - **Navigation is four items:** Play, Activity, Social, Wallet (+ role-gated
-  Admin). Pools / Tournament / Head-to-head are three *modes of one act* and live
+  Admin). Pools / Tournament / Head-to-head are three _modes of one act_ and live
   under Play with a mode switcher; Play stays lit on all three routes.
 - **The right rail** (≥1280px) is filled with real information, never invented
   content: the balance card, what's in play now, and who's queuing — all from
@@ -194,24 +250,26 @@ sit outside it.
 ## 6. The `WagerCard`, top to bottom
 
 The card is self-evident by design, so browse pages don't need an explainer
-paragraph (the "How it works" prose lives in a dismissible disclosure instead).
+paragraph (the "How it works" prose lives in a disclosure instead).
 
-1. Metric / field size in 12px grey (left) + optional `panel-raised` tag pill
-   (right): difficulty, "top 3 paid", "BLITZ".
-2. Title at 18px semibold.
-3. **The headline number** at 30px semibold (e.g. `1.80`) with "to clear" beside
-   it. (Tournaments and 1v1 have no bar, so they omit this.)
+1. Optional `meta` line in 12px grey (left) + optional `panel-raised` tag pill
+   (right), e.g. "16 players · top 3 paid". Pool cards omit it.
+2. Title at 18px semibold. On a pool card it is the difficulty plus the rule
+   ("Hard · wins only"), never the bar.
+3. **The headline number**: the bar target at 30px semibold with its unit and
+   "or fewer" (or "or better") beside it. This is the only place the card states
+   the bar. Tournaments and 1v1 have no bar, so they omit it.
 4. **The clear-rate meter:** a 6px track with a grey fill proportional to how
-   often you clear that bar, over "16% of your recent matches clear it".
+   often you clear that bar, over "16% of your recent games clear it".
 5. `ENTRY` mono caption, then a **segmented control of dollar amounts** (default
    middle preset).
-6. `EST. WIN` over the payout at 18px **in lime**, with fill count ("3 of 4 in")
-   or "1v1" on the right.
+6. The payout caption over the payout at 18px **in lime**, the fee note under
+   it, and "1v1" on the right for head-to-head.
 7. A full-width `lg` primary button naming the outcome: "Join pool", "Join
    tournament", "Find match".
 
 Changing the entry updates the payout **in place**. Entry is a parameter, not a
-product — this is why nine near-identical cards collapsed to three.
+product.
 
 ---
 
@@ -220,15 +278,16 @@ product — this is why nine near-identical cards collapsed to three.
 The product's one loud element, and the thing a stranger should remember. A
 horizontal track showing **your number** against **the number to beat**, gap
 shaded: a full-height white tick for the target, a filled bar for ground covered,
-the remaining distance washed in cyan at 25%. Underneath, two 12px lines:
-"your avg **1.42**" and either "need +0.38" (grey) or "clear" (lime). The target
-sits at ~78% of the track so an overshoot reads as an overshoot.
+the remaining distance washed in cyan at 25%. Underneath, one 12px line: your
+number, then either "need −N" (grey) or "clear" / "N under" (lime). Every number
+carries its unit via `format` (`formatMetric`: "31 moves", "4 wins", "3 in a
+row"). For
+`chess_moves` lower is better. The target sits at ~78% of the track so an
+overshoot reads as an overshoot.
 
-It appears in exactly four places, always meaning the same thing: the
-formed-room banner (Solo pools), the standings/in-play card, the rail's in-play
-card, and the Activity live line. On browse cards — where the server quotes a bar
-and a clear rate but not your baseline — the card shows the **clear-rate meter**
-instead rather than inventing the "you" end of the bar. Nothing else in the UI is
+It appears only where your own number is known (the formed pool and the rail's
+in-play card). Browse cards show the **clear-rate meter** instead rather than
+inventing the "you" end of the bar. Nothing else in the UI is
 allowed to be this loud; everything around it stays quiet.
 
 ---
@@ -242,9 +301,11 @@ allowed to be this loud; everything around it stays quiet.
   `Joining…` → toast `Joined the pool`.
 - **`≈` is gone.** An estimate says `est.` once, next to a properly-formatted
   number.
-- **Money is always formatted from integer cents**, never a raw float.
-- **The rake is always visible pre-commit** ("winner takes $18.00 · $2.00
-  platform fee").
+- **Points, not currency.** 1 point = 1 internal cent; always `formatPoints`
+  ("1,000 pts" in UI, "1,000 points" in sentences). No `$`, no cash wording;
+  points have no cash value.
+- **The rake is always visible pre-commit** ("winner takes 1,800 pts · fee
+  200 pts").
 - **Empty states end in a button, not an apology.**
 
 ---
@@ -256,12 +317,7 @@ monospace, bordered tables, square buttons, green `#080` for OK and red `#b00`
 for anything wrong. It should keep looking like one. Do not apply the consumer
 design system to it.
 
----
-
-## 10. One honest open issue
-
-`filledSpots()` in `apps/web/src/lib/spots.ts` invents the "3 of 4 in" figure on
-every contest card by hashing the card key. It is not a live count. On a
-real-money product that is fabricated social proof and needs a product decision —
-show a real count, or show nothing — before any further visual work makes it more
-prominent.
+It is self-contained: `AdminLayout` sets its own white background, `#111` ink and
+`color-scheme: light`, and every colour in `adminStyles.ts` is explicit, so nothing
+inherits from the dark app body. Tables sit in `styles.scroll` (horizontal scroll
+at 390px) and the nav wraps.

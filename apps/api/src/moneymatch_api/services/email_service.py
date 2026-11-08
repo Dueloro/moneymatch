@@ -1,15 +1,9 @@
-"""Transactional email (Resend) — the email side of notifications.
-
-Guarded like push/analytics: with no `RESEND_API_KEY` the module is a no-op, so
-tests and local runs never touch the network. Only real, deliverable addresses
-are emailed — the synthetic `@users.moneymatch.app` addresses that back username
-sign-in have no inbox and are skipped. Best-effort: a send failure is logged and
-never breaks the caller's transaction.
-"""
+"""Transactional email (Resend) — the email side of notifications."""
 
 from __future__ import annotations
 
 import uuid
+from html import escape
 
 import httpx
 import structlog
@@ -22,12 +16,7 @@ log = structlog.get_logger(__name__)
 
 _RESEND_ENDPOINT = "https://api.resend.com/emails"
 
-# Hosted email logo (Decision B — beta domain for now; one-line change later).
-_LOGO_URL = "https://moneymatch-beta.vercel.app/email/logo.png"
 
-# The reserved subdomain that username sign-in maps handles onto — a mirror of
-# `AUTH_EMAIL_DOMAIN` in apps/web/src/lib/usernameAuth.ts. These addresses have
-# no inbox, so mailing them is guaranteed to bounce; skip them entirely.
 _SYNTHETIC_EMAIL_DOMAIN = "users.moneymatch.app"
 
 
@@ -43,23 +32,26 @@ def is_deliverable(email: str | None) -> bool:
     return not email.lower().endswith(f"@{_SYNTHETIC_EMAIL_DOMAIN}")
 
 
+def _web_origin() -> str:
+    return get_settings().web_origin.split(",")[0].strip().rstrip("/")
+
+
 def _app_url(link_path: str | None) -> str | None:
     """Absolute app link from a relative path, using the first configured origin.
-
     WEB_ORIGIN is a comma-separated CORS list; the first entry is the canonical
     web app, so deep links in email resolve there.
     """
     if not link_path:
         return None
-    origin = get_settings().web_origin.split(",")[0].strip().rstrip("/")
-    return f"{origin}{link_path}"
+    return f"{_web_origin()}{link_path}"
 
 
 def _render_html(body: str, url: str | None) -> str:
-    """Hybrid-brand HTML: dark header/footer bands with the lime mark, light body,
-    lime CTA. Table-based + inline styles for email-client reliability."""
+    logo_url = escape(f"{_web_origin()}/email/logo.png", quote=True)
+    safe_body = escape(body).replace("\n", "<br>")
+    safe_url = escape(url, quote=True) if url else None
     button = (
-        f'<tr><td style="padding:8px 0 4px"><a href="{url}" '
+        f'<tr><td style="padding:8px 0 4px"><a href="{safe_url}" '
         'style="display:inline-block;background:#C6F440;color:#0B0B0C;'
         "padding:12px 22px;border-radius:9999px;text-decoration:none;"
         'font-weight:700;font-size:15px">Open Money Match</a></td></tr>'
@@ -68,7 +60,7 @@ def _render_html(body: str, url: str | None) -> str:
     )
     fallback = (
         f'<tr><td style="padding:12px 0 0;font-size:12px;color:#6b7280">'
-        f"Button not working? Paste this link: <br>{url}</td></tr>"
+        f"Button not working? Paste this link: <br>{safe_url}</td></tr>"
         if url
         else ""
     )
@@ -78,22 +70,20 @@ def _render_html(body: str, url: str | None) -> str:
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
         'style="max-width:600px;margin:0 auto;background:#ffffff;'
         'border-radius:16px;overflow:hidden">'
-        # Dark header band with the mark + wordmark.
         '<tr><td style="background:#0B0B0C;padding:20px 28px">'
-        f'<img src="{_LOGO_URL}" width="28" height="28" alt="Money Match" '
+        f'<img src="{logo_url}" width="28" height="28" alt="Money Match" '
         'style="vertical-align:middle;border-radius:8px">'
         '<span style="color:#ffffff;font-weight:600;font-size:15px;'
         'vertical-align:middle;margin-left:10px">Money Match</span>'
         "</td></tr>"
-        # Light body.
         '<tr><td style="padding:28px">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
-        f'<tr><td style="font-size:16px;line-height:1.5;color:#111827">{body}</td></tr>'
+        '<tr><td style="font-size:16px;line-height:1.5;color:#111827">'
+        f"{safe_body}</td></tr>"
         f"{button}{fallback}"
         "</table></td></tr>"
-        # Dark footer band.
         '<tr><td style="background:#0B0B0C;padding:16px 28px;font-size:12px;'
-        'color:#9ca3af">Money Match · peer-to-peer skill wagering<br>'
+        'color:#9ca3af">Money Match · chess for points, no cash value<br>'
         "Need help? Contact Dueloro Support.</td></tr>"
         "</table></div>"
     )
@@ -106,11 +96,8 @@ async def send_to_user(
     subject: str,
     body: str,
     link_path: str | None = None,
+    reply_to: str | None = None,
 ) -> bool:
-    """Best-effort transactional email to `user_id`. Returns whether a message was
-    sent. No-ops (returns False) when the seam is off or the address isn't
-    deliverable. Never raises — a mail failure must not break a money/notify path.
-    """
     if not is_enabled():
         return False
     user = await session.get(User, user_id)
@@ -126,6 +113,8 @@ async def send_to_user(
         "text": body if url is None else f"{body}\n\nOpen Money Match: {url}",
         "html": _render_html(body, url),
     }
+    if reply_to:
+        payload["reply_to"] = reply_to
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
@@ -137,4 +126,33 @@ async def send_to_user(
         return True
     except Exception as exc:  # noqa: BLE001 — best-effort; mail never breaks caller
         log.warning("email.send_failed", user_id=str(user_id), error=str(exc))
+        return False
+
+
+async def send_plain(
+    *, to: str, subject: str, text: str, reply_to: str | None = None
+) -> bool:
+    """Plain-text mail to an operator address (no template). Best-effort."""
+    if not is_enabled():
+        return False
+    settings = get_settings()
+    payload: dict[str, object] = {
+        "from": settings.email_from,
+        "to": [to],
+        "subject": subject,
+        "text": text,
+    }
+    if reply_to:
+        payload["reply_to"] = reply_to
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                _RESEND_ENDPOINT,
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                json=payload,
+            )
+            resp.raise_for_status()
+        return True
+    except Exception as exc:  # noqa: BLE001 — best-effort; mail never breaks caller
+        log.warning("email.send_failed", to="operator", error=str(exc))
         return False

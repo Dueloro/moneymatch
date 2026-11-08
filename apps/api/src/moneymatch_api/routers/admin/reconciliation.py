@@ -1,8 +1,7 @@
-"""`/admin/reconciliation` — on-demand solvency + per-contest conservation.
-
-Runs the global solvency check and sweeps every contest for a conservation
-breach; any violating ref comes back with its totals so the UI can render it red
-with the ledger trail. Also reports the worker heartbeat (09-phase-6 · d.2/d.4)."""
+"""Runs the global solvency check and sweeps every contest for a conservation breach;
+any violating ref comes back with its totals so the UI can render it red with the
+ledger trail.
+"""
 
 from __future__ import annotations
 

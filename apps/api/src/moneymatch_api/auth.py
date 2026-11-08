@@ -1,12 +1,4 @@
-"""Supabase JWT verification.
-
-The API trusts nothing but a valid Supabase token. Two verification modes:
-- HS256 with the project JWT secret (`SUPABASE_JWT_SECRET`), or
-- asymmetric via JWKS (`resolved_jwks_url`), keys cached by PyJWT.
-
-Verified claims become an `AuthedIdentity`; the DB user row is provisioned from
-it (see `services.user_service`). No client-supplied identity is ever trusted.
-"""
+"""Supabase JWT verification."""
 
 from __future__ import annotations
 
@@ -17,7 +9,6 @@ import jwt
 from jwt import PyJWKClient
 
 from .config import Settings, get_settings
-from .constants import DEMO_JWT_SECRET
 from .errors import APIError
 
 
@@ -48,36 +39,9 @@ def extract_bearer_token(authorization: str | None) -> str:
     return parts[1].strip()
 
 
-def _try_demo_token(token: str, settings: Settings) -> AuthedIdentity | None:
-    """Accept a demo-login token (its own signing key) when demo mode is on.
-
-    Returns None for anything that isn't a valid demo token, so a real Supabase
-    JWT falls through to normal verification below.
-    """
-    try:
-        claims = jwt.decode(
-            token,
-            DEMO_JWT_SECRET,
-            algorithms=["HS256"],
-            audience=settings.supabase_jwt_audience,
-        )
-    except jwt.InvalidTokenError:
-        return None
-    if claims.get("demo") is not True:
-        return None
-    sub = claims.get("sub")
-    if not sub:
-        return None
-    return AuthedIdentity(auth_id=str(sub), email=claims.get("email"))
-
-
 def verify_token(token: str, settings: Settings | None = None) -> AuthedIdentity:
     """Verify a Supabase JWT and return the identity, or raise AuthError."""
     settings = settings or get_settings()
-    if settings.demo_login_enabled:
-        demo = _try_demo_token(token, settings)
-        if demo is not None:
-            return demo
     try:
         if settings.supabase_jwt_secret:
             claims = jwt.decode(
@@ -100,9 +64,7 @@ def verify_token(token: str, settings: Settings | None = None) -> AuthedIdentity
     except jwt.ExpiredSignatureError as exc:
         raise AuthError("Token expired") from exc
     except (jwt.InvalidTokenError, jwt.PyJWKClientError) as exc:
-        # PyJWKClientError is *not* an InvalidTokenError — a stale HS256 / kid-less
-        # token used to 500 here, which left the SPA stuck on "Loading…" (CORS
-        # dropped on the unhandled exception, so the client never got a 401).
+        # PyJWKClientError is not an InvalidTokenError; it must map to 401, not 500.
         raise AuthError("Invalid token") from exc
 
     sub = claims.get("sub")

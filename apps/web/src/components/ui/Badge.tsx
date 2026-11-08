@@ -1,11 +1,3 @@
-/**
- * The one count badge (16-ui-revamp-plan §1), replacing the three treatments the
- * inventory found: the nav's bare dot, the sub-tab pill, and the conversation
- * list's larger glowing pill.
- *
- * It is never lime. An unread count is not money, so it uses the paper action
- * tone, which also keeps it legible at 11px.
- */
 export function Badge({
   count,
   className = '',
@@ -18,7 +10,7 @@ export function Badge({
     <span
       className={[
         'inline-flex min-w-[1.25rem] items-center justify-center rounded-pill',
-        'bg-action px-1.5 text-micro font-semibold text-bg',
+        'bg-action px-1.5 text-micro font-semibold tabular-nums text-bg',
         className,
       ].join(' ')}
     >
@@ -27,7 +19,6 @@ export function Badge({
   );
 }
 
-/** The dot form, for places with no room for a number (the nav bell). */
 export function BadgeDot({
   show,
   className = '',

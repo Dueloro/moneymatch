@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { track } from '../lib/telemetry';
 
-// Mirrors schemas/social.py. Requests carry ids/presets only.
-
 export interface ChallengeView {
   id: string;
   challenger_id: string;
@@ -58,7 +56,6 @@ function messageOf(error: unknown, fallback: string): string {
 
 function useInvalidate() {
   const qc = useQueryClient();
-  // Key by prefix so these work without the auth context (and match any user id).
   return () => {
     qc.invalidateQueries({ queryKey: ['notifications'] });
     qc.invalidateQueries({ queryKey: ['activity'] });
@@ -66,7 +63,6 @@ function useInvalidate() {
   };
 }
 
-/** Create a challenge: direct (challengee_id), rematch (rematch_of), or invite. */
 export function useCreateChallenge() {
   const invalidate = useInvalidate();
   return useMutation({
@@ -117,7 +113,6 @@ export function useDeclineChallenge() {
   });
 }
 
-/** Public invite preview (no auth) — funnel step 1. */
 export function useInvitePreview(token: string | undefined) {
   return useQuery({
     queryKey: ['invite', token],

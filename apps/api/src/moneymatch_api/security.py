@@ -1,16 +1,4 @@
-"""Security hardening middleware (10-phase-7 §2).
-
-Three concerns, all server-side and dependency-free:
-
-- `SecurityHeadersMiddleware` — a locked-down header set on every response. The
-  API only ever returns JSON, so the CSP is maximally strict (`default-src
-  'none'`) and framing is denied outright.
-- `MaxBodySizeMiddleware` — rejects oversized request bodies (`413`) before a
-  handler runs, capping input abuse (`Content-Length` guard).
-- `RateLimitMiddleware` — a fixed-window per-client cap on write / auth-sensitive
-  requests (`429`). In-process and single-instance at MVP scale; a shared store
-  (Redis) is the multi-instance follow-up, tracked in BACKLOG.
-"""
+"""Security hardening middleware."""
 
 from __future__ import annotations
 
@@ -20,10 +8,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from .auth import AuthError, extract_bearer_token, verify_token
+from .config import Settings
+
 # Methods that mutate state — the ones worth rate-limiting and body-capping.
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
-# A strict header set for a JSON-only API (no HTML, no framing, no inline).
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",
@@ -34,7 +24,6 @@ SECURITY_HEADERS = {
 
 
 def _error(status_code: int, code: str, message: str) -> JSONResponse:
-    """Match the app-wide RFC-7807 envelope (`{code, message, detail}`)."""
     return JSONResponse(
         status_code=status_code,
         content={"code": code, "message": message, "detail": None},
@@ -66,19 +55,32 @@ class MaxBodySizeMiddleware(BaseHTTPMiddleware):
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Fixed-window per-(client, method, path) cap on write requests."""
+    """Fixed-window per-(caller, method, path) cap on write requests.
+
+    The caller is the verified user (same check as `auth.verify_token`) when the
+    request carries a valid bearer token, else the client IP. Unverified tokens never
+    pick the bucket, so nobody can spend another user's budget.
+    """
 
     WINDOW_SECONDS = 60
 
-    def __init__(self, app, *, per_minute: int) -> None:
+    def __init__(
+        self, app, *, per_minute: int, settings: Settings | None = None
+    ) -> None:
         super().__init__(app)
         self.per_minute = per_minute
-        # key -> (window_start_epoch, count). Bounded implicitly by the small,
-        # authed surface at MVP; a real deploy swaps this for a shared store.
+        self.settings = settings
         self._buckets: dict[str, tuple[int, int]] = {}
 
     def _client(self, request: Request) -> str:
-        return request.client.host if request.client else "unknown"
+        authorization = request.headers.get("authorization")
+        if authorization:
+            try:
+                token = extract_bearer_token(authorization)
+                return "user:" + verify_token(token, self.settings).auth_id
+            except AuthError:
+                pass
+        return "ip:" + (request.client.host if request.client else "unknown")
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.method not in WRITE_METHODS:

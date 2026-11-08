@@ -2,13 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens (16-ui-revamp-plan §2). The ground is neutral ink rather than a
- * green-cast near-black, so lime reads as an accent instead of as the room's
- * ambient colour, and page / card / raised / overlay are genuinely distinct.
- *
- * Lime means ONE thing: money. Primary actions are paper, live states are cyan,
- * selection is structural. Tailwind colour names map to these vars, so the
- * existing class vocabulary keeps working. */
+/* Martian Mono at wdth 87.5 advances 0.65em; Menlo / Courier New advance 0.6em,
+   so scaling them 108% keeps figures the same width when the webfont swaps in. */
+@font-face {
+  font-family: 'Martian Mono Fallback';
+  src: local('Menlo'), local('Courier New');
+  size-adjust: 108%;
+}
+
+/* Design tokens. Lime means money only; tailwind colour names map to these vars. */
 :root {
   /* Surfaces, dark to light. */
   --bg: #0b0c0f; /* page */
@@ -18,13 +20,12 @@
   --hairline: #23272f; /* default 1px line */
   --line-strong: #333945; /* hover line, overlay edge */
 
-  /* Text. Both secondary and tertiary are contrast-checked against --panel:
-   * 7.2:1 and 5.0:1, so both clear AA for body copy. */
+  /* Text: both secondary and tertiary clear AA against --panel (7.2:1, 5.0:1). */
   --text: #eef0f4;
   --text-secondary: #9aa2b1;
   --text-tertiary: #7c8593;
 
-  /* Semantics. One job each. */
+  /* Semantics. */
   --green: #c6f440; /* MONEY ONLY: currency, gains, balance */
   --green-dim: #3d4a18; /* dim lime for money-adjacent rules */
   --action: #f2f5ef; /* primary action fill (ink text on top) */
@@ -34,22 +35,23 @@
   --warn: #f5b93c; /* pending, caution */
   --focus: #a8c7ff; /* focus ring only, never decorative */
 
-  /* Shape: a hierarchy, not four competing values. Anything sitting on the page
-   * is `card`; anything nested inside a card is `inset`; controls are `pill`. */
+  /* The live board: cool slate squares that sit quietly on the ink page. */
+  --board-light: #b9c0cc;
+  --board-dark: #6f7889;
+
+  /* Shape: `card` on the page, `inset` inside a card, `pill` for controls. */
   --radius-card: 12px;
   --radius-inset: 8px;
   --radius-pill: 999px;
 
-  /* Elevation: exactly one shadow, used only by overlays. Cards separate by
-   * border and surface value, never by shadow. */
+  /* One shadow, overlays only. */
   --shadow-overlay:
     0 16px 48px -24px rgb(0 0 0 / 0.85), 0 2px 8px -2px rgb(0 0 0 / 0.45);
 
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The numeric face: money, scores and their captions. */
+  --font-mono: 'Martian Mono', 'Martian Mono Fallback', ui-monospace, monospace;
 
-  /* Motion: two durations and one easing, so interactive feedback stays in the
-   * sub-300ms band (emilkowal.ski/ui/you-dont-need-animations) instead of each
-   * call site picking its own. Frequent/interactive → fast; entrances → base. */
+  /* Motion: two durations and one easing. */
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -72,13 +74,9 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Money is everywhere in this product, so lining tabular figures are the
-   * default rather than something each component opts into. */
-  font-variant-numeric: tabular-nums;
 }
 
-/* Scrollbars are thin and visible rather than hidden. A scroll container with no
- * affordance looks fine in a screenshot and feels broken in use. */
+/* Thin, visible scrollbars. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--hairline) transparent;
@@ -101,8 +99,7 @@ body {
   background-clip: content-box;
 }
 
-/* Kept for the marquee, which is decorative and must not show a gutter. Not for
- * real scroll containers. */
+/* Marquee only; not for real scroll containers. */
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -112,15 +109,28 @@ body {
   height: 0;
 }
 
-/* One focus treatment for everything interactive. `:focus-visible` so a mouse
- * click doesn't ring, but every keyboard path does. */
+/* `:focus-visible` so mouse clicks don't ring but keyboard paths do. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
-/* The one surviving mono label, and it has one job: the tiny caption above a
- * money figure (Entry, Pot, Balance). Not a heading style. */
+/* Money and score figures. Use through AmountText / AnimatedBalance where possible. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The "pts" after a figure: quieter than the number it qualifies. */
+.pts-unit {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.8em;
+  font-weight: 500;
+  letter-spacing: 0;
+  opacity: 0.6;
+}
+
+/* The tiny caption above a money figure (Entry, Pot, Balance). */
 .label-money {
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -130,14 +140,11 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Retained so any surface still referencing the old label keeps rendering; new
- * code should use .label-money or a SectionHeader. */
-.label-mono {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
-  line-height: 16px;
+/* Neutral caption for everything that isn't money (Inbox, Direct messages, statuses). */
+.label-neutral {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
   color: var(--text-tertiary);
 }
 
@@ -149,7 +156,7 @@ body {
   font-size: 11px;
 }
 
-/* Lime highlight marker for key words in headlines. */
+/* Lime highlight for headline words. */
 .mark {
   background: var(--green);
   color: #000;
@@ -159,20 +166,13 @@ body {
   -webkit-box-decoration-break: clone;
 }
 
-/* Selection is structural: a raised surface and a strong edge, no hue, so it
- * never competes with money or with the primary action. */
+/* Selection is structural: no hue, so it never competes with money. */
 .is-selected {
   border-color: var(--line-strong) !important;
   background-color: var(--panel-raised);
 }
 
-/* --- Moderate "arena" gaming cues. Structural, not colourful: they never
- * introduce a hue that competes with money (lime), live (cyan) or focus (blue).
- * --- */
-
-/* A faint grid, the contest-surface texture. Sits under content on hero panels
- * (sign-in, the play/pools side rail, the wallet header). Kept low-contrast so
- * it reads as material, not as a chart. */
+/* Faint grid texture for hero panels. */
 .mm-grid-surface {
   background-image:
     linear-gradient(to right, rgba(51, 57, 69, 0.22) 1px, transparent 1px),
@@ -180,10 +180,7 @@ body {
   background-size: 32px 32px;
 }
 
-/* A restrained halo for the single loudest CTA on a screen (Find match, Join
- * pool). Paper-coloured so it never masquerades as money or a live state; only
- * on hover, only for a pointer, and gone under reduced motion via the global
- * transition kill-switch. */
+/* Hover-only halo for the loudest CTA; disabled by the reduced-motion kill-switch. */
 .mm-glow {
   transition: box-shadow var(--dur-base) var(--ease-standard);
 }
@@ -193,7 +190,7 @@ body {
     0 10px 30px -12px rgba(242, 245, 239, 0.28);
 }
 
-/* Marquee crawl for the live ticker. Content is duplicated, so -50% loops. */
+/* Ticker crawl; content is duplicated so -50% loops. */
 @keyframes marquee {
   from {
     transform: translateX(0);
@@ -209,7 +206,7 @@ body {
   animation-play-state: paused;
 }
 
-/* Rise-in entrance for the matched / VS card. */
+/* Entrance for the matched / VS card. */
 @keyframes rise {
   from {
     opacity: 0;
@@ -224,9 +221,7 @@ body {
   animation: rise 0.28s ease-out;
 }
 
-/* The change in a balance after a wager settles: drifts up and fades out.
- * Carries its own horizontal centring, because a transform utility class would
- * be overridden by the animation the moment it started. */
+/* Balance delta after settle; carries its own centring so the animation doesn't override a transform class. */
 @keyframes money-delta {
   0% {
     opacity: 0;
@@ -249,420 +244,52 @@ body {
   animation: money-delta 2.2s ease-out forwards;
 }
 
-/* ── Settlement takeover ──────────────────────────────────────────────────
- *
- * Settlement is the moment the product does its job, so it gets the screen for
- * ~1.9s and then gives it straight back.
- *
- * Everything below animates `transform` and `opacity` only. Both are owned by
- * the compositor, so none of this triggers layout or paint — which is the whole
- * game here, because a settlement invalidates half the query cache and React is
- * re-rendering the page underneath at exactly the moment this plays. A blur
- * filter or an animated gradient stop would repaint every frame and drop the
- * illusion instantly, so softness is baked into static gradients and only
- * scale and opacity move.
- */
-
-/* The darkened backdrop. Colour comes from an inline gradient per outcome. */
-@keyframes mm-veil {
-  0% {
-    opacity: 0;
-  }
-  12% {
-    opacity: 1;
-  }
-  74% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+/* The settlement moment: a faint lime light behind a win, the check drawing in,
+   and the settle-time line arriving last. */
+.mm-result-glow {
+  background-image: radial-gradient(
+    120% 70% at 50% 0%,
+    rgb(198 244 64 / 0.09),
+    transparent 70%
+  );
 }
-.mm-veil {
-  animation: mm-veil 1.9s ease-out forwards;
-  will-change: opacity;
-}
-
-/* The central flash the burst erupts from. */
-@keyframes mm-flash {
-  0% {
-    opacity: 0;
-    transform: scale(0.2);
+@keyframes draw-check {
+  from {
+    stroke-dashoffset: 24;
   }
-  6% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-  22% {
-    opacity: 0.35;
-    transform: scale(1.6);
-  }
-  50% {
-    opacity: 0;
-    transform: scale(2.1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.1);
-  }
-}
-.mm-flash {
-  animation: mm-flash 1.9s cubic-bezier(0.12, 0.8, 0.3, 1) forwards;
-  will-change: transform, opacity;
-}
-
-/* A shockwave ring leaving the flash. */
-@keyframes mm-ring {
-  0% {
-    opacity: 0;
-    transform: scale(0.15);
-  }
-  10% {
-    opacity: 0.85;
-  }
-  55% {
-    opacity: 0;
-    transform: scale(2.6);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.6);
-  }
-}
-.mm-ring {
-  animation: mm-ring 1.9s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
-  will-change: transform, opacity;
-}
-
-/* Coins, bills and confetti thrown out of the centre, then falling. Each piece
- * carries its own vector, spin and delay as custom properties, so one keyframe
- * serves the whole burst. */
-@keyframes mm-burst {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.3);
-  }
-  6% {
-    opacity: 1;
-    transform: translate3d(calc(var(--tx) * 0.35), calc(var(--ty) * 0.35), 0)
-      rotate(calc(var(--rot) * 0.3)) scale(1);
-  }
-  38% {
-    opacity: 1;
-    transform: translate3d(var(--tx), var(--ty), 0) rotate(var(--rot)) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(calc(var(--tx) * 1.05), calc(var(--ty) + var(--fall)), 0)
-      rotate(calc(var(--rot) * 1.7)) scale(0.9);
-  }
-}
-.mm-burst {
-  animation: mm-burst var(--dur) cubic-bezier(0.08, 0.7, 0.25, 1) var(--delay) forwards;
-  will-change: transform, opacity;
-}
-
-/* A coin reads as a coin because it spins edge-on, not because of detail. */
-@keyframes mm-spin {
   to {
-    transform: rotateY(720deg);
+    stroke-dashoffset: 0;
   }
 }
-.mm-spin {
-  animation: mm-spin var(--dur) linear var(--delay) forwards;
-  will-change: transform;
+.mm-draw-check {
+  stroke-dasharray: 24;
+  animation: draw-check 0.45s 0.15s var(--ease-standard) both;
 }
-
-/* The headline: overshoots, settles, holds, leaves. */
-@keyframes mm-title {
-  0% {
+@keyframes fade-late {
+  from {
     opacity: 0;
-    transform: translate3d(0, 14px, 0) scale(0.72);
+    transform: translateY(3px);
   }
-  10% {
+  to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1.12);
-  }
-  18% {
-    transform: translate3d(0, 0, 0) scale(0.97);
-  }
-  26% {
-    transform: translate3d(0, 0, 0) scale(1.02);
-  }
-  34% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  76% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, -10px, 0) scale(1.03);
+    transform: none;
   }
 }
-.mm-title {
-  animation: mm-title 1.9s cubic-bezier(0.2, 1.1, 0.3, 1) forwards;
-  will-change: transform, opacity;
+.mm-fade-late {
+  animation: fade-late 0.4s 0.7s ease-out both;
 }
-
-/* The loss headline settles downward with the debris instead of rising. */
-@keyframes mm-title-down {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -12px, 0) scale(1.08);
-  }
-  12% {
-    opacity: 1;
-    transform: translate3d(0, 3px, 0) scale(0.99);
-  }
-  22% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  76% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, 10px, 0) scale(0.98);
-  }
-}
-.mm-title-down {
-  animation: mm-title-down 1.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
-  will-change: transform, opacity;
-}
-
-/* The amount arrives a beat after the headline. */
-@keyframes mm-amount {
-  0%,
-  12% {
-    opacity: 0;
-    transform: translate3d(0, 10px, 0) scale(0.9);
-  }
-  24% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1.04);
-  }
-  30% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  76% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, -6px, 0);
-  }
-}
-.mm-amount {
-  animation: mm-amount 1.9s cubic-bezier(0.2, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
-}
-
-/* A light beam sweeping left to right, once. */
-@keyframes mm-beam {
-  0%,
-  14% {
-    opacity: 0;
-    transform: translate3d(-140%, 0, 0) skewX(-14deg);
-  }
-  24% {
-    opacity: 1;
-  }
-  56% {
-    opacity: 0;
-    transform: translate3d(240%, 0, 0) skewX(-14deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(240%, 0, 0) skewX(-14deg);
-  }
-}
-.mm-beam {
-  animation: mm-beam 1.9s ease-out forwards;
-  will-change: transform, opacity;
-}
-
-/* Sparkles around the amount. */
-@keyframes mm-spark {
-  0%,
-  18% {
-    opacity: 0;
-    transform: scale(0);
-  }
-  30% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  60% {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-}
-.mm-spark {
-  animation: mm-spark 1.9s ease-out var(--delay) forwards;
-  will-change: transform, opacity;
-}
-
-/* The wager token: a tense shake, then it is gone. */
-@keyframes mm-shake {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) scale(0.86);
-  }
-  6% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  8% {
-    transform: translate3d(-3px, 0, 0) rotate(-2deg);
-  }
-  10% {
-    transform: translate3d(3px, 0, 0) rotate(2deg);
-  }
-  12% {
-    transform: translate3d(-3px, 0, 0) rotate(-2deg);
-  }
-  14% {
-    transform: translate3d(3px, 0, 0) rotate(2deg);
-  }
-  16% {
-    transform: translate3d(-2px, 0, 0) rotate(-1deg);
-  }
-  18% {
-    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.04);
-  }
-  22% {
-    opacity: 1;
-    transform: scale(0.94);
-  }
-  26% {
-    opacity: 0;
-    transform: scale(1.1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.1);
-  }
-}
-.mm-shake {
-  animation: mm-shake 1.9s ease-in-out forwards;
-  will-change: transform, opacity;
-}
-
-/* Debris from the shattered token: outward, then down, fading. */
-@keyframes mm-shard {
-  0%,
-  20% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) rotate(0deg);
-  }
-  24% {
-    opacity: 1;
-    transform: translate3d(calc(var(--tx) * 0.4), calc(var(--ty) * 0.4), 0)
-      rotate(calc(var(--rot) * 0.4));
-  }
-  52% {
-    opacity: 1;
-    transform: translate3d(var(--tx), var(--ty), 0) rotate(var(--rot));
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(var(--tx), calc(var(--ty) + var(--fall)), 0)
-      rotate(calc(var(--rot) * 1.6));
-  }
-}
-.mm-shard {
-  animation: mm-shard 1.9s cubic-bezier(0.15, 0.6, 0.3, 1) var(--delay) forwards;
-  will-change: transform, opacity;
-}
-
-/* Smoke left behind: rises, spreads, thins out. */
-@keyframes mm-smoke {
-  0%,
-  20% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) scale(0.5);
-  }
-  34% {
-    opacity: 0.5;
-    transform: translate3d(var(--tx), -14px, 0) scale(1.1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(calc(var(--tx) * 1.4), -46px, 0) scale(1.7);
-  }
-}
-.mm-smoke {
-  animation: mm-smoke 1.9s ease-out var(--delay) forwards;
-  will-change: transform, opacity;
-}
-
-/* A hairline crack across the veil, gone almost as soon as it appears. */
-@keyframes mm-crack {
-  0%,
-  18% {
-    opacity: 0;
-    transform: scaleX(0);
-  }
-  24% {
-    opacity: 0.8;
-    transform: scaleX(1);
-  }
-  44% {
-    opacity: 0;
-    transform: scaleX(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(1);
-  }
-}
-.mm-crack {
-  animation: mm-crack 1.9s ease-out forwards;
-  transform-origin: center;
-  will-change: transform, opacity;
+.mm-last-move {
+  transition: opacity var(--dur-base) var(--ease-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
-  .animate-rise {
+  .animate-rise,
+  .mm-draw-check,
+  .mm-fade-late {
     animation: none;
   }
-  /* Whether you won is information, not decoration, so the card stays put and
-   * stays visible; only the motion goes. It is still dismissed on the timer by
-   * JS, so it does not linger forever. Confetti is pure decoration and is the
-   * one part removed outright. */
-  /* Whether you won is information, not decoration. The headline and the
-   * amount stay, still and visible; everything that exists purely as spectacle
-   * is removed outright. JS still dismisses on the timer. */
-  .mm-veil,
-  .mm-title,
-  .mm-title-down,
-  .mm-amount {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-  .mm-flash,
-  .mm-ring,
-  .mm-burst,
-  .mm-spin,
-  .mm-beam,
-  .mm-spark,
-  .mm-shake,
-  .mm-shard,
-  .mm-smoke,
-  .mm-crack {
-    display: none;
-  }
-  /* Still shown, just not moving: the amount you won or lost is information,
-   * not decoration, so it must not be animated away to nothing. */
+  /* Reduced motion: keep the delta visible; it is information. */
   .animate-money-delta {
     animation: none;
     opacity: 1;

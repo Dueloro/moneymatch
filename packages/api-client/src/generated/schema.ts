@@ -134,8 +134,47 @@ export interface paths {
         /** List Links */
         get: operations["list_links_api_v1_links_get"];
         put?: never;
-        /** Create Link */
+        /**
+         * Create Link
+         * @description Unverified typed-username link: dev/e2e seam only (E2E_AUTH_ENABLED, never prod).
+         *
+         *     Real users link through the Lichess OAuth endpoints below, which prove ownership.
+         */
         post: operations["create_link_api_v1_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/links/lichess/oauth/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Lichess Oauth */
+        post: operations["start_lichess_oauth_api_v1_links_lichess_oauth_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/links/lichess/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Lichess Oauth */
+        post: operations["complete_lichess_oauth_api_v1_links_lichess_oauth_callback_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -171,138 +210,6 @@ export interface paths {
         post?: never;
         /** Delete Link */
         delete: operations["delete_link_api_v1_links__game__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cs2/steam/login-url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Steam Login Url
-         * @description Where to send the user to sign in through Steam.
-         */
-        get: operations["steam_login_url_api_v1_cs2_steam_login_url_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cs2/steam/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Steam Callback
-         * @description Verify a Steam sign-in and bind the SteamID64 to the current user.
-         */
-        post: operations["steam_callback_api_v1_cs2_steam_callback_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cs2/sharecode": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Submit Share Code
-         * @description Resolve a share code, verify it is the user's match, and store it.
-         *
-         *     Every rejection carries a reason the player can act on. "Invalid" is not a
-         *     message anyone can do anything with, and the most common cause is a code
-         *     copied from the wrong place.
-         */
-        post: operations["submit_share_code_api_v1_cs2_sharecode_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cs2/chain": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Chain Status
-         * @description Whether collection is connected. Never returns the auth code.
-         */
-        get: operations["chain_status_api_v1_cs2_chain_get"];
-        put?: never;
-        /**
-         * Connect Chain
-         * @description Connect automatic collection, verifying the credentials before saving.
-         *
-         *     Both failures a player can cause are told apart here, because they need
-         *     different fixes: a cursor from someone else's match, and an auth code that
-         *     Steam will not accept.
-         */
-        post: operations["connect_chain_api_v1_cs2_chain_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cs2/chain/sync": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Sync Chain
-         * @description Pull in every match played since the last poll.
-         */
-        post: operations["sync_chain_api_v1_cs2_chain_sync_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cs2/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Gc Health
-         * @description Whether the Game Coordinator sidecar is up, for the status page.
-         */
-        get: operations["gc_health_api_v1_cs2_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -387,7 +294,6 @@ export interface paths {
         /**
          * Get Match Grading
          * @description Transparent grading record: the rule, each side's stat line, the decision.
-         *     Only a participant can read it.
          */
         get: operations["get_match_grading_api_v1_play_matches__match_id__grading_get"];
         put?: never;
@@ -405,10 +311,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Dispute
-         * @description The viewer's dispute for this match, if any.
-         */
+        /** Get Dispute */
         get: operations["get_dispute_api_v1_play_matches__match_id__dispute_get"];
         put?: never;
         /**
@@ -602,16 +505,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Enter
-         * @description Join the open tournament for this stat + entry (or open one).
-         */
+        /** Enter */
         post: operations["enter_api_v1_tournaments_queue_post"];
-        /**
-         * Leave
-         * @description Leave — only while you are still the only player (full refund).
-         */
-        delete: operations["leave_api_v1_tournaments_queue_delete"];
+        /** Leave Queue */
+        delete: operations["leave_queue_api_v1_tournaments_queue_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -749,10 +646,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Contest Dispute
-         * @description The viewer's dispute for this contest, if any.
-         */
+        /** Get Contest Dispute */
         get: operations["get_contest_dispute_api_v1_disputes__ref_type___ref_id__get"];
         put?: never;
         post?: never;
@@ -1037,11 +931,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Respond Invite
-         * @description Accept or decline an invite card. Accepting a head-to-head forms a PENDING
-         *     match (same lifecycle as the Inbox Respond pill).
-         */
+        /** Respond Invite */
         post: operations["respond_invite_api_v1_chat_messages__message_id__respond_post"];
         delete?: never;
         options?: never;
@@ -1145,6 +1035,40 @@ export interface paths {
         put?: never;
         /** Push Unsubscribe */
         post: operations["push_unsubscribe_api_v1_notifications_push_unsubscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbox/badge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Badge */
+        get: operations["get_badge_api_v1_inbox_badge_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inbox/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Seen */
+        post: operations["mark_seen_api_v1_inbox_seen_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1474,15 +1398,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/game-matches": {
+    "/api/v1/admin/support": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Game Matches */
-        get: operations["list_game_matches_api_v1_admin_game_matches_get"];
+        /** List Support Threads */
+        get: operations["list_support_threads_api_v1_admin_support_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1491,19 +1415,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/tournaments/{tournament_id}/log": {
+    "/api/v1/admin/support/{conversation_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Tournament Log View
-         * @description The permanent settlement log: every entrant's result and every match of
-         *     theirs we had, with the verdict and timestamps. Empty until it finishes.
-         */
-        get: operations["tournament_log_view_api_v1_admin_tournaments__tournament_id__log_get"];
+        /** Get Support Thread */
+        get: operations["get_support_thread_api_v1_admin_support__conversation_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1512,7 +1432,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/admin/tournaments/{tournament_id}/void": {
+    "/api/v1/admin/support/{conversation_id}/reply": {
         parameters: {
             query?: never;
             header?: never;
@@ -1521,15 +1441,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Void Tournament */
-        post: operations["void_tournament_api_v1_admin_tournaments__tournament_id__void_post"];
+        /** Reply To Support Thread */
+        post: operations["reply_to_support_thread_api_v1_admin_support__conversation_id__reply_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/demo/login": {
+    "/api/v1/webhooks/resend": {
         parameters: {
             query?: never;
             header?: never;
@@ -1538,106 +1458,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Demo Login */
-        post: operations["demo_login_api_v1_demo_login_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/demo/relink": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Demo Relink
-         * @description Swap the shared demo user's placeholder handle for a real one, per game.
-         *
-         *     This router is only mounted when `demo_login_enabled` (main.py), so demo mode
-         *     is already enforced. Scoped further to the demo user (`auth_id ==
-         *     DEMO_AUTH_ID`) so real users' immutable bindings and the admin-only unlink are
-         *     untouched. `rebind` soft-unbinds the old link and binds the new handle — live
-         *     host verification + real skill bootstrap — in one transaction, so a bad handle
-         *     leaves the old link intact. Returns the same `LinksResponse` as `/links`.
-         */
-        post: operations["demo_relink_api_v1_demo_relink_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/demo/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Demo Reset
-         * @description Reset the shared demo account to its fresh-login state (demo user only).
-         */
-        post: operations["demo_reset_api_v1_demo_reset_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/demo/simulate_result": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Simulate Result
-         * @description Inject a finished match so a wager can settle without playing one.
-         *
-         *     The row is written against the target's **linked host account**, and the
-         *     adapter merges it into `poll_eligible_games` alongside real history. So the
-         *     settlement worker, the pool engine and the payout path all read it through
-         *     the same call they use for a real match, and none of them has a branch for
-         *     it. That is the point: a demo that proves the real path works.
-         */
-        post: operations["simulate_result_api_v1_demo_simulate_result_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/demo/force_settle": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Force Settle
-         * @description Settle one pool or tournament now, instead of at its window close.
-         *
-         *     Runs the worker's own grade-then-settle sequence for a single contest. It
-         *     does not shortcut grading: the contest is graded from whatever match history
-         *     the adapters return, so a forced settlement still reflects real (or injected)
-         *     results rather than a fabricated outcome.
-         */
-        post: operations["force_settle_api_v1_demo_force_settle_post"];
+        /** Resend Webhook */
+        post: operations["resend_webhook_api_v1_webhooks_resend_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1732,7 +1554,7 @@ export interface components {
         };
         /**
          * AdjustRequest
-         * @description Manual ledger adjustment. Signed cents (credit/debit); reason required.
+         * @description Manual ledger adjustment.
          */
         AdjustRequest: {
             /**
@@ -1893,69 +1715,6 @@ export interface components {
             /** Resolved At */
             resolved_at: string | null;
         };
-        /**
-         * AdminGameMatch
-         * @description One stored game from the background ingester (the admin match log).
-         */
-        AdminGameMatch: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-            /** Username */
-            username: string | null;
-            /** Host Username */
-            host_username: string | null;
-            /** Game */
-            game: string;
-            /** Host Account Id */
-            host_account_id: string;
-            /** Host Match Id */
-            host_match_id: string;
-            /**
-             * Started At
-             * Format: date-time
-             */
-            started_at: string;
-            /** Ended At */
-            ended_at: string | null;
-            /** Mode */
-            mode: string | null;
-            /** Rated */
-            rated: boolean;
-            /** Eligible */
-            eligible: boolean;
-            /** Result */
-            result: string | null;
-            /** Moves */
-            moves: number;
-            /** Metrics */
-            metrics: {
-                [key: string]: unknown;
-            };
-            /** Detail */
-            detail: {
-                [key: string]: unknown;
-            };
-            /**
-             * Fetched At
-             * Format: date-time
-             */
-            fetched_at: string;
-            /** Account Last Polled At */
-            account_last_polled_at: string | null;
-        };
-        /** AdminGameMatchesResponse */
-        AdminGameMatchesResponse: {
-            /** Matches */
-            matches: components["schemas"]["AdminGameMatch"][];
-        };
         /** AdminLedgerPage */
         AdminLedgerPage: {
             /** Entries */
@@ -1989,102 +1748,6 @@ export interface components {
             link_method: string;
             /** Status */
             status: string;
-        };
-        /**
-         * AdminTournamentLogEntrant
-         * @description One entrant's final result and every match of theirs we had.
-         */
-        AdminTournamentLogEntrant: {
-            /**
-             * Entry Id
-             * Format: uuid
-             */
-            entry_id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-            /** Username */
-            username: string | null;
-            /** Host Account Id */
-            host_account_id: string;
-            /**
-             * Entered At
-             * Format: date-time
-             */
-            entered_at: string;
-            /** Score */
-            score: number | null;
-            /** Matches Counted */
-            matches_counted: number;
-            /** Rank */
-            rank: number | null;
-            /** Entry Cents */
-            entry_cents: number;
-            /** Payout Cents */
-            payout_cents: number;
-            /** Outcome */
-            outcome: string;
-            /** Matches */
-            matches: components["schemas"]["AdminTournamentLogMatch"][];
-        };
-        /**
-         * AdminTournamentLogMatch
-         * @description One fetched match of one entrant, as the rules judged it at settlement.
-         */
-        AdminTournamentLogMatch: {
-            /** Host Match Id */
-            host_match_id: string;
-            /** Game Match Id */
-            game_match_id: string | null;
-            /**
-             * Started At
-             * Format: date-time
-             */
-            started_at: string;
-            /** Ended At */
-            ended_at: string | null;
-            /** Fetched At */
-            fetched_at: string | null;
-            /** Mode */
-            mode: string | null;
-            /** Result */
-            result: string | null;
-            /** Reason */
-            reason: string;
-            /** Reason Text */
-            reason_text: string;
-            /** Counted */
-            counted: boolean;
-            /** Value */
-            value: number | null;
-            /** Metrics */
-            metrics: {
-                [key: string]: unknown;
-            };
-            /**
-             * Recorded At
-             * Format: date-time
-             */
-            recorded_at: string;
-        };
-        /**
-         * AdminTournamentLogResponse
-         * @description The permanent settlement log of one finished tournament.
-         */
-        AdminTournamentLogResponse: {
-            /**
-             * Tournament Id
-             * Format: uuid
-             */
-            tournament_id: string;
-            /** Tournament Outcome */
-            tournament_outcome: string | null;
-            /** Recorded At */
-            recorded_at: string | null;
-            /** Entrants */
-            entrants: components["schemas"]["AdminTournamentLogEntrant"][];
         };
         /** AdminUserDetail */
         AdminUserDetail: {
@@ -2166,33 +1829,6 @@ export interface components {
             available_cents: number;
             /** Escrow Cents */
             escrow_cents: number;
-        };
-        /** ChainConnectRequest */
-        ChainConnectRequest: {
-            /** Auth Code */
-            auth_code: string;
-            /** Known Code */
-            known_code: string;
-        };
-        /** ChainStatusResponse */
-        ChainStatusResponse: {
-            /** Connected */
-            connected: boolean;
-            /** State */
-            state?: string | null;
-            /** Last Error */
-            last_error?: string | null;
-            /** Last Polled At */
-            last_polled_at?: string | null;
-            /** Last Code At */
-            last_code_at?: string | null;
-        };
-        /** ChainSyncResponse */
-        ChainSyncResponse: {
-            /** Collected */
-            collected: number;
-            /** More Available */
-            more_available: boolean;
         };
         /**
          * ChallengeAcceptResponse
@@ -2292,8 +1928,8 @@ export interface components {
         };
         /**
          * ChatReadResponse
-         * @description Named apart from the notifications mark-read so the two never collide in
-         *     the generated OpenAPI component map.
+         * @description Named apart from the notifications mark-read so the two never collide in the
+         *     generated OpenAPI component map.
          */
         ChatReadResponse: {
             /** Unread Total */
@@ -2348,13 +1984,7 @@ export interface components {
             /** Conversations */
             conversations: components["schemas"]["ConversationView"][];
         };
-        /**
-         * CreateChallengeRequest
-         * @description One shape for all three flows (the server picks based on which fields are
-         *     set): direct (`challengee_id`), rematch (`rematch_of`), or invite link
-         *     (neither). game/market/entry are ignored for a rematch (copied from the
-         *     original match). Entry is a preset choice — the server owns the cents.
-         */
+        /** CreateChallengeRequest */
         CreateChallengeRequest: {
             /** Challengee Id */
             challengee_id?: string | null;
@@ -2371,8 +2001,7 @@ export interface components {
         };
         /**
          * CreateLinkRequest
-         * @description Intent to bind a host account. The server fetches + verifies everything;
-         *     the client only names the game and the handle to claim.
+         * @description Intent to bind a host account.
          */
         CreateLinkRequest: {
             /** Game */
@@ -2391,29 +2020,6 @@ export interface components {
              */
             amount_preset_cents: number;
         };
-        /** DemoLoginResponse */
-        DemoLoginResponse: {
-            /** Access Token */
-            access_token: string;
-            /**
-             * Token Type
-             * @default bearer
-             */
-            token_type: string;
-            /**
-             * Email
-             * @default demo@dueloro.com
-             */
-            email: string;
-        };
-        /** DemoResetResponse */
-        DemoResetResponse: {
-            /**
-             * Ok
-             * @default true
-             */
-            ok: boolean;
-        };
         /** DemoWithdrawalRequest */
         DemoWithdrawalRequest: {
             /**
@@ -2424,7 +2030,7 @@ export interface components {
         };
         /**
          * DifficultyCard
-         * @description One difficulty quoted from the viewer's own baseline (design PDF p.4).
+         * @description One difficulty quoted from the viewer's own baseline.
          */
         DifficultyCard: {
             /** Difficulty */
@@ -2488,47 +2094,7 @@ export interface components {
             /** Flags */
             flags: components["schemas"]["FlagItem"][];
         };
-        /** ForceSettleRequest */
-        ForceSettleRequest: {
-            /**
-             * Contest Id
-             * Format: uuid
-             */
-            contest_id: string;
-        };
-        /** ForceSettleResponse */
-        ForceSettleResponse: {
-            /**
-             * Simulated
-             * @default true
-             */
-            simulated: boolean;
-            /**
-             * Warning
-             * @default Settlement was forced by an admin, not by the contest window.
-             */
-            warning: string;
-            /** Kind */
-            kind: string;
-            /**
-             * Contest Id
-             * Format: uuid
-             */
-            contest_id: string;
-            /** State */
-            state: string;
-            /** Detail */
-            detail?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * Forecast
-         * @description The duel-forecast disclosure for a stat/chess pairing.
-         *
-         *     `you_win_prob` is `P(you beat opponent)` from the model (held near 0.50 by
-         *     the eligibility window); `label` is the honest one-liner for the matched card.
-         */
+        /** Forecast */
         Forecast: {
             /** You Win Prob */
             you_win_prob: number;
@@ -2557,7 +2123,7 @@ export interface components {
         };
         /**
          * FriendItem
-         * @description One person in the friends list or a pending request (design PDF p.8).
+         * @description One person in the friends list or a pending request.
          */
         FriendItem: {
             /**
@@ -2589,9 +2155,6 @@ export interface components {
         /**
          * GameLink
          * @description One game's row on Profile: linked snapshot or an empty/blocked slot.
-         *
-         *     `status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),
-         *     UNLINKED (available to link), COMING_SOON (in the catalog, no adapter yet).
          */
         GameLink: {
             /** Game */
@@ -2602,7 +2165,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "LINKED" | "BLOCKED" | "UNLINKED" | "COMING_SOON";
+            status: "LINKED" | "BLOCKED" | "UNLINKED";
             /** Host Username */
             host_username?: string | null;
             /** Linked At */
@@ -2614,33 +2177,12 @@ export interface components {
              */
             win_streak: number;
         };
-        /** GcHealthResponse */
-        GcHealthResponse: {
-            /** Ready */
-            ready: boolean;
-            /** Queue Depth */
-            queue_depth: number;
-            /**
-             * Status
-             * @default unreachable
-             */
-            status: string;
-            /**
-             * Detail
-             * @default {}
-             */
-            detail: {
-                [key: string]: unknown;
-            };
-        };
         /**
          * GettingStarted
          * @description First-match funnel progress — drives the "getting started" checklist that
          *     nudges a new player from signup to their first wager.
          */
         GettingStarted: {
-            /** Picked Games */
-            picked_games: boolean;
             /** Linked Game */
             linked_game: boolean;
             /** Placed Wager */
@@ -2650,8 +2192,8 @@ export interface components {
         };
         /**
          * GradingExplanation
-         * @description "Why this result" — the transparent grading record for a contest the
-         *     viewer was in: the rule, what each side produced, and the decision.
+         * @description "Why this result" — the transparent grading record for a contest the viewer
+         *     was in: the rule, what each side produced, and the decision.
          */
         GradingExplanation: {
             /**
@@ -2710,9 +2252,17 @@ export interface components {
             worker: components["schemas"]["WorkerHealth"];
         };
         /**
+         * InboxBadgeResponse
+         * @description Unread items that arrived since the user last opened Social.
+         */
+        InboxBadgeResponse: {
+            /** Badge */
+            badge: number;
+        };
+        /**
          * InviteDraft
-         * @description The client's half of an invite card. Entry is a preset choice — the
-         *     server validates it against the offered presets and owns the cents.
+         * @description The client's half of an invite card. Entry is a preset choice — the server
+         *     validates it against the offered presets and owns the cents.
          */
         InviteDraft: {
             /** Invite Kind */
@@ -2785,6 +2335,18 @@ export interface components {
              */
             created_at: string;
         };
+        /** LichessOAuthCallbackRequest */
+        LichessOAuthCallbackRequest: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** LichessOAuthStartResponse */
+        LichessOAuthStartResponse: {
+            /** Authorize Url */
+            authorize_url: string;
+        };
         /** LimitsResponse */
         LimitsResponse: {
             /** Daily Loss Cap Cents */
@@ -2812,11 +2374,6 @@ export interface components {
             /** Games */
             games: components["schemas"]["GameLink"][];
         };
-        /** LoginUrlResponse */
-        LoginUrlResponse: {
-            /** Url */
-            url: string;
-        };
         /**
          * MarkReadRequest
          * @description Mark specific notifications read, or all of them when `ids` is omitted.
@@ -2832,7 +2389,7 @@ export interface components {
         };
         /**
          * MarketRow
-         * @description One market row on the Play screen (design PDF p.1).
+         * @description One market row on the Play screen.
          */
         MarketRow: {
             /** Key */
@@ -2841,18 +2398,19 @@ export interface components {
             label: string;
             /** Kind */
             kind: string;
-            /** Metric */
-            metric: string | null;
             /** Requires Speed */
             requires_speed: boolean;
             /** Speeds */
             speeds: string[];
+            /**
+             * Clocks
+             * @default []
+             */
+            clocks: components["schemas"]["SpeedClock"][];
             /** Multiplier Bps */
             multiplier_bps: number;
             /** Queue Depth */
             queue_depth: number;
-            /** Provisional */
-            provisional: boolean;
             /** Resolution Note */
             resolution_note: string;
         };
@@ -2923,8 +2481,6 @@ export interface components {
             multiplier_bps: number;
             /** State */
             state: string;
-            /** Brokered */
-            brokered: boolean;
             /** Host Game Id */
             host_game_id: string | null;
             /** Matched At */
@@ -2938,6 +2494,23 @@ export interface components {
             /** Your Play Url */
             your_play_url: string | null;
             forecast: components["schemas"]["Forecast"] | null;
+            /** Winner User Id */
+            winner_user_id?: string | null;
+            /**
+             * Friendly
+             * @default false
+             */
+            friendly: boolean;
+            /** Termination */
+            termination?: string | null;
+            /** Game Ended At */
+            game_ended_at?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Live */
+            live?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * MeResponse
@@ -2959,7 +2532,7 @@ export interface components {
         };
         /**
          * MessageView
-         * @description One rendered message. `payload` is populated for invite cards only.
+         * @description One rendered message.
          */
         MessageView: {
             /**
@@ -3022,8 +2595,8 @@ export interface components {
         };
         /**
          * OpenConversationRequest
-         * @description Open (or reopen) a thread: a friend's `user_id` for a DM, or
-         *     `kind='support'` for the support thread.
+         * @description Open (or reopen) a thread: a friend's `user_id` for a DM, or `kind='support'`
+         *     for the support thread.
          */
         OpenConversationRequest: {
             /** User Id */
@@ -3035,18 +2608,8 @@ export interface components {
             kind: string;
         };
         /**
-         * OpenTable
-         * @description How many players are already in the open tournament at one entry.
-         */
-        OpenTable: {
-            /** Entry Cents */
-            entry_cents: number;
-            /** Players */
-            players: number;
-        };
-        /**
          * PoolEnterRequest
-         * @description Enter a pool = enqueue. Ids + preset only — no bar, no amount.
+         * @description Enter a pool = enqueue.
          */
         PoolEnterRequest: {
             /** Game */
@@ -3178,10 +2741,6 @@ export interface components {
         /**
          * ProfileSnapshot
          * @description Verified skill profile for one linked host account.
-         *
-         *     Chess populates the per-format / `primary_speed` fields; other titles leave
-         *     those empty and use the generic `rating` / `rank_label` / `kd` descriptors.
-         *     `game` is the adapter id.
          */
         ProfileSnapshot: {
             /** Username */
@@ -3220,19 +2779,8 @@ export interface components {
             primary_speed?: ("bullet" | "blitz" | "rapid" | "classical") | null;
             /** Rating */
             rating?: number | null;
-            /** Rank Label */
-            rank_label?: string | null;
-            /** Kd */
-            kd?: number | null;
             /** Avatar Url */
             avatar_url?: string | null;
-            /**
-             * Extra
-             * @default {}
-             */
-            extra: {
-                [key: string]: number;
-            };
         };
         /** PushKeys */
         PushKeys: {
@@ -3272,7 +2820,7 @@ export interface components {
         };
         /**
          * QueueRequest
-         * @description Join the queue. Ids + a server preset only — no amounts, no timestamps.
+         * @description Join the queue.
          */
         QueueRequest: {
             /** Game */
@@ -3301,7 +2849,7 @@ export interface components {
         };
         /**
          * QueueStatusResponse
-         * @description Where the viewer stands: idle, searching (band + wait), or matched.
+         * @description Where the viewer stands: idle, searching (with wait), or matched.
          */
         QueueStatusResponse: {
             /** Status */
@@ -3309,13 +2857,27 @@ export interface components {
             match?: components["schemas"]["MatchView"] | null;
             /** Waited Seconds */
             waited_seconds?: number | null;
-            /** Tolerance Stage */
-            tolerance_stage?: number | null;
+            ticket?: components["schemas"]["QueueTicketView"] | null;
             /**
              * Can Cancel
              * @default true
              */
             can_cancel: boolean;
+        };
+        /**
+         * QueueTicketView
+         * @description The viewer's own search ticket, recapped on the searching screen.
+         */
+        QueueTicketView: {
+            /** Market */
+            market: string;
+            /** Speed */
+            speed: string | null;
+            clock: components["schemas"]["SpeedClock"] | null;
+            /** Entry Cents */
+            entry_cents: number;
+            /** Rating */
+            rating: number | null;
         };
         /** ReconViolationRow */
         ReconViolationRow: {
@@ -3445,119 +3007,17 @@ export interface components {
             body?: string | null;
             invite?: components["schemas"]["InviteDraft"] | null;
         };
-        /** ShareCodePlayer */
-        ShareCodePlayer: {
-            /** Steam Id */
-            steam_id: string;
-            /** Kills */
-            kills: number;
-            /** Deaths */
-            deaths: number;
-            /** Headshots */
-            headshots: number;
-            /** Is You */
-            is_you: boolean;
-        };
-        /** ShareCodeRequest */
-        ShareCodeRequest: {
-            /** Share Code */
-            share_code: string;
-        };
-        /** ShareCodeResponse */
-        ShareCodeResponse: {
-            /** Share Code */
-            share_code: string;
-            /**
-             * Match Time
-             * Format: date-time
-             */
-            match_time: string;
-            /** Map Name */
-            map_name: string | null;
-            /** Rounds */
-            rounds: number;
-            /** Score */
-            score: string;
-            /** Demo Expired */
-            demo_expired: boolean;
-            /** Your Metrics */
-            your_metrics: {
-                [key: string]: number;
-            };
-            /** Players */
-            players: components["schemas"]["ShareCodePlayer"][];
-        };
-        /** SimulateResultRequest */
-        SimulateResultRequest: {
-            /**
-             * Game
-             * @default cs2.steam
-             */
-            game: string;
-            /** User Id */
-            user_id?: string | null;
-            /**
-             * Metrics
-             * @default {}
-             */
-            metrics: {
-                [key: string]: number;
-            };
-            /**
-             * Rounds
-             * @default 0
-             */
-            rounds: number;
-            /**
-             * Moves
-             * @default 0
-             */
-            moves: number;
-            /**
-             * Won
-             * @default true
-             */
-            won: boolean | null;
-            /**
-             * Drawn
-             * @default false
-             */
-            drawn: boolean;
-            /** Played At */
-            played_at?: string | null;
-        };
-        /** SimulateResultResponse */
-        SimulateResultResponse: {
-            /**
-             * Simulated
-             * @default true
-             */
-            simulated: boolean;
-            /**
-             * Warning
-             * @default This is an injected result, not a real match. It is indistinguishable from a real one downstream by design.
-             */
-            warning: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Game */
-            game: string;
-            /** Host Account Id */
-            host_account_id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-            /** Created At Ms */
-            created_at_ms: number;
-            /** Metrics */
-            metrics: {
-                [key: string]: number;
-            };
+        /**
+         * SpeedClock
+         * @description The clock a brokered game is created with, in seconds.
+         */
+        SpeedClock: {
+            /** Speed */
+            speed: string;
+            /** Limit Seconds */
+            limit_seconds: number;
+            /** Increment Seconds */
+            increment_seconds: number;
         };
         /** StandingRow */
         StandingRow: {
@@ -3579,27 +3039,71 @@ export interface components {
             /** Payout Cents */
             payout_cents: number;
         };
-        /**
-         * SteamCallbackRequest
-         * @description Every `openid.*` parameter Steam put on the return URL, unmodified.
-         *
-         *     They are forwarded to Steam verbatim for verification, so the client must
-         *     not filter or reorder them.
-         */
-        SteamCallbackRequest: {
-            /** Params */
-            params: {
-                [key: string]: string;
-            };
+        /** SupportMessageItem */
+        SupportMessageItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Sender */
+            sender: string;
+            /** Body */
+            body: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Source */
+            source: string | null;
         };
-        /** SteamCallbackResponse */
-        SteamCallbackResponse: {
-            /** Steam Id */
-            steam_id: string;
-            /** Display Name */
-            display_name: string;
-            /** Linked */
-            linked: boolean;
+        /** SupportReplyRequest */
+        SupportReplyRequest: {
+            /** Body */
+            body: string;
+        };
+        /** SupportThreadDetail */
+        SupportThreadDetail: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Email */
+            email: string | null;
+            /** Messages */
+            messages: components["schemas"]["SupportMessageItem"][];
+        };
+        /** SupportThreadItem */
+        SupportThreadItem: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Username */
+            username: string | null;
+            /** Email */
+            email: string | null;
+            /** Last Message At */
+            last_message_at: string | null;
+            /** Last Message Preview */
+            last_message_preview: string | null;
+            /** Awaiting Reply */
+            awaiting_reply: boolean;
         };
         /** ThreadResponse */
         ThreadResponse: {
@@ -3616,31 +3120,6 @@ export interface components {
             /** Entry Preset Cents */
             entry_preset_cents: number;
         };
-        /**
-         * TournamentGame
-         * @description One of your games around the tournament, and whether/why it counted.
-         */
-        TournamentGame: {
-            /** Host Match Id */
-            host_match_id: string;
-            /**
-             * Started At
-             * Format: date-time
-             */
-            started_at: string;
-            /** Ended At */
-            ended_at: string | null;
-            /** Mode */
-            mode: string | null;
-            /** Result */
-            result: string | null;
-            /** Reason */
-            reason: string;
-            /** Reason Text */
-            reason_text: string;
-            /** Value */
-            value: number | null;
-        };
         /** TournamentMarketsResponse */
         TournamentMarketsResponse: {
             /** Game */
@@ -3653,14 +3132,6 @@ export interface components {
             prize_split: number[];
             /** Field Size */
             field_size: number;
-            /** Min Players */
-            min_players: number;
-            /** Score Matches */
-            score_matches: number;
-            /** Join Window Seconds */
-            join_window_seconds: number;
-            /** Duration Seconds */
-            duration_seconds: number;
             /** Metrics */
             metrics: components["schemas"]["TournamentMetric"][];
         };
@@ -3672,13 +3143,6 @@ export interface components {
             label: string;
             /** Provisional */
             provisional: boolean;
-            /** Rules */
-            rules: string;
-            /**
-             * Open Tables
-             * @default []
-             */
-            open_tables: components["schemas"]["OpenTable"][];
         };
         /** TournamentStatusResponse */
         TournamentStatusResponse: {
@@ -3715,20 +3179,18 @@ export interface components {
             prize_split: number[];
             /** Field Size */
             field_size: number;
-            /** Players */
-            players: number;
-            /** Score Matches */
-            score_matches: number;
             /** State */
             state: string;
-            /** Window Starts At */
-            window_starts_at: string | null;
-            /** Window Ends At */
-            window_ends_at: string | null;
-            /** Join Closes At */
-            join_closes_at: string | null;
-            /** Your Entered At */
-            your_entered_at: string | null;
+            /**
+             * Window Starts At
+             * Format: date-time
+             */
+            window_starts_at: string;
+            /**
+             * Window Ends At
+             * Format: date-time
+             */
+            window_ends_at: string;
             /** Field Mu Low */
             field_mu_low: number | null;
             /** Field Mu High */
@@ -3739,13 +3201,6 @@ export interface components {
             your_rank: number | null;
             /** Your Payout Cents */
             your_payout_cents: number | null;
-            /**
-             * Your Games
-             * @default []
-             */
-            your_games: components["schemas"]["TournamentGame"][];
-            /** Outcome Reason */
-            outcome_reason?: string | null;
             /** Resolved At */
             resolved_at: string | null;
         };
@@ -3758,7 +3213,7 @@ export interface components {
         /**
          * UpdateFlagRequest
          * @description Patch a flag: toggle `enabled` and/or replace its `payload` (e.g.
-         *     `geo_config`'s excluded-state list). At least one field must be present.
+         *     `geo_config`'s excluded-state list).
          */
         UpdateFlagRequest: {
             /** Enabled */
@@ -3771,9 +3226,6 @@ export interface components {
         /**
          * UpdateMeRequest
          * @description Onboarding (username + state + 18+, set once) and/or limit edits.
-         *
-         *     All fields optional so the endpoint serves both onboarding and later limit
-         *     changes. Lowering a cap is instant; raising is delayed (see limits_service).
          */
         UpdateMeRequest: {
             /**
@@ -3796,11 +3248,6 @@ export interface components {
             daily_deposit_cap_cents?: number | null;
             /** Cooloff Days */
             cooloff_days?: number | null;
-            /**
-             * Active Games
-             * @description Catalog game ids the player has chosen to play
-             */
-            active_games?: string[] | null;
             /**
              * Dismissed Checklists
              * @description Catalog game ids whose Play-tab checklist the player dismissed
@@ -3833,8 +3280,6 @@ export interface components {
              * Format: date-time
              */
             member_since: string;
-            /** Active Games */
-            active_games: string[];
             /** Dismissed Checklists */
             dismissed_checklists: string[];
         };
@@ -3890,7 +3335,7 @@ export interface components {
         };
         /**
          * WalletLedgerPage
-         * @description Cursor-paginated ledger. `next_cursor` is null on the last page.
+         * @description Cursor-paginated ledger.
          */
         WalletLedgerPage: {
             /** Entries */
@@ -4264,6 +3709,72 @@ export interface operations {
             };
         };
     };
+    start_lichess_oauth_api_v1_links_lichess_oauth_start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LichessOAuthStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_lichess_oauth_api_v1_links_lichess_oauth_callback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LichessOAuthCallbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinksResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     refresh_link_api_v1_links__game__profile_get: {
         parameters: {
             query?: never;
@@ -4326,213 +3837,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    steam_login_url_api_v1_cs2_steam_login_url_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LoginUrlResponse"];
-                };
-            };
-        };
-    };
-    steam_callback_api_v1_cs2_steam_callback_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SteamCallbackRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SteamCallbackResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    submit_share_code_api_v1_cs2_sharecode_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ShareCodeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ShareCodeResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    chain_status_api_v1_cs2_chain_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChainStatusResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    connect_chain_api_v1_cs2_chain_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChainConnectRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChainStatusResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    sync_chain_api_v1_cs2_chain_sync_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChainSyncResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    gc_health_api_v1_cs2_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GcHealthResponse"];
                 };
             };
         };
@@ -5197,7 +4501,7 @@ export interface operations {
             };
         };
     };
-    leave_api_v1_tournaments_queue_delete: {
+    leave_queue_api_v1_tournaments_queue_delete: {
         parameters: {
             query?: never;
             header?: {
@@ -6285,6 +5589,68 @@ export interface operations {
             };
         };
     };
+    get_badge_api_v1_inbox_badge_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxBadgeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_seen_api_v1_inbox_seen_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxBadgeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_flags_api_v1_admin_flags_get: {
         parameters: {
             query?: never;
@@ -6923,14 +6289,9 @@ export interface operations {
             };
         };
     };
-    list_game_matches_api_v1_admin_game_matches_get: {
+    list_support_threads_api_v1_admin_support_get: {
         parameters: {
-            query?: {
-                /** @description Username, or the host account id / handle */
-                player?: string | null;
-                game?: string | null;
-                limit?: number;
-            };
+            query?: never;
             header?: {
                 authorization?: string | null;
             };
@@ -6945,7 +6306,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminGameMatchesResponse"];
+                    "application/json": components["schemas"]["SupportThreadItem"][];
                 };
             };
             /** @description Validation Error */
@@ -6959,14 +6320,14 @@ export interface operations {
             };
         };
     };
-    tournament_log_view_api_v1_admin_tournaments__tournament_id__log_get: {
+    get_support_thread_api_v1_admin_support__conversation_id__get: {
         parameters: {
             query?: never;
             header?: {
                 authorization?: string | null;
             };
             path: {
-                tournament_id: string;
+                conversation_id: string;
             };
             cookie?: never;
         };
@@ -6978,7 +6339,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminTournamentLogResponse"];
+                    "application/json": components["schemas"]["SupportThreadDetail"];
                 };
             };
             /** @description Validation Error */
@@ -6992,20 +6353,20 @@ export interface operations {
             };
         };
     };
-    void_tournament_api_v1_admin_tournaments__tournament_id__void_post: {
+    reply_to_support_thread_api_v1_admin_support__conversation_id__reply_post: {
         parameters: {
             query?: never;
             header?: {
                 authorization?: string | null;
             };
             path: {
-                tournament_id: string;
+                conversation_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VoidRequest"];
+                "application/json": components["schemas"]["SupportReplyRequest"];
             };
         };
         responses: {
@@ -7015,7 +6376,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ResettleResult"];
+                    "application/json": components["schemas"]["SupportThreadDetail"];
                 };
             };
             /** @description Validation Error */
@@ -7029,7 +6390,7 @@ export interface operations {
             };
         };
     };
-    demo_login_api_v1_demo_login_post: {
+    resend_webhook_api_v1_webhooks_resend_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -7044,143 +6405,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DemoLoginResponse"];
-                };
-            };
-        };
-    };
-    demo_relink_api_v1_demo_relink_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateLinkRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LinksResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    demo_reset_api_v1_demo_reset_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DemoResetResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    simulate_result_api_v1_demo_simulate_result_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SimulateResultRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SimulateResultResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    force_settle_api_v1_demo_force_settle_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ForceSettleRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ForceSettleResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

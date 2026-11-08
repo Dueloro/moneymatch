@@ -7,9 +7,9 @@ from datetime import UTC, datetime, timedelta
 from moneymatch_api.models.play import Match, MatchPlayer
 from moneymatch_api.services import game_stats_service
 
-from .factories import create_linked_account, create_user, cs2_profile
+from .factories import chess_profile, create_linked_account, create_user
 
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 _BASE = datetime(2026, 7, 1, tzinfo=UTC)
 
 
@@ -17,16 +17,17 @@ async def _link(session, user):
     return await create_linked_account(
         session,
         user,
-        CS2,
+        CHESS,
         host_account_id=f"host_{user.username}",
-        profile=cs2_profile(user.username),
+        profile=chess_profile(user.username),
     )
 
 
-async def _settled(session, user, link, *, winner_id, when, game=CS2):
+async def _settled(session, user, link, *, winner_id, when, game=CHESS):
     match = Match(
         game=game,
-        market="kd_ratio",
+        market="win_h2h",
+        speed="blitz",
         entry_cents=1000,
         rake_bps=1000,
         pot_cents=2000,
@@ -58,14 +59,15 @@ async def test_counts_consecutive_recent_wins(session):
             session, user, link, winner_id=user.id, when=_BASE + timedelta(hours=i)
         )
 
-    assert (await game_stats_service.current_win_streaks(session, user.id)) == {CS2: 3}
+    assert (await game_stats_service.current_win_streaks(session, user.id)) == {
+        CHESS: 3
+    }
 
 
 async def test_recent_loss_resets_streak_to_zero(session):
     user = await create_user(session, username="loser")
     other = await create_user(session, username="rival")
     link = await _link(session, user)
-    # Two older wins, then a most-recent loss → streak resets to 0.
     await _settled(session, user, link, winner_id=user.id, when=_BASE)
     await _settled(
         session, user, link, winner_id=user.id, when=_BASE + timedelta(hours=1)
@@ -74,14 +76,15 @@ async def test_recent_loss_resets_streak_to_zero(session):
         session, user, link, winner_id=other.id, when=_BASE + timedelta(hours=2)
     )
 
-    assert (await game_stats_service.current_win_streaks(session, user.id)) == {CS2: 0}
+    assert (await game_stats_service.current_win_streaks(session, user.id)) == {
+        CHESS: 0
+    }
 
 
 async def test_only_leading_wins_after_last_loss_count(session):
     user = await create_user(session, username="bouncer")
     other = await create_user(session, username="foe")
     link = await _link(session, user)
-    # win, loss, win, win (newest) → only the two trailing wins count.
     await _settled(session, user, link, winner_id=user.id, when=_BASE)
     await _settled(
         session, user, link, winner_id=other.id, when=_BASE + timedelta(hours=1)
@@ -93,4 +96,6 @@ async def test_only_leading_wins_after_last_loss_count(session):
         session, user, link, winner_id=user.id, when=_BASE + timedelta(hours=3)
     )
 
-    assert (await game_stats_service.current_win_streaks(session, user.id)) == {CS2: 2}
+    assert (await game_stats_service.current_win_streaks(session, user.id)) == {
+        CHESS: 2
+    }

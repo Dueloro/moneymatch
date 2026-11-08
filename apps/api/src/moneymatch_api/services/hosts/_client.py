@@ -1,17 +1,4 @@
-"""Shared async HTTP helper for the host game clients.
-
-One place for the port changes the phase doc mandates (05-phase-2 · deliverable 1):
-
-- explicit timeouts + a bounded retry with jittered backoff (tenacity, 2 retries)
-  on transport errors / 5xx — a 4xx is never retried;
-- typed upstream errors (`HostUnavailable` / `HostNotFound`) instead of raw
-  `httpx` exceptions;
-- host latency logged (structlog) on every call for ops.
-
-Each process (api, worker) builds its own transient `AsyncClient` per call — no
-shared pool state across the two — which keeps this dependency-free and matches
-the PoC's per-call client usage.
-"""
+"""Shared async HTTP helper for the host game clients."""
 
 from __future__ import annotations
 
@@ -32,8 +19,6 @@ from .errors import HostError, HostNotFound, HostRateLimited, HostUnavailable
 
 log = structlog.get_logger(__name__)
 
-# 2 retries ⇒ 3 attempts total, with jittered exponential backoff so a briefly
-# flapping host doesn't turn into a thundering herd.
 _MAX_ATTEMPTS = 3
 _DEFAULT_TIMEOUT = 8.0
 
@@ -42,13 +27,6 @@ def _slow_host_ms() -> int:
     from ...config import get_settings
 
     return get_settings().slow_host_ms
-
-
-# Host error messages are ASCII on purpose. They travel into structlog, which
-# prints them, and a Windows console is cp1252: a single "→" in an error
-# string raises UnicodeEncodeError *inside the logger*, turning a handled 400
-# into a crashed request. Steam answering 400 for a private profile is the
-# normal case, so this was every CS2 link failing locally.
 
 
 async def request_json(
@@ -60,16 +38,11 @@ async def request_json(
     params: dict[str, Any] | None = None,
     data: dict[str, Any] | None = None,
     timeout_s: float = _DEFAULT_TIMEOUT,
+    retry: bool = True,
 ) -> httpx.Response:
-    """Perform a request, returning the 2xx `httpx.Response`.
-
-    Raises `HostNotFound` on 404 and `HostUnavailable` on 5xx / transport error /
-    timeout (after retries). The caller decides whether to fail soft (history
-    polls return `[]`) or surface the error (profile lookups map to 404/502).
-    """
     attempt = 0
-    async for retry in AsyncRetrying(
-        stop=stop_after_attempt(_MAX_ATTEMPTS),
+    async for attempt_ctx in AsyncRetrying(
+        stop=stop_after_attempt(_MAX_ATTEMPTS if retry else 1),
         wait=wait_random_exponential(multiplier=0.2, max=2.0),
         retry=(
             retry_if_exception_type(HostUnavailable)
@@ -77,7 +50,7 @@ async def request_json(
         ),
         reraise=True,
     ):
-        with retry:
+        with attempt_ctx:
             attempt += 1
             started = time.perf_counter()
             status_code: int | None = None
@@ -100,8 +73,6 @@ async def request_json(
                     attempt=attempt,
                     latency_ms=latency_ms,
                 )
-                # Ops signal: a slow host is the first sign of an outage or a
-                # settlement-latency regression (09-phase-6 · deliverable 4).
                 if latency_ms > _slow_host_ms():
                     log.warning(
                         "host.slow",
@@ -120,9 +91,6 @@ async def request_json(
                 )
             if response.status_code == 429:
                 raise HostRateLimited(host, f"{method} {url} -> 429", 429)
-            # Any other non-2xx (400/401/403/422…) is a typed, non-retryable
-            # HostError — never a raw httpx exception — so every `except HostError`
-            # guard degrades gracefully (a bad seed id 400 must not crash a cycle).
             if response.status_code >= 400:
                 raise HostError(
                     host,
@@ -130,5 +98,4 @@ async def request_json(
                     response.status_code,
                 )
             return response
-    # Unreachable: reraise=True re-raises the last error rather than exiting.
     raise HostUnavailable(host, "retry loop exhausted")  # pragma: no cover

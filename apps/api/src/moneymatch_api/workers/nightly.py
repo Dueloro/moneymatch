@@ -1,17 +1,4 @@
-"""The worker's nightly pass (backlog · Phase B).
-
-Runs at most once per ``NIGHTLY_INTERVAL_SECONDS`` (the settlement loop checks a
-last-run flag, same mechanism as the heartbeat). Three bounded sweeps, each in
-its own transaction so one bad account never poisons the pass:
-
-1. **Metric-model refresh** — re-`bootstrap` every linked account so μ/σ track
-   real form (stale baselines otherwise skew personal bars, dispersion, and
-   pairings). Deferred from Phases 2–4; the worker now owns it.
-2. **Sandbagging sweep** — fold the per-metric detection here so the wager hot
-   path keeps only the cheap `risk_flags` check (backlog · "cache the sandbagging
-   evaluation"). Fails open per account on a host outage.
-3. **Derived detectors** — `risk_detectors.detect_win_streaks` (host-free).
-"""
+"""The worker's nightly pass."""
 
 from __future__ import annotations
 
@@ -40,8 +27,6 @@ class NightlyReport:
 
 
 async def _refresh_account(session: AsyncSession, link: LinkedAccount) -> int:
-    """Refresh one account's metric models and run the sandbagging sweep over its
-    rate metrics. Returns the number of new sandbagging flags written."""
     await metric_models_service.bootstrap(
         session, link.user_id, link.game, link.host_account_id
     )
@@ -62,7 +47,6 @@ async def _refresh_account(session: AsyncSession, link: LinkedAccount) -> int:
 async def run_nightly(
     sm: async_sessionmaker[AsyncSession], *, now: datetime | None = None
 ) -> NightlyReport:
-    """One nightly pass. Returns a report (used by tests + ops logging)."""
     report = NightlyReport()
 
     async with sm() as session:

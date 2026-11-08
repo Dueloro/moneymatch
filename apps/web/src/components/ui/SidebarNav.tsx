@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
-import { useInboxUnread } from '../../hooks/useChat';
+import { useInboxBadge } from '../../hooks/useInbox';
 import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useMe } from '../../hooks/useMe';
 import { AnimatedBalance } from './AnimatedBalance';
@@ -9,22 +9,10 @@ import { Logo } from './brand';
 import { NavIcon } from './icons';
 import { NAV, isPlayPath } from './nav';
 
-/**
- * Left sidebar (224px): logo, four primary nav entries, and a footer that
- * carries the account. The previous version listed six entries and then left
- * ~600px of nothing beneath them; the footer now closes that column with the
- * balance, which is the thing a returning player looks for first.
- *
- * Entries are 16px with the same glyphs as the mobile tab bar. At 14px and
- * text-only, four items in a 224px column read as a caption block rather than
- * as the app's primary navigation, and left the column looking empty. The
- * footer only actually reaches the bottom of the screen because `AppShell`
- * pins the shell to the viewport.
- */
 export function SidebarNav() {
   const me = useMe();
   const available = useDisplayBalance();
-  const unread = useInboxUnread();
+  const unread = useInboxBadge();
   const { pathname } = useLocation();
   const username = me.data?.user.username ?? '…';
   const isAdmin = me.data?.user.role === 'admin';
@@ -43,15 +31,13 @@ export function SidebarNav() {
       className="hidden w-56 shrink-0 flex-col border-r border-hairline px-3 py-5 md:flex"
     >
       <div className="mb-8 shrink-0 px-2">
-        <Logo />
+        <Link to="/play" aria-label="Money Match home" className="inline-flex">
+          <Logo />
+        </Link>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
         {NAV.map((item) => {
-          // "Play" stays lit across all three contest modes, which live on
-          // separate routes but are one destination to the player. NavLink
-          // can't express that (it only knows its own path and would clear
-          // aria-current), so active is computed here and announced properly.
           const active =
             item.label === 'Play' ? isPlayPath(pathname) : pathname === item.to;
           return (

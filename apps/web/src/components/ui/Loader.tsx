@@ -1,16 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/**
- * The app's one loading indicator: a pixel grid that shimmers in a diagonal
- * wave with an elapsed-time readout, so a wait reads as "working" rather than
- * "stuck". Reimplemented from the beautifui.dev "Loading State" in our tokens —
- * no canvas, no deps. Honours prefers-reduced-motion (static grid, no timer).
- *
- * Use it for full-screen waits (route/auth gates). For content that loads in
- * place — lists, rows — reach for Skeleton instead.
- */
-
-const GRID = 5; // 5×5 pixels
+const GRID = 5;
 const CELLS = Array.from({ length: GRID * GRID }, (_, i) => i);
 const WAVE_SECONDS = 1.1;
 
@@ -33,8 +23,6 @@ export function Loader({
     >
       <div className="grid grid-cols-5 gap-1" aria-hidden>
         {CELLS.map((i) => {
-          // Diagonal distance drives the delay, so the shimmer sweeps corner to
-          // corner instead of every cell pulsing in unison.
           const row = Math.floor(i / GRID);
           const col = i % GRID;
           const delay = ((row + col) / (2 * (GRID - 1))) * WAVE_SECONDS;
@@ -53,9 +41,7 @@ export function Loader({
       <div className="flex items-center gap-2 text-xs">
         <span className="text-text-secondary">{label}</span>
         {!reduced && (
-          <span className="font-mono tabular-nums text-text-tertiary">
-            {elapsed.toFixed(1)}s
-          </span>
+          <span className="num text-text-tertiary">{elapsed.toFixed(1)}s</span>
         )}
       </div>
     </div>
@@ -83,7 +69,6 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-/** Seconds since mount, updated 10×/s. Paused entirely when `run` is false. */
 function useElapsed(run: boolean) {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {

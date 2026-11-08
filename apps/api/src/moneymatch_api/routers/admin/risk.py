@@ -1,8 +1,4 @@
-"""`/admin/risk` — rate-drift monitor + the sandbagging flag queue.
-
-Read the actual-vs-expected rates per market/difficulty, and clear a risk flag
-(freeze the user via `/admin/users/{id}/freeze`). Clearing is audited (09-phase-6
-· deliverable 2 · Risk view)."""
+"""`/admin/risk` — rate-drift monitor + the sandbagging flag queue."""
 
 from __future__ import annotations
 

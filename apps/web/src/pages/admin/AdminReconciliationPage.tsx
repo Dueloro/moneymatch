@@ -1,10 +1,13 @@
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import { useReconciliation } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminReconciliationPage() {
   const recon = useReconciliation();
-  if (recon.isLoading) return <div style={styles.page}>Running checks…</div>;
+  if (recon.isLoading) return <AdminLoading />;
+  if (recon.isError)
+    return <AdminError what="reconciliation" onRetry={() => void recon.refetch()} />;
   const d = recon.data as
     | {
         ok: boolean;
@@ -40,9 +43,9 @@ export function AdminReconciliationPage() {
         {d.solvency_ok ? 'solvent' : 'BREACH'}
       </p>
       <ul>
-        <li>user total: {formatCurrency(d.totals.user_total ?? 0)}</li>
-        <li>promo funding: {formatCurrency(d.totals.promo_funding ?? 0)}</li>
-        <li>rake: {formatCurrency(d.totals.rake ?? 0)}</li>
+        <li>user total: {formatPoints(d.totals.user_total ?? 0)}</li>
+        <li>promo funding: {formatPoints(d.totals.promo_funding ?? 0)}</li>
+        <li>rake: {formatPoints(d.totals.rake ?? 0)}</li>
       </ul>
       {d.solvency_violations.length > 0 && (
         <pre style={styles.pre}>{d.solvency_violations.join('\n')}</pre>
@@ -52,24 +55,26 @@ export function AdminReconciliationPage() {
       {d.contest_violations.length === 0 ? (
         <p style={styles.ok}>No contest breaches.</p>
       ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Ref</th>
-              <th style={styles.th}>Violations</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.contest_violations.map((v) => (
-              <tr key={v.ref_id}>
-                <td style={{ ...styles.td, ...styles.alert }}>
-                  {v.ref_type} {v.ref_id.slice(0, 8)}
-                </td>
-                <td style={styles.td}>{v.violations.join('; ')}</td>
+        <div style={styles.scroll}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Ref</th>
+                <th style={styles.th}>Violations</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {d.contest_violations.map((v) => (
+                <tr key={v.ref_id}>
+                  <td style={{ ...styles.td, ...styles.alert }}>
+                    {v.ref_type} {v.ref_id.slice(0, 8)}
+                  </td>
+                  <td style={styles.td}>{v.violations.join('; ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

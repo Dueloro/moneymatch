@@ -8,7 +8,7 @@ from sqlalchemy import select
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers, new_sessionmaker
-from .test_matchmaking import cs2_player, enq_cs2
+from .test_matchmaking import chess_player, enq_chess
 
 pytestmark = pytest.mark.asyncio
 
@@ -30,8 +30,8 @@ async def test_queue_view_reports_waiting_depth(client):
     await _admin(client)
     sm = new_sessionmaker()
     async with sm() as s:
-        a = await cs2_player(s, "waiter", mu=1.0, sigma=0.3)
-        await enq_cs2(s, a)  # one waiting ticket
+        a = await chess_player(s, "waiter")
+        await enq_chess(s, a)
         await s.commit()
 
     r = await client.get(f"{V1}/admin/queue", headers=auth_headers("auth_admin"))
@@ -50,7 +50,6 @@ async def test_reconciliation_clean_book(client):
     body = r.json()
     assert body["solvency_ok"] is True
     assert body["contest_violations"] == []
-    # Worker heartbeat has never been written in this test → stale.
     assert body["worker"]["stale"] is True
 
 
@@ -59,13 +58,12 @@ async def test_risk_view_and_clear_flag(client):
     sm = new_sessionmaker()
     from moneymatch_api.models.risk import RiskFlag
 
-    # Seed a user with an open sandbagging flag.
     async with sm() as s:
-        flagged = await cs2_player(s, "tanker", mu=1.0, sigma=0.3)
+        flagged = await chess_player(s, "tanker")
         flag = RiskFlag(
             user_id=flagged.id,
-            game="cs2.steam",
-            metric="cs2_kd_ratio",
+            game="chess.lichess",
+            metric="chess_moves",
             kind="sandbagging",
             detail={"z": -2.0},
         )
@@ -78,7 +76,6 @@ async def test_risk_view_and_clear_flag(client):
     flags = r.json()["flags"]
     assert any(f["id"] == str(flag_id) for f in flags)
 
-    # Clear it → audited, and it drops off the open queue.
     r = await client.post(
         f"{V1}/admin/risk/flags/{flag_id}/clear", headers=auth_headers("auth_admin")
     )

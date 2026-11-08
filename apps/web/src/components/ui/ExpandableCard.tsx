@@ -3,11 +3,6 @@ import { useId, useState, type ReactNode } from 'react';
 import { Card } from './Card';
 import { ChevronDownIcon } from './icons';
 
-/**
- * A card row with an optional expandable body: the app's standard "line item you
- * can open to learn more". Built on `Card`, so it shares the one radius, the one
- * border rule and the one surface value with everything else on the page.
- */
 export function ExpandableCard({
   left,
   title,

@@ -5,30 +5,14 @@ import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useLeavePool, usePoolStatus } from '../../hooks/usePools';
 import { useLeaveTournament, useTournamentStatus } from '../../hooks/useTournaments';
 import { useWallet } from '../../hooks/useWallet';
-import { formatCurrency } from '../../lib/format';
-import { gameMeta } from '../../lib/games';
+import { formatPoints } from '../../lib/format';
+import { barPhrase, formatMetric, isLowerBetter, metricUnit } from '../../lib/metrics';
 import { LiveLine } from '../activity/LiveLine';
-import { RailTournamentCard } from '../tournament/TournamentPanel';
 import { AnimatedBalance } from '../ui/AnimatedBalance';
 import { Card } from '../ui/Card';
 import { ClearBar } from '../ui/ClearBar';
-import { GameBadge } from '../ui/GameBadge';
 import { PillButton } from '../ui/PillButton';
 import { SectionHeader } from '../ui/SectionHeader';
-
-/**
- * The persistent right rail (16-ui-revamp-plan §5).
- *
- * The inventory found roughly 60% of a 1920px viewport empty on the browse
- * pages, with a 576px column stranded mid-screen on Friends. The fix is not
- * wider cards, it is giving a returning player the four things they actually
- * open the app for: what they have and what they have running right now.
- *
- * Every number here comes from a hook that already exists. The in-play list
- * reads `useActivity` (one 10s poll, already the Activity page's source) rather
- * than the three per-mode status endpoints, so mounting the rail app-wide costs
- * one request, not three at 2.5s.
- */
 
 const IN_PLAY = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT', 'OPEN', 'LOCKED']);
 
@@ -68,8 +52,6 @@ function title(item: ActivityItem): string {
   return `vs ${item.opponent_username ?? 'opponent'}`;
 }
 
-/** One in-flight contest. A pool shows the clear bar, because the bar is the
- * whole contest; everything else shows its live line. */
 function InPlayCard({ item }: { item: ActivityItem }) {
   const live = item.live;
   const pool =
@@ -84,29 +66,26 @@ function InPlayCard({ item }: { item: ActivityItem }) {
     <Card className="p-3">
       <div className="flex items-baseline justify-between gap-2">
         <p className="truncate text-sm font-medium text-text">{title(item)}</p>
-        <p className="shrink-0 text-xs text-text-tertiary">
-          {formatCurrency(item.entry_cents)}
+        <p className="shrink-0 text-xs tabular-nums text-text-tertiary">
+          {formatPoints(item.entry_cents)}
         </p>
       </div>
-      <div className="mt-0.5 flex items-center gap-1.5">
-        <GameBadge game={item.game} />
-        <span className="truncate text-xs text-text-secondary">
-          {item.market_label}
-        </span>
-      </div>
+      <p className="mt-0.5 truncate text-xs text-text-secondary">{item.market_label}</p>
       {pool ? (
         <div className="mt-3">
           <ClearBar
             size="sm"
             current={pool.current}
             target={pool.target}
-            label={live?.label ?? 'you'}
+            label="you"
+            lowerIsBetter={isLowerBetter(item.market)}
+            format={(n) => formatMetric(item.market, n)}
           />
         </div>
       ) : (
         live && (
           <div className="mt-2">
-            <LiveLine live={live} />
+            <LiveLine live={live} metric={item.market} />
           </div>
         )
       )}
@@ -114,12 +93,6 @@ function InPlayCard({ item }: { item: ActivityItem }) {
   );
 }
 
-/**
- * The pool you have in flight. It sits in the rail rather than above the browse
- * grid so a formed room stops pushing the cards you are still reading down the
- * page. PoolsPage keeps a copy inline below `xl`, where there is no rail.
- */
-/** You are in a queue and nothing has formed yet. */
 function QueuingCard({
   label,
   hint,
@@ -155,56 +128,60 @@ function QueuingCard({
   );
 }
 
-/** The pool you are actually in, once a room has formed. */
 function RoomFormed() {
   const { data: status } = usePoolStatus();
 
   const pool = status?.status === 'formed' ? status.pool : null;
   if (!pool) return null;
+  const fm = (n: number) => formatMetric(pool.metric, n);
 
   return (
     <Card className="p-3" data-testid="rail-room-card">
       <div className="flex items-center gap-2">
         <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-live" />
-        <p className="min-w-0 flex-1 truncate text-sm font-medium capitalize text-text">
-          {pool.difficulty} {pool.metric_label}
+        <p className="min-w-0 flex-1 truncate text-sm font-medium text-text">
+          {pool.difficulty.charAt(0).toUpperCase() + pool.difficulty.slice(1)} ·{' '}
+          {pool.metric_label}
         </p>
-        <GameBadge game={pool.game} />
       </div>
       <p className="mt-0.5 text-xs text-text-secondary">
         {pool.room_size} {pool.room_size === 1 ? 'player' : 'players'} · pot{' '}
-        {formatCurrency(pool.pot_cents)}
+        {formatPoints(pool.pot_cents)}
       </p>
       <div className="mt-3">
-        <ClearBar size="sm" current={pool.your_bar} target={pool.room_bar} />
+        <ClearBar
+          size="sm"
+          current={pool.your_bar}
+          target={pool.room_bar}
+          lowerIsBetter={isLowerBetter(pool.metric)}
+          format={fm}
+        />
       </div>
-      <p className="mt-1 text-xs text-text-tertiary">Room bar {pool.room_bar}</p>
+      <p className="mt-1 text-xs text-text-tertiary">
+        Room bar · {pool.room_bar}
+        {metricUnit(pool.metric) ? ` ${metricUnit(pool.metric)}` : ''}{' '}
+        {isLowerBetter(pool.metric) ? 'or fewer' : 'or better'}
+      </p>
       {pool.your_cleared === true ? (
         <p className="mt-3 text-xs font-medium text-green" data-testid="rail-room-live">
-          Cleared ✓
+          Cleared
           {pool.your_current != null && (
-            <span className="text-text-secondary">
-              {' '}
-              · your {pool.metric_label} {pool.your_current}
-            </span>
+            <span className="text-text-secondary"> · {fm(pool.your_current)}</span>
           )}{' '}
           · settling now.
         </p>
       ) : pool.your_cleared === false ? (
         <p className="mt-3 text-xs text-text" data-testid="rail-room-live">
-          Not over the bar yet
+          Not cleared yet
           {pool.your_current != null && (
-            <span className="text-text-secondary">
-              {' '}
-              · your {pool.metric_label} {pool.your_current}
-            </span>
+            <span className="text-text-secondary"> · {fm(pool.your_current)}</span>
           )}
-          . Play again to beat {pool.room_bar}.
+          . Play again to {barPhrase(pool.metric, pool.room_bar)}.
         </p>
       ) : (
         <p className="mt-3 text-xs text-text" data-testid="rail-room-play-cue">
-          Your {formatCurrency(pool.entry_cents)} is in escrow, so you can now play your{' '}
-          {gameMeta(pool.game).name} game.
+          Your {formatPoints(pool.entry_cents)} is in escrow. Play your next game on
+          Lichess.
         </p>
       )}
     </Card>
@@ -219,9 +196,6 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
   const leavePool = useLeavePool();
   const leaveTournament = useLeaveTournament();
 
-  // Undefined (not `?? 0`) while loading, so AnimatedBalance shows a placeholder
-  // rather than flashing $0 and firing a phantom gain on refresh. Held at its
-  // pre-settlement value while a win/loss overlay is up (see useDisplayBalance).
   const available = useDisplayBalance();
   const inPlayCents = wallet?.escrow_cents ?? 0;
 
@@ -229,27 +203,12 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
   const searchingTournament = tournamentStatus?.status === 'searching';
   const queuing = searchingPool || searchingTournament;
   const formedPool = poolStatus?.status === 'formed' ? poolStatus.pool : null;
-  // Your running tournament gets its own card. Once it is paid out (or
-  // refunded) it leaves the rail: the result shows in the settlement overlay
-  // and Activity, and the full record is kept server-side (tournament_log).
-  const formed =
-    tournamentStatus?.status === 'formed' ? tournamentStatus.tournament : null;
-  const tournament =
-    formed && ['OPEN', 'LOCKED'].includes(formed.state) ? formed : null;
 
-  // A formed pool is also an OPEN/LOCKED row in the activity feed, so it would
-  // otherwise render twice: once as the rich room card, once as a generic
-  // in-play card. The room card wins (it carries the bar and the play cue).
   const inPlay = (activity?.items ?? [])
-    .filter(
-      (i) => IN_PLAY.has(i.state) && i.id !== formedPool?.id && i.id !== tournament?.id,
-    )
+    .filter((i) => IN_PLAY.has(i.state) && i.id !== formedPool?.id)
     .slice(0, 3);
 
   const nothingRunning = !formedPool && inPlay.length === 0;
-  // A live tournament is already on screen as its own card; "Nothing running"
-  // under it would be wrong.
-  const tournamentLive = tournament?.state === 'OPEN' || tournament?.state === 'LOCKED';
 
   return (
     <div className="flex flex-col gap-6">
@@ -261,22 +220,18 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
           </p>
           {inPlayCents > 0 && (
             <p className="mt-1 text-xs text-text-secondary">
-              {formatCurrency(inPlayCents)} in play
+              {formatPoints(inPlayCents)} in play
             </p>
           )}
           <Link
             to="/wallet"
             className="mt-3 inline-block text-xs font-semibold text-text-secondary transition-colors hover:text-text"
           >
-            Add funds
+            Add points
           </Link>
         </Card>
       )}
 
-      {/* Two states, two labels. Waiting for a room is not the same as being in
-       * one, and calling both "In play" left you unable to tell whether you
-       * were still matching or already playing. A contest appears under
-       * Queuing, then moves to In play the moment it forms. */}
       {queuing && (
         <RailSection title="Queuing">
           <div className="flex flex-col gap-2">
@@ -302,30 +257,22 @@ export function SideRail({ showBalance = true }: { showBalance?: boolean }) {
         </RailSection>
       )}
 
-      {tournament && (
-        <RailSection title="Tournament">
-          <RailTournamentCard key={tournament.id} tournament={tournament} />
-        </RailSection>
-      )}
-
-      {!(nothingRunning && tournamentLive) && (
-        <RailSection title="In play" action={{ to: '/activity', label: 'All' }}>
-          {nothingRunning ? (
-            <p className="text-xs text-text-tertiary">
-              {queuing
-                ? 'Nothing running yet. Your contest lands here once it forms.'
-                : 'Nothing running. Join a pool to get started.'}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {formedPool && <RoomFormed />}
-              {inPlay.map((item) => (
-                <InPlayCard key={item.id} item={item} />
-              ))}
-            </div>
-          )}
-        </RailSection>
-      )}
+      <RailSection title="In play" action={{ to: '/activity', label: 'All' }}>
+        {nothingRunning ? (
+          <p className="text-xs text-text-tertiary">
+            {queuing
+              ? 'Nothing running yet. It shows here once it forms.'
+              : 'Nothing running.'}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {formedPool && <RoomFormed />}
+            {inPlay.map((item) => (
+              <InPlayCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
+      </RailSection>
     </div>
   );
 }

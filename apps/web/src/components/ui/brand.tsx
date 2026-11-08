@@ -1,5 +1,3 @@
-/** Dueloro brand mark + wordmark, and the ambient glow backdrop. */
-
 export function TriangleMark({ className = 'h-7 w-7' }: { className?: string }) {
   return (
     <span
@@ -32,8 +30,6 @@ export function Logo({
   );
 }
 
-/** Ambient lime glow painted behind content. Drop as the first child of a
- * `relative` container that has the base background; content paints on top. */
 export function GlowBackdrop({ className = '' }: { className?: string }) {
   return (
     <div

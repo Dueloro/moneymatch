@@ -4,10 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/testUtils';
 import { SideRail } from './SideRail';
 
-// No session, so wallet/activity/queue stay disabled and fall to their empty
-// states. The pool status is the thing under test, so drive it directly.
 vi.mock('../../auth/useAuth', () => ({
-  useAuth: () => ({ isDemo: false, session: null }),
+  useAuth: () => ({ session: null }),
 }));
 vi.mock('../../hooks/usePools', async () => {
   const actual =
@@ -29,13 +27,13 @@ const FORMED = {
   status: 'formed',
   pool: {
     id: 'p1',
-    game: 'cs2.steam',
-    metric: 'cs2_kd_ratio',
-    metric_label: 'K/D ratio',
+    game: 'chess.lichess',
+    metric: 'chess_moves',
+    metric_label: 'Moves to win',
     difficulty: 'medium',
-    room_bar: 1.75,
-    your_bar: 1.8,
-    bar_delta: -0.05,
+    room_bar: 32,
+    your_bar: 34,
+    bar_delta: -2,
     entry_cents: 1000,
     pot_cents: 4000,
     prize_cents: 0,
@@ -63,8 +61,6 @@ describe('SideRail', () => {
   it('stacks the board as balance, then one In play section', () => {
     renderWithProviders(<SideRail />);
     expect(screen.getByText('Balance')).toBeInTheDocument();
-    // Queue is gone, and the formed room no longer gets a section of its own:
-    // a contest moves through "In play" in place.
     expect(
       screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
     ).toEqual(['In play']);
@@ -74,25 +70,24 @@ describe('SideRail', () => {
     mockStatus(FORMED);
     renderWithProviders(<SideRail />);
     const card = screen.getByTestId('rail-room-card');
-    expect(card).toHaveTextContent('medium K/D ratio');
-    expect(card).toHaveTextContent('Room bar 1.75');
-    expect(card).toHaveTextContent('4 players · pot $40.00');
-    // The room names its game (the CS2 short label).
-    expect(card).toHaveTextContent('CS2');
+    expect(card).toHaveTextContent('Medium · Moves to win');
+    expect(card).toHaveTextContent('Room bar · 32 moves or fewer');
+    expect(card).toHaveTextContent('need −2 moves');
+    expect(card).toHaveTextContent('4 players · pot 4,000 pts');
     expect(screen.getByTestId('rail-room-play-cue')).toHaveTextContent(
-      /you can now play your .* game/i,
+      /play your next game on lichess/i,
     );
   });
 
   it('reflects a cleared live result instead of the play cue', () => {
     mockStatus({
       ...FORMED,
-      pool: { ...FORMED.pool, your_cleared: true, your_current: 2.1 },
+      pool: { ...FORMED.pool, your_cleared: true, your_current: 28 },
     });
     renderWithProviders(<SideRail />);
-    // Once your played match clears the bar, the room shows it (and stops
-    // prompting you to play) — the reflect-live fix for "doesn't reflect".
-    expect(screen.getByTestId('rail-room-live')).toHaveTextContent(/Cleared/);
+    expect(screen.getByTestId('rail-room-live')).toHaveTextContent(
+      'Cleared · 28 moves · settling now.',
+    );
     expect(screen.queryByTestId('rail-room-play-cue')).not.toBeInTheDocument();
   });
 
@@ -108,7 +103,6 @@ describe('SideRail', () => {
     const inPlay = screen
       .getAllByRole('heading', { level: 3 })
       .find((h) => h.textContent === 'In play')!;
-    // The room card is inside the In play section, not a sibling of it.
     expect(inPlay.closest('section')).toContainElement(
       screen.getByTestId('rail-room-card'),
     );
@@ -119,8 +113,6 @@ describe('SideRail', () => {
     mockStatus({ status: 'searching', pool: null });
     renderWithProviders(<SideRail />);
 
-    // Waiting for a room is its own labelled state, not "In play". Calling both
-    // the same left you unable to tell whether you were matching or playing.
     const headings = screen
       .getAllByRole('heading', { level: 3 })
       .map((h) => h.textContent);
@@ -130,8 +122,7 @@ describe('SideRail', () => {
       'Finding your pool room',
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    // And In play says the contest will arrive, rather than "join a pool".
-    expect(screen.getByText(/lands here once it forms/)).toBeInTheDocument();
+    expect(screen.getByText(/shows here once it forms/)).toBeInTheDocument();
   });
 
   it('drops the Queuing section once the room has formed', () => {

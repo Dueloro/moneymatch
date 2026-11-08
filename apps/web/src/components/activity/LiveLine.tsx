@@ -1,51 +1,48 @@
 import type { LiveInfo } from '../../hooks/useActivity';
+import { resultLine } from '../../lib/matchResult';
+import { formatMetric } from '../../lib/metrics';
 
 type Tone = 'live' | 'good' | 'bad' | 'muted';
 
-/** Format a live metric value: numbers to ≤2 dp, win/next verbs to words. */
-function fmtVal(v: number | string | null | undefined): string {
-  if (v == null) return '-';
-  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2);
-  return { won: 'won', lost: 'lost', pending: 'in a match' }[v] ?? v;
-}
-
-/** Collapse a viewer-oriented `live` object into one line + a tone. */
-function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
-  const label = live.label ?? 'stat';
+// A result line names how the game ended only when Lichess said so.
+function liveDescriptor(
+  live: LiveInfo,
+  metric: string,
+): { text: string; tone: Tone } | null {
+  const fm = (v: number | null | undefined) => formatMetric(metric, v);
   if (live.kind === 'pool') {
     switch (live.status) {
       case 'cleared':
         return {
-          text: `${label} ${fmtVal(live.current)} · cleared ${fmtVal(live.target)}`,
+          text: `cleared · ${fm(live.current)}, bar ${fm(live.target)}`,
           tone: 'good',
         };
       case 'missed':
         return {
-          text: `${label} ${fmtVal(live.current)} · target ${fmtVal(live.target)}`,
+          text: `missed · ${fm(live.current)}, bar ${fm(live.target)}`,
           tone: 'bad',
         };
       case 'unavailable':
-        return { text: `can't read the host right now`, tone: 'muted' };
+        return { text: `can't reach Lichess right now`, tone: 'muted' };
       default:
-        return { text: `waiting for your next match`, tone: 'muted' };
+        return { text: `waiting for your next game`, tone: 'muted' };
     }
   }
   if (live.kind === 'tournament') {
     if (live.status === 'scoring')
       return {
-        text: `#${live.rank ?? '-'} of ${live.field ?? '-'} · ${label} ${fmtVal(live.score)}`,
+        text: `#${live.rank ?? '-'} of ${live.field ?? '-'} · ${fm(live.score)}`,
         tone: 'live',
       };
-    return { text: `waiting for your first match`, tone: 'muted' };
+    return { text: `waiting for your first game`, tone: 'muted' };
   }
-  // match
   if (live.format === 'chess') {
     if (live.status === 'waiting')
       return { text: `game not started yet`, tone: 'muted' };
     if (live.status === 'finished') {
-      if (live.result === 'you') return { text: `checkmate · you won`, tone: 'good' };
-      if (live.result === 'opp') return { text: `game over · you lost`, tone: 'bad' };
-      return { text: `game over · draw`, tone: 'muted' };
+      const tone =
+        live.result === 'you' ? 'good' : live.result === 'opp' ? 'bad' : 'muted';
+      return { text: resultLine(live.result, live.termination), tone };
     }
     const whose =
       live.turn === 'you' ? 'your move' : live.turn === 'opp' ? "opponent's move" : '';
@@ -54,18 +51,7 @@ function liveDescriptor(live: LiveInfo): { text: string; tone: Tone } | null {
       tone: 'live',
     };
   }
-  if (live.status === 'waiting')
-    return { text: `waiting for your next match`, tone: 'muted' };
-  if (live.format === 'stat_race') {
-    const tone: Tone =
-      live.leader === 'you' ? 'good' : live.leader === 'opp' ? 'bad' : 'live';
-    return {
-      text: `${label} · you ${fmtVal(live.you)} · opp ${fmtVal(live.opp)}`,
-      tone,
-    };
-  }
-  // win_next
-  return { text: `you ${fmtVal(live.you)} · opp ${fmtVal(live.opp)}`, tone: 'live' };
+  return null;
 }
 
 const TONE_DOT: Record<Tone, string> = {
@@ -81,15 +67,22 @@ const TONE_TEXT: Record<Tone, string> = {
   muted: 'text-text-secondary',
 };
 
-/** The under-the-card live line for an in-flight contest. */
-export function LiveLine({ live }: { live: LiveInfo }) {
-  const d = liveDescriptor(live);
+export function LiveLine({
+  live,
+  metric = '',
+  final = false,
+}: {
+  live: LiveInfo;
+  metric?: string;
+  final?: boolean;
+}) {
+  const d = liveDescriptor(live, metric);
   if (!d) return null;
   return (
     <div className="flex items-center gap-2 text-xs">
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[d.tone]}`} />
       <span className="uppercase tracking-wide text-text-secondary">
-        {live.status === 'finished' ? 'Final' : 'Live'}
+        {final || live.status === 'finished' ? 'Final' : 'Live'}
       </span>
       <span className={TONE_TEXT[d.tone]}>{d.text}</span>
     </div>

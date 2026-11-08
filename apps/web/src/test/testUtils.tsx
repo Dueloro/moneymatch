@@ -17,3 +17,9 @@ export function renderWithProviders(
   );
   return render(ui, { wrapper: Wrapper });
 }
+
+/** Matches a points figure whose unit is set in its own span ("+1,800 pts"). */
+export const pts =
+  (text: string) =>
+  (_content: string, el: Element | null): boolean =>
+    !!el?.classList.contains('num') && el.textContent === text;

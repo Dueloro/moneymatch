@@ -1,8 +1,3 @@
-// Client telemetry. The event NAMES are the load-bearing part — they outlast
-// the demo and must stay stable (ported from poc-reference telemetry.ts). Phase 6
-// points `track` at PostHog (behind VITE_POSTHOG_KEY); with no key it stays
-// console-only, so local/dev never sends events (09-phase-6 · deliverable 3).
-
 import posthog from 'posthog-js';
 
 import { env } from './env';
@@ -20,7 +15,6 @@ export type TelemetryEvent =
   | 'rake_collected'
   | 'collusion_flagged'
   | 'limit_changed'
-  // Phase 5 acquisition funnel (08-phase-5 · exit criterion 2) + social.
   | 'friend_added'
   | 'challenge_sent'
   | 'challenge_accepted'
@@ -28,17 +22,13 @@ export type TelemetryEvent =
   | 'invite_created'
   | 'invite_viewed'
   | 'invite_accepted'
-  // Inbox messaging: a line sent, and an invite card sent from a chat thread.
   | 'chat_message_sent'
   | 'chat_invite_sent'
-  // Phase 6 activation funnel (gtm-prelaunch §1.2). `landing`/`signup` fire
-  // from the sign-in surface; the rest map to existing product moments.
   | 'landing'
   | 'signup'
   | 'account_linked'
   | 'first_contest_joined'
   | 'first_settlement'
-  // A player contests how a settled contest was graded (files a dispute).
   | 'contest_filed';
 
 let initialized = false;
@@ -67,12 +57,10 @@ export function track(
   client()?.capture(event, props);
 }
 
-/** Tie subsequent events to the authenticated user (call after sign-in). */
 export function identify(userId: string): void {
   client()?.identify(userId);
 }
 
-/** Drop the identity on sign-out so events aren't misattributed. */
 export function resetIdentity(): void {
   client()?.reset();
 }

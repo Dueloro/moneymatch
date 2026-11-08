@@ -1,9 +1,7 @@
-"""`/admin/contests` — inspect a contest's full money trail and fix it.
-
-List by state/game; detail shows lifecycle + participants + ledger + adapter
-evidence + a live reconciliation. Two money-fix actions on matches: `resettle`
-(re-runs the worker grade+settle path, idempotent) and `void` (CANCEL + full
-refund). Both audited (09-phase-6 · deliverable 2)."""
+"""`/admin/contests` — inspect a contest's full money trail and fix it. List by
+state/game; detail shows lifecycle + participants + ledger + adapter evidence + a
+live reconciliation.
+"""
 
 from __future__ import annotations
 

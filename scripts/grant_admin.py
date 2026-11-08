@@ -1,14 +1,5 @@
 #!/usr/bin/env python
-"""Grant (or revoke) the `admin` role on a user — the only way in (09-phase-6 · d.1).
-
-Run in the API venv so `moneymatch_api` and `DATABASE_URL` resolve:
-
-    cd apps/api && uv run python ../../scripts/grant_admin.py <username>
-    cd apps/api && uv run python ../../scripts/grant_admin.py <username> --revoke
-
-The change is audited (`admin_audit`, action `role.grant` / `role.revoke`) in the
-same transaction as the role update, so there is no unaudited path to admin.
-"""
+"""Grant (or revoke) the `admin` role on a user — the only way in."""
 
 from __future__ import annotations
 
@@ -17,7 +8,6 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Make `moneymatch_api` importable when run from the repo root or apps/api.
 _API_SRC = Path(__file__).resolve().parents[1] / "apps" / "api" / "src"
 if str(_API_SRC) not in sys.path:
     sys.path.insert(0, str(_API_SRC))
@@ -43,8 +33,6 @@ async def _run(username: str, *, revoke: bool) -> int:
                 print(f"error: no user with username {username!r}", file=sys.stderr)
                 return 1
             await admin_service.set_role(session, user, role)
-            # Self-audited: the acted-on user is the audit subject (bootstraps the
-            # first admin, where no other admin exists yet).
             await admin_audit_service.record(
                 session,
                 admin_id=user.id,
@@ -56,7 +44,6 @@ async def _run(username: str, *, revoke: bool) -> int:
         print(f"ok: {username} role -> {role}")
         return 0
     finally:
-        # Dispose inside this loop so pooled connections close cleanly.
         await dispose_engine()
 
 

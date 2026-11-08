@@ -1,7 +1,6 @@
-"""Leaderboard (08-phase-5 · tests): the qualification threshold, ROI math from
-ledger fixtures, and the rolling-window boundary. Fixtures write the exact ledger
-row shapes a settlement produces (escrow_release consumes a stake; payout credits
-a prize; refund is net-neutral and excluded)."""
+"""Fixtures write the exact ledger row shapes a settlement produces (escrow_release
+consumes a stake; payout credits a prize; refund is net-neutral and excluded).
+"""
 
 from __future__ import annotations
 
@@ -62,7 +61,7 @@ async def _player(session, name):
 async def test_qualification_threshold(session):
     user, wallet = await _player(session, "alice")
     await _loss(session, wallet.id)
-    await _loss(session, wallet.id)  # only 2 settled → not qualified
+    await _loss(session, wallet.id)
 
     board = await lb.compute(session, user)
     assert board.you.qualified is False
@@ -70,7 +69,7 @@ async def test_qualification_threshold(session):
     assert board.you.contests_needed == 1
     assert board.rows == []
 
-    await _win(session, wallet.id)  # 3rd contest → qualifies
+    await _win(session, wallet.id)
     board = await lb.compute(session, user)
     assert board.you.qualified is True
     assert board.you.contests == 3
@@ -80,17 +79,15 @@ async def test_qualification_threshold(session):
 async def test_roi_math_and_ranking(session):
     a, wa = await _player(session, "alice")
     b, wb = await _player(session, "bob")
-    # alice: 1 win + 2 losses → net −1200 on 3000 staked = −40%.
     await _win(session, wa.id)
     await _loss(session, wa.id)
     await _loss(session, wa.id)
-    # bob: 3 wins → net +2400 on 3000 staked = +80%.
     await _win(session, wb.id)
     await _win(session, wb.id)
     await _win(session, wb.id)
 
     board = await lb.compute(session, a)
-    assert [r.username for r in board.rows] == ["bob", "alice"]  # ROI desc
+    assert [r.username for r in board.rows] == ["bob", "alice"]
     bob, alice = board.rows
     assert bob.rank == 1 and alice.rank == 2
     assert bob.roi_bps == 8000 and bob.net_cents == 2400 and bob.staked_cents == 3000
@@ -104,8 +101,8 @@ async def test_refunds_and_friendlies_excluded(session):
     await _win(session, wallet.id)
     await _loss(session, wallet.id)
     await _loss(session, wallet.id)
-    await _refund(session, wallet.id)  # excluded
-    await _refund(session, wallet.id)  # excluded
+    await _refund(session, wallet.id)
+    await _refund(session, wallet.id)
 
     board = await lb.compute(session, user)
     row = board.you.row
@@ -117,7 +114,6 @@ async def test_refunds_and_friendlies_excluded(session):
 async def test_rolling_window_boundary(session):
     user, wallet = await _player(session, "alice")
     now = datetime.now(UTC)
-    # 3 recent contests qualify; an old win outside the window is ignored.
     await _win(session, wallet.id)
     await _loss(session, wallet.id)
     await _loss(session, wallet.id)
@@ -125,6 +121,6 @@ async def test_rolling_window_boundary(session):
 
     board = await lb.compute(session, user, now=now)
     row = board.you.row
-    assert row.contests == 3  # the 45-day-old win is outside the 30-day window
+    assert row.contests == 3
     assert row.staked_cents == 3000
     assert row.net_cents == -1200

@@ -1,26 +1,9 @@
-"""Best-effort *live* view for in-flight Activity cards (07-phase-4 follow-on).
-
-The settlement worker computes a "what's happening right now" snapshot for each
-in-flight pool and head-to-head match on a slow cadence and upserts it into
-`live_snapshots`; the `/activity` request path only ever **reads** that cache, so
-a page load never blocks on a host call (same posture as the tournament
-`standings_cache`). Tournaments already cache live standings, so their live view
-is derived from that cache at read time — no row is stored here for them.
-
-Every value here is a server-fetched host read normalized through the adapter —
-never client input, never money. Fidelity is whatever the host API allows: a
-brokered chess game is genuinely live (plies played, whose turn); the stat-race
-titles (CS2/Dota/PUBG) surface the latest in-window match, which is the same
-evidence settlement will grade.
-
-A stored snapshot is **participant-neutral** (it holds every member/seat keyed by
-user id); `view_for` orients it to a single viewer — "you vs opp", "your bar",
-"your colour" — so one cached row serves everyone in the contest.
-"""
+"""Best-effort *live* view for in-flight Activity cards."""
 
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -28,12 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
-from ..constants import lower_is_better, metric_label
+from ..constants import lower_is_better, metric_label, rated_only_game
 from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
-from . import demo_mode, markets, test_opponents
 
 log = structlog.get_logger(__name__)
 
@@ -45,17 +27,12 @@ async def _window_games(
     ends_ms: int,
     rated_only: bool = True,
 ) -> list[NormGame] | None:
-    """The account's finished games inside `[starts_ms, ends_ms]`, in adapter order
-    (oldest-first). `None` on a host outage or an unregistered game — the card
-    then shows an honest "can't read right now" rather than a wrong number."""
     try:
         adapter = registry.get(game)
     except ValueError:
         return None
     try:
         games = await adapter.poll_eligible_games(
-            # Same policy as settlement, so the live line never counts a game
-            # the grading would ignore.
             host_account_id,
             starts_ms,
             GameFilters(rated_only=rated_only),
@@ -70,40 +47,19 @@ def _ms(dt) -> int:
     return int(dt.timestamp() * 1000)
 
 
-# ---------------------------------------------------------------------------
-# Snapshot builders (worker side) — participant-neutral, cached as-is.
-# ---------------------------------------------------------------------------
-
-
 async def build_pool_snapshot(
     session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
 ) -> dict[str, Any]:
-    """Each member's progress toward the shared `room_bar`, keyed by user id.
-
-    The qualifying match is the member's **first** in-window match (what grading
-    uses), so once they've played, the card shows the value that will settle."""
+    """Each member's progress toward the shared `room_bar`, keyed by user id."""
     starts_ms, ends_ms = _ms(pool.window_starts_at), _ms(pool.window_ends_at)
     members: dict[str, Any] = {}
     for entry in entries:
-        # Practice opponents never play, so polling their host id returns
-        # nothing and they read as "waiting" forever. That is not cosmetic: a
-        # pool only settles early once *every* member is decided, so a single
-        # bot in the room kept every pool waiting for its window to close --
-        # turning "play a match and get paid" into "play a match and come back
-        # tomorrow". They are graded deterministically at settlement, so the
-        # live view reports the same answer settlement will.
-        if test_opponents.is_practice_opponent(entry.host_account_id):
-            cleared = test_opponents.clears_its_bar(entry.host_account_id)
-            members[str(entry.user_id)] = {
-                "status": "cleared" if cleared else "missed",
-                "cleared": cleared,
-                "practice_opponent": True,
-            }
-            continue
-
-        rated_only = await demo_mode.rated_only_for(session, entry.user_id, pool.game)
         games = await _window_games(
-            pool.game, entry.host_account_id, starts_ms, ends_ms, rated_only
+            pool.game,
+            entry.host_account_id,
+            starts_ms,
+            ends_ms,
+            rated_only_game(pool.game),
         )
         if games is None:
             members[str(entry.user_id)] = {"status": "unavailable"}
@@ -134,93 +90,70 @@ async def build_pool_snapshot(
 
 
 def pool_all_decided(snapshot: dict[str, Any]) -> bool:
-    """True when every member of a pool snapshot has a *verified* result
-    (``cleared`` or ``missed``) — the pool's outcome is final and it can settle
-    before its window ends. A member still ``waiting``/``unavailable`` (hasn't
-    played, or a host read failed) keeps this False, so an incomplete or
-    unverifiable pool always falls through to window-end settlement."""
+    """True when every member of a pool snapshot has a *verified* result (``cleared``
+    or ``missed``) — the pool's outcome is final and it can settle before its
+    window ends.
+    """
     members = list((snapshot.get("members") or {}).values())
     return bool(members) and all(
         m.get("status") in ("cleared", "missed") for m in members
     )
 
 
-async def build_match_snapshot(
-    session: AsyncSession, match: Match, seats: list[MatchPlayer]
-) -> dict[str, Any] | None:
-    """A neutral H2H snapshot: chess board state, or both seats' stat/result.
+_WAITING: dict[str, Any] = {"kind": "match", "format": "chess", "status": "waiting"}
 
-    `None` while the match has no live window yet (not paired). Chess is truly
-    live; the coordinated titles surface each seat's first in-window match."""
-    if match.matched_at is None or match.window_ends_at is None:
-        return None
-    market = markets.get(match.game, match.market)
-    kind = market.kind if market else ""
-    label = metric_label(market.metric) if (market and market.metric) else match.market
 
-    # Brokered chess: a single live board covers both seats.
-    if match.brokered and match.host_game_id:
-        adapter = registry.get(match.game)
-        handles = [s.host_account_id for s in seats]
-        try:
-            live = await adapter.live_match(match.host_game_id, handles)
-        except HostError:
-            live = None
-        if not live:
-            return {"kind": "match", "format": "chess", "status": "waiting"}
-        colors = {str(s.user_id): (s.color or "") for s in seats}
-        return {
-            "kind": "match",
-            "format": "chess",
-            "status": "finished" if live["finished"] else "live",
-            "moves": live["moves"],
-            "plies": live["plies"],
-            "turn": live["turn"],  # "white" | "black" | null
-            "winner": live["winner"],  # "white" | "black" | "draw" | null
-            "colors": colors,
-        }
+def _iso_ms(ms: int | None) -> str | None:
+    return datetime.fromtimestamp(ms / 1000, tz=UTC).isoformat() if ms else None
 
-    # Coordinated titles: each seat's first in-window match (what grading reads).
-    starts_ms, ends_ms = _ms(match.matched_at), _ms(match.window_ends_at)
-    metric = market.metric if market else None
-    seat_views: dict[str, Any] = {}
-    any_data = False
-    for seat in seats:
-        rated_only = await demo_mode.rated_only_for(session, seat.user_id, match.game)
-        games = await _window_games(
-            match.game, seat.host_account_id, starts_ms, ends_ms, rated_only
-        )
-        if games is None:
-            seat_views[str(seat.user_id)] = {"status": "unavailable"}
-            continue
-        first = games[0] if games else None
-        if first is not None:
-            any_data = True
-        value = first.metrics.get(metric) if (first and metric) else None
-        result = None
-        if first is not None:
-            if first.won:
-                result = "won"
-            else:
-                result = "pending" if first.won is None else "lost"
-        seat_views[str(seat.user_id)] = {
-            "matches": len(games),
-            "value": round(value, 2) if value is not None else None,
-            "result": result,
-        }
-    fmt = "stat_race" if kind == "stat_race" else "win_next"
+
+def snapshot_from_live(
+    live: dict[str, Any] | None, seats: list[MatchPlayer]
+) -> dict[str, Any]:
+    """The neutral stored snapshot for an adapter's live view (or `waiting`)."""
+    if not live:
+        return dict(_WAITING)
     return {
         "kind": "match",
-        "format": fmt,
-        "label": label,
-        "status": "live" if any_data else "waiting",
-        "seats": seat_views,
+        "format": "chess",
+        "status": "finished" if live["finished"] else "live",
+        "moves": live["moves"],
+        "plies": live["plies"],
+        "turn": live["turn"],
+        "winner": live["winner"],
+        "termination": live.get("termination"),
+        "san": live.get("san") or [],
+        "clocks": live.get("clocks"),
+        "clock": live.get("clock"),
+        "last_move_at": _iso_ms(live.get("last_move_at")),
+        "colors": _played_colors(live, seats),
     }
 
 
-# ---------------------------------------------------------------------------
-# Read side — orient a stored/derived snapshot to one viewer.
-# ---------------------------------------------------------------------------
+def _played_colors(live: dict[str, Any], seats: list[MatchPlayer]) -> dict[str, str]:
+    """Each seat's colour in the game actually played (seat colour as a fallback)."""
+    played = {(live.get(c) or "").lower(): c for c in ("white", "black") if live.get(c)}
+    return {
+        str(s.user_id): played.get(s.host_account_id.lower(), s.color or "")
+        for s in seats
+    }
+
+
+async def build_match_snapshot(
+    session: AsyncSession, match: Match, seats: list[MatchPlayer]
+) -> dict[str, Any] | None:
+    """A neutral H2H snapshot of the chess board."""
+    if match.matched_at is None or match.window_ends_at is None:
+        return None
+    if not match.host_game_id:
+        return dict(_WAITING)
+    adapter = registry.get(match.game)
+    handles = [s.host_account_id for s in seats]
+    try:
+        live = await adapter.live_match(match.host_game_id, handles)
+    except HostError:
+        live = None
+    return snapshot_from_live(live, seats)
 
 
 def _pool_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:
@@ -238,53 +171,40 @@ def _pool_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | 
     }
 
 
-def _match_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:
-    fmt = snapshot.get("format")
-    vid = str(viewer)
-    if fmt == "chess":
-        if snapshot.get("status") == "waiting":
-            return {"kind": "match", "format": "chess", "status": "waiting"}
-        colors = snapshot.get("colors") or {}
-        your_color = colors.get(vid)
-        turn = snapshot.get("turn")
-        winner = snapshot.get("winner")
-        result = None
-        if winner == "draw":
-            result = "draw"
-        elif winner:
-            result = "you" if winner == your_color else "opp"
-        if turn is None:
-            your_turn = None
-        else:
-            your_turn = "you" if turn == your_color else "opp"
-        return {
-            "kind": "match",
-            "format": "chess",
-            "status": snapshot.get("status"),
-            "moves": snapshot.get("moves"),
-            "your_color": your_color,
-            "turn": your_turn,
-            "result": result,
-        }
-
-    # stat_race / win_next
-    seats = snapshot.get("seats") or {}
-    you = seats.get(vid) or {}
-    opp: dict[str, Any] = next((v for k, v in seats.items() if k != vid), {}) or {}
+def _match_view(
+    snapshot: dict[str, Any], viewer: uuid.UUID, board: bool = False
+) -> dict[str, Any] | None:
+    if snapshot.get("format") != "chess":
+        return None
+    if snapshot.get("status") == "waiting":
+        return dict(_WAITING)
+    colors = snapshot.get("colors") or {}
+    your_color = colors.get(str(viewer))
+    turn = snapshot.get("turn")
+    winner = snapshot.get("winner")
+    result = None
+    if winner == "draw":
+        result = "draw"
+    elif winner:
+        result = "you" if winner == your_color else "opp"
+    your_turn = None if turn is None else ("you" if turn == your_color else "opp")
     view: dict[str, Any] = {
         "kind": "match",
-        "format": fmt,
-        "label": snapshot.get("label"),
-        "status": snapshot.get("status", "waiting"),
+        "format": "chess",
+        "status": snapshot.get("status"),
+        "moves": snapshot.get("moves"),
+        "your_color": your_color,
+        "turn": your_turn,
+        "result": result,
+        "termination": snapshot.get("termination"),
     }
-    if fmt == "stat_race":
-        yv, ov = you.get("value"), opp.get("value")
-        leader = None
-        if yv is not None and ov is not None:
-            leader = "you" if yv > ov else ("opp" if ov > yv else "tie")
-        view.update({"you": yv, "opp": ov, "leader": leader})
-    else:  # win_next
-        view.update({"you": you.get("result"), "opp": opp.get("result")})
+    if board:
+        view.update(
+            san=snapshot.get("san") or [],
+            clocks=snapshot.get("clocks"),
+            clock=snapshot.get("clock"),
+            last_move_at=snapshot.get("last_move_at"),
+        )
     return view
 
 
@@ -313,18 +233,19 @@ def tournament_view(
         "rank": me.get("rank"),
         "matches": me.get("matches", 0),
         "field": len(rows),
-        "score_matches": tournament.score_matches,
     }
 
 
 def view_for(
-    ref_type: str, snapshot: dict[str, Any], viewer: uuid.UUID
+    ref_type: str, snapshot: dict[str, Any], viewer: uuid.UUID, board: bool = False
 ) -> dict[str, Any] | None:
-    """Orient a stored neutral snapshot (`pool` | `match`) to one viewer."""
+    """Orient a stored neutral snapshot (`pool` | `match`) to one viewer; `board`
+    adds the moves and clocks for the match stage.
+    """
     if not snapshot:
         return None
     if ref_type == "pool":
         return _pool_view(snapshot, viewer)
     if ref_type == "match":
-        return _match_view(snapshot, viewer)
+        return _match_view(snapshot, viewer, board)
     return None

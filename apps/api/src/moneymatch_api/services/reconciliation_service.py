@@ -1,19 +1,4 @@
-"""Ledger reconciliation — the money invariants, checkable from the DB alone.
-
-Two levels (00-README §3.2, 01-architecture §3.3):
-
-- ``check(ref)`` — per-contest conservation:
-  ``entries == distributed + rake + still_held`` (an identity the primitives
-  must preserve; a mismatch means drift/tampering). A fully settled contest has
-  ``still_held == 0``, giving the headline form ``sum(payouts) + rake ==
-  sum(entries)``.
-- ``check_all()`` — global solvency:
-  ``sum(user available + escrow) == promo funding − rake`` plus per-wallet cache
-  integrity (each cached balance equals its ledger sum).
-
-Callers (the settlement worker in Phase 3, admin in Phase 6) treat a failure as
-**fail-closed**: pause settlement and alert. This module only detects.
-"""
+"""Ledger reconciliation — the money invariants, checkable from the DB alone."""
 
 from __future__ import annotations
 
@@ -89,11 +74,9 @@ async def check(session: AsyncSession, ref_type: str, ref_id: uuid.UUID) -> Reco
 async def check_contests(
     session: AsyncSession,
 ) -> list[tuple[str, uuid.UUID, ReconResult]]:
-    """Per-contest conservation across every match/pool/tournament.
-
-    Returns only the **violating** refs (with their totals) — the admin view
-    renders each red with its ledger trail (09-phase-6 · deliverable 2). At MVP
-    volume iterating every ref is cheap; a windowed sweep is a later optimization.
+    """Per-contest conservation across every match/pool/tournament. Returns only the
+    **violating** refs (with their totals) — the admin view renders each red with
+    its ledger trail.
     """
     from ..models.play import Match
     from ..models.pools import SoloPool

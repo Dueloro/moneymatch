@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -6,40 +5,69 @@ import {
   useNotifications,
   type NotificationItem,
 } from '../hooks/useNotifications';
-import { formatRelativeTime } from '../lib/format';
+import { formatPoints, formatRelativeTime } from '../lib/format';
+import { formatMetric } from '../lib/metrics';
 import { PoolDetail, TournamentDetail } from './notifications/ContestDetail';
 import { EmptyState } from './ui/EmptyState';
+import { ErrorState } from './ui/ErrorState';
+import { SkeletonList } from './ui/Skeleton';
 import { ExpandableCard } from './ui/ExpandableCard';
 import { PillButton } from './ui/PillButton';
 import { useAcceptChallenge, useDeclineChallenge } from '../hooks/useChallenges';
 
-/** The notification feed (design p.11): rows with an unread dot, age, and action
- * pills (View → deep link; Respond → accept/decline a challenge). Mark-read on
- * view. It lives inside the Inbox, as the pinned "Notifications" thread of the
- * messaging surface. */
 export function NotificationsFeed() {
-  const { data } = useNotifications();
+  const { data, isLoading, isError, refetch } = useNotifications();
   const markRead = useMarkNotificationsRead();
-
-  // Mark everything read once, when there's something unread (design: on view).
-  useEffect(() => {
-    if (data && data.unread > 0) markRead.mutate(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.unread]);
+  const unread = data?.unread ?? 0;
 
   return (
     <div className="max-w-xl">
-      {data && data.items.length === 0 ? (
+      {unread > 0 && (
+        <div className="mb-3 flex justify-end">
+          <PillButton
+            variant="text"
+            onClick={() => markRead.mutate(undefined)}
+            disabled={markRead.isPending}
+          >
+            Mark all read
+          </PillButton>
+        </div>
+      )}
+      {isLoading ? (
+        <SkeletonList rows={4} />
+      ) : isError ? (
+        <ErrorState
+          title="Couldn't load notifications"
+          onRetry={() => void refetch()}
+        />
+      ) : data && data.items.length === 0 ? (
         <EmptyState title="No notifications" subline="You're all caught up." />
       ) : (
         <div className="flex flex-col gap-2">
           {data?.items.map((n) => (
-            <NotificationRow key={n.id} note={n} />
+            <div
+              key={n.id}
+              onClickCapture={() => {
+                if (!n.read) markRead.mutate([n.id]);
+              }}
+            >
+              <NotificationRow note={n} />
+            </div>
           ))}
         </div>
       )}
     </div>
   );
+}
+
+const NOUN: Record<string, string> = { pool: 'pool', tournament: 'tournament' };
+const CONTEXT: Record<string, string> = {
+  pool: 'in a pool',
+  tournament: 'in a tournament',
+};
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function describe(note: NotificationItem): string {
@@ -56,12 +84,25 @@ function describe(note: NotificationItem): string {
         : `${name} sent you a friend request`;
     case 'match_found':
       return 'You have a match. Confirm to play';
-    case 'room_filled':
-      return 'Your pool room filled';
-    case 'settled':
-      return 'A contest settled';
-    case 'refund':
-      return 'A contest was refunded';
+    case 'room_filled': {
+      const parts = ['Your pool room filled'];
+      if (typeof p.difficulty === 'string') parts.push(cap(p.difficulty));
+      if (typeof p.room_bar === 'number' && typeof p.metric === 'string')
+        parts.push(formatMetric(p.metric, p.room_bar));
+      return parts.join(' · ');
+    }
+    case 'settled': {
+      const won = typeof p.payout_cents === 'number' ? p.payout_cents : 0;
+      if (won > 0)
+        return `You won ${formatPoints(won)} ${CONTEXT[p.kind as string] ?? ''}`.trim();
+      return `Your ${NOUN[p.kind as string] ?? 'result'} settled`;
+    }
+    case 'refund': {
+      const amt = typeof p.payout_cents === 'number' && p.payout_cents > 0;
+      return amt
+        ? `${formatPoints(p.payout_cents as number)} stake refunded`
+        : 'Your stake was refunded';
+    }
     case 'system':
       if (p.event === 'challenge_declined') return 'Your challenge was declined';
       if (p.event === 'challenge_expired') return 'Your challenge expired';
@@ -85,9 +126,6 @@ function NotificationRow({ note }: { note: NotificationItem }) {
       ? (p.match_id as string)
       : null;
 
-  // A contest notification carries the id of the thing it is about, so the row
-  // can open into the room itself: who is in it, and once it settles, what
-  // everyone did. Anything else stays a plain row.
   const poolId = p.kind === 'pool' ? ((p.pool_id as string) ?? null) : null;
   const tournamentId =
     p.kind === 'tournament' ? ((p.tournament_id as string) ?? null) : null;
@@ -118,7 +156,7 @@ function NotificationRow({ note }: { note: NotificationItem }) {
         challengeId ? (
           <div className="flex items-center gap-2">
             <PillButton onClick={onAccept} disabled={accept.isPending}>
-              Respond
+              Accept
             </PillButton>
             <PillButton
               variant="text"

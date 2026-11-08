@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..constants import CATALOG_GAMES
+from ..constants import REGISTERED_GAMES
 
 USERNAME_PATTERN = r"^[a-z0-9_]{3,20}$"
 STATE_PATTERN = r"^[A-Za-z]{2}$"
@@ -25,7 +25,6 @@ class UserResponse(BaseModel):
     role: str
     status: str
     member_since: datetime
-    active_games: list[str]
     dismissed_checklists: list[str]
 
 
@@ -43,11 +42,11 @@ class LimitsResponse(BaseModel):
 
 class GettingStarted(BaseModel):
     """First-match funnel progress — drives the "getting started" checklist that
-    nudges a new player from signup to their first wager."""
+    nudges a new player from signup to their first wager.
+    """
 
-    picked_games: bool  # chose games to play (active_games non-empty)
-    linked_game: bool  # linked at least one host account
-    placed_wager: bool  # entered at least one contest (any escrow held)
+    linked_game: bool
+    placed_wager: bool
     complete: bool
 
 
@@ -57,18 +56,13 @@ class MeResponse(BaseModel):
     user: UserResponse
     needs_onboarding: bool
     limits: LimitsResponse | None = None
-    unread_notifications: int = 0  # sidebar bell dot (08-phase-5)
+    unread_notifications: int = 0
     getting_started: GettingStarted | None = None
-    # Games the player has entered a contest for — per-game checklist progress.
     contested_games: list[str] = Field(default_factory=list)
 
 
 class UpdateMeRequest(BaseModel):
-    """Onboarding (username + state + 18+, set once) and/or limit edits.
-
-    All fields optional so the endpoint serves both onboarding and later limit
-    changes. Lowering a cap is instant; raising is delayed (see limits_service).
-    """
+    """Onboarding (username + state + 18+, set once) and/or limit edits."""
 
     username: str | None = Field(default=None, description="3–20 chars [a-z0-9_]; once")
     residence_state: str | None = Field(default=None, description="2-letter US state")
@@ -76,24 +70,20 @@ class UpdateMeRequest(BaseModel):
     daily_loss_cap_cents: int | None = Field(default=None, gt=0)
     daily_entry_cap_cents: int | None = Field(default=None, gt=0)
     daily_deposit_cap_cents: int | None = Field(default=None, gt=0)
-    # Start a self-imposed cool-off of N days (protective; extend-only).
     cooloff_days: int | None = Field(default=None, gt=0, le=365)
-    active_games: list[str] | None = Field(
-        default=None, description="Catalog game ids the player has chosen to play"
-    )
     dismissed_checklists: list[str] | None = Field(
         default=None,
         description="Catalog game ids whose Play-tab checklist the player dismissed",
     )
 
-    @field_validator("active_games", "dismissed_checklists")
+    @field_validator("dismissed_checklists")
     @classmethod
     def _validate_catalog_games(cls, v: list[str] | None) -> list[str] | None:
         if v is None:
             return None
         seen: list[str] = []
         for game in v:
-            if game not in CATALOG_GAMES:
+            if game not in REGISTERED_GAMES:
                 raise ValueError(f"Unknown game id: {game}")
             if game not in seen:
                 seen.append(game)

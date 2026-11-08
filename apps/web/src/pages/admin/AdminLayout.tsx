@@ -1,12 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
-import { styles } from './adminStyles';
+import { INK, PAPER, styles } from './adminStyles';
 
 const TABS = [
   ['users', 'Users'],
   ['contests', 'Contests'],
-  ['matches', 'Matches'],
   ['disputes', 'Disputes'],
+  ['support', 'Support'],
   ['queue', 'Queue'],
   ['flags', 'Flags'],
   ['reconciliation', 'Reconciliation'],
@@ -15,33 +15,43 @@ const TABS = [
 
 export function AdminLayout() {
   return (
-    <div style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>
+    <div style={styles.root} data-testid="admin-root">
       <nav
         style={{
           display: 'flex',
-          gap: 4,
-          padding: '8px 16px',
-          borderBottom: '2px solid #333',
-          background: '#fafafa',
+          flexWrap: 'wrap',
+          gap: 6,
+          padding: '10px 16px',
+          borderBottom: `2px solid ${INK}`,
+          background: '#f4f4f5',
           alignItems: 'center',
         }}
       >
-        <strong style={{ marginRight: 12 }}>MoneyMatch Admin</strong>
+        <strong style={{ marginRight: 12, fontSize: 14 }}>Money Match admin</strong>
         {TABS.map(([path, label]) => (
           <NavLink
             key={path}
             to={`/admin/${path}`}
             style={({ isActive }) => ({
               ...styles.button,
-              background: isActive ? '#333' : '#eee',
-              color: isActive ? '#fff' : '#000',
+              borderColor: isActive ? INK : '#52525b',
+              background: isActive ? INK : PAPER,
+              color: isActive ? PAPER : INK,
               textDecoration: 'none',
             })}
           >
             {label}
           </NavLink>
         ))}
-        <NavLink to="/play" style={{ marginLeft: 'auto', fontSize: 12 }}>
+        <NavLink
+          to="/play"
+          style={{
+            marginLeft: 'auto',
+            fontSize: 12,
+            color: INK,
+            textDecoration: 'underline',
+          }}
+        >
           ← back to app
         </NavLink>
       </nav>

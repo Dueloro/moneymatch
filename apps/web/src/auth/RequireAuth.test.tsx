@@ -37,7 +37,6 @@ describe('RequireAuth', () => {
     mockUseAuth.mockReturnValue({
       session: null,
       loading: false,
-      isDemo: false,
       isPasswordRecovery: false,
       signUpWithEmail: vi.fn(),
       signInWithEmail: vi.fn(),
@@ -59,7 +58,6 @@ describe('RequireAuth', () => {
     mockUseAuth.mockReturnValue({
       session: { user: { id: 'u1' } } as never,
       loading: false,
-      isDemo: false,
       isPasswordRecovery: false,
       signUpWithEmail: vi.fn(),
       signInWithEmail: vi.fn(),

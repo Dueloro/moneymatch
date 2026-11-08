@@ -1,75 +1,40 @@
 import { PillButton } from '../ui/PillButton';
-import { PresetSelector } from '../ui/PresetSelector';
+import { SkillBandRuler } from './SkillBandRuler';
 import { VersusCard } from './VersusCard';
-import { formatCurrency, formatPct } from '../../lib/format';
+import { useWaitedSeconds } from '../../hooks/useWaitedSeconds';
+import { bandAt, bandRange, formatWaited, MAX_BAND } from '../../lib/skillBand';
+import { dashless, formatPoints } from '../../lib/format';
+import { clockFor, timeControlLabel, type SpeedClock } from '../../lib/timeControl';
 import {
   prizeForEntry,
   useConfirmMatch,
   useDeclineMatch,
   useLeaveQueue,
-  type MarketRow,
   type MatchView,
   type QueueStatus,
 } from '../../hooks/useMatchmaking';
 
-/**
- * The right slip panel's state machine (design PDF p.1–2):
- *   pick → presets + "You'd win" → Find match → searching (band + cancel)
- *        → matched (opponent card + Confirm) → active ("Go play").
- *
- * The live queue status is server-authoritative, so once a match forms the slip
- * follows it regardless of local selection.
- */
+/** Searching, then the confirm card. Once both confirm, the match stage takes over. */
 export function PlaySlip({
   status,
-  market,
-  entryCents,
-  presetsCents,
-  onSelectEntry,
-  onFindMatch,
-  finding,
+  clocks,
 }: {
   status: QueueStatus | undefined;
-  market: MarketRow | null;
-  entryCents: number | null;
-  presetsCents: number[];
-  onSelectEntry: (cents: number) => void;
-  onFindMatch: () => void;
-  finding: boolean;
+  clocks?: SpeedClock[];
 }) {
   if (status?.status === 'matched' && status.match) {
-    return <MatchedSlip match={status.match} />;
+    return <MatchedSlip match={status.match} clocks={clocks} />;
   }
   if (status?.status === 'searching') {
     return <SearchingSlip status={status} />;
   }
-  if (market) {
-    return (
-      <WagerSlip
-        market={market}
-        entryCents={entryCents}
-        presetsCents={presetsCents}
-        onSelectEntry={onSelectEntry}
-        onFindMatch={onFindMatch}
-        finding={finding}
-      />
-    );
-  }
-  return (
-    <SlipShell>
-      <p className="text-sm font-semibold text-text">Pick a market to start</p>
-      <p className="mt-1 text-xs text-text-secondary">
-        Choose a market, set your entry, and we&apos;ll find a fair, evenly-matched
-        opponent.
-      </p>
-    </SlipShell>
-  );
+  return null;
 }
 
 function SlipShell({ children }: { children: React.ReactNode }) {
   return (
     <aside
-      className="w-full shrink-0 rounded-card border border-hairline bg-panel p-6 md:w-[354px]"
+      className="w-full rounded-card border border-hairline bg-panel p-5 md:p-6"
       data-testid="play-slip"
     >
       {children}
@@ -88,100 +53,72 @@ function RakeLine({
   const fee = entryCents * 2 - prize;
   return (
     <p className="mt-3 text-xs text-text-secondary">
-      Both stake {formatCurrency(entryCents)} · winner takes {formatCurrency(prize)} ·{' '}
-      {formatCurrency(fee)} platform fee
+      Both stake {formatPoints(entryCents)} · winner takes {formatPoints(prize)} · fee{' '}
+      {formatPoints(fee)}
     </p>
   );
 }
 
-function WagerSlip({
-  market,
-  entryCents,
-  presetsCents,
-  onSelectEntry,
-  onFindMatch,
-  finding,
-}: {
-  market: MarketRow;
-  entryCents: number | null;
-  presetsCents: number[];
-  onSelectEntry: (cents: number) => void;
-  onFindMatch: () => void;
-  finding: boolean;
-}) {
-  const canFind = entryCents != null && !market.provisional && !finding;
-  const prize =
-    entryCents != null ? prizeForEntry(entryCents, market.multiplier_bps) : 0;
-
-  return (
-    <SlipShell>
-      <p className="text-xs uppercase tracking-wide text-text-secondary">Wagering on</p>
-      <h3 className="text-lg font-bold text-text">{market.label}</h3>
-
-      {market.provisional ? (
-        <p className="mt-3 rounded-inset bg-bg p-3 text-xs text-text-secondary">
-          You need more recent matches on this stat before you can duel it. Play a few
-          and check back.
-        </p>
-      ) : (
-        <>
-          <p className="mt-4 mb-2 text-xs font-semibold text-text-secondary">Entry</p>
-          <PresetSelector
-            presetsCents={presetsCents}
-            selectedCents={entryCents}
-            onSelect={onSelectEntry}
-          />
-
-          {entryCents != null && (
-            <>
-              <p className="mt-4 text-sm text-text">
-                You&apos;d win{' '}
-                <span className="font-bold text-green">{formatCurrency(prize)}</span> on
-                a {formatCurrency(entryCents)} wager
-              </p>
-              <RakeLine entryCents={entryCents} multiplierBps={market.multiplier_bps} />
-            </>
-          )}
-
-          <p className="mt-3 text-xs text-text-secondary">{market.resolution_note}</p>
-
-          <div className="mt-5">
-            <PillButton fullWidth disabled={!canFind} onClick={onFindMatch}>
-              {finding ? 'Finding…' : 'Find match'}
-            </PillButton>
-          </div>
-        </>
-      )}
-    </SlipShell>
-  );
-}
-
 function SearchingSlip({ status }: { status: QueueStatus }) {
+  const ticket = status.ticket ?? null;
   const leave = useLeaveQueue();
-  const stage = status.tolerance_stage ?? 0;
-  const bandCopy =
-    stage === 0
-      ? 'Matching you tightly on skill…'
-      : `Widening the search for a fair match (stage ${stage + 1})…`;
+  const seconds = useWaitedSeconds(status.waited_seconds);
+  const rating = ticket?.rating ?? null;
+  const band = bandAt(seconds);
+  const recap = ticket
+    ? [
+        timeControlLabel(ticket.speed, ticket.clock),
+        `${formatPoints(ticket.entry_cents)} stake`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
 
   return (
     <SlipShell>
-      <div className="flex items-center gap-3">
-        <span
-          className="h-3 w-3 animate-pulse rounded-full bg-live"
-          data-testid="searching-dot"
-        />
-        <p className="text-sm font-semibold text-text">Searching…</p>
-      </div>
-      <p className="mt-2 text-xs text-text-secondary">{bandCopy}</p>
-      {status.waited_seconds != null && (
-        <p className="mt-1 text-xs text-text-secondary">
-          Waiting {status.waited_seconds}s
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="h-2 w-2 animate-pulse rounded-full bg-live"
+              data-testid="searching-dot"
+            />
+            <p className="text-sm font-semibold text-text">Searching</p>
+          </div>
+          {recap && <p className="mt-1 text-xs text-text-secondary">{recap}</p>}
+        </div>
+        <p
+          className="num text-sm text-text-secondary"
+          aria-label={`Waited ${seconds} seconds`}
+          data-testid="waited"
+        >
+          {formatWaited(seconds)}
         </p>
-      )}
-      <div className="mt-5">
+      </div>
+
+      <div className="mt-6">
+        <p className="num text-2xl font-semibold text-text" data-testid="band-range">
+          {rating != null ? bandRange(rating, seconds).join('–') : `±${band}`}
+        </p>
+        <p className="label-neutral mt-0.5">
+          {band >= MAX_BAND ? 'Widest range' : 'Your range'}
+          {rating != null ? ` · ±${band}` : ''}
+        </p>
+      </div>
+
+      <div className="mt-4">
+        <SkillBandRuler rating={rating} seconds={seconds} />
+      </div>
+
+      <div className="mt-6 flex items-center justify-between gap-4 border-t border-hairline pt-4">
+        <p className="text-xs text-text-tertiary">
+          {band >= MAX_BAND
+            ? 'Matched with the closest rating in range'
+            : `Widens as you wait, up to ±${MAX_BAND}`}
+        </p>
         <PillButton
           variant="text"
+          className="shrink-0 whitespace-nowrap"
           onClick={() => leave.mutate()}
           disabled={leave.isPending}
         >
@@ -192,18 +129,20 @@ function SearchingSlip({ status }: { status: QueueStatus }) {
   );
 }
 
-function MatchedSlip({ match }: { match: MatchView }) {
+function MatchedSlip({ match, clocks }: { match: MatchView; clocks?: SpeedClock[] }) {
   const confirm = useConfirmMatch();
   const decline = useDeclineMatch();
   const you = match.players.find((p) => p.is_you);
   const opponent = match.players.find((p) => !p.is_you);
-  const active = match.state === 'ACTIVE' || match.state === 'AWAITING_RESULT';
 
   return (
     <SlipShell>
       <VersusCard
-        marketLabel={match.market_label}
-        status={active ? 'Match on' : 'Opponent found'}
+        marketLabel={
+          timeControlLabel(match.speed, clockFor(match.speed, clocks)) ||
+          match.market_label
+        }
+        status="Opponent found"
         you={{ name: you?.username ?? 'You', rating: you?.rating }}
         opponent={{ name: opponent?.username ?? 'Opponent', rating: opponent?.rating }}
         potCents={match.pot_cents}
@@ -212,80 +151,36 @@ function MatchedSlip({ match }: { match: MatchView }) {
 
       {match.forecast && (
         <p className="mt-3 text-xs text-text-secondary" data-testid="forecast">
-          {match.forecast.label}
+          {dashless(match.forecast.label)}
         </p>
       )}
 
       <RakeLine entryCents={match.entry_cents} multiplierBps={match.multiplier_bps} />
 
-      {active ? (
-        <GoPlay match={match} />
-      ) : (
-        <div className="mt-5 space-y-2">
-          {match.you_confirmed ? (
-            <p className="text-xs text-text-secondary">
-              Waiting for {opponent?.username ?? 'your opponent'} to confirm…
-            </p>
-          ) : (
-            <PillButton
-              fullWidth
-              onClick={() => confirm.mutate(match.id)}
-              disabled={confirm.isPending}
-            >
-              Confirm &amp; stake {formatCurrency(match.entry_cents)}
-            </PillButton>
-          )}
+      <div className="mt-5 space-y-2">
+        {match.you_confirmed ? (
+          <p className="text-xs text-text-secondary">
+            Waiting for {opponent?.username ?? 'your opponent'} to confirm…
+          </p>
+        ) : (
           <PillButton
-            variant="text"
             fullWidth
-            onClick={() => decline.mutate(match.id)}
-            disabled={decline.isPending}
+            size="lg"
+            onClick={() => confirm.mutate(match.id)}
+            disabled={confirm.isPending}
           >
-            Decline
+            Confirm &amp; stake {formatPoints(match.entry_cents)}
           </PillButton>
-        </div>
-      )}
+        )}
+        <PillButton
+          variant="text"
+          fullWidth
+          onClick={() => decline.mutate(match.id)}
+          disabled={decline.isPending}
+        >
+          Decline
+        </PillButton>
+      </div>
     </SlipShell>
-  );
-}
-
-function GoPlay({ match }: { match: MatchView }) {
-  if (match.brokered && match.your_play_url) {
-    return (
-      <div className="mt-5">
-        <a href={match.your_play_url} target="_blank" rel="noreferrer">
-          <PillButton fullWidth>Go play your game ↗</PillButton>
-        </a>
-        <p className="mt-2 text-xs text-text-secondary">
-          Only you and your opponent can take these seats. We settle this exact game
-          automatically.
-        </p>
-      </div>
-    );
-  }
-  if (match.brokered) {
-    return (
-      <div className="mt-5 rounded-inset bg-bg p-3">
-        <p className="text-sm font-medium text-text">Game link unavailable</p>
-        <p className="mt-1 text-xs text-text-secondary">
-          Your entry is held safely — the link should arrive shortly. Contact support
-          with your match ID if this persists.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="mt-5 rounded-inset bg-bg p-3">
-      <p className="text-sm font-medium text-text">Play your next match now</p>
-      <p className="mt-1 text-xs text-text-secondary">
-        Jump into {match.game.split('.')[0].toUpperCase()} and play. We grade your next
-        finished match automatically, no reporting needed.
-      </p>
-      {match.forecast && (
-        <p className="mt-2 text-xs text-text-secondary">
-          Even-duel forecast: {formatPct(match.forecast.you_win_prob)} you.
-        </p>
-      )}
-    </div>
   );
 }

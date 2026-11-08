@@ -1,5 +1,6 @@
-"""New-user provisioning: DEMO wallet + default limits + $1000 signup grant,
-funded from platform:promo, idempotent across logins."""
+"""New-user provisioning: DEMO wallet + default limits + $1000 signup grant, funded
+from platform:promo, idempotent across logins.
+"""
 
 from __future__ import annotations
 
@@ -45,20 +46,17 @@ async def test_first_authed_call_grants_1000_and_funds_promo(client, session):
             PlatformLedgerEntry.account == "platform:promo"
         )
     )
-    assert promo == -100_000  # promo funded exactly the grant
+    assert promo == -100_000
 
 
 async def test_friend_code_collision_retries(session, monkeypatch):
-    """A friend_code unique collision must be retried, not surfaced as a 500."""
     from moneymatch_api.auth import AuthedIdentity
     from moneymatch_api.services import user_service
 
-    # A committed user occupies MM-CLASH1 so it survives the retry rollback.
     existing = User(auth_id="fc_existing", friend_code="MM-CLASH1")
     session.add(existing)
     await session.commit()
 
-    # First generated code collides; the retry mints a fresh one and provisions.
     codes = iter(["MM-CLASH1", "MM-FRESH1"])
     monkeypatch.setattr(user_service, "gen_friend_code", lambda: next(codes))
 
@@ -67,7 +65,6 @@ async def test_friend_code_collision_retries(session, monkeypatch):
     )
 
     assert user.friend_code == "MM-FRESH1"
-    # Fully provisioned despite the collision (wallet grant landed).
     wallet = await _wallet_for(session, "fc_new")
     assert wallet.available_cents == 100_000
 
@@ -86,7 +83,7 @@ async def test_second_login_does_not_regrant(client, session):
     await client.get("/api/v1/me", headers=auth_headers("repeat"))
 
     wallet = await _wallet_for(session, "repeat")
-    assert wallet.available_cents == 100_000  # still exactly one grant
+    assert wallet.available_cents == 100_000
 
     count = await session.scalar(
         select(func.count())

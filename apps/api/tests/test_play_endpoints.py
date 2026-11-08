@@ -1,6 +1,6 @@
-"""`/play` + `/activity` HTTP surface: markets, the queue → confirm → active
-flow, the waiting list, tamper-resistance (no amounts/timestamps, no settle
-endpoint), and the queue kill switch.
+"""`/play` + `/activity` HTTP surface: markets, the queue → confirm → active flow,
+the waiting list, tamper-resistance (no amounts/timestamps, no settle endpoint),
+and the queue kill switch.
 """
 
 from __future__ import annotations
@@ -13,16 +13,15 @@ from moneymatch_api.models.feature_flag import FeatureFlag
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers, new_sessionmaker
-from .factories import create_linked_account, create_metric_model, cs2_profile
+from .factories import chess_profile, create_linked_account
 
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 
 
-async def setup_player(client, auth_id, name, *, mu=1.0, n=15, host=None):
-    """Provision a user via the auth path, then link CS2 + seed metric models."""
+async def setup_player(client, auth_id, name, *, rating=1500, host=None):
     r = await client.get(f"{V1}/me", headers=auth_headers(auth_id))
     assert r.status_code == 200
     sm = new_sessionmaker()
@@ -31,10 +30,12 @@ async def setup_player(client, auth_id, name, *, mu=1.0, n=15, host=None):
         user.username = name
         user.residence_state = "MA"  # onboarded resident (the geo-fence needs a state)
         await create_linked_account(
-            s, user, CS2, host_account_id=host, profile=cs2_profile(name)
+            s,
+            user,
+            CHESS,
+            host_account_id=host,
+            profile=chess_profile(name, rating=rating),
         )
-        for metric in ("cs2_kd_ratio", "cs2_kills", "cs2_headshot_pct"):
-            await create_metric_model(s, user, CS2, metric, mu=mu, sigma=0.3, n=n)
         await s.commit()
 
 
@@ -42,41 +43,30 @@ def _hdr(auth_id):
     return auth_headers(auth_id)
 
 
-# --- markets -------------------------------------------------------------- #
-
-
-async def test_markets_lists_cs2_with_derived_multiplier(client):
+async def test_markets_lists_chess_with_derived_multiplier(client):
     await setup_player(client, "auth_m1", "m1")
     r = await client.get(
-        f"{V1}/play/markets", params={"game": CS2}, headers=_hdr("auth_m1")
+        f"{V1}/play/markets", params={"game": CHESS}, headers=_hdr("auth_m1")
     )
     assert r.status_code == 200
     body = r.json()
     assert body["linked"] is True
     assert body["entry_presets_cents"] == [500, 1000, 2500]
-    keys = {m["key"] for m in body["markets"]}
-    assert keys == {"kd_ratio", "kills", "headshot_pct", "win_next"}
-    kd = next(m for m in body["markets"] if m["key"] == "kd_ratio")
-    assert kd["multiplier_bps"] == 18000  # derived ×1.80, never an odds line
-    assert kd["provisional"] is False  # seeded n=15
+    assert [m["key"] for m in body["markets"]] == ["win_h2h"]
+    h2h = body["markets"][0]
+    assert h2h["requires_speed"] is True and h2h["speeds"]
+    assert h2h["multiplier_bps"] == 18000
 
 
-async def test_market_provisional_flag_when_metric_thin(client):
-    await setup_player(client, "auth_prov", "prov", n=4)  # below the floor
-    r = await client.get(
-        f"{V1}/play/markets", params={"game": CS2}, headers=_hdr("auth_prov")
-    )
-    kd = next(m for m in r.json()["markets"] if m["key"] == "kd_ratio")
-    assert kd["provisional"] is True
-
-
-# --- queue → confirm → active -------------------------------------------- #
-
-
-async def _queue(client, auth_id, market="kd_ratio", entry=1000):
+async def _queue(client, auth_id, speed="blitz", entry=1000):
     return await client.post(
         f"{V1}/play/queue",
-        json={"game": CS2, "market": market, "entry_preset_cents": entry},
+        json={
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": speed,
+            "entry_preset_cents": entry,
+        },
         headers=_hdr(auth_id),
     )
 
@@ -93,11 +83,9 @@ async def test_full_queue_confirm_activate_flow(client):
     assert body2["status"] == "matched"
     match_id = body2["match"]["id"]
 
-    # Alice sees "matched" on her status poll.
     rs = await client.get(f"{V1}/play/queue/status", headers=_hdr("auth_a"))
     assert rs.json()["status"] == "matched"
 
-    # Both confirm → ACTIVE, with an honest forecast on the card.
     rc1 = await client.post(
         f"{V1}/play/matches/{match_id}/confirm", headers=_hdr("auth_a")
     )
@@ -110,7 +98,6 @@ async def test_full_queue_confirm_activate_flow(client):
     assert active["forecast"]["you_win_prob"] > 0
     assert "model gives you" in active["forecast"]["label"]
 
-    # Escrow shows on the wallet ("$X in play").
     rw = await client.get(f"{V1}/wallet", headers=_hdr("auth_a"))
     assert rw.json()["escrow_cents"] == 1000
 
@@ -118,7 +105,7 @@ async def test_full_queue_confirm_activate_flow(client):
 async def test_waiting_list_and_direct_match(client):
     await setup_player(client, "auth_w1", "w1")
     await setup_player(client, "auth_w2", "w2")
-    await _queue(client, "auth_w1")  # w1 waits
+    await _queue(client, "auth_w1")
 
     rw = await client.get(f"{V1}/play/waiting", headers=_hdr("auth_w2"))
     waiting = rw.json()["waiting"]
@@ -143,22 +130,18 @@ async def test_activity_lists_the_match(client):
     assert len(items) == 1
     assert items[0]["type"] == "match"
     assert items[0]["opponent_username"] == "ac2"
-    assert items[0]["net_cents"] is None  # still in flight
-
-
-# --- tamper-resistance ---------------------------------------------------- #
+    assert items[0]["net_cents"] is None
 
 
 async def test_queue_rejects_non_preset_entry(client):
     await setup_player(client, "auth_t1", "t1")
-    r = await _queue(client, "auth_t1", entry=1234)  # not a preset
+    r = await _queue(client, "auth_t1", entry=1234)
     assert r.status_code == 422
     assert r.json()["code"] == "invalid_entry"
 
 
 async def test_there_is_no_settle_endpoint(client):
     await setup_player(client, "auth_ns", "ns")
-    # A client can never post a settlement — only the worker settles.
     r = await client.post(
         f"{V1}/play/matches/00000000-0000-0000-0000-000000000000/settle",
         json={"winner": "me", "amount_cents": 99999},

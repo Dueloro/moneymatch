@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import {
   useAdjustUser,
   useAdminUser,
@@ -8,6 +8,7 @@ import {
   useFreezeUser,
 } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminUsersPage() {
   const [q, setQ] = useState('');
@@ -18,52 +19,65 @@ export function AdminUsersPage() {
     <div style={styles.page}>
       <h1 style={styles.h1}>Users</h1>
       <input
-        style={{ ...styles.input, width: 320 }}
+        style={{
+          ...styles.input,
+          width: 320,
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+        }}
         placeholder="search username / email / friend code / id"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
-      <table style={{ ...styles.table, marginTop: 12 }}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Username</th>
-            <th style={styles.th}>Email</th>
-            <th style={styles.th}>Role</th>
-            <th style={styles.th}>Status</th>
-            <th style={styles.th}>Available</th>
-            <th style={styles.th}>Escrow</th>
-            <th style={styles.th}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(users.data ?? []).map((u) => (
-            <tr key={u.id}>
-              <td style={styles.td}>{u.username ?? '—'}</td>
-              <td style={styles.td}>{u.email ?? '—'}</td>
-              <td style={styles.td}>{u.role}</td>
-              <td style={styles.td}>
-                <span style={u.status === 'active' ? styles.ok : styles.alert}>
-                  {u.status}
-                </span>
-              </td>
-              <td style={styles.td}>{formatCurrency(u.available_cents)}</td>
-              <td style={styles.td}>{formatCurrency(u.escrow_cents)}</td>
-              <td style={styles.td}>
-                <button style={styles.button} onClick={() => setSelected(u.id)}>
-                  Open
-                </button>
-              </td>
-            </tr>
-          ))}
-          {users.data?.length === 0 && (
+      {users.isLoading && <AdminLoading bare />}
+      {users.isError && (
+        <AdminError bare what="users" onRetry={() => void users.refetch()} />
+      )}
+      <div style={styles.scroll}>
+        <table style={{ ...styles.table, marginTop: 12 }}>
+          <thead>
             <tr>
-              <td style={styles.td} colSpan={7}>
-                No users.
-              </td>
+              <th style={styles.th}>Username</th>
+              <th style={styles.th}>Email</th>
+              <th style={styles.th}>Role</th>
+              <th style={styles.th}>Status</th>
+              <th style={styles.th}>Available</th>
+              <th style={styles.th}>Escrow</th>
+              <th style={styles.th}></th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {(users.data ?? []).map((u) => (
+              <tr key={u.id}>
+                <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                  {u.username ?? '—'}
+                </td>
+                <td style={styles.td}>{u.email ?? '—'}</td>
+                <td style={styles.td}>{u.role}</td>
+                <td style={styles.td}>
+                  <span style={u.status === 'active' ? styles.ok : styles.alert}>
+                    {u.status}
+                  </span>
+                </td>
+                <td style={styles.td}>{formatPoints(u.available_cents)}</td>
+                <td style={styles.td}>{formatPoints(u.escrow_cents)}</td>
+                <td style={styles.td}>
+                  <button style={styles.button} onClick={() => setSelected(u.id)}>
+                    Open
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {users.data?.length === 0 && (
+              <tr>
+                <td style={styles.td} colSpan={7}>
+                  No users.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
       {selected && <UserDetail userId={selected} />}
     </div>
   );
@@ -76,7 +90,9 @@ function UserDetail({ userId }: { userId: string }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
 
-  if (detail.isLoading) return <div style={{ marginTop: 16 }}>Loading detail…</div>;
+  if (detail.isLoading) return <AdminLoading bare />;
+  if (detail.isError)
+    return <AdminError bare what="this user" onRetry={() => void detail.refetch()} />;
   const d = detail.data as
     | {
         username: string | null;
@@ -108,11 +124,10 @@ function UserDetail({ userId }: { userId: string }) {
         {d.username ?? userId} — {d.status}
       </h1>
       <p>
-        available {formatCurrency(d.available_cents)} · escrow{' '}
-        {formatCurrency(d.escrow_cents)} · lifetime{' '}
-        {formatCurrency(d.lifetime_net_cents)}
+        available {formatPoints(d.available_cents)} · escrow{' '}
+        {formatPoints(d.escrow_cents)} · lifetime {formatPoints(d.lifetime_net_cents)}
       </p>
-      <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
         <button
           style={styles.button}
           onClick={() => freeze.mutate(d.status === 'active')}
@@ -161,46 +176,50 @@ function UserDetail({ userId }: { userId: string }) {
       </ul>
 
       <h1 style={{ ...styles.h1, marginTop: 12 }}>Contests</h1>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Type</th>
-            <th style={styles.th}>Market</th>
-            <th style={styles.th}>State</th>
-            <th style={styles.th}>Payout</th>
-          </tr>
-        </thead>
-        <tbody>
-          {d.contests.map((c) => (
-            <tr key={c.ref_id}>
-              <td style={styles.td}>{c.ref_type}</td>
-              <td style={styles.td}>{c.market}</td>
-              <td style={styles.td}>{c.state}</td>
-              <td style={styles.td}>{formatCurrency(c.payout_cents)}</td>
+      <div style={styles.scroll}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Type</th>
+              <th style={styles.th}>Market</th>
+              <th style={styles.th}>State</th>
+              <th style={styles.th}>Payout</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {d.contests.map((c) => (
+              <tr key={c.ref_id}>
+                <td style={styles.td}>{c.ref_type}</td>
+                <td style={styles.td}>{c.market}</td>
+                <td style={styles.td}>{c.state}</td>
+                <td style={styles.td}>{formatPoints(c.payout_cents)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <h1 style={{ ...styles.h1, marginTop: 12 }}>Recent ledger</h1>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Type</th>
-            <th style={styles.th}>Amount</th>
-            <th style={styles.th}>Memo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {d.recent_ledger.map((r) => (
-            <tr key={r.id}>
-              <td style={styles.td}>{r.entry_type}</td>
-              <td style={styles.td}>{formatCurrency(r.amount_cents)}</td>
-              <td style={styles.td}>{r.memo ?? ''}</td>
+      <div style={styles.scroll}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>Type</th>
+              <th style={styles.th}>Amount</th>
+              <th style={styles.th}>Memo</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {d.recent_ledger.map((r) => (
+              <tr key={r.id}>
+                <td style={styles.td}>{r.entry_type}</td>
+                <td style={styles.td}>{formatPoints(r.amount_cents)}</td>
+                <td style={styles.td}>{r.memo ?? ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

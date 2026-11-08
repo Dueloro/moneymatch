@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useRespondInvite, type ChatMessage } from '../../hooks/useChat';
-import { formatCurrency } from '../../lib/format';
+import { formatPoints } from '../../lib/format';
 import { gameMeta } from '../../lib/games';
 import { PillButton } from '../ui/PillButton';
 import { SwordsIcon, TrophyIcon, UsersIcon } from './icons';
@@ -13,7 +13,6 @@ const KIND_META = {
   h2h: { label: 'Head-to-head challenge', Icon: SwordsIcon, path: '/play' },
 } as const;
 
-/** Small metadata pill inside an invite card (game, entry, friendly). */
 function Chip({
   children,
   highlight = false,
@@ -41,12 +40,6 @@ const STATUS_STYLE: Record<string, string> = {
   expired: 'border-hairline text-text-tertiary',
 };
 
-/**
- * An invite rendered inside the thread (design: the invite lands where you talk,
- * not only in the notification feed). A head-to-head card wraps a real challenge
- * — accepting forms the PENDING match and jumps to it. Pool / tournament cards
- * open the tab where the room is actually joined.
- */
 export function InviteCard({ message }: { message: ChatMessage }) {
   const navigate = useNavigate();
   const respond = useRespondInvite();
@@ -76,8 +69,6 @@ export function InviteCard({ message }: { message: ChatMessage }) {
       data-testid="invite-card"
       className="w-full max-w-md overflow-hidden rounded-card border border-hairline bg-panel-raised "
       style={{
-        // A faint wash of the game's accent, so a CS2 card reads differently
-        // from a PUBG one at a glance.
         backgroundImage: `linear-gradient(180deg, color-mix(in srgb, ${accent} 8%, transparent), transparent 60%)`,
       }}
     >
@@ -93,7 +84,7 @@ export function InviteCard({ message }: { message: ChatMessage }) {
           >
             <meta.Icon className="h-4 w-4" />
           </span>
-          <span className="label-money !text-micro">{meta.label}</span>
+          <span className="label-neutral">{meta.label}</span>
           {!pending && (
             <span
               className={[
@@ -110,9 +101,8 @@ export function InviteCard({ message }: { message: ChatMessage }) {
           {p.title ?? 'Invite'}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <Chip>{p.game ? gameMeta(p.game).name : 'Game'}</Chip>
           {p.entry_cents != null && (
-            <Chip highlight>{formatCurrency(p.entry_cents)} entry</Chip>
+            <Chip highlight>{formatPoints(p.entry_cents)} entry</Chip>
           )}
           {p.friendly && <Chip>friendly · no rake</Chip>}
         </div>

@@ -1,3 +1,4 @@
+import { lazy, Suspense, type ComponentType } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { RequireAdmin } from './auth/RequireAdmin';
@@ -5,73 +6,103 @@ import { RequireAuth } from './auth/RequireAuth';
 import { useAuth } from './auth/useAuth';
 import { AppShell } from './components/AppShell';
 import { Loader } from './components/ui/Loader';
-import { ActivityPage } from './pages/ActivityPage';
-import { DemoSignInPage } from './pages/DemoSignInPage';
-import { InvitePage } from './pages/InvitePage';
-import { PlayPage } from './pages/PlayPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { SteamCallbackPage } from './pages/SteamCallbackPage';
-import { SignInPage } from './pages/SignInPage';
-import { SocialPage } from './pages/SocialPage';
-import { TournamentPage } from './pages/TournamentPage';
-import { WalletPage } from './pages/WalletPage';
-import { AdminContestsPage } from './pages/admin/AdminContestsPage';
-import { AdminDisputesPage } from './pages/admin/AdminDisputesPage';
-import { AdminFlagsPage } from './pages/admin/AdminFlagsPage';
-import { AdminLayout } from './pages/admin/AdminLayout';
-import { AdminMatchesPage } from './pages/admin/AdminMatchesPage';
-import { AdminQueuePage } from './pages/admin/AdminQueuePage';
-import { AdminReconciliationPage } from './pages/admin/AdminReconciliationPage';
-import { AdminRiskPage } from './pages/admin/AdminRiskPage';
-import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+
+const ActivityPage = lazyPage(() => import('./pages/ActivityPage'), 'ActivityPage');
+const InvitePage = lazyPage(() => import('./pages/InvitePage'), 'InvitePage');
+const LichessCallbackPage = lazyPage(
+  () => import('./pages/LichessCallbackPage'),
+  'LichessCallbackPage',
+);
+const PlayPage = lazyPage(() => import('./pages/PlayPage'), 'PlayPage');
+const PoolsPage = lazyPage(() => import('./pages/PoolsPage'), 'PoolsPage');
+const ProfilePage = lazyPage(() => import('./pages/ProfilePage'), 'ProfilePage');
+const SignInPage = lazyPage(() => import('./pages/SignInPage'), 'SignInPage');
+const SocialPage = lazyPage(() => import('./pages/SocialPage'), 'SocialPage');
+const TournamentPage = lazyPage(
+  () => import('./pages/TournamentPage'),
+  'TournamentPage',
+);
+const WalletPage = lazyPage(() => import('./pages/WalletPage'), 'WalletPage');
+const AdminLayout = lazyPage(() => import('./pages/admin/AdminLayout'), 'AdminLayout');
+const AdminUsersPage = lazyPage(
+  () => import('./pages/admin/AdminUsersPage'),
+  'AdminUsersPage',
+);
+const AdminContestsPage = lazyPage(
+  () => import('./pages/admin/AdminContestsPage'),
+  'AdminContestsPage',
+);
+const AdminDisputesPage = lazyPage(
+  () => import('./pages/admin/AdminDisputesPage'),
+  'AdminDisputesPage',
+);
+const AdminSupportPage = lazyPage(
+  () => import('./pages/admin/AdminSupportPage'),
+  'AdminSupportPage',
+);
+const AdminFlagsPage = lazyPage(
+  () => import('./pages/admin/AdminFlagsPage'),
+  'AdminFlagsPage',
+);
+const AdminQueuePage = lazyPage(
+  () => import('./pages/admin/AdminQueuePage'),
+  'AdminQueuePage',
+);
+const AdminReconciliationPage = lazyPage(
+  () => import('./pages/admin/AdminReconciliationPage'),
+  'AdminReconciliationPage',
+);
+const AdminRiskPage = lazyPage(
+  () => import('./pages/admin/AdminRiskPage'),
+  'AdminRiskPage',
+);
+
+function lazyPage<T extends Record<K, ComponentType>, K extends keyof T>(
+  load: () => Promise<T>,
+  name: K,
+) {
+  return lazy(async () => ({ default: (await load())[name] }));
+}
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<RootRedirect />} />
-      <Route path="/signin" element={<SignInPage />} />
-      {/* Hidden demo entry — not linked from the main sign-in form. */}
-      <Route path="/demosignin" element={<DemoSignInPage />} />
-      {/* Steam returns here after a full-page redirect. Outside RequireAuth is
-       * wrong (we need the session to bind the link), so it sits inside. */}
-      <Route path="/i/:token" element={<InvitePage />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
-          <Route path="play" element={<PlayPage />} />
-          {/* Solo pools are closed; old links land on tournaments. */}
-          <Route path="pools" element={<Navigate to="/tournament" replace />} />
-          <Route path="tournament" element={<TournamentPage />} />
-          <Route path="activity" element={<ActivityPage />} />
-          <Route path="social" element={<SocialPage />} />
-          <Route path="wallet" element={<WalletPage />} />
-          <Route path="inbox" element={<Navigate to="/social?tab=inbox" replace />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="auth/steam/callback" element={<SteamCallbackPage />} />
-        </Route>
-        {/* Admin tree: separate, dense layout (not the consumer design system). */}
-        <Route element={<RequireAdmin />}>
-          <Route path="admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to="/admin/users" replace />} />
-            <Route path="users" element={<AdminUsersPage />} />
-            <Route path="contests" element={<AdminContestsPage />} />
-            <Route path="matches" element={<AdminMatchesPage />} />
-            <Route path="disputes" element={<AdminDisputesPage />} />
-            <Route path="queue" element={<AdminQueuePage />} />
-            <Route path="flags" element={<AdminFlagsPage />} />
-            <Route path="reconciliation" element={<AdminReconciliationPage />} />
-            <Route path="risk" element={<AdminRiskPage />} />
+    <Suspense fallback={<Loader />}>
+      <Routes>
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/signin" element={<SignInPage />} />
+        <Route path="/i/:token" element={<InvitePage />} />
+        <Route element={<RequireAuth />}>
+          <Route path="link/lichess/callback" element={<LichessCallbackPage />} />
+          <Route element={<AppShell />}>
+            <Route path="play" element={<PlayPage />} />
+            <Route path="pools" element={<PoolsPage />} />
+            <Route path="tournament" element={<TournamentPage />} />
+            <Route path="activity" element={<ActivityPage />} />
+            <Route path="social" element={<SocialPage />} />
+            <Route path="wallet" element={<WalletPage />} />
+            <Route path="inbox" element={<Navigate to="/social?tab=inbox" replace />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
+          <Route element={<RequireAdmin />}>
+            <Route path="admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/users" replace />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="contests" element={<AdminContestsPage />} />
+              <Route path="disputes" element={<AdminDisputesPage />} />
+              <Route path="support" element={<AdminSupportPage />} />
+              <Route path="queue" element={<AdminQueuePage />} />
+              <Route path="flags" element={<AdminFlagsPage />} />
+              <Route path="reconciliation" element={<AdminReconciliationPage />} />
+              <Route path="risk" element={<AdminRiskPage />} />
+            </Route>
           </Route>
         </Route>
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 
-/**
- * The bare domain has no marketing page: send visitors straight into the app.
- * Authenticated → Play; everyone else → sign-in.
- */
 function RootRedirect() {
   const { session, loading } = useAuth();
   if (loading) return <Loader />;

@@ -1,14 +1,4 @@
-"""Authorization matrix (10-phase-7 §2).
-
-Two guarantees the money model depends on:
-
-1. **Every router requires auth.** No consumer endpoint is reachable without a
-   verified Supabase JWT — an unauthenticated request is rejected before any
-   handler runs.
-2. **Object-level access control (no IDOR).** A user cannot read or mutate
-   another user's contest, and per-user surfaces (wallet, notifications) never
-   leak across accounts. Ids are not capabilities.
-"""
+"""Authorization matrix."""
 
 from __future__ import annotations
 
@@ -23,8 +13,6 @@ pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
 
-# One representative endpoint per consumer router — the auth gate is a router
-# dependency, so hitting one path per router proves the whole surface.
 NO_AUTH_ENDPOINTS = [
     ("GET", f"{V1}/me"),
     ("GET", f"{V1}/wallet"),
@@ -51,7 +39,6 @@ async def test_endpoint_requires_auth(client, method: str, path: str) -> None:
 
 
 async def _match_between(client, a_auth: str, b_auth: str) -> str:
-    """Queue two linked players and return the match id they were paired into."""
     await setup_player(client, a_auth, a_auth.replace("auth_", ""))
     await setup_player(client, b_auth, b_auth.replace("auth_", ""))
     await _queue(client, a_auth)
@@ -61,7 +48,7 @@ async def _match_between(client, a_auth: str, b_auth: str) -> str:
 
 async def test_outsider_cannot_read_others_match(client) -> None:
     match_id = await _match_between(client, "auth_idor_a", "auth_idor_b")
-    await setup_player(client, "auth_idor_c", "idorc")  # uninvolved third user
+    await setup_player(client, "auth_idor_c", "idorc")
 
     r = await client.get(
         f"{V1}/play/matches/{match_id}", headers=auth_headers("auth_idor_c")
@@ -93,9 +80,8 @@ async def test_unknown_match_id_is_not_found(client) -> None:
 
 
 async def test_notifications_do_not_leak_across_users(client) -> None:
-    # Pairing fans out a match_found notification to both participants only.
     await _match_between(client, "auth_idor_h", "auth_idor_i")
-    await setup_player(client, "auth_idor_j", "idorj")  # uninvolved
+    await setup_player(client, "auth_idor_j", "idorj")
 
     involved = await client.get(
         f"{V1}/notifications", headers=auth_headers("auth_idor_h")
@@ -109,7 +95,6 @@ async def test_notifications_do_not_leak_across_users(client) -> None:
 
 
 async def test_wallet_is_caller_scoped(client) -> None:
-    # A's deposit is invisible to B; the wallet endpoint has no id to tamper with.
     await setup_player(client, "auth_idor_k", "idork")
     await setup_player(client, "auth_idor_l", "idorl")
     await client.post(
@@ -118,5 +103,4 @@ async def test_wallet_is_caller_scoped(client) -> None:
         headers=auth_headers("auth_idor_k"),
     )
     b_wallet = await client.get(f"{V1}/wallet", headers=auth_headers("auth_idor_l"))
-    # B only ever sees B's own signup grant, never A's deposit.
     assert b_wallet.json()["available_cents"] == 100_000

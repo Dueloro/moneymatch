@@ -1,21 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { FriendsPanel } from '../components/FriendsPanel';
 import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { SubTabs } from '../components/ui/SubTabs';
 import { useInboxUnread } from '../hooks/useChat';
+import { useInboxBadge, useMarkInboxSeen } from '../hooks/useInbox';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { InboxPage } from './InboxPage';
 
 type SocialTab = 'inbox' | 'leaderboard' | 'friends';
 const TABS: SocialTab[] = ['inbox', 'leaderboard', 'friends'];
 
-/** The Social section: Inbox, Leaderboard, and Friends under one nav entry.
- * Inbox leads and is the default tab — messages and notifications are what you
- * come here to check; the leaderboard is a browse. The notification bell
- * deep-links here via `?tab=inbox`; Friends' Message button adds
- * `&dm=<user_id>` to land in a specific thread. */
 export function SocialPage() {
   usePageTitle('Social');
   const [params] = useSearchParams();
@@ -24,9 +20,19 @@ export function SocialPage() {
     TABS.includes(initial as SocialTab) ? (initial as SocialTab) : 'inbox',
   );
   const inboxUnread = useInboxUnread();
+  const badge = useInboxBadge();
+  const seen = useMarkInboxSeen();
+  const stamped = useRef(false);
 
-  // Follow later `?tab=` changes too (the page stays mounted when another
-  // surface links across, e.g. Friends → Message).
+  // Being on Social is "seen": stamp on mount, and again if something new arrives
+  // while the page is open. Per-item unread dots stay until each item is opened.
+  useEffect(() => {
+    if (stamped.current && badge === 0) return;
+    stamped.current = true;
+    seen.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [badge]);
+
   useEffect(() => {
     if (TABS.includes(initial as SocialTab)) setTab(initial as SocialTab);
   }, [initial]);

@@ -1,40 +1,43 @@
 import { usePool, type PoolMember } from '../../hooks/usePools';
 import { useTournament } from '../../hooks/useTournaments';
-import { formatCurrency, formatStat as stat } from '../../lib/format';
-import { isLowerBetter } from '../../lib/metrics';
+import { formatPoints } from '../../lib/format';
+import { formatMetric, isLowerBetter } from '../../lib/metrics';
 import { AmountText } from '../ui/AmountText';
+import { ErrorState } from '../ui/ErrorState';
 import { ListRow } from '../ui/ListRow';
+import { Skeleton } from '../ui/Skeleton';
 
-/**
- * The body behind a contest notification.
- *
- * A notification used to be a dead end: "Your pool room filled" told you a room
- * existed but not who was in it, and "A contest settled" told you something
- * finished but not what happened or to whom. Both of those are answerable from
- * data the API already returns, so opening the row answers them in place rather
- * than sending you off to hunt through Activity.
- *
- * Fetching lives here, not in the row, because `ExpandableCard` only mounts its
- * children once opened. A feed of fifty notifications therefore costs zero
- * requests until something is actually opened.
- */
+function DetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-2" data-testid="detail-skeleton">
+      <Skeleton className="h-3.5 w-48" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+    </div>
+  );
+}
 
 function Line({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-text-secondary">{children}</p>;
 }
 
 export function PoolDetail({ poolId }: { poolId: string }) {
-  const { data: pool, isPending, isError } = usePool(poolId);
+  const { data: pool, isPending, isError, refetch } = usePool(poolId);
 
-  if (isPending) return <Line>Loading the room…</Line>;
-  if (isError || !pool) return <Line>Could not load this room.</Line>;
+  if (isPending) return <DetailSkeleton />;
+  if (isError || !pool)
+    return (
+      <ErrorState
+        title="Couldn't load this room"
+        subline="Try again in a moment."
+        onRetry={() => void refetch()}
+      />
+    );
 
   const settled = pool.state === 'SETTLED' || pool.state === 'CANCELED';
   const lower = isLowerBetter(pool.metric);
+  const stat = (n: number | null | undefined) => formatMetric(pool.metric, n);
 
-  // Once settled, lead with whoever cleared: the outcome is the point of
-  // opening a settled contest. While it is live, order is meaningless, so
-  // keep the room's own order and just mark yourself.
   const members: PoolMember[] = settled
     ? [...pool.members].sort((a, b) => rankOf(a) - rankOf(b))
     : pool.members;
@@ -44,7 +47,7 @@ export function PoolDetail({ poolId }: { poolId: string }) {
       <Line>
         {pool.metric_label} · {pool.difficulty} · room bar{' '}
         <span className="text-text">{stat(pool.room_bar)}</span> ·{' '}
-        {formatCurrency(pool.entry_cents)} each
+        {formatPoints(pool.entry_cents)} each
       </Line>
 
       <div className="mt-2">
@@ -57,7 +60,7 @@ export function PoolDetail({ poolId }: { poolId: string }) {
                 {m.is_you ? ' (you)' : ''}
               </span>
             }
-            subline={memberSubline(m, settled, lower)}
+            subline={memberSubline(m, settled, lower, stat)}
             right={
               settled ? (
                 <span className="flex items-center gap-2">
@@ -77,7 +80,7 @@ export function PoolDetail({ poolId }: { poolId: string }) {
       {!settled && (
         <Line>
           Everyone is playing their own bar. Clear yours to take a share of{' '}
-          {formatCurrency(pool.pot_cents)}.
+          {formatPoints(pool.pot_cents)}.
         </Line>
       )}
     </div>
@@ -91,11 +94,16 @@ function rankOf(m: PoolMember): number {
   return 2;
 }
 
-function memberSubline(m: PoolMember, settled: boolean, lower: boolean): string {
+function memberSubline(
+  m: PoolMember,
+  settled: boolean,
+  lower: boolean,
+  stat: (n: number) => string,
+): string {
   const bar = `bar ${stat(m.personal_bar)}`;
   if (!settled) return bar;
   if (m.result_value == null) {
-    return m.status === 'REFUNDED' ? `${bar} · no qualifying match` : bar;
+    return m.status === 'REFUNDED' ? `${bar} · no qualifying game` : bar;
   }
   const verb = lower ? 'in' : 'hit';
   return `${verb} ${stat(m.result_value)} · ${bar}`;
@@ -120,21 +128,29 @@ function Outcome({ status }: { status: string }) {
 }
 
 export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
-  const { data: t, isPending, isError } = useTournament(tournamentId);
+  const { data: t, isPending, isError, refetch } = useTournament(tournamentId);
 
-  if (isPending) return <Line>Loading standings…</Line>;
-  if (isError || !t) return <Line>Could not load this tournament.</Line>;
+  if (isPending) return <DetailSkeleton />;
+  if (isError || !t)
+    return (
+      <ErrorState
+        title="Couldn't load this tournament"
+        subline="Try again in a moment."
+        onRetry={() => void refetch()}
+      />
+    );
 
   const settled = t.state === 'SETTLED' || t.state === 'CANCELED';
+  const stat = (n: number) => formatMetric(t.metric, n);
 
   return (
     <div>
       <Line>
-        {t.metric_label} · {t.standings.length} entrants ·{' '}
-        {formatCurrency(t.entry_cents)} each · {settled ? 'final' : 'live'} standings
+        {t.metric_label} · {t.standings.length} entrants · {formatPoints(t.entry_cents)}{' '}
+        each · {settled ? 'final' : 'live'} standings
       </Line>
 
-      <div className="mt-2">
+      <div className="mt-2 tabular-nums">
         {t.standings.map((row) => (
           <ListRow
             key={row.user_id}
@@ -147,9 +163,9 @@ export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
             subline={
               row.score != null
                 ? `${stat(row.score)} · ${row.matches} ${
-                    row.matches === 1 ? 'match' : 'matches'
+                    row.matches === 1 ? 'game' : 'games'
                   }`
-                : 'No qualifying match'
+                : 'No qualifying game yet'
             }
             right={
               row.payout_cents > 0 ? (
@@ -162,7 +178,7 @@ export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
 
       {!settled && (
         <Line>
-          Prizes are paid when the window closes. Pot {formatCurrency(t.pot_cents)}.
+          Prizes are paid when the window closes. Pot {formatPoints(t.pot_cents)}.
         </Line>
       )}
     </div>

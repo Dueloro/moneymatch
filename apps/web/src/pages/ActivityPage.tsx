@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 import { Link } from 'react-router-dom';
 
@@ -9,58 +9,21 @@ import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { formatCurrency } from '../lib/format';
-import { toast } from '../lib/toast';
-import { useActivity, type ActivityItem } from '../hooks/useActivity';
-
-/** A newly-settled contest → a one-line toast summarizing the outcome. */
-function toastFor(item: ActivityItem): string {
-  const what =
-    item.type === 'match'
-      ? `vs ${item.opponent_username ?? 'opponent'}`
-      : (item.title ?? item.market_label);
-  const net = item.net_cents ?? 0;
-  if (item.state === 'SETTLED') {
-    if (net > 0) return `You won ${formatCurrency(net)} ${what}`;
-    if (net < 0) return `You lost ${formatCurrency(Math.abs(net))} ${what}`;
-    return `Settled · ${what}`;
-  }
-  if (item.state === 'PUSHED') return `Push ${what} · entry refunded`;
-  return `Refunded · ${what}`;
-}
+import { useActivity } from '../hooks/useActivity';
 
 export function ActivityPage() {
   usePageTitle('Activity');
   const { data, isLoading, isError, refetch } = useActivity();
   const items = useMemo(() => data?.items ?? [], [data]);
 
-  // Settlement toast: track which resolved matches we've already shown, seeding
-  // from the first load so we only pop for transitions that happen live.
-  const seen = useRef<Set<string> | null>(null);
-
-  useEffect(() => {
-    const resolved = items.filter((i) => i.resolved_at != null);
-    if (seen.current === null) {
-      seen.current = new Set(resolved.map((i) => i.id));
-      return;
-    }
-    const fresh = resolved.find((i) => !seen.current!.has(i.id));
-    if (fresh) {
-      resolved.forEach((i) => seen.current!.add(i.id));
-      toast.info(toastFor(fresh));
-    }
-  }, [items]);
-
-  // The newest contest that has actually finished. `items` is newest first, so
-  // the first resolved row is the one you just played.
   const newestFinished = items.find((i) => i.resolved_at != null);
 
   return (
-    // Spans the column rather than capping at the reading measure: the rail
-    // already balances the page, so a 640px cap only stranded ~160px of dead
-    // column between the list and the rail.
     <div>
-      <SectionHeader level="page" hint="Every contest you have played, newest first.">
+      <SectionHeader
+        level="page"
+        hint="Your matches, pools and tournaments, newest first."
+      >
         Activity
       </SectionHeader>
 
@@ -74,8 +37,8 @@ export function ActivityPage() {
         <SkeletonList rows={5} />
       ) : items.length === 0 ? (
         <EmptyState
-          title="No contests yet"
-          subline="Play a match and your results land here automatically."
+          title="Nothing played yet"
+          subline="Your results land here automatically after each game."
           action={
             <Link to="/play">
               <PillButton>Start playing</PillButton>
@@ -88,9 +51,6 @@ export function ActivityPage() {
             <ActivityCard
               key={item.id}
               item={item}
-              // Your latest finished contest opens on arrival, so the stat line
-              // you actually came to check is on screen without a click. Every
-              // older row stays collapsed.
               defaultOpen={item.id === newestFinished?.id}
             />
           ))}

@@ -1,7 +1,4 @@
-"""`/notifications` — the Inbox feed and mark-read (design PDF p.11).
-
-Reading the Inbox also bumps the presence heartbeat (this is a polled surface).
-Mark-read is idempotent (08-phase-5 · deliverable 4)."""
+"""`/notifications` — the Inbox feed and mark-read. Mark-read is idempotent."""
 
 from __future__ import annotations
 
@@ -37,8 +34,6 @@ class PushUnsubscribeRequest(BaseModel):
 
 
 class PushPublicKeyResponse(BaseModel):
-    # The VAPID application-server public key (base64url), or null when push is
-    # not configured — the client then hides the "enable notifications" control.
     public_key: str | None
 
 

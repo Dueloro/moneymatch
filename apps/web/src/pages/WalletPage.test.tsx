@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../test/testUtils';
+import { renderWithProviders, pts } from '../test/testUtils';
 import { WalletPage } from './WalletPage';
 
 vi.mock('../hooks/useWallet', async () => {
@@ -11,20 +11,13 @@ vi.mock('../hooks/useWallet', async () => {
     ...actual,
     useWallet: vi.fn(),
     useWalletLedger: vi.fn(),
-    useDemoDeposit: vi.fn(),
-    useDemoWithdrawal: vi.fn(),
+    usePlayMoneyDeposit: vi.fn(),
   };
 });
 
-import {
-  useDemoDeposit,
-  useDemoWithdrawal,
-  useWallet,
-  useWalletLedger,
-} from '../hooks/useWallet';
+import { usePlayMoneyDeposit, useWallet, useWalletLedger } from '../hooks/useWallet';
 
 const depositMutate = vi.fn();
-const withdrawMutate = vi.fn();
 
 describe('WalletPage', () => {
   beforeEach(() => {
@@ -63,33 +56,44 @@ describe('WalletPage', () => {
       isFetchingNextPage: false,
       fetchNextPage: vi.fn(),
     } as unknown as ReturnType<typeof useWalletLedger>);
-    vi.mocked(useDemoDeposit).mockReturnValue({
+    vi.mocked(usePlayMoneyDeposit).mockReturnValue({
       mutate: depositMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof useDemoDeposit>);
-    vi.mocked(useDemoWithdrawal).mockReturnValue({
-      mutate: withdrawMutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useDemoWithdrawal>);
+    } as unknown as ReturnType<typeof usePlayMoneyDeposit>);
   });
 
   it('leads with available balance, with escrow and lifetime as context', () => {
     renderWithProviders(<WalletPage />);
     expect(screen.getByText('Available')).toBeInTheDocument();
-    expect(screen.getByText('$1,000.00')).toBeInTheDocument();
-    // Escrow and lifetime now read as one supporting line under the hero.
-    expect(screen.getByText(/\$26\.00 in play/)).toBeInTheDocument();
-    expect(screen.getByText('+$68.94')).toBeInTheDocument(); // lifetime
+    expect(screen.getByTestId('wallet-balance')).toHaveTextContent('100,000 pts');
+    expect(screen.getByText(pts('2,600 pts'))).toBeInTheDocument();
+    expect(screen.getByText(pts('+6,894 pts'))).toBeInTheDocument();
+    expect(screen.getByText('Points have no cash value.')).toBeInTheDocument();
   });
 
-  it('shows the signup grant ledger row', () => {
+  it('labels the signup grant as welcome points', () => {
     renderWithProviders(<WalletPage />);
-    expect(screen.getByText('signup grant')).toBeInTheDocument();
+    expect(screen.getByText('Welcome points')).toBeInTheDocument();
   });
 
-  it('fires a preset deposit on click', () => {
+  it('adds points only after the confirm step', () => {
     renderWithProviders(<WalletPage />);
-    fireEvent.click(screen.getAllByRole('button', { name: '$25.00' })[0]);
-    expect(depositMutate).toHaveBeenCalledWith(2500);
+    expect(screen.getByRole('button', { name: 'Add points' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '2,500 pts' }));
+    expect(depositMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2,500 pts' }));
+    expect(depositMutate).toHaveBeenCalledWith(2500, expect.anything());
+  });
+
+  it('can back out of a selection', () => {
+    renderWithProviders(<WalletPage />);
+    fireEvent.click(screen.getByRole('button', { name: '2,500 pts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Add points' })).toBeDisabled();
+  });
+
+  it('does not offer a cash-out', () => {
+    renderWithProviders(<WalletPage />);
+    expect(screen.queryByText(/cash out/i)).not.toBeInTheDocument();
   });
 });

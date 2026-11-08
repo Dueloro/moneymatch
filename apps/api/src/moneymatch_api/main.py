@@ -1,13 +1,7 @@
-"""FastAPI application factory.
-
-Wires config → logging → Sentry → middleware → routers. The API is a stateless,
-long-running service (00-README §2); nothing durable lives in process memory.
-"""
+"""FastAPI application factory."""
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -20,16 +14,17 @@ from .db.session import dispose_engine
 from .errors import register_error_handlers
 from .logging import configure_logging
 from .middleware import ExceptionEnvelopeMiddleware, RequestLogMiddleware
+from .observability import init_sentry
 from .routers import (
     activity,
     admin,
     challenges,
     chat,
-    cs2,
     disputes,
     events,
     friends,
     health,
+    inbox,
     leaderboard,
     links,
     me,
@@ -38,6 +33,7 @@ from .routers import (
     pools,
     tournaments,
     wallet,
+    webhooks,
 )
 from .security import (
     MaxBodySizeMiddleware,
@@ -50,66 +46,23 @@ log = structlog.get_logger(__name__)
 API_V1_PREFIX = "/api/v1"
 
 
-def _init_sentry(settings: Settings) -> None:
-    if not settings.sentry_dsn:
-        return
-    import os
-
-    import sentry_sdk
-
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        environment=settings.env,
-        release=os.getenv("RENDER_GIT_COMMIT") or settings.release,
-        traces_sample_rate=0.0,
-        send_default_pii=True,
-    )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("api.startup")
     settings: Settings = app.state.settings
 
     if settings.env == "prod":
-        # The geo-fence is the one gate that decides whether a stake may be
-        # taken at all, and it lives in a database row rather than in code. A
-        # fresh, half-restored or hand-edited database can therefore come up
-        # with no fence and nothing anywhere errors. Check it once, at boot, and
-        # refuse the deploy rather than serve with a hole in it.
+        # The geo-fence is the one gate that decides whether a stake may be taken at
+        # all, and it lives in a database row rather than in code.
         from .db.session import get_sessionmaker
         from .services import geo_service
 
         async with get_sessionmaker()() as session:
             await geo_service.assert_configured_for_production(session)
 
-    worker_task: asyncio.Task[None] | None = None
-    if settings.run_worker_in_process:
-        # Run the settlement loop as a background task in this process (no separate
-        # worker service). Import lazily so this module stays importable without the
-        # worker's deps in every context.
-        from .workers.settlement_worker import run_forever
-
-        worker_task = asyncio.create_task(run_forever())
-        log.info("api.worker_in_process_started")
-
-    keep_alive_task: asyncio.Task[None] | None = None
-    if settings.run_worker_in_process and settings.keep_alive_url:
-        # Free tiers sleep an idle web service, and the worker with it.
-        from .services import keep_alive
-
-        keep_alive_task = asyncio.create_task(
-            keep_alive.run_forever(settings.keep_alive_url)
-        )
-
     try:
         yield
     finally:
-        for task in (keep_alive_task, worker_task):
-            if task is not None:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
         await dispose_engine()
         log.info("api.shutdown")
 
@@ -117,30 +70,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
-    _init_sentry(settings)
+    init_sentry(settings)
 
     app = FastAPI(
         title="MoneyMatch API",
         version="0.0.0",
         lifespan=lifespan,
     )
-    # The lifespan reads settings off app.state (it only receives the app instance).
     app.state.settings = settings
 
-    # Middleware wrap inner→outer in add order (last added = outermost). The
-    # target chain, outer→inner, is: CORS → security headers → rate limit →
-    # body-size cap → request log → exception envelope → app, so every response
-    # (including an early 413/429) still carries CORS + security headers
-    # (10-phase-7 §2). The exception envelope is innermost so an unhandled error
-    # is re-shaped into a JSON 500 that still flows back out through logging, the
-    # security headers, and CORS — otherwise Starlette's ServerErrorMiddleware
-    # (outside CORS) returns a raw 500 with no CORS header and the browser sees
-    # only "Failed to fetch".
+    # The target chain, outer→inner, is: CORS → security headers → rate limit → body-
+    # size cap → request log → exception envelope → app, so every response (including an
+    # early 413/429) still carries CORS + security headers.
     app.add_middleware(ExceptionEnvelopeMiddleware)
     app.add_middleware(RequestLogMiddleware)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_bytes)
     app.add_middleware(
-        RateLimitMiddleware, per_minute=settings.rate_limit_writes_per_minute
+        RateLimitMiddleware,
+        per_minute=settings.rate_limit_writes_per_minute,
+        settings=settings,
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
@@ -157,7 +105,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(me.router, prefix=API_V1_PREFIX)
     app.include_router(wallet.router, prefix=API_V1_PREFIX)
     app.include_router(links.router, prefix=API_V1_PREFIX)
-    app.include_router(cs2.router, prefix=API_V1_PREFIX)
     app.include_router(play.router, prefix=API_V1_PREFIX)
     app.include_router(pools.router, prefix=API_V1_PREFIX)
     app.include_router(tournaments.router, prefix=API_V1_PREFIX)
@@ -169,27 +116,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(chat.router, prefix=API_V1_PREFIX)
     app.include_router(leaderboard.router, prefix=API_V1_PREFIX)
     app.include_router(notifications.router, prefix=API_V1_PREFIX)
+    app.include_router(inbox.router, prefix=API_V1_PREFIX)
     app.include_router(admin.router, prefix=API_V1_PREFIX)
+    app.include_router(webhooks.router, prefix=API_V1_PREFIX)
 
-    # Dev/e2e sign-in bypass — mounted only outside prod and only when explicitly
-    # enabled (backlog · "Browser e2e test-auth seam"). Absent entirely otherwise.
     if settings.e2e_auth_enabled and settings.env != "prod":
         from .routers import dev
 
         app.include_router(dev.router, prefix=API_V1_PREFIX)
-        log.warning("api.e2e_auth_enabled")  # loud: this must never fire in prod
-
-    # Demo-login bypass — a complete, Supabase-free sign-in for demos. Gated on an
-    # explicit flag (so it can be enabled wherever a demo runs) and loud, since it
-    # lets anyone in as the shared demo user. Play-money only.
-    if settings.demo_login_enabled:
-        from .routers import demo
-
-        app.include_router(demo.router, prefix=API_V1_PREFIX)
-        log.warning("api.demo_login_enabled")
+        log.warning("api.e2e_auth_enabled")
 
     return app
 
 
-# Module-level app for `uvicorn moneymatch_api.main:app`.
 app = create_app()

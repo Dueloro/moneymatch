@@ -1,31 +1,32 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { subscribeToasts, type ToastMessage } from '../../lib/toast';
 
 const DURATION_MS = 4000;
+const WITH_ACTION_MS = 6000;
 
 const DOT: Record<ToastMessage['kind'], string> = {
-  // Green, so a success toast agrees with the green status controls it is
-  // usually confirming. `action` is the brand accent and reads as "a thing to
-  // click", not "that worked".
   success: 'bg-green',
   error: 'bg-red',
   info: 'bg-live',
+  neutral: 'bg-text-tertiary',
 };
 
-/** Global toast host. Mounted once at the root; sits above the mobile tab bar. */
 export function Toaster() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const unsubscribe = subscribeToasts((message) => {
-      // Keep the last few so a burst never fills the screen.
       setToasts((prev) => [...prev, message].slice(-3));
-      const timer = setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== message.id));
-        timers.delete(timer);
-      }, DURATION_MS);
+      const timer = setTimeout(
+        () => {
+          setToasts((prev) => prev.filter((t) => t.id !== message.id));
+          timers.delete(timer);
+        },
+        message.action ? WITH_ACTION_MS : DURATION_MS,
+      );
       timers.add(timer);
     });
     return () => {
@@ -45,13 +46,21 @@ export function Toaster() {
         <div
           key={t.id}
           role="status"
-          className="pointer-events-auto flex max-w-sm items-center gap-2.5 rounded-pill border border-line-strong bg-overlay px-4 py-2.5 text-sm font-medium text-text shadow-overlay"
+          className="pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-card border border-line-strong bg-overlay px-4 py-2.5 text-sm font-medium text-text shadow-overlay md:w-auto md:rounded-pill"
         >
           <span
             aria-hidden
             className={`h-2 w-2 shrink-0 rounded-full ${DOT[t.kind]}`}
           />
-          {t.text}
+          <span className="min-w-0 flex-1 break-words">{t.text}</span>
+          {t.action && (
+            <Link
+              to={t.action.to}
+              className="ml-1 shrink-0 rounded-pill px-1 text-text-secondary underline-offset-2 hover:text-text hover:underline"
+            >
+              {t.action.label}
+            </Link>
+          )}
         </div>
       ))}
     </div>

@@ -6,14 +6,10 @@ import { TriangleMark } from '../components/ui/brand';
 import { PillButton } from '../components/ui/PillButton';
 import { useAcceptInvite, useInvitePreview } from '../hooks/useChallenges';
 import { useMe } from '../hooks/useMe';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
+import { setReturnTo } from '../lib/returnTo';
 import { track } from '../lib/telemetry';
 
-/**
- * Public invite-link landing (`/i/:token`) — the acquisition funnel's front door
- * (08-phase-5 · deliverable 3). Preview is public; accepting requires sign-in +
- * a linked game. Every step emits a telemetry event (exit criterion 2).
- */
 export function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const { session } = useAuth();
@@ -27,7 +23,7 @@ export function InvitePage() {
   }, [preview]);
 
   function goSignIn() {
-    if (token) sessionStorage.setItem('mm.returnTo', `/i/${token}`);
+    if (token) setReturnTo(`/i/${token}`);
     navigate('/signin');
   }
 
@@ -47,8 +43,6 @@ export function InvitePage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm text-center">
-        {/* The same mark as the shell and sign-in. This page used to carry a
-         * second, unrelated logo treatment. */}
         <div className="mx-auto mb-6 flex justify-center">
           <TriangleMark className="h-11 w-11" />
         </div>
@@ -64,7 +58,7 @@ export function InvitePage() {
             </h1>
             <p className="mt-2 text-sm text-text-secondary">
               {preview.market_label} for{' '}
-              <span className="text-green">{formatCurrency(preview.entry_cents)}</span>
+              <span className="text-green">{formatPoints(preview.entry_cents)}</span>
             </p>
 
             {!preview.valid ? (
@@ -75,7 +69,7 @@ export function InvitePage() {
                   Sign in to accept
                 </PillButton>
                 <p className="mt-3 text-xs text-text-secondary">
-                  New here? You&apos;ll create an account and link your game next.
+                  New here? You&apos;ll create an account and link Lichess next.
                 </p>
               </div>
             ) : me.data?.needs_onboarding ? (
@@ -91,7 +85,7 @@ export function InvitePage() {
                 </PillButton>
                 {needsLink && (
                   <p className="mt-3 text-xs text-red">
-                    Link your {preview.game} account first.{' '}
+                    Link your Lichess account first.{' '}
                     <button className="underline" onClick={() => navigate('/profile')}>
                       go to Profile
                     </button>

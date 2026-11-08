@@ -1,4 +1,4 @@
-import { formatCurrency } from '../../lib/format';
+import { AmountText } from '../ui/AmountText';
 
 interface Side {
   name: string;
@@ -6,10 +6,6 @@ interface Side {
   you?: boolean;
 }
 
-/**
- * Head-to-head duel card: the emotional core of a match. Both players, the pot,
- * and what you take home. Used for the matched slip state and the landing hero.
- */
 export function VersusCard({
   marketLabel,
   you,
@@ -28,8 +24,8 @@ export function VersusCard({
   return (
     <div className="animate-rise rounded-card border border-hairline bg-panel-raised p-5">
       <div className="flex items-center justify-between">
-        <span className="label-money">{status ?? 'Opponent found'}</span>
-        <span className="label-money">{marketLabel}</span>
+        <span className="label-neutral">{status ?? 'Opponent found'}</span>
+        <span className="label-neutral">{marketLabel}</span>
       </div>
 
       <div className="mt-4 flex items-stretch gap-3">
@@ -45,14 +41,14 @@ export function VersusCard({
       <div className="mt-5 flex items-center justify-between border-t border-hairline pt-4">
         <div>
           <div className="label-money">Pot</div>
-          <div className="text-lg font-bold tabular-nums">
-            {formatCurrency(potCents)}
+          <div className="text-lg font-semibold">
+            <AmountText cents={potCents} signed={false} />
           </div>
         </div>
         <div className="text-right">
-          <div className="label-money">You&apos;d win</div>
-          <div className="text-lg font-bold tabular-nums text-green">
-            {formatCurrency(prizeCents)}
+          <div className="label-money">Winner takes</div>
+          <div className="text-lg font-semibold">
+            <AmountText cents={prizeCents} signed={false} money />
           </div>
         </div>
       </div>

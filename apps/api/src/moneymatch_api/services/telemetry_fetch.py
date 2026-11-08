@@ -1,23 +1,7 @@
-"""Server-fetched telemetry grading for pools & tournaments (07-phase-4 · 5).
-
-At window end the worker asks each entrant's adapter for the matches they played
-**inside the window** (`poll_eligible_games` bounded to `[window_starts,
-window_ends]`), persists the normalized evidence to `raw_payloads`, and turns it
-into a grade. Zero self-report anywhere — the player supplies nothing.
-
-Watchdog rules (architecture §3.4):
-- a host outage (adapter raises) → the entry is **unverifiable** → refunded
-  (never a loss on infra);
-- a pool entrant with no qualifying match → unverifiable → refunded;
-- a tournament entrant with a readable history but no in-window match → an empty
-  score list → **forfeit** (ranked last, paid nothing).
-
-Window-boundary matches are excluded (strict `[starts, ends]` containment).
-"""
+"""Server-fetched telemetry grading for pools & tournaments."""
 
 from __future__ import annotations
 
-import math
 import uuid
 from typing import Any
 
@@ -27,15 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
 from ..constants import (
-    METRIC_BAR_INCREMENT,
     lower_is_better,
     metric_floor,
+    rated_only_game,
     requires_win,
 )
 from ..models.pools import SoloEntry, SoloPool
+from ..models.tournaments import Tournament, TournamentEntry
 from ..services.hosts.errors import HostError
-from . import demo_mode, raw_payload_service, test_opponents
+from . import aggregate_metrics, raw_payload_service
 from .pool_engine import PoolGrade
+from .tournament_engine import TournamentGrade
 
 log = structlog.get_logger(__name__)
 
@@ -43,19 +29,14 @@ log = structlog.get_logger(__name__)
 async def _window_games(
     game: str, host_account_id: str, starts, ends, rated_only: bool = True
 ) -> list[NormGame] | None:
-    """The entrant's finished matches inside `[starts, ends]`, oldest-first.
-
-    `None` signals a host outage (adapter raised) — the caller refunds; an empty
-    list means the account was readable but played nothing in the window.
+    """The entrant's finished matches inside `[starts, ends]`, oldest-first. `None`
+    signals a host outage (adapter raised) — the caller refunds; an empty list
+    means the account was readable but played nothing in the window.
     """
     starts_ms = int(starts.timestamp() * 1000)
     ends_ms = int(ends.timestamp() * 1000)
     adapter = registry.get(game)
     try:
-        # Rated only for real accounts: a casual game must never move a pool bar
-        # or a tournament score, and on Lichess a brokered duel is itself
-        # casual, so this also stops a money duel feeding the stats it was
-        # quoted from. The demo account opts in to casual games (demo_mode).
         games = await adapter.poll_eligible_games(
             host_account_id, starts_ms, GameFilters(rated_only=rated_only)
         )
@@ -82,64 +63,23 @@ def _evidence(
     }
 
 
-def _clearing_value(metric: str, bar: float) -> float:
-    """A believable score for the opponent built to clear `bar`.
-
-    Snapped up to the metric's own increment, because the number goes on the
-    results card next to yours. Kills come in whole units, and an opponent
-    credited with 18.4 kills reads as a bug in the thing holding your money.
-    Rounding up rather than to nearest also keeps it strictly past the bar, so
-    the score shown always agrees with the grade awarded.
-    """
-    increment = METRIC_BAR_INCREMENT.get(metric, 0.01)
-    return round(math.ceil(bar * 1.15 / increment) * increment, 2)
-
-
 async def grade_pool(
     session: AsyncSession, pool: SoloPool, entries: list[SoloEntry]
 ) -> dict[uuid.UUID, PoolGrade]:
     """Grade every entry's first qualifying in-window match against `room_bar`."""
     grades: dict[uuid.UUID, PoolGrade] = {}
     for entry in entries:
-        # Practice opponents never play, so they are graded rather than looked
-        # up. Most miss and forfeit their entry: without that they would grade
-        # as unverifiable and be refunded, and a test pool would pay nobody.
-        #
-        # One is built to clear (`CLEARING_HANDLES`), because a pool where only
-        # you can win never exercises the rule that decides the money — clearers
-        # *split* the pot. With a clearing opponent in the room, clearing your
-        # bar splits it and missing yours hands it over, which is the real
-        # behaviour a single real player otherwise cannot reach.
-        if test_opponents.is_practice_opponent(entry.host_account_id):
-            cleared = test_opponents.clears_its_bar(entry.host_account_id)
-            grades[entry.user_id] = PoolGrade(
-                cleared=cleared,
-                telemetry={
-                    pool.metric: _clearing_value(pool.metric, float(pool.room_bar))
-                    if cleared
-                    else None,
-                    "practice_opponent": True,
-                },
-            )
-            continue
         games = await _window_games(
             pool.game,
             entry.host_account_id,
             pool.window_starts_at,
             pool.window_ends_at,
-            await demo_mode.rated_only_for(session, entry.user_id, pool.game),
+            rated_only_game(pool.game),
         )
         if games is None or not games:
             grades[entry.user_id] = PoolGrade(cleared=None)  # unverifiable → refund
             continue
 
-        # The first match that produces a value is the graded attempt, not the
-        # first match played: for a win-required metric a loss carries no value,
-        # so grading `games[0]` would let one early loss forfeit a later win
-        # that clears the bar. Taking the *first* qualifying game (not the best)
-        # keeps it a single priced attempt, so the advertised clear rate holds.
-        # A value below the metric floor is physically impossible and dropped as
-        # bad evidence rather than allowed to clear beneath the floor.
         floor = metric_floor(pool.metric)
         graded = next(
             (
@@ -159,13 +99,8 @@ async def grade_pool(
             memo=f"pool {pool.metric}",
         )
         if value is None:
-            # No value on a match that was actually played. For a win-required
-            # metric that means no win in the window, which is a definite
-            # **miss**: they had their attempts and did not make it.
-            # Refunding here would turn entering and losing into a free option,
-            # and would hand a loss the same outcome as never playing at all.
-            # Any other metric keeps the old reading: we could not measure it,
-            # so we cannot claim they failed.
+            # Refunding here would turn entering and losing into a free option, and
+            # would hand a loss the same outcome as never playing at all.
             grades[entry.user_id] = PoolGrade(
                 cleared=False if requires_win(pool.metric) else None,
                 telemetry={pool.metric: None, "won": graded.won},
@@ -182,3 +117,73 @@ async def grade_pool(
             raw_payload_id=payload.id,
         )
     return grades
+
+
+async def grade_tournament(
+    session: AsyncSession,
+    tournament: Tournament,
+    entries: list[TournamentEntry],
+) -> dict[uuid.UUID, TournamentGrade]:
+    """Score each entry's in-window aggregate result (keyed by entry id)."""
+    metric = tournament.ranking_metric
+    spec = aggregate_metrics.REGISTRY[metric]
+    grades: dict[uuid.UUID, TournamentGrade] = {}
+    for entry in entries:
+        games = await _window_games(
+            tournament.game,
+            entry.host_account_id,
+            tournament.window_starts_at,
+            tournament.window_ends_at,
+            rated_only_game(tournament.game),
+        )
+        if games is None:
+            grades[entry.id] = TournamentGrade(values=None)  # host outage → refund
+            continue
+        score = spec.score(games)
+        payload = await raw_payload_service.persist(
+            session,
+            f"grade:{tournament.game}",
+            _evidence(entry.id, metric, games),
+            memo=f"tournament {metric}",
+        )
+        grades[entry.id] = TournamentGrade(
+            values=[] if score is None else [score],
+            score=score,
+            counted=spec.counted(games),
+            telemetry={metric: score, "games": len(games)},
+            raw_payload_id=payload.id,
+        )
+    return grades
+
+
+async def live_standings(
+    session: AsyncSession,
+    tournament: Tournament,
+    entries: list[TournamentEntry],
+    usernames: dict[uuid.UUID, str | None],
+) -> list[dict[str, Any]]:
+    """Compute current standings mid-window (cheap host reads; cached by caller)."""
+    metric = tournament.ranking_metric
+    spec = aggregate_metrics.REGISTRY[metric]
+    rows: list[dict[str, Any]] = []
+    for entry in entries:
+        games = await _window_games(
+            tournament.game,
+            entry.host_account_id,
+            tournament.window_starts_at,
+            tournament.window_ends_at,
+            rated_only_game(tournament.game),
+        )
+        rows.append(
+            {
+                "user_id": str(entry.user_id),
+                "username": usernames.get(entry.user_id),
+                "score": spec.score(games or []),
+                "matches": spec.counted(games or []),
+            }
+        )
+    sign = 1.0 if aggregate_metrics.higher_is_better(metric) else -1.0
+    rows.sort(key=lambda r: (r["score"] is None, -sign * (r["score"] or 0.0)))
+    for i, row in enumerate(rows):
+        row["rank"] = i + 1 if row["score"] is not None else None
+    return rows

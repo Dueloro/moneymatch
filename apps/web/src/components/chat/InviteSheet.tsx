@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useGameSelection } from '../../hooks/useGameSelection';
 import { useSendMessage } from '../../hooks/useChat';
-import { gameMeta } from '../../lib/games';
+import { useMarkets } from '../../hooks/useMatchmaking';
+import { CHESS } from '../../lib/games';
+import { middlePreset } from '../../lib/stake';
+import { PointsFigure } from '../ui/AmountText';
+import { Dialog } from '../ui/Dialog';
 import { PillButton } from '../ui/PillButton';
-import { PresetSelector } from '../ui/PresetSelector';
+import { StakeChoice } from '../ui/MatchChoices';
+import { Segmented } from '../ui/Segmented';
 
-// The server validates entry against its own presets (`ENTRY_PRESETS_CENTS`);
-// these are the same three amounts every wager surface offers.
-const ENTRY_PRESETS = [500, 1000, 2500];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 const COPY = {
@@ -29,11 +30,6 @@ const COPY = {
   },
 } as const;
 
-/**
- * Compose a pool / tournament invite from inside a thread: pick a game and an
- * entry preset, and the card lands in the conversation. "Open <tab>" is the
- * escape hatch to the surface where rooms are actually joined.
- */
 export function InviteSheet({
   conversationId,
   kind,
@@ -46,22 +42,27 @@ export function InviteSheet({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const { games } = useGameSelection();
   const send = useSendMessage();
+  const { data: markets } = useMarkets(CHESS);
   const copy = COPY[kind];
 
-  const gameIds = games.length > 0 ? games.map((g) => g.game) : ['cs2.steam'];
-  const [game, setGame] = useState(gameIds[0]);
-  const [entryCents, setEntryCents] = useState<number | null>(ENTRY_PRESETS[1]);
+  const [entryPick, setEntryCents] = useState<number | null>(null);
   const [difficulty, setDifficulty] = useState<string>('medium');
+  const presets = markets?.entry_presets_cents ?? [];
+  const entryCents =
+    entryPick != null && presets.includes(entryPick)
+      ? entryPick
+      : presets.length
+        ? middlePreset(presets)
+        : null;
 
   async function sendInvite() {
-    if (!entryCents) return;
+    if (entryCents == null) return;
     await send.mutateAsync({
       conversationId,
       invite: {
         invite_kind: kind,
-        game,
+        game: CHESS,
         entry_preset_cents: entryCents,
         difficulty: kind === 'pool' ? difficulty : null,
       },
@@ -70,86 +71,72 @@ export function InviteSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={copy.title}
+    <Dialog
+      title={copy.title}
+      onClose={onClose}
+      testId="invite-sheet"
+      width="md:max-w-lg"
     >
-      <div
-        className="w-full max-w-lg rounded-card border border-hairline bg-panel p-7 shadow-overlay"
-        data-testid="invite-sheet"
-      >
-        <div className="mb-1 flex items-start justify-between gap-4">
-          <h3 className="text-xl font-bold text-text">{copy.title}</h3>
-          <PillButton variant="text" className="!px-2" onClick={onClose}>
-            Close
-          </PillButton>
-        </div>
-        <p className="mb-6 text-xs leading-relaxed text-text-secondary">{copy.blurb}</p>
-
-        <p className="label-money mb-2.5">Game</p>
-        <div className="mb-6 flex flex-wrap gap-2">
-          {gameIds.map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setGame(id)}
-              className={[
-                'rounded-pill px-4 py-1.5 text-xs font-semibold transition',
-                id === game
-                  ? 'bg-text text-black'
-                  : 'border border-hairline text-text-secondary hover:text-text',
-              ].join(' ')}
-            >
-              {gameMeta(id).short}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4 md:px-6">
+        <p className="text-xs leading-relaxed text-text-secondary">{copy.blurb}</p>
 
         {kind === 'pool' && (
-          <>
-            <p className="label-money mb-2.5">Difficulty</p>
-            <div className="mb-6 flex flex-wrap gap-2">
-              {DIFFICULTIES.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDifficulty(d)}
-                  className={[
-                    'rounded-pill border px-4 py-1.5 text-xs font-semibold capitalize transition',
-                    d === difficulty
-                      ? 'is-selected text-text'
-                      : 'border-hairline text-text-secondary hover:text-text',
-                  ].join(' ')}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </>
+          <div>
+            <p className="label-neutral mb-2">Difficulty</p>
+            <Segmented
+              size="lg"
+              fullWidth
+              ariaLabel="Difficulty"
+              selectionRole="radiogroup"
+              options={DIFFICULTIES.map((d) => ({
+                value: d,
+                label: <span className="capitalize">{d}</span>,
+              }))}
+              value={difficulty}
+              onChange={setDifficulty}
+            />
+          </div>
         )}
 
-        <p className="label-money mb-2.5">Entry</p>
-        <PresetSelector
-          presetsCents={ENTRY_PRESETS}
-          selectedCents={entryCents}
-          onSelect={setEntryCents}
-        />
+        {entryCents != null && (
+          <StakeChoice presets={presets} value={entryCents} onChange={setEntryCents} />
+        )}
 
         {send.error && (
-          <p className="mt-3 text-xs text-red">{(send.error as Error).message}</p>
+          <p className="text-xs text-red">{(send.error as Error).message}</p>
         )}
-
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          <PillButton disabled={!entryCents || send.isPending} onClick={sendInvite}>
-            {send.isPending ? 'Sending…' : `Send to ${peerName}`}
-          </PillButton>
-          <PillButton variant="outline" onClick={() => navigate(copy.path)}>
-            Open {copy.tab} ↗
-          </PillButton>
-        </div>
       </div>
-    </div>
+
+      <div className="flex flex-col gap-2 border-t border-hairline px-5 py-5 md:flex-row-reverse md:px-6">
+        <PillButton
+          size="lg"
+          className="mm-glow md:flex-1"
+          disabled={send.isPending || entryCents == null}
+          onClick={sendInvite}
+        >
+          {send.isPending ? (
+            'Sending…'
+          ) : (
+            <>
+              Send to {peerName}
+              {entryCents != null && (
+                <>
+                  {' '}
+                  · <PointsFigure cents={entryCents} />
+                </>
+              )}
+            </>
+          )}
+        </PillButton>
+        <PillButton
+          size="lg"
+          variant="outline"
+          className="md:flex-1"
+          onClick={() => navigate(copy.path)}
+        >
+          Open {copy.tab} ↗
+        </PillButton>
+      </div>
+    </Dialog>
   );
 }

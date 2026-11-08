@@ -1,10 +1,11 @@
 node_modules/
 dist/
 build/
-poc-reference/
+future-expansion/
 docs/
 pnpm-lock.yaml
 packages/api-client/src/generated/
 packages/api-client/openapi.json
 pnpm-lock.yaml
 docs/design/*.pdf
+docs-export/

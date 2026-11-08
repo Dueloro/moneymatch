@@ -7,7 +7,7 @@ import {
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
-import { formatCurrency } from '../lib/format';
+import { formatPoints } from '../lib/format';
 import { toast } from '../lib/toast';
 
 export interface LedgerEntry {
@@ -35,13 +35,10 @@ interface LedgerPage {
   next_cursor: string | null;
 }
 
-// Server presets ($10/$25/$50/$100). The server re-validates; this only drives
-// which pills render (04-phase-1 · deposits are presets, never client amounts).
-export const DEMO_DEPOSIT_PRESETS_CENTS = [1000, 2500, 5000, 10000] as const;
+export const DEPOSIT_PRESETS_CENTS = [1000, 2500, 5000, 10000] as const;
 
 const walletKey = (userId?: string) => ['wallet', userId];
 
-/** Balances + recent ledger. Shared by the Wallet screen and the Play header. */
 export function useWallet() {
   const { session } = useAuth();
   return useQuery({
@@ -55,7 +52,6 @@ export function useWallet() {
   });
 }
 
-/** Cursor-paginated ledger for the full "Recent" list ("Load more"). */
 export function useWalletLedger() {
   const { session } = useAuth();
   return useInfiniteQuery({
@@ -82,36 +78,19 @@ function useWalletInvalidation() {
   };
 }
 
-export function useDemoDeposit() {
+export function usePlayMoneyDeposit() {
   const invalidate = useWalletInvalidation();
   return useMutation({
     mutationFn: async (amountPresetCents: number): Promise<Wallet> => {
       const { data, error } = await api.POST('/api/v1/wallet/demo-deposit', {
         body: { amount_preset_cents: amountPresetCents },
       });
-      if (error) throw new Error('Deposit failed');
+      if (error) throw new Error('Could not add points');
       return data as Wallet;
     },
     onSuccess: (_data, amountPresetCents) => {
       invalidate();
-      toast.success(`Added ${formatCurrency(amountPresetCents)}`);
-    },
-  });
-}
-
-export function useDemoWithdrawal() {
-  const invalidate = useWalletInvalidation();
-  return useMutation({
-    mutationFn: async (amountCents: number): Promise<Wallet> => {
-      const { data, error } = await api.POST('/api/v1/wallet/demo-withdrawal', {
-        body: { amount_cents: amountCents },
-      });
-      if (error) throw new Error('Withdrawal failed');
-      return data as Wallet;
-    },
-    onSuccess: (_data, amountCents) => {
-      invalidate();
-      toast.success(`Cashed out ${formatCurrency(amountCents)}`);
+      toast.success(`Added ${formatPoints(amountPresetCents, { long: true })}`);
     },
   });
 }

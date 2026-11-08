@@ -1,13 +1,4 @@
-"""Friends — the request/accept/decline/block state machine + presence-lite.
-
-Adds by MoneyMatch **username** (exact citext match — never host-game accounts,
-so linkage never leaks) or by immutable **friend code** (`MM-7F3K2Q`). One row
-per relationship (`user_id` = requester, `friend_id` = addressee); the service
-guards the reverse pair so A→B and B→A never coexist — a request that mirrors a
-pending one auto-accepts. Caps bite here (500 friends, 20 pending outbound).
-Friendship is also what gates chat — see `chat_service` (08-phase-5 ·
-deliverable 2). Flushes, never commits — the caller owns the transaction.
-"""
+"""Friends — the request/accept/decline/block state machine + presence-lite."""
 
 from __future__ import annotations
 
@@ -47,14 +38,10 @@ async def heartbeat(session: AsyncSession, user: User) -> None:
     await session.flush()
 
 
-# --------------------------------------------------------------------------- #
-# Lookups.
-# --------------------------------------------------------------------------- #
-
-
 async def resolve_target(session: AsyncSession, query: str) -> User:
     """Resolve `username_or_code` to a user — friend code if it looks like one,
-    otherwise an exact username match. Never resolves host-game handles."""
+    otherwise an exact username match.
+    """
     q = query.strip()
     if not q:
         raise FriendError(
@@ -74,7 +61,6 @@ async def resolve_target(session: AsyncSession, query: str) -> User:
 async def _relationship(
     session: AsyncSession, a: uuid.UUID, b: uuid.UUID
 ) -> Friendship | None:
-    """The friendship row between two users in either direction, if any."""
     return await session.scalar(
         select(Friendship).where(
             or_(
@@ -86,7 +72,6 @@ async def _relationship(
 
 
 async def are_friends(session: AsyncSession, a: uuid.UUID, b: uuid.UUID) -> bool:
-    """Whether two users are accepted friends (either direction)."""
     rel = await _relationship(session, a, b)
     return rel is not None and rel.state == "accepted"
 
@@ -116,11 +101,6 @@ async def _pending_outbound_count(session: AsyncSession, user_id: uuid.UUID) -> 
     )
 
 
-# --------------------------------------------------------------------------- #
-# Transitions.
-# --------------------------------------------------------------------------- #
-
-
 async def add_friend(session: AsyncSession, user: User, query: str) -> Friendship:
     """Send a friend request (or auto-accept a mirrored pending one)."""
     target = await resolve_target(session, query)
@@ -137,7 +117,6 @@ async def add_friend(session: AsyncSession, user: User, query: str) -> Friendshi
             raise FriendError(
                 "blocked", "This relationship is blocked.", status_code=403
             )
-        # pending: mirror → accept; same direction → duplicate.
         if existing.friend_id == user.id:
             return await accept(session, user, existing)
         raise FriendError(
@@ -221,8 +200,9 @@ async def accept_by_id(
 
 
 async def decline(session: AsyncSession, user: User, friendship_id: uuid.UUID) -> None:
-    """Decline a pending request (addressee) — the row is removed so a fresh
-    request can be sent later. Declining a non-pending row is rejected."""
+    """Decline a pending request (addressee) — the row is removed so a fresh request
+    can be sent later.
+    """
     friendship = await _load_membership(session, user, friendship_id)
     if friendship.state != "pending":
         raise FriendError(
@@ -257,11 +237,6 @@ async def block(
     return friendship
 
 
-# --------------------------------------------------------------------------- #
-# Listing (accepted friends + presence, plus pending in/out).
-# --------------------------------------------------------------------------- #
-
-
 @dataclass
 class FriendRow:
     friendship_id: uuid.UUID
@@ -278,8 +253,6 @@ class FriendsView:
 
 
 async def list_friends(session: AsyncSession, user: User) -> FriendsView:
-    """Accepted friends (with presence) plus incoming/outgoing pending requests.
-    Blocked relationships are hidden."""
     now = clock.now()
     rows = list(
         await session.scalars(

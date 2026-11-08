@@ -1,22 +1,16 @@
-"""The chess.lichess GameAdapter (ported from poc-reference).
-
-Identity + skill from the Lichess public API. Chess is **brokered**: the platform
-creates a Lichess open challenge restricted to the two linked accounts, and
-Phase-3 settlement grades that specific game id (`match_winner` verifies both of
-our accounts actually played it).
-"""
+"""The chess.lichess GameAdapter."""
 
 from __future__ import annotations
 
 import time
 
+from ..constants import CHESS_CLOCKS
 from ..schemas.profile import FormatStat, ProfileSnapshot, Speed
 from ..services.hosts import lichess
-from .base import GameAdapter, GameFilters, HistoryBatch, NormGame
+from .base import GameAdapter, GameFilters, MatchResult, NormGame
 
 _SPEEDS: tuple[Speed, ...] = ("bullet", "blitz", "rapid", "classical")
 
-# Lichess game statuses that mean the game finished with a real result.
 _FINISHED = {
     "mate",
     "resign",
@@ -26,15 +20,30 @@ _FINISHED = {
     "outoftime",
     "cheat",
     "variantEnd",
+    "insufficientMaterialClaim",
+    "unknownFinish",
 }
-_DRAW_STATUSES = {"draw", "stalemate"}
+_ABORTED = {"aborted", "noStart"}
+_DRAW_STATUSES = {"draw", "stalemate", "insufficientMaterialClaim"}
 
-_CLOCK_FOR_SPEED = {"bullet": 60, "blitz": 300, "rapid": 600, "classical": 1800}
+# Lichess status -> our stable termination enum.
+_TERMINATION = {
+    "mate": "checkmate",
+    "resign": "resignation",
+    "outoftime": "time",
+    "draw": "draw",
+    "insufficientMaterialClaim": "draw",
+    "stalemate": "stalemate",
+    "timeout": "abandoned",
+    "aborted": "aborted",
+    "noStart": "aborted",
+}
 
-# Games per ingestion page. Lichess streams the export, so a page this size is
-# one cheap request; a poll reads at most this many pages.
-_HISTORY_PAGE = 100
-_HISTORY_MAX_PAGES = 5
+
+def termination_of(status: str | None) -> str | None:
+    if status in _FINISHED or status in _ABORTED:
+        return _TERMINATION.get(status or "", "other")
+    return None
 
 
 def _move_count(moves: str | None) -> int:
@@ -43,13 +52,27 @@ def _move_count(moves: str | None) -> int:
     return (len(moves.split()) + 1) // 2
 
 
+def _clocks(g: dict, plies: int) -> dict | None:
+    """Remaining time per side in ms. Lichess `clocks` holds the mover's clock (cs)
+    after each ply; before any move, both sides sit on `clock.initial` (s).
+    """
+    clock = g.get("clock") or {}
+    initial = clock.get("initial")
+    white = black = initial * 1000 if isinstance(initial, int) else None
+    series = [c for c in (g.get("clocks") or [])[:plies] if isinstance(c, int)]
+    if series[0::2]:
+        white = series[0::2][-1] * 10
+    if series[1::2]:
+        black = series[1::2][-1] * 10
+    if white is None or black is None:
+        return None
+    return {"white_ms": white, "black_ms": black}
+
+
 class ChessLichessAdapter(GameAdapter):
     id = "chess.lichess"
-    brokered = True  # the platform creates the game via a Lichess open challenge
 
     async def link_account(self, method: str, identifier: str) -> ProfileSnapshot:
-        # OAuth is the production path; MVP uses the public username path. Both
-        # funnel through fetch_profile so the code path is identical.
         profile = await self.fetch_profile(identifier)
         profile.link_method = "oauth" if method == "oauth" else "username"
         return profile
@@ -72,90 +95,56 @@ class ChessLichessAdapter(GameAdapter):
             norm = self._normalize(g, account_id)
             if norm is None:
                 continue
-            # The host filter above should already have excluded these, but a
-            # casual game must never reach a stat, so re-check locally rather
-            # than trusting the query string.
             if filters.rated_only and not norm.rated:
                 continue
             out.append(norm)
-        out.sort(key=lambda x: x.created_at_ms)  # oldest first
+        out.sort(key=lambda x: x.created_at_ms)
         return out
 
-    async def fetch_history(
-        self,
-        account_id: str,
-        since_ms: int,
-        *,
-        known_ids: set[str],
-        first_poll: bool,
-    ) -> HistoryBatch:
-        """Every finished standard game since ``since_ms``, rated or not, oldest
-        first. Pages forward up to `_HISTORY_MAX_PAGES` pages per poll; if the
-        last page was still full there is more, so the batch is marked
-        incomplete and the ingester polls again next cycle from its cursor."""
-        out: list[NormGame] = []
-        cursor = since_ms
-        complete = False
-        for _ in range(_HISTORY_MAX_PAGES):
-            raw_games = await lichess.get_user_games(
-                account_id,
-                cursor,
-                max_games=_HISTORY_PAGE,
-                rated_only=False,
-                oldest_first=True,
-                raise_errors=True,
-            )
-            for g in raw_games:
-                norm = self._normalize(g, account_id)
-                if norm is not None and norm.id not in known_ids:
-                    out.append(norm)
-            if len(raw_games) < _HISTORY_PAGE:
-                complete = True
-                break
-            cursor = max(int(g.get("createdAt", 0)) for g in raw_games) + 1
-        out.sort(key=lambda x: x.created_at_ms)
-        return HistoryBatch(out, complete=complete)
-
-    # --- Phase-3 brokering seams ------------------------------------------- #
-
     async def create_match(self, speed: str, users: list[str]) -> dict | None:
-        # A Lichess **open challenge restricted to the two linked usernames**
-        # (users=a,b): both get the same link but only those accounts can occupy
-        # the seats, and settlement grades that specific game id (no OAuth needed
-        # at MVP — 01-architecture §3.1).
-        return await lichess.create_open_challenge(
-            _CLOCK_FOR_SPEED.get(speed, 300), users=users
-        )
+        limit, increment = CHESS_CLOCKS.get(speed, CHESS_CLOCKS["blitz"])
+        return await lichess.create_open_challenge(limit, increment, users=users)
 
     async def match_winner(self, game_id: str, players: list[str]) -> str | None:
-        """Grade a brokered game once finished, verifying both accounts played it.
+        result = await self.match_result(game_id, players)
+        return result.winner if result.finished else None
 
-        Returns the winner's ``player_id``, ``""`` for a draw, or ``None`` while
-        unfinished / if the game wasn't between our two linked accounts.
+    async def match_result(self, game_id: str, players: list[str]) -> MatchResult:
+        """Grade a brokered game, verifying both accounts played it. One export call
+        also carries the live board, so grading doubles as the live refresh. Host
+        outages raise (the worker extends the window); they never read as unfinished.
         """
-        g = await lichess.get_game(game_id)
-        if not g or g.get("status") not in _FINISHED:
-            return None
-        players_j = g.get("players", {}) or {}
-        white = (((players_j.get("white") or {}).get("user")) or {}).get("name")
-        black = (((players_j.get("black") or {}).get("user")) or {}).get("name")
-        if not white or not black:
-            return None  # anonymous player — can't verify
-        ids_lower = {p.lower(): p for p in players}
-        # Integrity: the game must be between exactly our two matched accounts.
-        if white.lower() not in ids_lower or black.lower() not in ids_lower:
-            return None
-        winner = g.get("winner")  # "white" | "black" | None(draw)
-        if winner is None:
-            return ""  # draw → refund
-        winner_name = white if winner == "white" else black
-        return ids_lower.get(winner_name.lower())
+        live = self._view(await lichess.get_game_for_grading(game_id), players)
+        if live is None or not live["finished"]:
+            return MatchResult(finished=False, live=live)
+        winner = live["winner"]
+        handle: str | None
+        if winner in ("white", "black"):
+            handle = next(p for p in players if p.lower() == live[winner].lower())
+        elif live["termination"] == "aborted":
+            if live["plies"] >= 2:
+                return MatchResult(finished=False, live=live)  # deadline decides
+            handle = None  # never really started -> refund now
+        elif live["status"] == "unknownFinish":
+            handle = None  # no result to grade -> refund
+        else:
+            handle = ""  # draw -> refund
+        return MatchResult(
+            finished=True,
+            winner=handle,
+            termination=live["termination"],
+            ended_at_ms=live["last_move_at"],
+            live=live,
+        )
 
     async def live_match(self, game_id: str, players: list[str]) -> dict | None:
-        """Colour-neutral mid-game view: plies played, whose turn, and the
-        result once finished. Verified to be our two accounts' game so a stray
-        id never leaks someone else's board. ``None`` while unverifiable."""
-        g = await lichess.get_live_game(game_id)
+        """Colour-neutral view for display (any host error is None)."""
+        return self._view(await lichess.get_live_game(game_id), players)
+
+    def _view(self, g: dict | None, players: list[str]) -> dict | None:
+        """The moves (SAN), clocks, whose turn, and the result and termination once
+        finished, for a game played by exactly these two accounts.
+        """
         if not g:
             return None
         players_j = g.get("players", {}) or {}
@@ -163,30 +152,43 @@ class ChessLichessAdapter(GameAdapter):
         black = (((players_j.get("black") or {}).get("user")) or {}).get("name")
         if not white or not black:
             return None
-        want = {p.lower() for p in players}
-        if white.lower() not in want or black.lower() not in want:
+        if {white.lower(), black.lower()} != {p.lower() for p in players}:
             return None
         status = g.get("status")
-        finished = status in _FINISHED
-        plies = len((g.get("moves") or "").split())
-        winner = g.get("winner")  # "white" | "black" | None
-        result = winner if finished else None
+        finished = status in _FINISHED or status in _ABORTED
+        san = (g.get("moves") or "").split()
+        plies = len(san)
+        winner = g.get("winner") if finished else None
+        if winner not in ("white", "black"):
+            winner = None
+        result = winner
         if finished and winner is None:
-            result = "draw"
+            result = None if status in _ABORTED or status == "unknownFinish" else "draw"
+        termination = termination_of(status)
+        if status in _ABORTED and winner:
+            termination = "abandoned"
+        clock = g.get("clock") or {}
+        last_move_at = g.get("lastMoveAt")
         return {
             "status": status,
             "finished": finished,
+            "termination": termination,
             "plies": plies,
             "moves": _move_count(g.get("moves")),
-            # Even ply count ⇒ white is to move (white opens on ply 0).
+            "san": san,
+            "clocks": _clocks(g, plies),
+            "clock": (
+                {"limit": clock["initial"], "increment": clock.get("increment", 0)}
+                if isinstance(clock.get("initial"), int)
+                else None
+            ),
+            "last_move_at": last_move_at if isinstance(last_move_at, int) else None,
             "turn": None if finished else ("white" if plies % 2 == 0 else "black"),
-            "winner": result,  # "white" | "black" | "draw" | None(ongoing)
+            "winner": result,
             "white": white,
             "black": black,
             "speed": g.get("speed"),
         }
-
-    # --- Host-specific mapping (private to the adapter) -------------------- #
 
     def _to_profile(self, raw: dict) -> ProfileSnapshot:
         perfs = raw.get("perfs", {}) or {}
@@ -249,7 +251,7 @@ class ChessLichessAdapter(GameAdapter):
         elif me == black_id:
             my_color = "black"
         else:
-            return None  # not actually the linked user's game
+            return None
 
         winner = g.get("winner")
         drawn = winner is None and status in _DRAW_STATUSES
@@ -260,10 +262,6 @@ class ChessLichessAdapter(GameAdapter):
             won = winner == my_color
 
         moves = _move_count(g.get("moves"))
-        opp_color = "black" if my_color == "white" else "white"
-        me_j = players.get(my_color) or {}
-        opp_j = players.get(opp_color) or {}
-        last_move = g.get("lastMoveAt")
         return NormGame(
             id=g.get("id", ""),
             speed=g.get("speed", "blitz"),
@@ -272,40 +270,5 @@ class ChessLichessAdapter(GameAdapter):
             moves=moves,
             won=won,
             drawn=drawn,
-            # Chess had no per-match rate stat, which left `chess_accuracy` in
-            # constants.py with no data source behind it: pools and tournaments
-            # on chess could never grade. Lichess only reports accuracy for
-            # games a player has requested analysis on, so it is not usable as a
-            # settlement input.
-            #
-            # `chess_moves` is the honest stand-in: it comes straight off the
-            # game record we already fetch, with no extra call.
-            #
-            # Emitted **only for a game you won**. The bar reads "at or under N
-            # moves", so counting every game would make resigning on move one a
-            # perfect score, and instantly resigning is both free and always
-            # available. Requiring the win also makes the baseline mean what the
-            # card says: the moves you take to win, not the moves you last.
-            #
-            # Caveat that remains: a player can still stall a won position to
-            # inflate their average and earn a roomier bar, so this wants a
-            # sandbagging look before it carries real money at scale.
-            #
-            # `moves > 0` guards a won record with no move list (aborted/empty):
-            # a 0-move "win" would sit below every bar and clear for free, and
-            # drag the baseline mean toward zero. No value ⇒ unqualified match.
             metrics=({"chess_moves": float(moves)} if won and moves > 0 else {}),
-            ended_at_ms=int(last_move) if last_move else None,
-            detail={
-                "status": status,
-                "color": my_color,
-                "rating": me_j.get("rating"),
-                "opponent_id": ((opp_j.get("user") or {}).get("id") or "").lower()
-                or None,
-                "opponent_rating": opp_j.get("rating"),
-                # Lichess marks a rating provisional until it has settled over
-                # enough rated games. A brand-new throwaway account always is,
-                # which is what the tournament farming guard keys on.
-                "opponent_provisional": bool(opp_j.get("provisional", False)),
-            },
         )

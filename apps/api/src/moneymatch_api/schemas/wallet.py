@@ -35,7 +35,7 @@ class WalletResponse(BaseModel):
 
 
 class WalletLedgerPage(BaseModel):
-    """Cursor-paginated ledger. `next_cursor` is null on the last page."""
+    """Cursor-paginated ledger."""
 
     entries: list[LedgerEntryResponse]
     next_cursor: str | None

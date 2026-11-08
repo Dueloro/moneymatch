@@ -1,8 +1,3 @@
-"""Challenges (08-phase-5 · tests): the accept path forms a correct PENDING
-match; decline/expiry notify the challenger; invite tokens are single-use, expire,
-and survive a fresh-signup accept; an unlinked challengee is prompted to link;
-and the pair rake-cap flips a challenge to a zero-rake friendly."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -28,8 +23,9 @@ async def _any_link(session, user):
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
-KD = "kd_ratio"
+CHESS = "chess.lichess"
+MARKET = "win_h2h"
+SPEED = "blitz"
 ENTRY = 1_000
 
 
@@ -41,9 +37,9 @@ async def _friends(session, a, b):
 async def _pair(session, *, link=True, friends=True):
     a = await create_user(session, username="alice")
     b = await create_user(session, username="bob")
-    await create_linked_account(session, a, CS2, host_account_id="host_alice")
+    await create_linked_account(session, a, CHESS, host_account_id="host_alice")
     if link:
-        await create_linked_account(session, b, CS2, host_account_id="host_bob")
+        await create_linked_account(session, b, CHESS, host_account_id="host_bob")
     if friends:
         await _friends(session, a, b)
     return a, b
@@ -62,10 +58,15 @@ async def _notifications(session, user_id, kind):
 async def test_direct_accept_forms_pending_match(session):
     a, b = await _pair(session)
     ch = await challenge_service.create_direct(
-        session, a, challengee_id=b.id, game=CS2, market_key=KD, entry_cents=ENTRY
+        session,
+        a,
+        challengee_id=b.id,
+        game=CHESS,
+        market_key=MARKET,
+        speed=SPEED,
+        entry_cents=ENTRY,
     )
     assert ch.state == "sent"
-    # challengee got a challenge_received notification.
     assert len(await _notifications(session, b.id, "challenge_received")) == 1
 
     match = await challenge_service.accept_direct(session, b, ch.id)
@@ -80,7 +81,6 @@ async def test_direct_accept_forms_pending_match(session):
         )
     )
     assert {s.user_id for s in seats} == {a.id, b.id}
-    # challenge resolved + linked to the match; challenger notified.
     assert ch.state == "accepted" and ch.match_id == match.id
     assert len(await _notifications(session, a.id, "challenge_accepted")) == 1
 
@@ -89,7 +89,13 @@ async def test_direct_challenge_requires_friendship(session):
     a, b = await _pair(session, friends=False)
     with pytest.raises(APIError) as exc:
         await challenge_service.create_direct(
-            session, a, challengee_id=b.id, game=CS2, market_key=KD, entry_cents=ENTRY
+            session,
+            a,
+            challengee_id=b.id,
+            game=CHESS,
+            market_key=MARKET,
+            speed=SPEED,
+            entry_cents=ENTRY,
         )
     assert exc.value.code == "not_friends"
 
@@ -98,7 +104,13 @@ async def test_self_challenge_rejected(session):
     a, _ = await _pair(session)
     with pytest.raises(APIError) as exc:
         await challenge_service.create_direct(
-            session, a, challengee_id=a.id, game=CS2, market_key=KD, entry_cents=ENTRY
+            session,
+            a,
+            challengee_id=a.id,
+            game=CHESS,
+            market_key=MARKET,
+            speed=SPEED,
+            entry_cents=ENTRY,
         )
     assert exc.value.code == "self_challenge"
 
@@ -106,18 +118,30 @@ async def test_self_challenge_rejected(session):
 async def test_unlinked_challengee_prompts_linking(session):
     a, b = await _pair(session, link=False)
     ch = await challenge_service.create_direct(
-        session, a, challengee_id=b.id, game=CS2, market_key=KD, entry_cents=ENTRY
+        session,
+        a,
+        challengee_id=b.id,
+        game=CHESS,
+        market_key=MARKET,
+        speed=SPEED,
+        entry_cents=ENTRY,
     )
     with pytest.raises(APIError) as exc:
         await challenge_service.accept_direct(session, b, ch.id)
     assert exc.value.code == "needs_link"
-    assert exc.value.detail == {"game": CS2}
+    assert exc.value.detail == {"game": CHESS}
 
 
 async def test_decline_notifies_challenger(session):
     a, b = await _pair(session)
     ch = await challenge_service.create_direct(
-        session, a, challengee_id=b.id, game=CS2, market_key=KD, entry_cents=ENTRY
+        session,
+        a,
+        challengee_id=b.id,
+        game=CHESS,
+        market_key=MARKET,
+        speed=SPEED,
+        entry_cents=ENTRY,
     )
     await challenge_service.decline(session, b, ch.id)
     assert ch.state == "declined"
@@ -128,9 +152,14 @@ async def test_decline_notifies_challenger(session):
 async def test_expiry_notifies_and_is_terminal(session):
     a, b = await _pair(session)
     ch = await challenge_service.create_direct(
-        session, a, challengee_id=b.id, game=CS2, market_key=KD, entry_cents=ENTRY
+        session,
+        a,
+        challengee_id=b.id,
+        game=CHESS,
+        market_key=MARKET,
+        speed=SPEED,
+        entry_cents=ENTRY,
     )
-    # Force it past its TTL and run the worker's expiry sweep.
     ch.expires_at = datetime.now(UTC) - timedelta(minutes=1)
     await session.flush()
     n = await challenge_service.expire_due(session)
@@ -138,7 +167,6 @@ async def test_expiry_notifies_and_is_terminal(session):
     assert ch.state == "expired"
     sys_notes = await _notifications(session, a.id, "system")
     assert any(n.payload.get("event") == "challenge_expired" for n in sys_notes)
-    # Accepting an expired challenge fails.
     with pytest.raises(APIError) as exc:
         await challenge_service.accept_direct(session, b, ch.id)
     assert exc.value.code in ("not_open", "expired")
@@ -146,23 +174,21 @@ async def test_expiry_notifies_and_is_terminal(session):
 
 async def test_invite_token_single_use_and_fresh_signup(session):
     a = await create_user(session, username="alice")
-    await create_linked_account(session, a, CS2, host_account_id="host_alice")
+    await create_linked_account(session, a, CHESS, host_account_id="host_alice")
     ch = await challenge_service.create_invite(
-        session, a, game=CS2, market_key=KD, entry_cents=ENTRY
+        session, a, game=CHESS, market_key=MARKET, speed=SPEED, entry_cents=ENTRY
     )
     assert ch.invite_token is not None
     token = ch.invite_token
 
-    # A brand-new user links + accepts — the funnel's end state.
     newcomer = await create_user(session, username="carol")
-    await create_linked_account(session, newcomer, CS2, host_account_id="host_carol")
+    await create_linked_account(session, newcomer, CHESS, host_account_id="host_carol")
     match = await challenge_service.accept_invite(session, newcomer, token)
     assert match.state == "PENDING"
     assert {s for s in (ch.challenger_id, ch.challengee_id)} == {a.id, newcomer.id}
 
-    # Single-use: a second accept fails.
     other = await create_user(session, username="dave")
-    await create_linked_account(session, other, CS2, host_account_id="host_dave")
+    await create_linked_account(session, other, CHESS, host_account_id="host_dave")
     with pytest.raises(APIError) as exc:
         await challenge_service.accept_invite(session, other, token)
     assert exc.value.code == "not_open"
@@ -170,14 +196,14 @@ async def test_invite_token_single_use_and_fresh_signup(session):
 
 async def test_invite_expired_cannot_accept(session):
     a = await create_user(session, username="alice")
-    await create_linked_account(session, a, CS2, host_account_id="host_alice")
+    await create_linked_account(session, a, CHESS, host_account_id="host_alice")
     ch = await challenge_service.create_invite(
-        session, a, game=CS2, market_key=KD, entry_cents=ENTRY
+        session, a, game=CHESS, market_key=MARKET, speed=SPEED, entry_cents=ENTRY
     )
     ch.expires_at = datetime.now(UTC) - timedelta(minutes=1)
     await session.flush()
     b = await create_user(session, username="bob")
-    await create_linked_account(session, b, CS2, host_account_id="host_bob")
+    await create_linked_account(session, b, CHESS, host_account_id="host_bob")
     with pytest.raises(APIError) as exc:
         await challenge_service.accept_invite(session, b, ch.invite_token)
     assert exc.value.code == "expired"
@@ -185,9 +211,9 @@ async def test_invite_expired_cannot_accept(session):
 
 async def test_preview_token_is_public_shape(session):
     a = await create_user(session, username="alice")
-    await create_linked_account(session, a, CS2, host_account_id="host_alice")
+    await create_linked_account(session, a, CHESS, host_account_id="host_alice")
     ch = await challenge_service.create_invite(
-        session, a, game=CS2, market_key=KD, entry_cents=ENTRY
+        session, a, game=CHESS, market_key=MARKET, speed=SPEED, entry_cents=ENTRY
     )
     preview = await challenge_service.preview_token(session, ch.invite_token)
     assert preview.valid is True
@@ -198,8 +224,9 @@ async def test_preview_token_is_public_shape(session):
 async def _settled_pair_match(session, a, b):
     """Insert a settled, rake-bearing match between two users (cap counter input)."""
     match = Match(
-        game=CS2,
-        market=KD,
+        game=CHESS,
+        market=MARKET,
+        speed=SPEED,
         entry_cents=ENTRY,
         rake_bps=1000,
         pot_cents=2 * ENTRY,
@@ -234,7 +261,13 @@ async def test_pair_rake_cap_flips_to_friendly(session, monkeypatch):
     assert await challenge_service.pair_over_cap(session, a.id, b.id) is True
 
     ch = await challenge_service.create_direct(
-        session, a, challengee_id=b.id, game=CS2, market_key=KD, entry_cents=ENTRY
+        session,
+        a,
+        challengee_id=b.id,
+        game=CHESS,
+        market_key=MARKET,
+        speed=SPEED,
+        entry_cents=ENTRY,
     )
     assert ch.friendly is True
     match = await challenge_service.accept_direct(session, b, ch.id)
@@ -248,8 +281,9 @@ async def test_friendly_count_excludes_friendlies(session, monkeypatch):
     a, b = await _pair(session)
     # A friendly match doesn't count toward the rake cap.
     fmatch = Match(
-        game=CS2,
-        market=KD,
+        game=CHESS,
+        market=MARKET,
+        speed=SPEED,
         entry_cents=ENTRY,
         rake_bps=0,
         pot_cents=2 * ENTRY,

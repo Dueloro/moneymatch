@@ -2,10 +2,9 @@
 # Env comes from the repo-root .env (copy .env.example → .env first).
 .DEFAULT_GOAL := help
 .PHONY: help install db down migrate api web dev test test-api test-web \
-        lint typecheck gen-api seed worker e2e
+        lint typecheck gen-api worker e2e
 
-# Source the repo-root .env into a recipe (api/migrate need DATABASE_URL etc).
-# $(CURDIR) anchors to the Makefile dir so it works after `cd apps/api`.
+# Source the repo-root .env into a recipe; $(CURDIR) keeps it valid after `cd apps/api`.
 LOADENV := set -a; [ -f $(CURDIR)/.env ] && . $(CURDIR)/.env; set +a;
 
 help: ## Show this help
@@ -28,18 +27,18 @@ down: ## Stop all Docker services
 migrate: ## Apply DB migrations
 	cd apps/api && $(LOADENV) uv run alembic upgrade head
 
-api: ## Run the API on :8000 — the worker loop runs inside it (one process)
+api: ## Run the API (reload) on :8000
 	cd apps/api && uv run uvicorn moneymatch_api.main:app --reload --port 8000 --env-file ../../.env
 
 web: ## Run the web app (Vite) on :5173
 	cd apps/web && pnpm dev
 
-worker: ## Optional standalone worker (the API already runs one; a DB lock keeps only one active)
+worker: ## Run the settlement worker (polls Postgres; separate process)
 	cd apps/api && uv run --env-file ../../.env python -m moneymatch_api.workers.settlement_worker
 
-dev: db migrate ## Start db + api (with its worker loop) + web together
-	@echo "starting api (+ in-process worker) + web (Ctrl-C to stop)..."
-	@$(MAKE) -j2 api web
+dev: db migrate ## Start db + api + worker + web together
+	@echo "starting api + worker + web (Ctrl-C to stop)..."
+	@$(MAKE) -j3 api worker web
 
 test: test-api test-web ## Run all tests
 
@@ -52,9 +51,6 @@ test-web: ## Run web tests
 e2e: ## Run the Playwright H2H e2e (needs the stack up — see apps/web/e2e/README.md)
 	pnpm --filter @moneymatch/web exec playwright install --with-deps chromium
 	pnpm --filter @moneymatch/web test:e2e
-
-seed: ## Seed a demoable environment (users, tickets, a pool, a tournament)
-	cd apps/api && $(LOADENV) uv run python ../../scripts/seed_demo.py
 
 lint: ## Lint everything
 	cd apps/api && uv run ruff check src tests ../../scripts \

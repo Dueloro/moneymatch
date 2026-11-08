@@ -17,7 +17,6 @@ describe('Loader', () => {
   });
 
   it('shows an elapsed-time readout when motion is allowed', () => {
-    // test/setup mocks matchMedia to matches:false → motion allowed
     render(<Loader />);
     expect(screen.getByText(/^\d+\.\d+s$/)).toBeInTheDocument();
   });

@@ -1,5 +1,6 @@
 """reconciliation_service: per-contest conservation, global solvency, drift
-detection, and a concurrent demo-op storm (Phase 1 exit criterion)."""
+detection, and a concurrent demo-op storm.
+"""
 
 from __future__ import annotations
 
@@ -64,7 +65,7 @@ async def test_check_holds_identity_while_in_flight(session):
     ref = uuid.uuid4()
     await ws.escrow_hold(session, a.id, 10_00, ref_type="match", ref_id=ref)
     result = await recon.check(session, "match", ref)
-    assert result.ok  # identity holds even unsettled
+    assert result.ok
     assert result.totals["still_held"] == 10_00
 
 
@@ -133,7 +134,6 @@ async def test_check_all_after_concurrent_storm(client, session):
                 except ws.WalletError:
                     await s.rollback()
 
-    # Two concurrent workers per user hammer the same wallets in parallel.
     tasks = []
     for i, u in enumerate(users):
         tasks.append(churn(u.id, seed=i))

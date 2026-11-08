@@ -12,10 +12,10 @@ from moneymatch_api.models.play import Match, MatchPlayer
 from moneymatch_api.models.user import User
 
 from .conftest import auth_headers
-from .factories import create_linked_account, cs2_profile
+from .factories import chess_profile, create_linked_account
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 
 
 async def _user(session, auth_id, name, *, role="user"):
@@ -31,15 +31,16 @@ async def _user(session, auth_id, name, *, role="user"):
     session.add(user)
     await session.flush()
     link = await create_linked_account(
-        session, user, CS2, host_account_id=f"h_{name}", profile=cs2_profile(name)
+        session, user, CHESS, host_account_id=f"h_{name}", profile=chess_profile(name)
     )
     return user, link
 
 
 async def _settled_match(session, players, *, state="SETTLED", winner=None):
     match = Match(
-        game=CS2,
-        market="kd_ratio",
+        game=CHESS,
+        market="win_h2h",
+        speed="blitz",
         entry_cents=1000,
         rake_bps=1000,
         pot_cents=2000,
@@ -78,7 +79,6 @@ async def test_file_dispute_and_dedupe(session, client):
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "open"
 
-    # Filing again is a conflict.
     r2 = await client.post(
         f"{V1}/play/matches/{match.id}/dispute",
         json={"reason": "again"},
@@ -86,7 +86,6 @@ async def test_file_dispute_and_dedupe(session, client):
     )
     assert r2.status_code == 409 and r2.json()["code"] == "already_disputed"
 
-    # The filer can read their dispute back.
     r3 = await client.get(
         f"{V1}/play/matches/{match.id}/dispute", headers=auth_headers("auth_da")
     )
@@ -96,7 +95,7 @@ async def test_file_dispute_and_dedupe(session, client):
 async def test_non_participant_cannot_dispute(session, client):
     a, la = await _user(session, "auth_dc", "dc")
     b, lb = await _user(session, "auth_dd", "dd")
-    await _user(session, "auth_de", "de")  # outsider
+    await _user(session, "auth_de", "de")
     match = await _settled_match(session, [(a, la), (b, lb)], winner=a.id)
     await session.commit()
 
@@ -134,7 +133,6 @@ async def test_admin_resolves_and_notifies(session, client):
         json={"reason": "regrade please"},
         headers=auth_headers("auth_dh"),
     )
-    # Admin lists open disputes and resolves one.
     lst = await client.get(f"{V1}/admin/disputes", headers=auth_headers("auth_admin_d"))
     assert lst.status_code == 200
     dispute_id = next(
@@ -150,7 +148,6 @@ async def test_admin_resolves_and_notifies(session, client):
     )
     assert res.status_code == 200 and res.json()["status"] == "resolved"
 
-    # The filer got a notification.
     notes = list(
         await session.scalars(
             select(Notification).where(
@@ -162,7 +159,6 @@ async def test_admin_resolves_and_notifies(session, client):
     assert len(notes) == 1
     assert notes[0].payload["status"] == "resolved"
 
-    # And the dispute is closed.
     row = await session.get(Dispute, dispute_id)
     await session.refresh(row)
     assert row.status == "resolved" and row.resolved_at is not None
@@ -176,10 +172,10 @@ async def test_file_pool_dispute_participant_only(session, client):
     a, la = await _user(session, "auth_dpa", "dpa")
     now = datetime.now(UTC)
     pool = SoloPool(
-        game=CS2,
-        metric="cs2_kd_ratio",
+        game=CHESS,
+        metric="chess_moves",
         difficulty="medium",
-        room_bar=1.25,
+        room_bar=25.0,
         entry_cents=1000,
         rake_bps=1000,
         room_size=1,
@@ -197,7 +193,7 @@ async def test_file_pool_dispute_participant_only(session, client):
             user_id=a.id,
             linked_account_id=la.id,
             host_account_id=la.host_account_id,
-            personal_bar=1.25,
+            personal_bar=25.0,
             status="MISSED",
         )
     )
@@ -211,7 +207,6 @@ async def test_file_pool_dispute_participant_only(session, client):
     assert r.status_code == 201, r.text
     assert r.json()["ref_type"] == "pool" and r.json()["status"] == "open"
 
-    # A non-participant can't contest it.
     await _user(session, "auth_dpb", "dpb")
     await session.commit()
     r2 = await client.post(
@@ -230,15 +225,14 @@ async def test_file_tournament_dispute(session, client):
     a, la = await _user(session, "auth_dta", "dta")
     now = datetime.now(UTC)
     t = Tournament(
-        game=CS2,
-        ranking_metric="cs2_kd_ratio",
+        game=CHESS,
+        ranking_metric="chess_wins",
         entry_cents=1000,
         rake_bps=1000,
         prize_split=[100],
         field_size=4,
         min_field=2,
         min_ranked=1,
-        score_matches=3,
         pot_cents=4000,
         prize_cents=3600,
         rake_cents=400,
@@ -268,7 +262,6 @@ async def test_file_tournament_dispute(session, client):
     assert r.status_code == 201, r.text
     assert r.json()["ref_type"] == "tournament"
 
-    # Read it back through the generic getter.
     g = await client.get(
         f"{V1}/disputes/tournament/{t.id}", headers=auth_headers("auth_dta")
     )

@@ -1,15 +1,23 @@
-/** Pulsing placeholder block. Compose these into skeleton rows/cards while a
- * query loads, instead of bare "Loading…" text. */
-export function Skeleton({ className = '' }: { className?: string }) {
+/** `inline` renders a span so it can sit inside text (a loading figure). */
+export function Skeleton({
+  className = '',
+  inline = false,
+  testId,
+}: {
+  className?: string;
+  inline?: boolean;
+  testId?: string;
+}) {
+  const Tag = inline ? 'span' : 'div';
   return (
-    <div
+    <Tag
       aria-hidden
-      className={`animate-pulse rounded-inset bg-panel-raised ${className}`}
+      data-testid={testId}
+      className={`animate-pulse rounded-inset bg-panel-raised ${inline ? 'inline-block' : ''} ${className}`}
     />
   );
 }
 
-/** A list-row-shaped skeleton (title + subline + right slot), matching ListRow. */
 export function SkeletonRow() {
   return (
     <div className="flex items-center justify-between border-b border-hairline py-4">
@@ -22,7 +30,6 @@ export function SkeletonRow() {
   );
 }
 
-/** A stack of skeleton rows. */
 export function SkeletonList({ rows = 4 }: { rows?: number }) {
   return (
     <div data-testid="skeleton-list">

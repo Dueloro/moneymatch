@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
 
-/**
- * Generic list row (02-design §5): optional left slot, title + subline, and a
- * right slot. Hairline-separated by the containing list. Used by the ledger,
- * waiting/friends/activity/inbox lists.
- */
+/** Used by the ledger, waiting/friends/activity/inbox lists. */
 export function ListRow({
   left,
   title,
@@ -16,7 +12,6 @@ export function ListRow({
   title: ReactNode;
   subline?: ReactNode;
   right?: ReactNode;
-  /** Optional full-width slot rendered under the row (e.g. an Activity live line). */
   footer?: ReactNode;
 }) {
   return (
@@ -29,7 +24,11 @@ export function ListRow({
             <div className="truncate text-xs text-text-secondary">{subline}</div>
           )}
         </div>
-        {right && <div className="shrink-0 text-sm">{right}</div>}
+        {right && (
+          <div className="flex shrink-0 items-center text-sm touch:min-h-11">
+            {right}
+          </div>
+        )}
       </div>
       {footer && <div className="mt-2 pl-[1.375rem]">{footer}</div>}
     </div>

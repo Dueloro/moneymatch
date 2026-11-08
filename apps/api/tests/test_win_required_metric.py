@@ -1,19 +1,4 @@
-"""`chess_moves` must only ever count a game you won.
-
-Without the win requirement the metric is exploitable in the cheapest possible
-way. The bar reads "at or under N moves" and a resignation on move one scores 1,
-so instantly resigning clears **every** tier of **every** pool. It costs
-nothing, takes a second, needs no skill, and always works. That is not a
-loophole at the edges, it is a strictly dominant strategy.
-
-Two halves make it safe, and they have to agree:
-
-- the adapter emits no value for a game you did not win, so a loss cannot
-  produce a score and cannot drag your baseline either;
-- grading reads a missing value on a match you *did* play as a **miss**, not as
-  "unverifiable". Refunding there would hand a loss the same outcome as never
-  playing, which is a free option: enter, lose, get your stake back.
-"""
+"""`chess_moves` must only ever count a game you won."""
 
 from __future__ import annotations
 
@@ -26,7 +11,6 @@ pytestmark = pytest.mark.nodb
 
 
 def _game(**over):
-    """A finished Lichess game record, as the export endpoint returns it."""
     game = {
         "id": "abc123",
         "rated": True,
@@ -34,7 +18,7 @@ def _game(**over):
         "createdAt": 1_700_000_000_000,
         "status": "mate",
         "winner": "white",
-        "moves": " ".join(["e4"] * 17),  # 17 plies -> 9 full moves
+        "moves": " ".join(["e4"] * 17),
         "players": {
             "white": {"user": {"id": "me"}, "rating": 1100},
             "black": {"user": {"id": "you"}, "rating": 1100},
@@ -45,7 +29,6 @@ def _game(**over):
 
 
 def _norm(**over):
-    """Normalize as the poller does. `None` means the record was not usable."""
     norm = ChessLichessAdapter()._normalize(_game(**over), "me")
     assert norm is not None, "fixture should be a finished standard game"
     return norm
@@ -53,7 +36,7 @@ def _norm(**over):
 
 def test_the_metric_is_registered_as_win_only():
     assert requires_win("chess_moves") is True
-    assert requires_win("cs2_kd_ratio") is False
+    assert requires_win("chess_accuracy") is False
 
 
 def test_a_win_still_scores_its_move_count():
@@ -63,14 +46,9 @@ def test_a_win_still_scores_its_move_count():
 
 
 def test_the_instant_resign_exploit_scores_nothing():
-    """The whole reason this file exists.
-
-    Two plies then resign: one full move, which would clear any bar ever
-    quoted. It must produce no value at all.
-    """
     exploit = _norm(status="resign", winner="black", moves="e4 e5")
     assert exploit.won is False
-    assert exploit.moves == 1  # the game really was that short
+    assert exploit.moves == 1
     assert "chess_moves" not in exploit.metrics
 
 
@@ -83,33 +61,24 @@ def test_no_loss_produces_a_value_however_it_ended(status, winner):
 
 
 def test_a_draw_produces_no_value_either():
-    """A draw is nobody's win, and the prior is fitted on decisive games."""
     drawn = _norm(status="draw", winner=None)
     assert drawn.won is False
     assert "chess_moves" not in drawn.metrics
 
 
 def test_an_unfinished_game_never_reaches_grading_at_all():
-    """A game still in progress is dropped by the normalizer, not scored."""
     assert ChessLichessAdapter()._normalize(_game(status="started"), "me") is None
 
 
 def test_an_aborted_game_with_no_winner_scores_nothing():
-    """`won is None` must not be read as a win: it is simply not a victory."""
     unknown = _norm(status="timeout", winner=None)
     assert unknown.won is not True
     assert "chess_moves" not in unknown.metrics
 
 
-# --------------------------------------------------------------------------- #
-# The grading half of the rule.
-# --------------------------------------------------------------------------- #
-
-
 def _outcome(metric: str, value: float | None, played: bool) -> str:
-    """Mirror `grade_pool`'s decision for one entrant."""
     if not played:
-        return "refund"  # nothing to look at, so nothing can be claimed
+        return "refund"
     if value is None:
         return "miss" if requires_win(metric) else "refund"
     return "clear" if value <= 12 else "miss"
@@ -130,5 +99,4 @@ def test_a_fast_win_clears_and_a_slow_win_does_not():
 
 
 def test_an_unmeasurable_metric_is_untouched_by_the_rule():
-    """Only win-required metrics turn a missing value into a loss."""
-    assert _outcome("cs2_kd_ratio", None, played=True) == "refund"
+    assert _outcome("chess_accuracy", None, played=True) == "refund"

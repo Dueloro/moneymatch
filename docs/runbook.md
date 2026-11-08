@@ -1,191 +1,246 @@
-# MoneyMatch Runbook
+# Runbook
 
-Operational reference for the MoneyMatch MVP (see
-[`implementation-guide/implementation-summary.md`](./implementation-guide/implementation-summary.md)).
-Written to be followed by someone who did **not** build the system — if a
-step here is ambiguous, that is a bug in the runbook; fix it.
+Operating Money Match in production. The rule above all others: the ledger is
+the source of truth. If money looks wrong, pause settlement and investigate.
+Don't push money through.
 
-The one rule that overrides everything below: **the ledger is the source of
-truth, and `sum(payouts) + rake == sum(entries)` must hold on every settlement
-path.** When in doubt, pause settlement and investigate rather than push money.
+## Topology
 
----
+| Piece | Where | Defined in |
+|---|---|---|
+| API (`moneymatch-api`) | Render web service, `api.dueloro.com` | `render.yaml` |
+| Worker (`moneymatch-worker`) | Render background worker, same image | `render.yaml` |
+| Postgres 16 (`moneymatch-postgres`) | Render Postgres | `render.yaml` |
+| Web | Vercel, builds `apps/web` | `apps/web/vercel.json` |
+| Auth | Supabase | Supabase dashboard |
 
-## 1. Topology
+Admin endpoints below are under `/api/v1/admin` and need an admin user's
+token. The `/admin` web pages call the same endpoints.
 
-| Component | Runs as | Host | Notes |
-| --- | --- | --- | --- |
-| `api` | long-running FastAPI (uvicorn) | Render web service | stateless; scale horizontally |
-| `worker` | settlement worker loop | Render background worker | **single writer of settlements**; same image, worker entrypoint |
-| Postgres 16 | managed DB | Render Postgres / Neon | ledger + queue; PITR enabled |
-| `web` | static React (Vite) | Vercel | `apps/web/vercel.json` (SPA rewrite + security headers) |
-| Auth | Supabase (email + Google) | Supabase | API verifies JWT; owns all other state |
+## First-time setup
 
-Blueprint: [`render.yaml`](../render.yaml). Every env var is documented in
-[`.env.example`](../.env.example); `config.py` fails fast on a missing one, so a
-misconfigured deploy never boots half-working.
+Order: Vercel project, Render Blueprint, custom domain, first admin. `WEB_ORIGIN`
+is entered at Blueprint creation and must be the exact production origin,
+`https://play.dueloro.com`, on both Render services; the API refuses to boot in
+prod if it is localhost. The marketing site and the app are separate Vercel
+projects under one domain: apex/`www` = marketing, `play.` = this app. The
+marketing site's CTAs point to `https://play.dueloro.com`.
 
-Environments: **staging** (full stack, host APIs live, seed cohort) and
-**production**. Promote staging → production only after the acceptance
-walk-through (acceptance sign-off tracked in
-[`implementation-guide/BACKLOG.md`](./implementation-guide/BACKLOG.md)).
+### 1. Vercel project
 
----
+- Root Directory `apps/web`, Framework Preset Vite. Keep "Include files outside
+  the root directory" on (the `packages/api-client` workspace dep needs it).
+- Env vars: `VITE_API_BASE_URL=https://api.dueloro.com`, `VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_ANON_KEY` (all required), optional `VITE_POSTHOG_*` and
+  `VITE_SENTRY_DSN`. Never set `VITE_E2E_AUTH` in prod.
+- The CSP in `apps/web/vercel.json` hardcodes `https://api.dueloro.com` and the
+  Supabase project `bxjzxvujyveucyfvmmto`. If your Supabase project differs,
+  update `connect-src` first or auth calls are blocked.
+- Domains: add `play.dueloro.com` to this project (CNAME `play` to the target
+  Vercel shows, or automatic if dueloro.com DNS is on Vercel). `vercel.json`
+  permanently redirects the old beta host to it.
 
-## 2. Deploy
+### 2. Render Blueprint
 
-Migrations run as a **release step**, never at import time.
+1. Render → New → Blueprint → pick this repo. It reads `render.yaml`.
+2. `sync: false` secrets are prompted only at creation, per service (give the
+   API and the worker the same values): `SUPABASE_URL`, `SUPABASE_JWT_SECRET`,
+   `WEB_ORIGIN`, `SENTRY_DSN`, `POSTHOG_API_KEY`, `RESEND_API_KEY`,
+   `EMAIL_FROM`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+   The API also needs `RESEND_WEBHOOK_SECRET`; the worker does not.
+   `DATABASE_URL` is wired from the database. Edit later in each service's
+   Environment tab.
+   - `SUPABASE_URL` and a non-localhost `WEB_ORIGIN` are required on both.
+   - `EMAIL_FROM` = `Money Match <noreply@send.dueloro.com>`.
+   - `SUPPORT_EMAIL` defaults to `support@dueloro.com` and
+     `SUPPORT_INBOUND_DOMAIN` to `reply.dueloro.com`. Each user message in a
+     support thread is emailed to support, at most once per thread per minute
+     with later lines batched. The reply-to address routes the response back
+     into that in-app thread. Needs the Resend inbound setup below.
+   - Blank `SUPABASE_JWT_SECRET` means verify via JWKS. Blank `SENTRY_DSN`,
+     `POSTHOG_API_KEY` or `VAPID_*` just disables that feature.
+3. Region: every service and the database must be in the same region as the
+   Supabase project (`oregon` in `render.yaml`, matching Supabase `us-west-2`). Change all of them together.
 
-1. Merge to `main` (squash). CI must be green (ruff · mypy · pytest · eslint ·
-   tsc · vitest · build · pip-audit · pnpm audit).
-2. Deploy triggers on Render. The `api` service's `preDeployCommand` runs
-   `alembic upgrade head` **once** before new instances take traffic.
-   The worker never runs migrations.
-3. Vercel builds `apps/web` from the same commit.
-4. Set `RELEASE` to the git SHA so Sentry + PostHog tag events to the build.
-5. Smoke: `GET /api/v1/health` returns `ok` and a fresh worker heartbeat; sign
-   in on web; check the admin reconciliation view is green.
+### 3. Custom domain
 
-### Migrations
+API service → Settings → Custom Domains → add `api.dueloro.com`. At your DNS
+provider add a CNAME `api` → the service's `*.onrender.com` host, then click
+Verify and wait for the certificate. On Cloudflare, keep the record DNS-only
+until the certificate is issued.
 
-- Forward-only Alembic revisions; every schema change ships its migration in the
-  same PR. Never edit a shipped revision.
-- Verify locally before merge: `uv run alembic upgrade head && uv run alembic check`
-  (drift check must report "No new upgrade operations").
+### 4. First admin
 
----
+Sign up on the web app, then run the script under Granting admin against the
+database's external URL (Render's default allow-list accepts external
+connections). Rewrite the scheme to `postgresql+asyncpg://` and add
+`?ssl=require`; `SUPABASE_URL` is required because the config loads on import.
 
-## 3. Rollback
+### Google sign-in
 
-A bad release: redeploy the previous image from the Render dashboard (both `api`
-and `worker`). Vercel: promote the previous deployment.
+The web offers Google via Supabase. Create a Google OAuth client with
+authorized redirect `https://<supabase-ref>.supabase.co/auth/v1/callback` and
+`https://play.dueloro.com` under Authorized JavaScript origins.
+In Supabase enable Auth → Providers → Google with its client ID and secret,
+and add the web origin under Auth → URL Configuration (Site URL and Redirect
+URLs).
 
-**Migrations are the caveat.** A forward migration that a rollback would strand
-must be backward-compatible (additive) — that is why schema changes are additive
-and shipped ahead of the code that needs them. If a deploy included a
-destructive migration, do **not** roll back blindly: pause settlement (§5.3),
-restore from PITR to just before the migration (§6), then redeploy.
+### Lichess linking
 
----
+Linking uses Lichess OAuth with PKCE. Lichess needs no app registration and
+no secret: `LICHESS_OAUTH_CLIENT_ID` (optional, default `moneymatch`) is just
+the name shown on the Lichess consent screen. The redirect is
+`<first WEB_ORIGIN>/link/lichess/callback`, so the first `WEB_ORIGIN` entry
+must be the web address users are on. Tokens are revoked right after reading
+the account and never stored.
 
-## 4. Worker operations
+### Supabase email (via Resend)
 
-The worker polls Postgres every ~15 s, claiming each unit of work with
-`FOR UPDATE SKIP LOCKED` in its own transaction. A crash between claim and commit
-leaves the row **re-claimable** — settlement is idempotent and never double-pays
-(proven: `tests/test_chaos_resilience.py`).
+Do these only after the sending domain (`send.dueloro.com`) shows Verified in
+Resend. An unverified domain makes every auth email fail.
 
-- **Restart:** restart the Render worker service. No coordination needed; in-flight
-  rows were never half-settled. Multiple workers are safe (SKIP LOCKED).
-- **Heartbeat:** the worker writes `feature_flags.worker_heartbeat` each cycle.
-  `GET /api/v1/health` and the admin reconciliation view redden when it is stale
-  (> 120 s). A stale heartbeat = the worker is down or wedged → restart it.
-- **Never** run a second worker as a one-off script against prod without
-  understanding SKIP LOCKED; it is safe, but the ops signal (heartbeat) comes
-  from the managed process.
+1. Auth → SMTP Settings → Custom SMTP: host `smtp.resend.com`, port `465`,
+   user `resend`, password a Resend API key, sender `Money Match`
+   `<noreply@send.dueloro.com>`.
+2. Auth → Providers → Email: enable Confirm email; keep email OTP on.
+3. Auth → URL Configuration: Site URL = `https://play.dueloro.com`; add
+   `https://play.dueloro.com/**` and `http://localhost:5173/**` to Redirect URLs.
+4. Auth → Email Templates: paste `supabase/email-templates/confirm-signup.html`,
+   `magic-link.html` (must keep `{{ .Token }}`), `reset-password.html`.
+5. Sign up with a real address and check the verify, code and reset emails.
 
----
+### Support email replies (via Resend Inbound)
 
-## 5. Common incidents
+1. In Resend Receiving, add the custom inbound domain `reply.dueloro.com` and
+   publish the DNS records Resend supplies.
+2. In Resend Webhooks, add
+   `https://api.dueloro.com/api/v1/webhooks/resend` for `email.received`.
+3. Copy its signing secret into `RESEND_WEBHOOK_SECRET` on the API service only.
+4. Send a support message in the app, reply to the alert received at
+   `support@dueloro.com`, and confirm the reply appears in the same in-app
+   thread. Reply to the user notification too; that response should return to
+   the thread and alert support.
 
-### 5.1 Stuck match (won't settle)
+Inbound replies accept only the configured support address or the email on the
+user account, verify the webhook signature against the raw request, and ignore
+attachments. The admin Support page provides the other reply path.
 
-Symptom: a match sits in `ACTIVE`/`AWAITING_RESULT` past its window; a user asks
-where their money is.
+## Deploy
 
-1. Open the contest in admin: `GET /api/v1/admin/contests/match/{id}` — inspect
-   the ledger trail + reconciliation for that ref.
-2. If the host result is now available and the worker missed it, force a
-   re-settle: `POST /api/v1/admin/matches/{id}/resettle`. This re-runs the exact
-   worker grade+settle path (no bespoke money math) and is audited.
-3. If the game genuinely never happened (host outage through the window), the
-   worker cancels + refunds at the hard ceiling automatically. To resolve sooner,
-   void with refund: `POST /api/v1/admin/matches/{id}/void`. Refunds rake nothing.
-4. Confirm the contest reconciles green afterward.
+Push or merge to `main`. CI runs; Render auto-deploys both services
+(`autoDeployTrigger: commit`) and Vercel builds the web app from the same
+commit. After deploy:
 
-### 5.2 Host API down (FaceIt / Lichess / OpenDota)
+- `GET https://api.dueloro.com/api/v1/health` returns `status: ok` and
+  `worker.stale: false`.
+- Sign in on the web app; the admin Reconciliation tab is green.
 
-Symptom: settlement latency climbing; worker logs `HostUnavailable`.
+## Migrations
 
-- The worker already **extends** each affected match's window (outage never
-  consumes it) and cancels + refunds at the hard ceiling — no money is stranded.
-- To stop *new* contests on the affected game while the host is down, flip its
-  per-game kill switch: `PUT /api/v1/admin/flags/game:<game_id>` → `enabled:false`
-  (e.g. `game:cs2.steam`). Takes effect on the next request, no deploy.
-- Re-enable when the host recovers. Backfill settles automatically as results
-  become available.
+The API's `preDeployCommand: alembic upgrade head` runs once per deploy before
+the new instance takes traffic. A failure aborts the deploy. The worker never
+migrates.
 
-### 5.3 Reconciliation failure (hard stop)
+To run one by hand, copy the database's **External** URL from Render and run:
 
-Symptom: the worker hit a `ReconciliationError` and **set `settlement_paused` and
-stopped** (fail-closed), or the admin reconciliation view shows a violation.
+```bash
+cd apps/api
+DATABASE_URL='postgresql+asyncpg://USER:PASS@HOST/DB?ssl=require' \
+SUPABASE_URL=https://<project>.supabase.co \
+uv run alembic upgrade head
+```
 
-This is the one page-someone incident. **Do not clear `settlement_paused` to make
-it go away.**
+Change the scheme to `postgresql+asyncpg://` and add `?ssl=require` (asyncpg
+needs it for external connections). `SUPABASE_URL` is required because the
+config loads on import.
 
-1. Leave settlement paused. Money is frozen, which is the safe state.
-2. Open the admin reconciliation view: identify the offending ref
-   (`solvency_violations` / `contest_violations`).
-3. Reconstruct the ref's money trail event-by-event from the ledger in the admin
-   contest detail. A settled contest must satisfy `sum(payouts) + rake ==
-   sum(entries)`.
-4. Root-cause before resuming. Only once the book is proven consistent (or the
-   bad ref is corrected via an audited admin adjustment) clear the flag:
-   `PUT /api/v1/admin/flags/settlement_paused` → `enabled:false`.
+## Rollback
 
-### 5.4 Queue misbehaving / abuse
+- Render: each service → Deploys → pick the last good deploy → Rollback →
+  Rollback to this deploy. This turns off auto-deploy for that service;
+  re-enable it in Settings once fixed. Roll back the API and the worker
+  together.
+- Vercel: Project → Instant Rollback → choose the deployment → Confirm. New
+  pushes stop going live until you Undo Rollback (or promote a deployment).
+  Hobby plans can only roll back to the previous deployment.
+- Migrations don't roll back. Keep schema changes additive so old code still
+  runs on the new schema. If a deploy ran a destructive migration, pause
+  settlement first and restore the database with Render's point-in-time
+  recovery instead of rolling back blindly.
+- Point-in-time recovery: available on paid Render Postgres, 3-day window on
+  Hobby workspaces and 7 days on Pro+; you can't restore to within the last 10
+  minutes. It creates a NEW database, so set `DATABASE_URL` on the API and the
+  worker to the new internal URL, and update `render.yaml`'s `fromDatabase`
+  name so a Blueprint sync doesn't point back at the old DB.
 
-- Pause matchmaking: `PUT /api/v1/admin/flags/queue_paused` → `enabled:true`. The
-  worker then drains waiting tickets into clean cancels (no escrow was held).
-- Freeze a specific user: `POST /api/v1/admin/users/{id}/freeze` (audited);
-  a frozen user cannot stake. Unfreeze with `/unfreeze`.
+## Worker health
 
----
+- Each cycle (every 15 s) the worker writes the `worker_heartbeat` flag, even
+  while settlement is paused.
+- `GET /api/v1/health` reports `worker.heartbeat_at` and `worker.stale`
+  (stale after 120 s). The admin Reconciliation tab shows the same.
+- Stale: check the worker's logs in Render and restart it. Restarting is safe:
+  work is claimed with `FOR UPDATE SKIP LOCKED` and settlement is idempotent.
 
-## 6. Backup & restore
+## Reconciliation
 
-- Postgres runs on a PITR-capable plan (Render Postgres standard / Neon). Point-
-  in-time restore is the primary recovery tool.
-- **Restore procedure:** pause settlement (§5.3) → provision a restore to the
-  target timestamp → repoint `DATABASE_URL` (or promote the restored branch) →
-  run `alembic upgrade head` if the restore predates the current schema →
-  verify reconciliation is green → resume settlement.
-- Test a restore once before production launch and record the wall-clock time.
-- The ledger is append-only (DB triggers enforce immutability), so a restore
-  reproduces the exact money history — no derived-balance drift.
+- `GET /api/v1/admin/reconciliation` (or the admin Reconciliation tab) checks
+  global solvency and every contest's `entries = payouts + refunds + rake`.
+- After every settle the code checks that contest. A breach makes the worker
+  set `settlement_paused` and stop.
+- On a breach: **leave settlement paused.** Find the ref in
+  `contest_violations`, read its ledger trail
+  (`GET /api/v1/admin/contests/{ref_type}/{ref_id}`), and find the cause.
+  Correct with an audited adjustment (`POST /api/v1/admin/users/{id}/adjust`)
+  if needed. Resume only when reconciliation is green.
 
----
+## Kill switches
 
-## 7. On-call basics
+`PUT /api/v1/admin/flags/{key}` with `{"enabled": true|false}`, or the admin
+Flags tab. Takes effect on the next request or cycle, no deploy. The body takes
+`enabled` and/or `payload`; for `geo_config`:
+`{"payload": {"excluded_states": ["AZ", "AR", ...]}}`.
 
-- **Dashboards:** Sentry (api + web errors), PostHog (funnel + liquidity), the
-  admin reconciliation + risk views.
-- **First checks for any money incident:** (1) worker heartbeat fresh? (2)
-  reconciliation green? (3) `settlement_paused` off? If reconciliation is red,
-  go to §5.3 and stop.
-- **Escalation:** a reconciliation violation is a hard stop — keep settlement
-  paused and escalate rather than guessing.
+| Flag | Effect |
+|---|---|
+| `settlement_paused` | Worker settles nothing (heartbeat continues) |
+| `queue_paused` | No new queueing; the worker cancels waiting tickets (no escrow is held) |
+| `game:chess.lichess` | Off = no new chess contests |
+| `geo_config` | Payload `excluded_states` lists blocked states |
 
-### Error budget (beta)
+In prod the API refuses to boot if `geo_config` excludes fewer than the 14
+seeded states (`GEO_REQUIRED_EXCLUDED_STATES` in `constants.py`). You can add
+states by flag, but un-excluding one is a code change and deploy (or setting
+`GEO_ENFORCE_SEEDED_FLOOR=false` on both services, and recording why).
 
-- Reconciliation violations: **0** (hard stop — any violation halts settlement).
-- Settlement latency: **p95 < 2 min** from host-result availability.
-- API latency under ~50 concurrent users: **p95 < 300 ms** (load sanity —
-  [`load/`](../load/)).
+Real-money rails (`PAYMENTS_LIVE`, `KYC_LIVE`) are not flags. They are env
+config plus code guards and stay off.
 
----
+## Granting admin
 
-## 8. Kill-switch reference
+```bash
+cd apps/api
+DATABASE_URL='postgresql+asyncpg://…?ssl=require' SUPABASE_URL=https://<project>.supabase.co \
+  uv run python ../../scripts/grant_admin.py <username>          # add --revoke to remove
+```
 
-Flags live in the `feature_flags` table, flipped via `PUT /api/v1/admin/flags/{key}`
-with no deploy. They take effect on the next request/cycle.
+The change is written to `admin_audit`.
 
-| Key | Effect |
-| --- | --- |
-| `settlement_paused` | Worker idles; no settlements commit (fail-closed). |
-| `queue_paused` | Matchmaking off; worker drains waiting tickets to cancels. |
-| `game:<game_id>` | Per-game enable (e.g. `game:cs2.steam`). False ⇒ no new contests on that game. |
+## Incidents
 
-Real payment/KYC rails have **no** admin flag: `payments_live` / `kyc_live` are
-config + code guarded (a flip alone is inert), so they can never be enabled by
-an operator by accident.
+First checks for any money problem: is the worker heartbeat fresh, is
+reconciliation green, is `settlement_paused` off?
+
+- **Match won't settle.** Inspect it (`GET /api/v1/admin/contests/match/{id}`).
+  If Lichess has the result, `POST /api/v1/admin/matches/{id}/resettle`
+  (same grading path, audited). If the game never happened,
+  `POST /api/v1/admin/matches/{id}/void` refunds both, no fee. Unattended, the
+  worker cancels and refunds at the hard ceiling.
+- **Lichess down.** The worker extends match windows and cancels with refunds
+  past the ceiling. To stop new contests, turn `game:chess.lichess` off.
+- **Abuse.** `POST /api/v1/admin/users/{id}/freeze` (and `/unfreeze`). Review
+  the admin Risk tab. Pause the queue if needed.
+- **Reconciliation breach.** See above. Keep settlement paused and escalate.
+
+Dashboards: Sentry (API, worker, web errors), PostHog (funnel, money events),
+Render logs, the admin Reconciliation and Risk tabs.

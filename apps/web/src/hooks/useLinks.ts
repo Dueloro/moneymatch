@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { setLinkReturnTo } from '../lib/linkReturnTo';
 
 export interface FormatStat {
   speed: string;
@@ -23,14 +24,10 @@ export interface ProfileSnapshot {
   formats: FormatStat[];
   primary_speed: string | null;
   rating: number | null;
-  rank_label: string | null;
-  kd: number | null;
   avatar_url: string | null;
-  /** Title-specific extras (CS2 lifetime kills, hours). Display only. */
-  extra?: Record<string, number>;
 }
 
-export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED' | 'COMING_SOON';
+export type LinkStatus = 'LINKED' | 'BLOCKED' | 'UNLINKED';
 
 export interface GameLink {
   game: string;
@@ -39,7 +36,6 @@ export interface GameLink {
   host_username: string | null;
   linked_at: string | null;
   profile: ProfileSnapshot | null;
-  /** Current consecutive-win streak on this game (0 = none; losses reset it). */
   win_streak: number;
 }
 
@@ -49,7 +45,6 @@ export interface LinksResponse {
 
 const linksKey = (userId?: string) => ['links', userId];
 
-/** Read: one row per registered game with the viewer's LINKED/BLOCKED/UNLINKED state. */
 export function useLinks() {
   const { session } = useAuth();
   return useQuery({
@@ -63,7 +58,6 @@ export function useLinks() {
   });
 }
 
-/** Surface the server's error message (RFC-7807 `message`) to the UI. */
 function messageOf(error: unknown, fallback: string): string {
   const msg = (error as { message?: string } | undefined)?.message;
   return typeof msg === 'string' && msg ? msg : fallback;
@@ -77,41 +71,34 @@ function useLinksInvalidation() {
   };
 }
 
-/** Bind a host account. The server verifies via the adapter; the client only names it. */
-export function useCreateLink() {
+export function useConnectLichess() {
+  return useMutation({
+    mutationFn: async (returnTo: string | null): Promise<void> => {
+      const { data, error } = await api.POST('/api/v1/links/lichess/oauth/start');
+      if (error || !data) throw new Error(messageOf(error, 'Could not reach Lichess.'));
+      if (returnTo) setLinkReturnTo(returnTo);
+      window.location.assign(data.authorize_url);
+    },
+  });
+}
+
+export function useCompleteLichessLink() {
   const invalidate = useLinksInvalidation();
   return useMutation({
     mutationFn: async (vars: {
-      game: string;
-      username: string;
+      code: string;
+      state: string;
     }): Promise<LinksResponse> => {
-      const { data, error } = await api.POST('/api/v1/links', { body: vars });
-      if (error) throw new Error(messageOf(error, 'Could not link that account.'));
+      const { data, error } = await api.POST('/api/v1/links/lichess/oauth/callback', {
+        body: vars,
+      });
+      if (error) throw new Error(messageOf(error, 'Could not connect Lichess.'));
       return data as LinksResponse;
     },
     onSuccess: invalidate,
   });
 }
 
-/** Demo-only: swap the shared demo user's placeholder handle for a real one, per
- * game. The server soft-unbinds the old link and binds the new (live host verify
- * + real skill bootstrap). Only reachable when demo mode is on. */
-export function useDemoRelink() {
-  const invalidate = useLinksInvalidation();
-  return useMutation({
-    mutationFn: async (vars: {
-      game: string;
-      username: string;
-    }): Promise<LinksResponse> => {
-      const { data, error } = await api.POST('/api/v1/demo/relink', { body: vars });
-      if (error) throw new Error(messageOf(error, 'Could not link that account.'));
-      return data as LinksResponse;
-    },
-    onSuccess: invalidate,
-  });
-}
-
-/** Re-fetch a linked account's snapshot (ratings/stats) from the host. */
 export function useRefreshLink() {
   const invalidate = useLinksInvalidation();
   return useMutation({

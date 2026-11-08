@@ -2,9 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../lib/api';
 
-// Dense operator types (mirrors schemas/admin.py). The admin surface is plain and
-// boring by design (09-phase-6 · deliverable 2) — not the consumer design system.
-
 export interface FlagItem {
   key: string;
   enabled: boolean;
@@ -37,7 +34,31 @@ export interface AdminContestListItem {
   resolved_at: string | null;
 }
 
-// --- Flags ----------------------------------------------------------------- //
+export interface AdminSupportThread {
+  conversation_id: string;
+  user_id: string;
+  username: string | null;
+  email: string | null;
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  awaiting_reply: boolean;
+}
+
+export interface AdminSupportMessage {
+  id: string;
+  sender: 'user' | 'support' | 'system';
+  body: string | null;
+  created_at: string;
+  source: string | null;
+}
+
+export interface AdminSupportDetail {
+  conversation_id: string;
+  user_id: string;
+  username: string | null;
+  email: string | null;
+  messages: AdminSupportMessage[];
+}
 
 export function useAdminFlags() {
   return useQuery({
@@ -46,6 +67,57 @@ export function useAdminFlags() {
       const { data, error } = await api.GET('/api/v1/admin/flags');
       if (error) throw new Error('Failed to load flags');
       return (data as { flags: FlagItem[] }).flags;
+    },
+  });
+}
+
+export function useAdminSupportThreads() {
+  return useQuery({
+    queryKey: ['admin', 'support'],
+    refetchInterval: 10000,
+    queryFn: async (): Promise<AdminSupportThread[]> => {
+      const { data, error } = await api.GET('/api/v1/admin/support');
+      if (error) throw new Error('Failed to load support threads');
+      return data as AdminSupportThread[];
+    },
+  });
+}
+
+export function useAdminSupportThread(conversationId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'support', conversationId],
+    enabled: !!conversationId,
+    refetchInterval: 6000,
+    queryFn: async (): Promise<AdminSupportDetail> => {
+      const { data, error } = await api.GET('/api/v1/admin/support/{conversation_id}', {
+        params: { path: { conversation_id: conversationId! } },
+      });
+      if (error) throw new Error('Failed to load support thread');
+      return data as AdminSupportDetail;
+    },
+  });
+}
+
+export function useReplyToSupport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      conversationId: string;
+      body: string;
+    }): Promise<AdminSupportDetail> => {
+      const { data, error } = await api.POST(
+        '/api/v1/admin/support/{conversation_id}/reply',
+        {
+          params: { path: { conversation_id: input.conversationId } },
+          body: { body: input.body },
+        },
+      );
+      if (error) throw new Error('Reply failed');
+      return data as AdminSupportDetail;
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(['admin', 'support', data.conversation_id], data);
+      qc.invalidateQueries({ queryKey: ['admin', 'support'] });
     },
   });
 }
@@ -67,8 +139,6 @@ export function useUpdateFlag() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'flags'] }),
   });
 }
-
-// --- Users ----------------------------------------------------------------- //
 
 export function useAdminUsers(q: string) {
   return useQuery({
@@ -136,8 +206,6 @@ export function useAdjustUser(userId: string | null) {
   });
 }
 
-// --- Contests -------------------------------------------------------------- //
-
 export function useAdminContests(filters: { state?: string; game?: string }) {
   return useQuery({
     queryKey: ['admin', 'contests', filters],
@@ -193,71 +261,6 @@ export function useVoidMatch() {
   });
 }
 
-export function useVoidTournament() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      tournamentId: string;
-      reason: string;
-    }): Promise<void> => {
-      const { error } = await api.POST(
-        '/api/v1/admin/tournaments/{tournament_id}/void',
-        {
-          params: { path: { tournament_id: input.tournamentId } },
-          body: { reason: input.reason },
-        },
-      );
-      if (error) throw new Error('Void failed');
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
-  });
-}
-
-// --- Stored match log (background ingestion) ------------------------------ //
-
-export interface AdminGameMatch {
-  id: string;
-  user_id: string;
-  username: string | null;
-  host_username: string | null;
-  game: string;
-  host_account_id: string;
-  host_match_id: string;
-  started_at: string;
-  ended_at: string | null;
-  mode: string | null;
-  rated: boolean;
-  eligible: boolean;
-  result: string | null;
-  moves: number;
-  metrics: Record<string, number>;
-  detail: Record<string, unknown>;
-  fetched_at: string;
-  account_last_polled_at: string | null;
-}
-
-export function useAdminGameMatches(filters: { player?: string; game?: string }) {
-  return useQuery({
-    queryKey: ['admin', 'game-matches', filters],
-    refetchInterval: 30_000,
-    queryFn: async (): Promise<AdminGameMatch[]> => {
-      const { data, error } = await api.GET('/api/v1/admin/game-matches', {
-        params: {
-          query: {
-            player: filters.player || undefined,
-            game: filters.game || undefined,
-            limit: 200,
-          },
-        },
-      });
-      if (error) throw new Error('Failed to load stored matches');
-      return (data as { matches: AdminGameMatch[] }).matches;
-    },
-  });
-}
-
-// --- Queue / Reconciliation / Risk ---------------------------------------- //
-
 export function useAdminQueue() {
   return useQuery({
     queryKey: ['admin', 'queue'],
@@ -305,11 +308,9 @@ export function useClearFlag() {
   });
 }
 
-// --- Disputes -------------------------------------------------------------- //
-
 export interface AdminDispute {
   id: string;
-  ref_type: string; // match | pool | tournament
+  ref_type: string;
   ref_id: string;
   user_id: string;
   reason: string;
@@ -319,7 +320,6 @@ export interface AdminDispute {
   resolved_at: string | null;
 }
 
-/** Open, user-filed contest disputes awaiting admin review. */
 export function useAdminDisputes() {
   return useQuery({
     queryKey: ['admin', 'disputes'],
@@ -347,60 +347,5 @@ export function useResolveDispute() {
       if (error) throw new Error('Resolve failed');
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'disputes'] }),
-  });
-}
-
-// --- Tournament settlement log (permanent, written at settlement) ---------- //
-
-export interface AdminTournamentLogMatch {
-  host_match_id: string;
-  game_match_id: string | null;
-  started_at: string;
-  ended_at: string | null;
-  fetched_at: string | null;
-  mode: string | null;
-  result: string | null;
-  reason: string;
-  reason_text: string;
-  counted: boolean;
-  value: number | null;
-  metrics: Record<string, number>;
-  recorded_at: string;
-}
-
-export interface AdminTournamentLogEntrant {
-  entry_id: string;
-  user_id: string;
-  username: string | null;
-  host_account_id: string;
-  entered_at: string;
-  score: number | null;
-  matches_counted: number;
-  rank: number | null;
-  entry_cents: number;
-  payout_cents: number;
-  outcome: string;
-  matches: AdminTournamentLogMatch[];
-}
-
-export interface AdminTournamentLog {
-  tournament_id: string;
-  tournament_outcome: string | null;
-  recorded_at: string | null;
-  entrants: AdminTournamentLogEntrant[];
-}
-
-export function useTournamentLog(tournamentId: string | null) {
-  return useQuery({
-    queryKey: ['admin', 'tournament-log', tournamentId],
-    enabled: !!tournamentId,
-    queryFn: async (): Promise<AdminTournamentLog> => {
-      const { data, error } = await api.GET(
-        '/api/v1/admin/tournaments/{tournament_id}/log',
-        { params: { path: { tournament_id: tournamentId! } } },
-      );
-      if (error) throw new Error('Failed to load the tournament log');
-      return data as AdminTournamentLog;
-    },
   });
 }

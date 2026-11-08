@@ -1,10 +1,4 @@
-"""`DemoKycProvider` — the only `KycProvider` at MVP.
-
-There is no real verification vendor; the demo provider auto-verifies so the
-seam is demonstrably exercisable. It is never reached on the hot path at MVP
-because `kyc_required` returns False everywhere — it exists so the protocol has
-a concrete implementation and the resolver has something to return.
-"""
+"""`DemoKycProvider` — the only `KycProvider` at MVP."""
 
 from __future__ import annotations
 

@@ -1,14 +1,4 @@
-"""Casual games must never reach anything that builds or grades a stat.
-
-`GameFilters.rated_only` existed but nothing read it: the chess adapter ignored
-the flag and the host client hardcoded `rated=true`, so casual games were
-excluded by accident while three call sites passed `rated_only=False` believing
-it did something. This pins the behaviour down now that the flag is real.
-
-Matters more for chess than it looks: a brokered Lichess duel is created through
-`/challenge/open`, which sends no `rated` field, so the duel itself is casual.
-Without this filter a money duel would feed the very baseline it was quoted from.
-"""
+"""Casual games must never reach anything that builds or grades a stat."""
 
 from __future__ import annotations
 
@@ -21,7 +11,6 @@ pytestmark = pytest.mark.nodb
 
 
 def _raw(game_id: str, rated: bool) -> dict:
-    """A finished standard game as Lichess returns it."""
     return {
         "id": game_id,
         "rated": rated,
@@ -40,7 +29,6 @@ def _raw(game_id: str, rated: bool) -> dict:
 
 @pytest.fixture
 def patched_host(monkeypatch):
-    """Capture the params the adapter asks for, and serve a mixed history."""
     seen: dict[str, object] = {}
     games = [_raw("rated1", True), _raw("casual1", False), _raw("rated2", True)]
 
@@ -48,7 +36,6 @@ def patched_host(monkeypatch):
         username, since_ms, perf_types=None, max_games=50, rated_only=True
     ):
         seen["rated_only"] = rated_only
-        # Mirror the host: it honours the filter server-side.
         return [g for g in games if g["rated"]] if rated_only else games
 
     monkeypatch.setattr(
@@ -67,11 +54,6 @@ async def test_default_filters_are_rated_only(patched_host):
 
 
 async def test_casual_games_are_dropped_even_if_the_host_returns_them(monkeypatch):
-    """Belt and braces: never trust the query string alone.
-
-    If the host ignores the parameter, or the parameter is ever dropped, a
-    casual game still must not become a stat.
-    """
 
     async def leaky_get_user_games(
         username, since_ms, perf_types=None, max_games=50, rated_only=True
@@ -87,8 +69,6 @@ async def test_casual_games_are_dropped_even_if_the_host_returns_them(monkeypatc
 
 
 async def test_opting_out_returns_casual_games_too(patched_host):
-    """The flag is real in both directions, for callers that genuinely want all
-    of a player's games (a display-only view, say)."""
     out = await ChessLichessAdapter().poll_eligible_games(
         "me", 0, GameFilters(rated_only=False)
     )
@@ -99,5 +79,4 @@ async def test_opting_out_returns_casual_games_too(patched_host):
 
 async def test_the_metric_still_lands_on_the_kept_games(patched_host):
     out = await ChessLichessAdapter().poll_eligible_games("me", 0, GameFilters())
-    # 7 plies -> 4 full moves, and that is what pools and tournaments read.
     assert all(g.metrics["chess_moves"] == 4.0 for g in out)

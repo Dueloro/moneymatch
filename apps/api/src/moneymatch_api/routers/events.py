@@ -1,19 +1,4 @@
-"""`/events/stream` — a Server-Sent Events stream of contest lifecycle events.
-
-The settlement worker runs in a *separate process*, so an in-process pub/sub
-can't reach the API's connections. Instead every `notifications_service.emit`
-issues a Postgres `pg_notify` (delivered on COMMIT); this endpoint holds one
-dedicated `LISTEN` connection per client and forwards the events addressed to the
-authenticated viewer. The browser keeps a single `EventSource` open and refreshes
-the Activity feed / rail the instant an event arrives — no client-side polling.
-
-Auth: `EventSource` can't set an `Authorization` header, and putting the
-long-lived access token in the `?token=` query string would leak it into access
-logs and browser history. So the client first trades its bearer token (sent the
-normal way, in the header) for a **single-use, short-lived ticket** via
-`POST /events/ticket`, then connects with `?ticket=`. The ticket is a random
-opaque string, consumed on connect, and grants nothing but this user's stream.
-"""
+"""`/events/stream` — a Server-Sent Events stream of contest lifecycle events."""
 
 from __future__ import annotations
 
@@ -37,17 +22,9 @@ log = structlog.get_logger(__name__)
 router = APIRouter(tags=["events"])
 
 _CHANNEL = "moneymatch_events"
-# Cap the idle wait so we emit an SSE heartbeat (keeps proxies from closing the
-# connection) and re-check client disconnect on the same cadence.
 _HEARTBEAT_SECONDS = 15
 _TICKET_TTL_SECONDS = 30
 
-# Single-use SSE tickets: {ticket -> (user_id, expires_at_monotonic)}.
-#
-# The store is in-process, which is correct for the single web instance this
-# runs on. A horizontally-scaled deployment would move it to Postgres/Redis so a
-# ticket minted on one instance can be consumed on another; the endpoint contract
-# stays the same.
 _tickets: dict[str, tuple[str, float]] = {}
 
 
@@ -68,7 +45,6 @@ async def issue_ticket(user: CurrentUser) -> dict[str, object]:
 
 
 def _consume_ticket(ticket: str) -> str:
-    """Pop-and-return the ticket's user_id, or 401 if unknown/expired (one-time)."""
     now = time.monotonic()
     _prune(now)
     entry = _tickets.pop(ticket, None)
@@ -80,7 +56,6 @@ def _consume_ticket(ticket: str) -> str:
 
 
 def _raw_dsn() -> str:
-    """A plain libpq DSN for asyncpg (strip the SQLAlchemy `+asyncpg` marker)."""
     return get_settings().database_url.replace(
         "postgresql+asyncpg://", "postgresql://", 1
     )
@@ -88,8 +63,6 @@ def _raw_dsn() -> str:
 
 @router.get("/events/stream")
 async def stream(request: Request, ticket: str = Query(...)) -> StreamingResponse:
-    # Consume the single-use ticket up front so a bad one fails as a clean 401
-    # before we open the stream. The long-lived access token never appears here.
     user_id = _consume_ticket(ticket)
 
     async def event_gen() -> AsyncIterator[str]:
@@ -101,7 +74,6 @@ async def stream(request: Request, ticket: str = Query(...)) -> StreamingRespons
 
         await conn.add_listener(_CHANNEL, _on_notify)
         try:
-            # A comment line so the client's `onopen` fires and proxies flush headers.
             yield ": connected\n\n"
             while True:
                 if await request.is_disconnected():
@@ -117,12 +89,8 @@ async def stream(request: Request, ticket: str = Query(...)) -> StreamingRespons
                     data = json.loads(payload)
                 except (json.JSONDecodeError, TypeError):
                     continue
-                # One channel serves every user; only forward this viewer's events.
                 if data.get("user_id") != user_id:
                     continue
-                # Default (unnamed) SSE message so the client's `onmessage` catches
-                # every kind; the `kind` travels inside the JSON `data` for anyone
-                # who wants to branch on it.
                 yield f"data: {payload}\n\n"
         finally:
             try:
@@ -136,7 +104,6 @@ async def stream(request: Request, ticket: str = Query(...)) -> StreamingRespons
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            # Disable proxy buffering (nginx) so events flush immediately.
             "X-Accel-Buffering": "no",
         },
     )

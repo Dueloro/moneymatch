@@ -5,13 +5,6 @@ import type {
   TextareaHTMLAttributes,
 } from 'react';
 
-/**
- * Styled form controls. The inventory found native browser checkboxes, selects
- * and radios leaking through on sign-in and in the challenge dialog, which is
- * the fastest way to make a product look unfinished. These give every control
- * one shared treatment and one focus behaviour.
- */
-
 const CONTROL =
   'w-full rounded-pill border border-hairline bg-panel-raised px-4 py-2.5 text-sm text-text ' +
   'transition-colors placeholder:text-text-tertiary hover:border-line-strong ' +
@@ -38,7 +31,6 @@ export function TextArea({
   );
 }
 
-/** Native select with the arrow drawn by us, so it matches on every platform. */
 export function Select({
   className = '',
   children,
@@ -66,7 +58,6 @@ export function Select({
   );
 }
 
-/** A label above a control, with optional hint and error lines. */
 export function Field({
   label,
   hint,
@@ -88,7 +79,6 @@ export function Field({
   );
 }
 
-/** Checkbox drawn as a real box we control. Keeps the native input for a11y. */
 export function Checkbox({
   checked,
   onChange,
@@ -135,7 +125,6 @@ export function Checkbox({
   );
 }
 
-/** Radio row used by the challenge dialog's market list. */
 export function RadioRow({
   checked,
   onSelect,

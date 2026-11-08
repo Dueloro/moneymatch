@@ -9,6 +9,7 @@ import { ChallengeDialog } from '../ChallengeDialog';
 import { Skeleton } from '../ui/Skeleton';
 import { Avatar } from './Avatar';
 import { Composer, type InviteChoice } from './Composer';
+import { ErrorState } from '../ui/ErrorState';
 import { InviteSheet } from './InviteSheet';
 import { MessageBubble } from './MessageBubble';
 import { BackIcon, ChatIcon } from './icons';
@@ -28,7 +29,6 @@ function dayLabel(iso: string): string {
   });
 }
 
-/** True when this message starts a new visual run (new sender, or 5+ min gap). */
 function startsRun(message: ChatMessage, previous: ChatMessage | undefined): boolean {
   if (!previous || previous.sender_id !== message.sender_id) return true;
   const gap =
@@ -36,16 +36,14 @@ function startsRun(message: ChatMessage, previous: ChatMessage | undefined): boo
   return gap > 5 * 60 * 1000;
 }
 
-/** The open conversation: header, scrolling transcript, and the typing bar. */
 export function MessageThread({
   conversationId,
   onBack,
 }: {
   conversationId: string;
-  /** Mobile: return to the conversation list. */
   onBack: () => void;
 }) {
-  const { data, isLoading } = useThread(conversationId);
+  const { data, isLoading, isError, refetch } = useThread(conversationId);
   const markRead = useMarkConversationRead();
   const [invite, setInvite] = useState<InviteChoice | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -55,14 +53,11 @@ export function MessageThread({
   const peerName = conversation?.title ?? 'Conversation';
   const unread = conversation?.unread ?? 0;
 
-  // Opening a thread (or receiving into an open one) clears its badge.
   useEffect(() => {
     if (unread > 0) markRead.mutate(conversationId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, unread]);
 
-  // Pin to the newest message as the transcript grows. (jsdom has no
-  // scrollIntoView, hence the guard — tests render the same component.)
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ block: 'end' });
   }, [messages.length, conversationId]);
@@ -77,7 +72,7 @@ export function MessageThread({
           type="button"
           onClick={onBack}
           aria-label="Back to conversations"
-          className="grid h-9 w-9 place-items-center rounded-full text-text-secondary transition hover:bg-panel-raised hover:text-text md:hidden"
+          className="grid h-9 w-9 place-items-center rounded-full text-text-secondary transition hover:bg-panel-raised hover:text-text lg:hidden"
         >
           <BackIcon className="h-5 w-5" />
         </button>
@@ -117,7 +112,14 @@ export function MessageThread({
           </div>
         )}
 
-        {!isLoading && messages.length === 0 && (
+        {isError && !data && (
+          <ErrorState
+            title="Couldn't load this conversation"
+            onRetry={() => void refetch()}
+          />
+        )}
+
+        {!isLoading && !isError && messages.length === 0 && (
           <div className="m-auto max-w-xs text-center">
             <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full border border-hairline bg-panel-raised text-text-tertiary">
               <ChatIcon className="h-6 w-6" />

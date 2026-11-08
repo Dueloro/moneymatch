@@ -1,10 +1,4 @@
-"""Transactional email seam (Resend).
-
-Guarded like push/analytics: unconfigured ⇒ a no-op that never touches the
-network. Synthetic username addresses (no inbox) are never mailed; only real
-addresses reach Resend. The wire into `notifications.emit` is covered by the
-notifications tests — here we pin the service's own contract.
-"""
+"""Transactional email seam (Resend)."""
 
 from __future__ import annotations
 
@@ -28,7 +22,6 @@ def test_is_deliverable_filters_synthetic_addresses():
 
 @pytest.mark.nodb
 def test_is_enabled_is_false_without_key():
-    # No RESEND_API_KEY in the test env → the whole seam is a no-op.
     assert email_service.is_enabled() is False
 
 
@@ -41,7 +34,6 @@ async def _make_user(session, *, email: str) -> User:
 
 async def test_send_is_noop_without_key(session):
     user = await _make_user(session, email="real@example.com")
-    # Unconfigured → returns False without ever building an HTTP client.
     sent = await email_service.send_to_user(session, user.id, subject="Hi", body="Body")
     assert sent is False
 
@@ -55,7 +47,7 @@ async def test_send_skips_synthetic_address(session, monkeypatch):
             session, user.id, subject="Hi", body="Body"
         )
     assert sent is False
-    assert not route.called  # a non-deliverable address never hits the network
+    assert not route.called
 
 
 async def test_send_posts_to_resend_for_real_address(session, monkeypatch):
@@ -85,8 +77,6 @@ async def test_send_posts_to_resend_for_real_address(session, monkeypatch):
     assert payload["from"] == "Money Match <noreply@moneymatch.app>"
     assert payload["to"] == ["real@example.com"]
     assert payload["subject"] == "Your contest settled"
-    # The deep link is absolutised against the first WEB_ORIGIN and reaches both
-    # the text and HTML bodies.
     assert "https://app.moneymatch.app/activity" in payload["text"]
     assert "https://app.moneymatch.app/activity" in payload["html"]
 
@@ -98,7 +88,6 @@ async def test_send_swallows_provider_error(session, monkeypatch):
         respx.post(email_service._RESEND_ENDPOINT).mock(
             return_value=httpx.Response(422, json={"message": "bad from"})
         )
-        # A provider failure is logged and returns False — never raises.
         sent = await email_service.send_to_user(
             session, user.id, subject="Hi", body="Body"
         )
@@ -108,7 +97,9 @@ async def test_send_swallows_provider_error(session, monkeypatch):
 async def test_html_uses_hybrid_brand(session, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "resend_api_key", "re_test_key")
-    monkeypatch.setattr(settings, "web_origin", "https://moneymatch-beta.vercel.app")
+    monkeypatch.setattr(
+        settings, "web_origin", "https://play.dueloro.com,https://other.example"
+    )
     user = await _make_user(session, email="real@example.com")
     with respx.mock:
         route = respx.post(email_service._RESEND_ENDPOINT).mock(
@@ -122,7 +113,13 @@ async def test_html_uses_hybrid_brand(session, monkeypatch):
             link_path="/activity",
         )
     html = json.loads(route.calls.last.request.content)["html"]
-    # Brand: hosted logo, the lime CTA, and the Dueloro support footer.
-    assert "/email/logo.png" in html
+    assert 'src="https://play.dueloro.com/email/logo.png"' in html
     assert "Open Money Match" in html
     assert "Dueloro" in html
+
+
+def test_render_html_escapes_message_content():
+    html = email_service._render_html('<script>alert("x")</script>\nThanks', None)
+
+    assert "<script>" not in html
+    assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;<br>Thanks" in html

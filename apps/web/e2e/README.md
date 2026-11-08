@@ -1,63 +1,49 @@
 # End-to-end tests (Playwright)
 
-`h2h.spec.ts` drives the Phase-3 exit criterion: two users complete
-queue → match → confirm → play → auto-settlement, and the money lands exactly
-(winner **+$18.00**, loser **−$10.00**, **$2.00** rake).
+| Spec                 | Covers                                                           | Needs Lichess handles |
+| -------------------- | ---------------------------------------------------------------- | --------------------- |
+| `chat.spec.ts`       | friends → DM → unread badge → reply                              | no                    |
+| `chat.spec.ts`       | head-to-head invite from chat → accept → PENDING match           | yes                   |
+| `h2h.spec.ts`        | queue blitz at $10 → paired → both confirm → game link           | yes                   |
+| `invite.spec.ts`     | invite link → preview → accept → both confirm → game link        | yes                   |
+| `pools.spec.ts`      | fee shown → join via confirm → queued → leave, balance untouched | A only                |
+| `tournament.spec.ts` | fee shown → join → queued → leave, balance untouched             | A only                |
 
-`pools.spec.ts` drives the Phase-4 exit criterion: four similar-stat users pick
-Medium, enqueue, form a room whose `room_bar` is the rounded mean of their bars,
-clear a (fixture) match, and split the pool from server-fetched telemetry — zero
-client input after enqueue.
+Settlement is not driven end to end: it needs the game played to a
+result on Lichess, and a formed pool room or tournament field needs several
+similar-rated linked accounts. The money math is covered by the API suite
+(`apps/api/tests/test_settlement_worker.py`).
 
-`invite.spec.ts` drives the Phase-5 funnel: A mints an invite link, a **fresh**
-user B accepts, both confirm, the fixture settles, and both inboxes are correct.
+Every spec **skips** unless `E2E_AUTH=1`, so none silently passes. The suite is
+not in the unit-test CI job; it needs the whole stack and real browsers.
 
-`chat.spec.ts` drives the Inbox messaging loop (14-inbox-messaging): A befriends
-B, messages them from the Friends tab, B's bell lights **from another page**, B
-reads and replies, A sends a head-to-head invite from the chat composer, and B
-accepts the card — forming a real PENDING match. It is the only test that
-exercises two independent sessions against the poll loop and the unread cursor.
+## Auth seam and fixtures
 
-All four **skip** unless `E2E_AUTH=1` (they never silently pass). This suite is
-**not** in the unit-test CI job — it needs the whole stack and real browsers.
+- **API**: with `E2E_AUTH_ENABLED=true` (and `env != prod`),
+  `POST /api/v1/dev/e2e/token {auth_id}` mints a short-lived HS256 JWT signed
+  with `SUPABASE_JWT_SECRET`, verified by the same path as a real token.
+- **web**: built with `VITE_E2E_AUTH=true`, the app reads the token from the
+  `mm.e2e.access_token` localStorage key (`src/lib/e2eAuth.ts`).
+- **`auth.ts`**: `signInAs(browser, authId)` mints a token and opens a page.
+- **`fixtures.ts`**: builds players through the public API (`PATCH /me`,
+  `POST /links`, `/friends`, `/challenges`). Steps are idempotent, so the
+  linked players reuse stable `auth_id`s across runs.
 
-## The test-auth seam
+## Run
 
-Auth is Supabase-JWT, but the specs no longer need a live Supabase project. The
-seam (backlog · resolved) has two halves:
+```bash
+E2E_AUTH_ENABLED=true VITE_E2E_AUTH=true make dev   # api mints tokens; web reads them
+E2E_AUTH=1 E2E_LICHESS_A=<handle> E2E_LICHESS_B=<handle> make e2e
+```
 
-- **API** — with `E2E_AUTH_ENABLED=true` (and `env != prod`), the route
-  `POST /api/v1/dev/e2e/token {auth_id, email?}` mints a short-lived HS256 JWT
-  signed with `SUPABASE_JWT_SECRET`. It is verified by the exact same
-  `auth.verify_token` path as a real token — the auth boundary is unchanged.
-- **web** — built with `VITE_E2E_AUTH=true`, the app reads an access token from
-  the `mm.e2e.access_token` localStorage key instead of a Supabase session
-  (`src/lib/e2eAuth.ts`). Inert in a normal build.
+`SUPABASE_JWT_SECRET` must be an HS256 secret locally, or `/dev/e2e/token`
+returns `e2e_auth_unavailable`.
 
-`e2e/auth.ts` ties them together: `signInAs(browser, authId)` mints a token for a
-seeded user and injects it into a fresh context.
+`E2E_LICHESS_A` / `E2E_LICHESS_B` are two real Lichess accounts (linking
+verifies them live). A handle binds to one Money Match account for good, so keep
+`E2E_AUTH_ID_A` / `E2E_AUTH_ID_B` (defaults `e2e_linked_a` / `e2e_linked_b`)
+the same across runs. Pick accounts within ~800 rating points so they pair.
 
-## Prerequisites
-
-1. **Stack up with the seam on:**
-   ```bash
-   E2E_AUTH_ENABLED=true make dev    # api mints tokens; web built with VITE_E2E_AUTH=true
-   ```
-2. **Seed the cohort:** `make seed` — creates `seed_player1…N` (CS2-linked,
-   non-provisional). The specs default to these `auth_id`s.
-3. **Stubbed host adapter:** the settlement worker must grade each account's next
-   CS2 match deterministically (a fixture FaceIt response), so contests resolve
-   without a real game.
-4. **Run:**
-   ```bash
-   E2E_AUTH=1 make e2e
-   ```
-
-Overrides (all optional): `E2E_AUTH_ID_A` / `E2E_AUTH_ID_B` (h2h + invite
-challenger), `E2E_POOL_AUTH_IDS` (JSON array), `E2E_FRESH_AUTH_ID` (invite's
-fresh signup), `E2E_API_BASE_URL` (default `http://localhost:8000`).
-
-The exact settlement money math is also proven executably by the API/worker suite
-(`apps/api/tests/test_settlement_worker.py` ·
-`test_stat_race_win_pays_winner_and_reconciles`: winner 10800, loser 9000,
-rake 200 — i.e. +$18 / −$10 / $2 — with the conservation invariant asserted).
+Other overrides: `E2E_USERNAME_A` / `E2E_USERNAME_B`, `E2E_API_BASE_URL`
+(default `http://localhost:8000`), `E2E_BASE_URL` (default
+`http://localhost:5173`).

@@ -16,15 +16,12 @@ function messageOf(error: unknown, fallback: string): string {
   return typeof msg === 'string' && msg ? msg : fallback;
 }
 
-/** File a dispute ("contest") against any settled contest — match, pool, or
- * tournament. On success the Activity feed refetches so the card flips to
- * "Contested · under review". */
 export function useFileDispute() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (vars: ContestVars) => {
       const { data, error } = await api.POST('/api/v1/disputes', { body: vars });
-      if (error) throw new Error(messageOf(error, 'Could not submit your contest.'));
+      if (error) throw new Error(messageOf(error, 'Could not send your report.'));
       return data;
     },
     onSuccess: (_data, vars) => {

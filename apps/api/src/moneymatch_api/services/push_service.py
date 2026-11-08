@@ -1,11 +1,4 @@
-"""Web Push delivery (VAPID) — the browser-push side of notifications.
-
-Subscriptions are stored per browser endpoint; `send_to_user` fans a payload out
-to all of a user's subscriptions. `pywebpush` is synchronous, so each send runs
-in a worker thread to keep the event loop free. A push service that returns
-404/410 means the subscription is dead, so we prune it. Without a VAPID keypair
-configured, push is a no-op and the app falls back to in-app notifications.
-"""
+"""Web Push delivery (VAPID) — the browser-push side of notifications."""
 
 from __future__ import annotations
 
@@ -67,7 +60,6 @@ async def unsubscribe(session: AsyncSession, user_id: uuid.UUID, endpoint: str) 
 
 
 def _send_one(sub_info: dict[str, Any], data: str) -> None:
-    """Blocking single push (run in a thread). Raises on failure."""
     from pywebpush import webpush
 
     s = get_settings()
@@ -88,8 +80,6 @@ async def send_to_user(
     body: str,
     url: str | None = None,
 ) -> int:
-    """Best-effort push to every subscription of `user_id`. Returns the count
-    delivered; prunes dead subscriptions. Never raises."""
     if not is_enabled():
         return 0
     subs = list(

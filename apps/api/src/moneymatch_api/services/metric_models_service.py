@@ -1,13 +1,4 @@
-"""Metric-model bootstrap + refresh (05-phase-2 · deliverable 6).
-
-On link (and later on settlement / nightly) we pull the account's recent finished
-matches through its adapter and compute, per typed rate metric, a recency-weighted
-EWMA mean/std-dev and sample size `n` (half-life 10). `n` below the config floor
-marks the metric **provisional** (no stat duels/pools on it). Metrics are
-rate-based only — the adapters never surface raw totals.
-
-Pure math (`compute_ewma`) is separated from I/O so it is trivially testable.
-"""
+"""Metric-model bootstrap + refresh."""
 
 from __future__ import annotations
 
@@ -20,28 +11,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..adapters import registry
 from ..adapters.base import GameFilters, NormGame
 from ..constants import (
-    GAME_HISTORY_FLOOR,
     GAME_RATE_METRICS,
     METRIC_EWMA_HALF_LIFE,
-    METRIC_PROVISIONAL_MIN_N,
+    rated_only_game,
 )
 from ..models.skill import MetricModel
-from . import demo_mode
 
-# How far back to pull for the bootstrap (~last N finished matches; adapters cap
-# their own page sizes below this).
 _BOOTSTRAP_MATCH_LIMIT = 50
 
 
 async def get_metric_model(
     session: AsyncSession, user_id: uuid.UUID, game: str, metric: str
 ) -> MetricModel | None:
-    """The user's model for one game+metric, or None if they have none yet.
-
-    The single reader for this row: matchmaking and pool formation both quote a
-    bar off it, so it lived as an identical private ``_metric_model`` in each.
-    One copy here keeps the two entry paths reading the model the same way.
-    """
+    """The user's model for one game+metric, or None if they have none yet."""
     return await session.scalar(
         select(MetricModel).where(
             MetricModel.user_id == user_id,
@@ -54,11 +36,7 @@ async def get_metric_model(
 def compute_ewma(
     values: list[float], half_life: int = METRIC_EWMA_HALF_LIFE
 ) -> tuple[float, float, int]:
-    """Recency-weighted (mean, std-dev, n) over ``values`` (oldest-first).
-
-    The most recent sample carries weight 1; each step older is halved every
-    ``half_life`` samples. `n` is the raw sample count (drives provisional-ness).
-    """
+    """Recency-weighted (mean, std-dev, n) over ``values`` (oldest-first)."""
     n = len(values)
     if n == 0:
         return 0.0, 0.0, 0
@@ -67,16 +45,6 @@ def compute_ewma(
     mu = sum(w * x for w, x in zip(weights, values, strict=True)) / total_w
     var = sum(w * (x - mu) ** 2 for w, x in zip(weights, values, strict=True)) / total_w
     return mu, math.sqrt(var), n
-
-
-def is_provisional(model: MetricModel) -> bool:
-    """A metric with too few samples can't back a stat duel/pool."""
-    return model.n < METRIC_PROVISIONAL_MIN_N
-
-
-def meets_history_floor(game: str, total_finished: int) -> bool:
-    """Whether an account clears the per-game history floor (else win-only)."""
-    return total_finished >= GAME_HISTORY_FLOOR.get(game, 0)
 
 
 async def _upsert(
@@ -111,11 +79,7 @@ async def bootstrap(
     game: str,
     host_account_id: str,
 ) -> list[MetricModel]:
-    """Fetch recent history and (re)compute this account's metric models.
-
-    Returns the models written (empty for win-only games like chess, or when the
-    account has no readable rate metrics yet).
-    """
+    """Fetch recent history and (re)compute this account's metric models."""
     metrics = GAME_RATE_METRICS.get(game, ())
     if not metrics:
         return []
@@ -124,10 +88,7 @@ async def bootstrap(
     games: list[NormGame] = await adapter.poll_eligible_games(
         host_account_id,
         0,
-        # Build the baseline from the same population it will be graded
-        # against, so a demo bar quoted from casual games is judged on casual
-        # games too.
-        GameFilters(rated_only=await demo_mode.rated_only_for(session, user_id, game)),
+        GameFilters(rated_only=rated_only_game(game)),
     )
     games = games[-_BOOTSTRAP_MATCH_LIMIT:]
 
@@ -137,22 +98,6 @@ async def bootstrap(
         mu, sigma, n = compute_ewma(values)
 
         if n == 0:
-            # An empty result set is not evidence, and evidence is the only
-            # thing allowed to overwrite a model.
-            #
-            # Writing (0, 0, 0) here reads as provisional, and a provisional
-            # metric is offered no pools at all. That destroyed two different
-            # things:
-            #
-            #   - the prior `cs2_prior.seed()` writes when a Steam account is
-            #     linked (the account has no *stored* matches yet, so every
-            #     later refresh zeroed the bar the player had just been quoted);
-            #   - an established baseline whenever the host API happened to be
-            #     unavailable during a refresh — fifty matches of real history
-            #     replaced by zeros because Steam was down.
-            #
-            # Creating a fresh zero row is still correct: an account we have
-            # never seen genuinely is provisional. Only *overwriting* is refused.
             existing = await session.scalar(
                 select(MetricModel).where(
                     MetricModel.user_id == user_id,

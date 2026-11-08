@@ -1,8 +1,6 @@
-"""`/admin/users` — find a user, see their whole money trail, and fix things.
-
-Search → detail (wallet, ledger, linked accounts, limits, contests) → actions:
-freeze / unfreeze, force-unbind a linked account, manual ledger adjustment. Every
-action writes an `admin_audit` row in the same transaction (09-phase-6 · d.2).
+"""`/admin/users` — find a user, see their whole money trail, and fix things. Search
+→ detail (wallet, ledger, linked accounts, limits, contests) → actions: freeze /
+unfreeze, force-unbind a linked account, manual ledger adjustment.
 """
 
 from __future__ import annotations

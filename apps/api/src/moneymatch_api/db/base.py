@@ -1,8 +1,4 @@
-"""Declarative base + shared column mixins.
-
-All models inherit `Base`. `TimestampMixin` gives every table the
-`created_at`/`updated_at` convention from 01-architecture §2.
-"""
+"""Declarative base + shared column mixins."""
 
 from __future__ import annotations
 

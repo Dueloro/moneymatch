@@ -1,4 +1,4 @@
-"""The worker's nightly pass + its self-throttling cadence (backlog · Phase B)."""
+"""The worker's nightly pass + its self-throttling cadence."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ from moneymatch_api.workers import settlement_worker
 from moneymatch_api.workers.nightly import run_nightly
 
 from .conftest import new_sessionmaker
-from .factories import create_linked_account, create_user, cs2_profile
+from .factories import chess_profile, create_linked_account, create_user
 
 pytestmark = pytest.mark.asyncio
 
-CS2 = "cs2.steam"
-KD = "cs2_kd_ratio"
+CHESS = "chess.lichess"
+METRIC = "chess_moves"
 
 
 class _FakeAdapter:
@@ -26,13 +26,13 @@ class _FakeAdapter:
         self._games = [
             NormGame(
                 id=str(i),
-                speed="cs2",
+                speed="blitz",
                 rated=True,
                 created_at_ms=i,
-                moves=0,
-                won=None,
+                moves=int(v),
+                won=True,
                 drawn=False,
-                metrics={KD: v},
+                metrics={METRIC: v},
             )
             for i, v in enumerate(values_oldest_first)
         ]
@@ -44,12 +44,12 @@ class _FakeAdapter:
 async def test_run_nightly_refreshes_models_and_flags_sandbagger(session, monkeypatch):
     user = await create_user(session, username="tank")
     await create_linked_account(
-        session, user, CS2, host_account_id="host_tank", profile=cs2_profile("tank")
+        session, user, CHESS, host_account_id="host_tank", profile=chess_profile("tank")
     )
-    await session.commit()  # visible to run_nightly's own sessions
+    await session.commit()
 
-    baseline = [1.5, 1.4, 1.6, 1.5, 1.5, 1.4, 1.6]
-    recent_tanked = [0.6] * 10
+    baseline = [34.0, 36.0, 35.0, 33.0, 37.0, 35.0, 34.0]
+    recent_tanked = [55.0, 54.0, 56.0, 55.0, 53.0, 57.0, 55.0, 54.0, 56.0, 55.0]
     history = baseline + recent_tanked
     monkeypatch.setattr(registry, "get", lambda g: _FakeAdapter(history))
 
@@ -61,7 +61,7 @@ async def test_run_nightly_refreshes_models_and_flags_sandbagger(session, monkey
 
     model = await session.scalar(
         select(MetricModel).where(
-            MetricModel.user_id == user.id, MetricModel.metric == KD
+            MetricModel.user_id == user.id, MetricModel.metric == METRIC
         )
     )
     assert model is not None and model.n == len(baseline) + len(recent_tanked)
@@ -85,6 +85,6 @@ async def test_maybe_run_nightly_runs_once_then_throttles(monkeypatch):
     monkeypatch.setattr("moneymatch_api.workers.nightly.run_nightly", _fake_nightly)
     sm = new_sessionmaker()
 
-    assert await settlement_worker.maybe_run_nightly(sm) is True  # never run → due
-    assert await settlement_worker.maybe_run_nightly(sm) is False  # throttled
+    assert await settlement_worker.maybe_run_nightly(sm) is True
+    assert await settlement_worker.maybe_run_nightly(sm) is False
     assert len(calls) == 1

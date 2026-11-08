@@ -31,35 +31,27 @@ router = APIRouter(tags=["me"])
 
 
 async def _getting_started(session: AsyncSession, user: User) -> GettingStarted:
-    """First-match funnel progress for the getting-started checklist."""
     linked = await session.scalar(
         select(LinkedAccount.id)
         .where(LinkedAccount.user_id == user.id, LinkedAccount.status != "unbound")
         .limit(1)
     )
-    # Any escrow ever held = they've entered a contest (H2H / pool / tournament).
     wagered = await session.scalar(
         select(LedgerEntry.id)
         .join(Wallet, Wallet.id == LedgerEntry.wallet_id)
         .where(Wallet.user_id == user.id, LedgerEntry.entry_type == "escrow_hold")
         .limit(1)
     )
-    picked = bool(user.active_games)
     linked_game = linked is not None
     placed_wager = wagered is not None
     return GettingStarted(
-        picked_games=picked,
         linked_game=linked_game,
         placed_wager=placed_wager,
-        complete=picked and linked_game and placed_wager,
+        complete=linked_game and placed_wager,
     )
 
 
 async def _contested_games(session: AsyncSession, user: User) -> list[str]:
-    """Games the player has entered at least one contest for (pool / H2H /
-    tournament). Computed, not stored: three `user_id`-indexed lookups unioned
-    into a small distinct set — cheap enough for a checklist and avoids a
-    per-game counter that every escrow path would have to keep in sync."""
     pools = (
         select(SoloPool.game)
         .join(SoloEntry, SoloEntry.pool_id == SoloPool.id)
@@ -140,16 +132,6 @@ async def update_me(
             daily_deposit_cap_cents=body.daily_deposit_cap_cents,
             timeout_until=timeout_until,
         )
-
-    if body.active_games is not None:
-        user.active_games = body.active_games
-        # Keep dismissals a subset of the play set: a removed game forgets its
-        # dismissal, so re-adding it shows the checklist again (starting over).
-        active = set(body.active_games)
-        user.dismissed_checklists = [
-            g for g in user.dismissed_checklists if g in active
-        ]
-        await session.flush()
 
     if body.dismissed_checklists is not None:
         user.dismissed_checklists = body.dismissed_checklists

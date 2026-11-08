@@ -1,9 +1,4 @@
-"""Direct-insert factories for service/DB tests.
-
-These bypass the HTTP layer and (deliberately) the wallet_service so a test can
-arrange a known starting balance before exercising the money primitives. Real
-provisioning + signup grant is tested separately.
-"""
+"""Direct-insert factories for service/DB tests."""
 
 from __future__ import annotations
 
@@ -16,6 +11,7 @@ from moneymatch_api.models.skill import MetricModel
 from moneymatch_api.models.user import User
 from moneymatch_api.models.wallet import Limit, Wallet
 from moneymatch_api.schemas.profile import FormatStat, ProfileSnapshot
+from moneymatch_api.services import fairness, skill_prior
 
 
 async def create_user(
@@ -82,19 +78,13 @@ def chess_profile(
     )
 
 
-def cs2_profile(
-    username: str, *, rating: int = 1500, total_games: int = 60
-) -> ProfileSnapshot:
-    return ProfileSnapshot(
-        username=username,
-        display_name=username,
-        url=f"https://steamcommunity.com/profiles/{username}",
-        link_method="username",
-        game="cs2.steam",
-        win_rate=0.5,
-        total_games=total_games,
-        rating=rating,
+def chess_moves_corrected(
+    mu: float, sigma: float, n: int, rating: float | None = 1500
+) -> tuple[float, float]:
+    mu, sigma = skill_prior.shrink(
+        mu, sigma, n, skill_prior.prior_for("chess_moves", rating)
     )
+    return mu, fairness.effective_sigma(sigma, 1.0)
 
 
 async def create_linked_account(

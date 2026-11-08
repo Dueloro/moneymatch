@@ -1,7 +1,3 @@
-// Web Push (browser) — register the service worker, subscribe against the
-// server's VAPID public key, and mirror the subscription to the API. All calls
-// no-op gracefully where push isn't supported or configured.
-
 import { api } from './api';
 
 export function isPushSupported(): boolean {
@@ -13,7 +9,6 @@ export function isPushSupported(): boolean {
   );
 }
 
-/** The server's VAPID public key, or null when push isn't configured. */
 async function serverPublicKey(): Promise<string | null> {
   const { data, error } = await api.GET('/api/v1/notifications/push/public-key');
   if (error) return null;
@@ -34,7 +29,6 @@ async function registration(): Promise<ServiceWorkerRegistration> {
   return existing ?? navigator.serviceWorker.register('/sw.js');
 }
 
-/** True when this browser already has an active push subscription. */
 export async function isSubscribed(): Promise<boolean> {
   if (!isPushSupported()) return false;
   const reg = await navigator.serviceWorker.getRegistration();
@@ -42,12 +36,10 @@ export async function isSubscribed(): Promise<boolean> {
   return (await reg.pushManager.getSubscription()) != null;
 }
 
-/** Ask permission, subscribe, and register the subscription with the API.
- * Returns true on success. */
 export async function enablePush(): Promise<boolean> {
   if (!isPushSupported()) return false;
   const publicKey = await serverPublicKey();
-  if (!publicKey) return false; // push not configured server-side
+  if (!publicKey) return false;
 
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return false;
@@ -70,7 +62,6 @@ export async function enablePush(): Promise<boolean> {
   return !error;
 }
 
-/** Unsubscribe locally and on the server. */
 export async function disablePush(): Promise<void> {
   if (!isPushSupported()) return;
   const reg = await navigator.serviceWorker.getRegistration();

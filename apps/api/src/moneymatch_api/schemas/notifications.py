@@ -1,8 +1,4 @@
-"""Inbox wire types (design PDF p.11): notification rows + unread count.
-
-The `kind` + `payload` are enough for the client to render the row text and its
-action pills (View → deep link, Respond → challenge accept). Read state is the
-only mutable field."""
+"""Inbox wire types: notification rows + unread count."""
 
 from __future__ import annotations
 
@@ -33,3 +29,9 @@ class MarkReadRequest(BaseModel):
 
 class MarkReadResponse(BaseModel):
     unread: int
+
+
+class InboxBadgeResponse(BaseModel):
+    """Unread items that arrived since the user last opened Social."""
+
+    badge: int

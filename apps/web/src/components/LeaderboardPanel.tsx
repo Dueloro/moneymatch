@@ -1,18 +1,27 @@
 import { formatRoi, useLeaderboard } from '../hooks/useLeaderboard';
 import { EmptyState } from './ui/EmptyState';
+import { ErrorState } from './ui/ErrorState';
+import { SkeletonList } from './ui/Skeleton';
 import { ListRow } from './ui/ListRow';
 
-/** Leaderboard tab (design p.7): ROI-ranked real users, you-row highlighted. */
 export function LeaderboardPanel() {
-  const { data } = useLeaderboard();
+  const { data, isLoading, isError, refetch } = useLeaderboard();
 
-  if (!data) return null;
+  if (isLoading) return <SkeletonList rows={5} />;
+  if (isError || !data) {
+    return (
+      <ErrorState
+        title="Couldn't load the leaderboard"
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
   if (data.rows.length === 0) {
     return (
       <EmptyState
         title="Nobody is ranked yet"
-        subline={`Settle ${data.min_contests} contests inside ${data.window_days} days and you are on the board.`}
+        subline={`Finish ${data.min_contests} matches, pools or tournaments in ${data.window_days} days to get on the board.`}
       />
     );
   }
@@ -33,10 +42,9 @@ export function LeaderboardPanel() {
               {row.is_you ? ' (you)' : ''}
             </span>
           }
-          subline={`${row.contests} contests`}
+          subline={`${row.contests} played`}
           right={
-            // ROI is a return on money, so lime stays correct here.
-            <span className={row.roi_bps >= 0 ? 'text-green' : 'text-text-secondary'}>
+            <span className={row.roi_bps >= 0 ? 'text-green' : 'text-red'}>
               {formatRoi(row.roi_bps)}
             </span>
           }
@@ -44,8 +52,7 @@ export function LeaderboardPanel() {
       ))}
       {!data.you.qualified && (
         <p className="mt-4 text-xs text-text-secondary">
-          You are not ranked yet. Settle {data.you.contests_needed} more contest
-          {data.you.contests_needed === 1 ? '' : 's'} to qualify.
+          You are not ranked yet. Finish {data.you.contests_needed} more to qualify.
         </p>
       )}
     </div>

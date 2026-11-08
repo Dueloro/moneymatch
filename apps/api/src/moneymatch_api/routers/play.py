@@ -1,13 +1,11 @@
-"""`/play` — markets, the DB-backed queue, the match slip, and the waiting list.
-
-Every write is an **intent with ids** (join a market, confirm a match, take a
+"""Every write is an **intent with ids** (join a market, confirm a match, take a
 waiting slot): the server owns the entry cents, the pairing, the timestamps, and
-the settlement. There is deliberately **no settle endpoint** — only the worker
-settles (00-README §3; 06-phase-3 exit criteria).
+the settlement.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -15,13 +13,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import clock
-from ..constants import ENTRY_PRESETS_CENTS, METRIC_PROVISIONAL_MIN_N
+from ..constants import (
+    CHESS_CLOCKS,
+    ENTRY_PRESETS_CENTS,
+    LIVE_SNAPSHOT_STALE_SECONDS,
+)
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
+from ..models.live import LiveSnapshot
 from ..models.play import Match, MatchPlayer, QueueTicket
-from ..models.skill import MetricModel
 from ..models.user import User
 from ..schemas.play import (
     DisputeView,
@@ -33,39 +35,59 @@ from ..schemas.play import (
     MatchView,
     QueueRequest,
     QueueStatusResponse,
+    QueueTicketView,
+    SpeedClock,
     WaitingResponse,
     WaitingRow,
 )
-from ..services import dispute_service, matchmaking, money_math, test_opponents
-from ..services.markets import (
-    KIND_STAT_RACE,
-    KIND_WIN_H2H,
-    KIND_WIN_NEXT,
-    MarketDef,
+from ..services import (
+    dispute_service,
+    live_activity_service,
+    matchmaking,
+    money_math,
 )
 from ..services.markets import for_game as markets_for_game
 from ..services.markets import get as get_market
 from ..services.match_lifecycle import cancel_pending, confirm, players
+from ..services.match_states import is_terminal
 
 router = APIRouter(prefix="/play", tags=["play"])
 
-_CHESS_SPEEDS = ["bullet", "blitz", "rapid", "classical"]
-
-# --------------------------------------------------------------------------- #
-# View builders.
-# --------------------------------------------------------------------------- #
+_CHESS_SPEEDS = list(CHESS_CLOCKS)
 
 
-def _resolution_note(market: MarketDef) -> str:
-    if market.kind == KIND_WIN_H2H:
-        return "Brokered game between you both · draw = push, entries refunded."
-    if market.kind == KIND_WIN_NEXT:
-        return "Win beats loss · tie = push. Your next finished match after matchup."
-    return (
-        f"Higher {market.label} wins · equal = push. Graded from your next "
-        "finished match; if your opponent never plays, you win by forfeit after "
-        "the window plus a short grace period."
-    )
+_RESOLUTION_NOTE = "Brokered game between you both · draw = push, entries refunded."
+
+
+def _speed_clock(speed: str | None) -> SpeedClock | None:
+    if speed not in CHESS_CLOCKS:
+        return None
+    limit, increment = CHESS_CLOCKS[speed]
+    return SpeedClock(speed=speed, limit_seconds=limit, increment_seconds=increment)
+
+
+def _when(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+async def _live_view(session: AsyncSession, match: Match, user: User) -> dict | None:
+    """The stored board for this viewer; an in-flight board that stopped refreshing
+    is withheld so the stage falls back to the Lichess link.
+    """
+    if match.matched_at is None:
+        return None
+    row = await session.get(LiveSnapshot, ("match", match.id))
+    if row is None:
+        return None
+    age = (clock.now() - row.updated_at).total_seconds()
+    if not is_terminal(match.state) and age > LIVE_SNAPSHOT_STALE_SECONDS:
+        return None
+    return live_activity_service.view_for("match", row.data, user.id, board=True)
 
 
 async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
@@ -105,9 +127,10 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
     forecast = None
     if market is not None and your_seat is not None and opp_seat is not None:
         forecast = matchmaking.forecast_between(
-            market, your_seat.baseline_snapshot, opp_seat.baseline_snapshot
+            your_seat.baseline_snapshot, opp_seat.baseline_snapshot
         )
 
+    detail = match.outcome_detail or {}
     return MatchView(
         id=match.id,
         game=match.game,
@@ -121,7 +144,6 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
         rake_cents=match.rake_cents,
         multiplier_bps=money_math.h2h_multiplier_bps(match.rake_bps),
         state=match.state,
-        brokered=match.brokered,
         host_game_id=match.host_game_id,
         matched_at=match.matched_at,
         window_ends_at=match.window_ends_at,
@@ -129,6 +151,12 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
         you_confirmed=your_seat.confirmed_at is not None if your_seat else False,
         your_play_url=your_seat.play_url if your_seat else None,
         forecast=forecast,
+        winner_user_id=match.winner_user_id,
+        friendly=match.friendly,
+        termination=detail.get("termination"),
+        game_ended_at=_when(detail.get("game_ended_at")),
+        resolved_at=match.resolved_at,
+        live=await _live_view(session, match, user),
     )
 
 
@@ -141,17 +169,19 @@ async def _status_view(
         )
     if result.status == "searching" and result.ticket is not None:
         waited = int((clock.now() - result.ticket.created_at).total_seconds())
+        t = result.ticket
         return QueueStatusResponse(
             status="searching",
             waited_seconds=waited,
-            tolerance_stage=result.ticket.tolerance_stage,
+            ticket=QueueTicketView(
+                market=t.market,
+                speed=t.speed,
+                clock=_speed_clock(t.speed),
+                entry_cents=t.entry_cents,
+                rating=t.rating,
+            ),
         )
     return QueueStatusResponse(status="idle", can_cancel=False)
-
-
-# --------------------------------------------------------------------------- #
-# Markets.
-# --------------------------------------------------------------------------- #
 
 
 @router.get("/markets", response_model=MarketsResponse)
@@ -185,33 +215,22 @@ async def get_markets(
     )
     depths = {market: int(count) for market, count in depth_rows}
 
-    # Which stat metrics is the viewer still provisional on?
-    model_rows = await session.execute(
-        select(MetricModel.metric, MetricModel.n).where(
-            MetricModel.user_id == user.id, MetricModel.game == game
+    rows = [
+        MarketRow(
+            key=market.key,
+            label=market.label,
+            kind=market.kind,
+            requires_speed=market.requires_speed,
+            speeds=_CHESS_SPEEDS if market.requires_speed else [],
+            clocks=[c for s in _CHESS_SPEEDS if (c := _speed_clock(s))]
+            if market.requires_speed
+            else [],
+            multiplier_bps=market.multiplier_bps,
+            queue_depth=depths.get(market.key, 0),
+            resolution_note=_RESOLUTION_NOTE,
         )
-    )
-    n_by_metric = {metric: n for metric, n in model_rows}
-
-    rows: list[MarketRow] = []
-    for market in defs:
-        provisional = False
-        if market.kind == KIND_STAT_RACE and market.metric is not None:
-            provisional = n_by_metric.get(market.metric, 0) < METRIC_PROVISIONAL_MIN_N
-        rows.append(
-            MarketRow(
-                key=market.key,
-                label=market.label,
-                kind=market.kind,
-                metric=market.metric,
-                requires_speed=market.requires_speed,
-                speeds=_CHESS_SPEEDS if market.requires_speed else [],
-                multiplier_bps=market.multiplier_bps,
-                queue_depth=depths.get(market.key, 0),
-                provisional=provisional,
-                resolution_note=_resolution_note(market),
-            )
-        )
+        for market in defs
+    ]
 
     return MarketsResponse(
         game=game,
@@ -219,11 +238,6 @@ async def get_markets(
         entry_presets_cents=list(ENTRY_PRESETS_CENTS),
         markets=rows,
     )
-
-
-# --------------------------------------------------------------------------- #
-# Queue.
-# --------------------------------------------------------------------------- #
 
 
 @router.post("/queue", response_model=QueueStatusResponse)
@@ -241,20 +255,6 @@ async def join_queue(
         speed=body.speed,
     )
 
-    # --- practice opponents (scaffolding, delete before launch) ------------- #
-    # With one real account nothing ever forms, so the whole fetch/grade/settle
-    # path is untestable. The demo account fills the bucket and re-polls, so the
-    # contest forms on this same request. Real signups never take this branch.
-    if test_opponents.is_enabled(user):
-        await test_opponents.fill_queue(
-            session,
-            user,
-            game=body.game,
-            market=body.market,
-            speed=body.speed,
-            entry_cents=body.entry_preset_cents,
-        )
-        result = await matchmaking.poll_status(session, user)
     return await _status_view(session, result, user)
 
 
@@ -272,11 +272,6 @@ async def leave_queue(
 ) -> QueueStatusResponse:
     await matchmaking.cancel(session, user)
     return QueueStatusResponse(status="idle", can_cancel=False)
-
-
-# --------------------------------------------------------------------------- #
-# Matches.
-# --------------------------------------------------------------------------- #
 
 
 async def _load_match(session: AsyncSession, match_id: UUID) -> Match:
@@ -308,8 +303,7 @@ async def get_match_grading(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> GradingExplanation:
-    """Transparent grading record: the rule, each side's stat line, the decision.
-    Only a participant can read it."""
+    """Transparent grading record: the rule, each side's stat line, the decision."""
     match = await _load_match(session, match_id)
     seats = await players(session, match.id)
     your_seat = next((s for s in seats if s.user_id == user.id), None)
@@ -330,7 +324,7 @@ async def get_match_grading(
         settled=match.state in ("SETTLED", "PUSHED"),
         result=result,
         market_label=market.label if market else match.market,
-        rule=_resolution_note(market) if market else "",
+        rule=_RESOLUTION_NOTE if market else "",
         engine_version=match.engine_version,
         resolved_at=match.resolved_at,
         winner_username=(
@@ -362,7 +356,6 @@ async def get_dispute(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> DisputeView | None:
-    """The viewer's dispute for this match, if any."""
     dispute = await dispute_service.get_for(session, "match", match_id, user.id)
     return DisputeView.model_validate(dispute) if dispute else None
 
@@ -390,11 +383,6 @@ async def decline_match(
         raise APIError("not_a_player", "You are not in this match.", status_code=403)
     await cancel_pending(session, match, reason="declined")
     return await _match_view(session, match, user)
-
-
-# --------------------------------------------------------------------------- #
-# Waiting list ("Waiting to play").
-# --------------------------------------------------------------------------- #
 
 
 @router.get("/waiting", response_model=WaitingResponse)

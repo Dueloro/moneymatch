@@ -1,17 +1,11 @@
-"""The `/admin` router tree (09-phase-6).
-
-One aggregating router, gated at the router level on `require_admin` so **every**
-`/admin/*` route is admin-only — a non-admin never reaches a handler. Sub-routers
-(flags, users, contests, queue, reconciliation, risk) are plain operator surfaces;
-each mutation writes an `admin_audit` row via `admin_audit_service`.
-"""
+"""The `/admin` router tree."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
 from ...dependencies import require_admin
-from . import contests, disputes, flags, matches, queue, reconciliation, risk, users
+from . import contests, disputes, flags, queue, reconciliation, risk, support, users
 
 router = APIRouter(
     prefix="/admin",
@@ -26,4 +20,4 @@ router.include_router(queue.router)
 router.include_router(reconciliation.router)
 router.include_router(risk.router)
 router.include_router(disputes.router)
-router.include_router(matches.router)
+router.include_router(support.router)

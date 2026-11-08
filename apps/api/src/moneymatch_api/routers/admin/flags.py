@@ -1,10 +1,6 @@
-"""`/admin/flags` — kill switches & config, flippable without a deploy.
-
-Toggles per-game enable (`game:<id>`), `queue_paused`, `settlement_paused`, and
-edits the `geo_config` excluded-state list. The read path is per-request, so a
-flip takes effect on the next API call / worker cycle — no restart (09-phase-6 ·
-exit criterion "flag flips verifiably stop the machinery"). Every write is
-audited.
+"""`/admin/flags` — kill switches & config, flippable without a deploy. Toggles per-
+game enable (`game:<id>`), `queue_paused`, `settlement_paused`, and edits the
+`geo_config` excluded-state list.
 """
 
 from __future__ import annotations

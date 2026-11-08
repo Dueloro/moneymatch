@@ -1,15 +1,4 @@
-"""The GameAdapter interface plus the shared, host-agnostic value types.
-
-Ported from `poc-reference/api/_lib/adapters/base.py` (11-migration-map §1), with
-`TelemetrySample` moved here (05-phase-2 · deliverable 1). A normalized
-`NormGame` is the lowest common denominator every adapter produces, so the
-shared metric/settlement logic never sees host-specific JSON.
-
-Phase 2 uses the identity/profile/history surface (`link_account`,
-`fetch_profile`, `poll_eligible_games`). Match brokering and result grading are
-Phase-3 concerns; the seams are declared here and implemented per-adapter as they
-land, so nothing about the Phase-1 PoC `Contract` schema leaks into the port.
-"""
+"""The GameAdapter interface plus the shared, host-agnostic value types."""
 
 from __future__ import annotations
 
@@ -27,33 +16,10 @@ class NormGame:
     speed: str
     rated: bool
     created_at_ms: int
-    moves: int  # full moves played (chess)
-    won: bool | None  # True/False for the linked user; None if unknown/draw
+    moves: int
+    won: bool | None
     drawn: bool
-    metrics: dict[str, float] = field(default_factory=dict)  # rate stats (CS2/Dota)
-    # When the game finished on the host (epoch ms). None when the host does not
-    # say; the tournament cutoff then falls back to the start time.
-    ended_at_ms: int | None = None
-    # False for a game the host reports but that can never settle a contest
-    # (PUBG custom/arcade/event modes). Ingestion stores it anyway, marked.
-    eligible: bool = True
-    # Host-specific facts worth keeping for scoring and later skill grouping
-    # (chess: opponent id / rating / provisional; PUBG: placement, mode).
-    detail: dict = field(default_factory=dict)
-
-
-@dataclass
-class HistoryBatch:
-    """What one ingestion poll fetched.
-
-    ``complete`` is False when the host had more new games than one poll reads
-    (a very active player's backfill). The ingester then keeps polling the
-    account every cycle and does **not** mark it caught up, so a tournament
-    never settles on a history that stops short of the present.
-    """
-
-    games: list[NormGame]
-    complete: bool = True
+    metrics: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -65,27 +31,30 @@ class GameFilters:
 
 @dataclass
 class TelemetrySample:
-    """Server-fetched per-match telemetry for solo/pool grading (Phase 4).
-
-    Rate metrics only (K/D, ADR, HS%, KDA, GPM); never raw totals or self-report.
-    """
+    """Server-fetched per-match telemetry for solo/pool grading."""
 
     game: str
     metrics: dict[str, float]
+
+
+@dataclass
+class MatchResult:
+    """A brokered game's state for grading. ``winner`` is the winning handle, ``""``
+    for a draw, or ``None``; ``finished`` with no winner and ``termination ==
+    "aborted"`` means the game never really happened (refund).
+    """
+
+    finished: bool
+    winner: str | None = None
+    termination: str | None = None
+    ended_at_ms: int | None = None
+    live: dict | None = None
 
 
 class GameAdapter(abc.ABC):
     """Contract every supported title implements."""
 
     id: str
-    # True ⇒ the platform can create the match itself (e.g. a Lichess open
-    # challenge). False ⇒ players coordinate on the host and we settle on the
-    # shared match found in their histories.
-    brokered: bool = False
-    # True ⇒ linking must NOT bootstrap this game's metric models inline (its host
-    # is too rate-limited for a synchronous history fan-out). The settlement worker
-    # bootstraps deferred accounts out-of-band. Default False (bootstrap at link).
-    defer_bootstrap: bool = False
 
     @abc.abstractmethod
     async def link_account(self, method: str, identifier: str) -> ProfileSnapshot:
@@ -101,46 +70,21 @@ class GameAdapter(abc.ABC):
     ) -> list[NormGame]:
         """Return the user's finished, eligible games since ``since_ms``."""
 
-    async def fetch_history(
-        self,
-        account_id: str,
-        since_ms: int,
-        *,
-        known_ids: set[str],
-        first_poll: bool,
-    ) -> HistoryBatch:
-        """New games for the background ingester (`services/match_ingestion`).
-
-        Returns every game the host reports since ``since_ms`` that is not in
-        ``known_ids``, **including ineligible ones** (they are stored, marked),
-        oldest first. Must raise a `HostError` on a host failure rather than
-        return ``[]``: an empty list means "nothing new", and the ingester
-        advances its cursor on it.
-
-        The default reuses ``poll_eligible_games`` with the rated filter off,
-        which suits hosts whose history call is a single cheap request.
-        """
-        games = await self.poll_eligible_games(
-            account_id, since_ms, GameFilters(rated_only=False)
-        )
-        return HistoryBatch([g for g in games if g.id not in known_ids])
-
-    # --- Phase-3 brokering/settlement seams (implemented per-adapter later) ---
-
     async def create_match(self, speed: str, users: list[str]) -> dict | None:
         """Broker a game between two players, restricting the seats to ``users``
-        (their host handles). Brokered adapters only (Phase 3)."""
+        (their host handles).
+        """
         raise NotImplementedError
 
     async def match_winner(self, game_id: str, players: list[str]) -> str | None:
         """For a brokered game id, return the winning ``player_id`` once finished,
-        ``""`` for a draw, or ``None`` while unfinished / unverifiable (Phase 3)."""
+        ``""`` for a draw, or ``None`` while unfinished / unverifiable.
+        """
         raise NotImplementedError
 
-    async def live_match(self, game_id: str, players: list[str]) -> dict | None:
-        """Best-effort mid-game snapshot for the Activity live view.
+    async def match_result(self, game_id: str, players: list[str]) -> MatchResult:
+        winner = await self.match_winner(game_id, players)
+        return MatchResult(finished=winner is not None, winner=winner)
 
-        Brokered adapters (chess) return whose turn it is, plies played, and the
-        result once finished; ``None`` means "nothing live to show" and is the
-        default for adapters whose host has no in-progress feed."""
+    async def live_match(self, game_id: str, players: list[str]) -> dict | None:
         return None

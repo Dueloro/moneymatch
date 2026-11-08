@@ -1,10 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-import { getDemoToken } from './demoAuth';
 import { getE2eToken } from './e2eAuth';
 import { env } from './env';
 
-// The only durable client-side state is the Supabase session (01-architecture §1).
 export const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
   auth: {
     persistSession: true,
@@ -14,9 +12,6 @@ export const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
 });
 
 export async function getAccessToken(): Promise<string | null> {
-  // Demo / e2e bypass first: use the injected token, never touching Supabase.
-  const demo = getDemoToken();
-  if (demo) return demo;
   const e2e = getE2eToken();
   if (e2e) return e2e;
   const { data } = await supabase.auth.getSession();

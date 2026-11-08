@@ -1,21 +1,4 @@
-"""Challenges — direct friend challenges, rematches, and invite links.
-
-A challenge is an *intent* to play a specific market at a preset entry; accepting
-it forms a PENDING match through the same lifecycle as a paired game (both
-confirm → escrow → activate), so no money moves until confirm and the server owns
-every number (08-phase-5 · deliverable 3).
-
-Two anti-collusion rules bite here, both on the **money flow, not the fun**:
-
-- Rake-bearing contests between the same pair are capped (config: 3/day, 10/week,
-  friends included). Past the cap a challenge becomes a **friendly** — zero-rake,
-  entries refunded on settle, excluded from the leaderboard.
-- Direct challenges are only to accepted friends (or a rematch of a shared,
-  settled match); strangers meet through the fair matcher, not a hand-picked slip.
-
-Invite links carry a single-use `invite_token` (24 h TTL); the recipient signs
-in, links the game, and accepts. Flushes, never commits.
-"""
+"""Challenges — direct friend challenges, rematches, and invite links."""
 
 from __future__ import annotations
 
@@ -47,10 +30,9 @@ from . import (
     linking_service,
     matchmaking,
     notifications_service,
-    sandbagging_service,
 )
 from .feature_flags import get_boolean_flags
-from .markets import KIND_STAT_RACE, MarketDef
+from .markets import MarketDef
 from .markets import get as get_market
 from .match_states import CANCELED
 
@@ -61,16 +43,12 @@ class ChallengeError(APIError):
     """A challenge-flow failure (RFC-7807 via APIError)."""
 
 
-# --------------------------------------------------------------------------- #
-# Pair rake-cap → friendly.
-# --------------------------------------------------------------------------- #
-
-
 async def _pair_rake_count(
     session: AsyncSession, a: uuid.UUID, b: uuid.UUID, since: datetime
 ) -> int:
-    """Rake-bearing (non-friendly, non-canceled) matches between two users since
-    a cutoff — the anti-collusion counter (friends included)."""
+    """Rake-bearing (non-friendly, non-canceled) matches between two users since a
+    cutoff — the anti-collusion counter (friends included).
+    """
     p1 = MatchPlayer.__table__.alias("cp1")
     p2 = MatchPlayer.__table__.alias("cp2")
     stmt = (
@@ -95,18 +73,14 @@ async def pair_over_cap(
     session: AsyncSession, a: uuid.UUID, b: uuid.UUID, *, now: datetime | None = None
 ) -> bool:
     """Whether the pair is at/over its rake-bearing cap (⇒ the next contest is a
-    friendly). Checks both the daily and the weekly window."""
+    friendly).
+    """
     now = now or clock.now()
     day = await _pair_rake_count(session, a, b, now - timedelta(days=1))
     if day >= PAIR_RAKE_CONTESTS_PER_DAY:
         return True
     week = await _pair_rake_count(session, a, b, now - timedelta(days=7))
     return week >= PAIR_RAKE_CONTESTS_PER_WEEK
-
-
-# --------------------------------------------------------------------------- #
-# Shared validation.
-# --------------------------------------------------------------------------- #
 
 
 def _resolve_market(game: str, market_key: str, speed: str | None) -> MarketDef:
@@ -169,11 +143,6 @@ async def _require_challenger_ready(
     return link
 
 
-# --------------------------------------------------------------------------- #
-# Creation.
-# --------------------------------------------------------------------------- #
-
-
 async def create_direct(
     session: AsyncSession,
     challenger: User,
@@ -194,7 +163,6 @@ async def create_direct(
     if challengee is None:
         raise ChallengeError("challengee_not_found", "No such player.", status_code=404)
 
-    # Authorization: friends, or a rematch of a shared settled match.
     if rematch_of is None and not await friends_service.are_friends(
         session, challenger.id, challengee_id
     ):
@@ -234,8 +202,6 @@ async def create_direct(
             "friendly": friendly,
         },
     )
-    # Mirror the invite into the pair's DM so it lands where they actually talk
-    # (the Inbox chat), not only in the notification feed.
     await chat_service.post_challenge_invite(
         session,
         challenger=challenger,
@@ -254,7 +220,8 @@ async def create_rematch(
     session: AsyncSession, user: User, match_id: uuid.UUID
 ) -> Challenge:
     """One-tap rematch of a settled H2H match — same game/market/entry, same
-    opponent, subject to the same friend/cap checks (08-phase-5 · deliverable 6)."""
+    opponent, subject to the same friend/cap checks.
+    """
     match = await session.get(Match, match_id)
     if match is None:
         raise ChallengeError("match_not_found", "No such match.", status_code=404)
@@ -306,7 +273,7 @@ async def create_invite(
         market=market,
         entry_cents=entry_cents,
         speed=speed,
-        friendly=False,  # determined at accept, once the recipient is known
+        friendly=False,
         rematch_of=None,
     )
 
@@ -349,11 +316,6 @@ async def _create(
     return challenge
 
 
-# --------------------------------------------------------------------------- #
-# Accept / decline.
-# --------------------------------------------------------------------------- #
-
-
 def _assert_live(challenge: Challenge, now: datetime) -> None:
     if challenge.state != "sent":
         raise ChallengeError(
@@ -366,8 +328,6 @@ def _assert_live(challenge: Challenge, now: datetime) -> None:
 async def _accept(
     session: AsyncSession, challenge: Challenge, challengee: User
 ) -> Match:
-    """Shared accept: verify the challengee is ready, form the PENDING match,
-    resolve the challenge, notify the challenger."""
     now = clock.now()
     _assert_live(challenge, now)
     if challengee.id == challenge.challenger_id:
@@ -384,7 +344,6 @@ async def _accept(
 
     challengee_link = await _link_for(session, challengee.id, challenge.game)
     if challengee_link is None or challengee_link.status != "active":
-        # The invite/challenge funnel: prompt linking, then accept.
         raise ChallengeError(
             "needs_link",
             f"Link your {challenge.game} account to accept this challenge.",
@@ -402,19 +361,7 @@ async def _accept(
         )
 
     market = _resolve_market(challenge.game, challenge.market, challenge.speed)
-    # Recompute the friendly flag now that both parties are known (invite links
-    # had no challengee at creation; direct challenges may have crossed the cap
-    # since). The accept-time value governs the match economics.
     friendly = await pair_over_cap(session, challenge.challenger_id, challengee.id)
-
-    # A rake-bearing stat duel honors an existing sandbagging flag for either
-    # party (backlog · Phase B — friend stat-duel gap). Friendlies consent to
-    # skill gaps with disclosure and skip this, as they do the fairness gates.
-    if market.kind == KIND_STAT_RACE and market.metric is not None and not friendly:
-        for uid in (challenge.challenger_id, challengee.id):
-            await sandbagging_service.assert_not_flagged(
-                session, uid, market.game, market.metric
-            )
 
     match = await matchmaking.create_challenge_match(
         session,
@@ -447,8 +394,6 @@ async def _accept(
             "friendly": friendly,
         },
     )
-    # Keep the chat invite card in step, however the challenge was answered
-    # (Inbox pill, chat card, or invite link).
     await chat_service.note_challenge_resolved(
         session, challenge.id, status="accepted", match_id=match.id
     )
@@ -507,11 +452,6 @@ async def decline(
     return challenge
 
 
-# --------------------------------------------------------------------------- #
-# Preview + lookups + worker expiry.
-# --------------------------------------------------------------------------- #
-
-
 async def _load_token(session: AsyncSession, token: str) -> Challenge:
     challenge = await session.scalar(
         select(Challenge).where(Challenge.invite_token == token)
@@ -527,7 +467,7 @@ async def _load_token(session: AsyncSession, token: str) -> Challenge:
 class ChallengePreview:
     challenge: Challenge
     challenger_username: str | None
-    valid: bool  # still open + unexpired (can be accepted)
+    valid: bool
 
 
 async def preview_token(session: AsyncSession, token: str) -> ChallengePreview:

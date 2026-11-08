@@ -1,16 +1,4 @@
-"""The match state machine — one place, explicit legal transitions (00-README §3.4).
-
-Every match transition happens in exactly one lifecycle-service function inside a
-DB transaction; this module only declares which moves are legal and raises on an
-illegal one, so a double-fire or out-of-order worker pass is a clean no-op/error
-rather than silent money movement.
-
-    PENDING ──confirm(both)──► ACTIVE ──begin grading──► AWAITING_RESULT
-       │                          │                            │
-       │ decline/expire           └──────────┬─────────────────┘
-       ▼                                      ▼
-    CANCELED                      SETTLED · PUSHED · CANCELED
-"""
+"""The match state machine — one place, explicit legal transitions."""
 
 from __future__ import annotations
 
@@ -25,8 +13,6 @@ CANCELED = "CANCELED"
 
 TERMINAL_STATES = frozenset({SETTLED, PUSHED, CANCELED})
 
-# Legal transitions. A settlement can resolve from either ACTIVE (fast host) or
-# AWAITING_RESULT; expiry/cancel can fire from any non-terminal state.
 LEGAL_TRANSITIONS: dict[str, frozenset[str]] = {
     PENDING: frozenset({ACTIVE, CANCELED}),
     ACTIVE: frozenset({AWAITING_RESULT, SETTLED, PUSHED, CANCELED}),

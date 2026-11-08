@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { humanizeIds } from './labels';
+import { humanizeIds, ledgerLabel } from './labels';
 
 describe('humanizeIds — no raw identifiers reach the player', () => {
   it('maps known metric ids inside a pool memo', () => {
@@ -9,8 +9,8 @@ describe('humanizeIds — no raw identifiers reach the player', () => {
     );
   });
 
-  it('maps a short H2H market id', () => {
-    expect(humanizeIds('kd_ratio entry')).toBe('K/D ratio entry');
+  it('maps the H2H market id', () => {
+    expect(humanizeIds('win_h2h entry')).toBe('Head to head entry');
   });
 
   it('maps a multi-word metric id', () => {
@@ -24,7 +24,49 @@ describe('humanizeIds — no raw identifiers reach the player', () => {
   });
 
   it('leaves plain memos with no ids untouched', () => {
-    expect(humanizeIds('pool refund (demo reset)')).toBe('pool refund (demo reset)');
-    expect(humanizeIds('Added funds')).toBe('Added funds');
+    expect(humanizeIds('pool refund')).toBe('pool refund');
+    expect(humanizeIds('Points added')).toBe('Points added');
+  });
+});
+
+describe('ledgerLabel', () => {
+  const row = (entry_type: string, ref_type = 'match', memo: string | null = null) => ({
+    entry_type,
+    ref_type,
+    memo,
+  });
+
+  it('welcomes the signup grant and names top-ups', () => {
+    expect(ledgerLabel(row('demo_deposit', 'demo_rail', 'signup grant'))).toBe(
+      'Welcome points',
+    );
+    expect(ledgerLabel(row('demo_deposit', 'demo_rail', 'Add funds'))).toBe(
+      'Points added',
+    );
+  });
+
+  it('names stakes and winnings by contest type', () => {
+    expect(ledgerLabel(row('escrow_hold', 'match', 'win_h2h entry'))).toBe(
+      'Match stake',
+    );
+    expect(ledgerLabel(row('escrow_hold', 'solo_pool'))).toBe('Pool stake');
+    expect(ledgerLabel(row('payout', 'tournament'))).toBe('Tournament winnings');
+  });
+
+  it('covers every entry type the API writes', () => {
+    for (const type of [
+      'demo_deposit',
+      'demo_withdrawal',
+      'escrow_hold',
+      'escrow_release',
+      'payout',
+      'rake',
+      'refund',
+      'adjustment',
+    ]) {
+      expect(ledgerLabel(row(type, 'admin'))).not.toMatch(/_|\$|cash|funds/i);
+    }
+    expect(ledgerLabel(row('refund'))).toBe('Stake refunded');
+    expect(ledgerLabel(row('rake'))).toBe('Platform fee');
   });
 });

@@ -1,24 +1,4 @@
-"""Leaderboard — real users ranked by ROI, computed from the ledger.
-
-Ports the PoC's ROI/ranking spirit (`poc-reference/api/_lib/leaderboard.py`) with
-the substrate rewritten (11-migration-map §1): **no seeded bot field** — real
-users only, and every number comes from `ledger_entries`, not a client merge.
-
-The math falls straight out of the ledger sign conventions (see `wallet_service`).
-Over a rolling window, per user:
-
-- **staked** = −Σ(`escrow_release`.escrow_delta) — every stake actually *consumed*
-  into a settled pot. Pushes, cancels, and **friendlies** refund instead of
-  releasing, so they never enter staked (friendlies are leaderboard-excluded by
-  construction, no special case needed).
-- **net** = Σ(`payout`.amount) + Σ(`escrow_release`.escrow_delta) — prizes won
-  minus stakes consumed, i.e. realized P&L (the same quantity `lifetime_net`
-  tracks all-time, here windowed).
-- **ROI** = net / staked. Qualify at ≥ `LEADERBOARD_MIN_CONTESTS` settled
-  contests in the window; a big bankroll grinding break-even can't top the board.
-
-Pure read; ranks by ROI desc (net, then username as stable tiebreaks).
-"""
+"""Leaderboard — real users ranked by ROI, computed from the ledger."""
 
 from __future__ import annotations
 
@@ -33,7 +13,6 @@ from .. import clock
 from ..constants import LEADERBOARD_MIN_CONTESTS, LEADERBOARD_WINDOW_DAYS
 from ..models.user import User
 from ..models.wallet import LedgerEntry, Wallet
-from . import test_opponents
 
 _CONTEST_REFS = ("match", "solo_pool", "tournament")
 _MAX_ROWS = 100
@@ -44,7 +23,7 @@ class LeaderboardRow:
     rank: int
     user_id: uuid.UUID
     username: str | None
-    roi_bps: int  # ROI in basis points (3120 = +31.2%)
+    roi_bps: int
     net_cents: int
     staked_cents: int
     contests: int
@@ -55,8 +34,8 @@ class LeaderboardRow:
 class YouSummary:
     qualified: bool
     contests: int
-    contests_needed: int  # more settled contests to qualify (0 if qualified)
-    row: LeaderboardRow | None  # your ranked row, if you qualify
+    contests_needed: int
+    row: LeaderboardRow | None
 
 
 @dataclass
@@ -73,7 +52,6 @@ async def compute(
     now = now or clock.now()
     since = now - timedelta(days=LEADERBOARD_WINDOW_DAYS)
 
-    # Windowed contest ledger, one aggregate row per real user.
     released_delta = case(
         (LedgerEntry.entry_type == "escrow_release", LedgerEntry.escrow_delta_cents),
         else_=0,
@@ -104,14 +82,11 @@ async def compute(
             LedgerEntry.ref_type.in_(_CONTEST_REFS),
             LedgerEntry.created_at >= since,
             User.username.isnot(None),
-            # Practice opponents never rank (services/test_opponents.py).
-            test_opponents.test_user_filter(),
         )
         .group_by(User.id, User.username)
     )
     rows = list(await session.execute(stmt))
 
-    # Rank the qualified field by ROI (net, then username as stable tiebreaks).
     qualified = [
         r for r in rows if r.contests >= LEADERBOARD_MIN_CONTESTS and r.staked > 0
     ]
@@ -140,7 +115,6 @@ async def compute(
             you_row = row
         ranked.append(row)
 
-    # Trim to the top N, but always keep the viewer's row visible if they rank.
     top = ranked[:_MAX_ROWS]
     if you_row is not None and you_row not in top:
         top = [*top, you_row]

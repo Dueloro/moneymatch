@@ -1,31 +1,12 @@
-// Friendly labels for the market/metric identifiers the API embeds in free-text
-// it hands the client — most visibly the ledger `memo` ("chess_accuracy easy
-// pool entry", "kd_ratio entry"). Mirrors METRIC_LABELS in the API's
-// constants.py, and adds the short market ids used in H2H match memos
-// (`match.market`, e.g. "kd_ratio"). Keep in sync when a metric/market is added.
 const ID_LABELS: Record<string, string> = {
-  // Metric ids (pool/tournament memos: "{metric} {difficulty} pool entry").
   chess_accuracy: 'Chess accuracy',
   chess_moves: 'Moves to win',
   chess_win_streak: 'Longest win streak',
   chess_wins: 'Total wins',
   chess_fastest_win: 'Fastest win',
-  cs2_kd_ratio: 'K/D ratio',
-  cs2_headshot_pct: 'Headshot %',
-  cs2_kills: 'Kills',
-  dota2_kda_ratio: 'KDA ratio',
-  dota2_gpm: 'GPM',
-  pubg_kills: 'Kills',
-  pubg_damage: 'Damage',
-  pubg_headshot_pct: 'Headshot %',
-  // Short market ids (H2H match memos: "{market} entry").
-  kd_ratio: 'K/D ratio',
-  kda_ratio: 'KDA ratio',
-  gpm: 'GPM',
-  headshot_pct: 'Headshot %',
+  win_h2h: 'Head to head',
 };
 
-/** Title-case a bare snake_case id so an unmapped identifier never shows raw. */
 function desnake(id: string): string {
   const spaced = id.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
@@ -33,13 +14,54 @@ function desnake(id: string): string {
 
 /**
  * Replace snake_case market/metric ids inside a server string with friendly
- * labels, leaving the surrounding words untouched. Unmapped ids are de-snaked
- * so a raw identifier (underscores) never reaches a user. Consumer surfaces
- * only — admin tools intentionally keep raw ids.
+ * labels, leaving the surrounding words untouched.
  */
 export function humanizeIds(text: string): string {
   return text.replace(
     /\b[a-z0-9]+(?:_[a-z0-9]+)+\b/g,
     (id) => ID_LABELS[id] ?? desnake(id),
+  );
+}
+
+// Every user-ledger entry_type the API can write (models/wallet.py
+// ck_ledger_entry_type), refined by ref_type where it reads better.
+const LEDGER_BY_REF: Record<string, Record<string, string>> = {
+  escrow_hold: {
+    match: 'Match stake',
+    solo_pool: 'Pool stake',
+    tournament: 'Tournament stake',
+  },
+  payout: {
+    match: 'Match winnings',
+    solo_pool: 'Pool winnings',
+    tournament: 'Tournament winnings',
+  },
+};
+
+const LEDGER_LABELS: Record<string, string> = {
+  demo_deposit: 'Points added',
+  demo_withdrawal: 'Points removed',
+  escrow_hold: 'Stake',
+  escrow_release: 'Stake to pot',
+  payout: 'Winnings',
+  refund: 'Stake refunded',
+  rake: 'Platform fee',
+  adjustment: 'Adjustment',
+};
+
+export const SIGNUP_GRANT_MEMO = 'signup grant';
+
+export function ledgerLabel(entry: {
+  entry_type: string;
+  ref_type: string;
+  memo: string | null;
+}): string {
+  if (entry.entry_type === 'demo_deposit' && entry.memo === SIGNUP_GRANT_MEMO) {
+    return 'Welcome points';
+  }
+  return (
+    LEDGER_BY_REF[entry.entry_type]?.[entry.ref_type] ??
+    LEDGER_LABELS[entry.entry_type] ??
+    desnake(entry.entry_type)
   );
 }

@@ -1,8 +1,4 @@
-"""RFC-7807-style error envelope and exception handlers.
-
-Every error response is `{code, message, detail}` (01-architecture §4) so the
-web client has one shape to parse.
-"""
+"""RFC-7807-style error envelope and exception handlers."""
 
 from __future__ import annotations
 

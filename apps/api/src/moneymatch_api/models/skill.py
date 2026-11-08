@@ -1,15 +1,4 @@
-"""Skill & audit substrate (01-architecture §2 · Skill & audit substrate).
-
-- `metric_models` — per `(user_id, game, metric)`, an EWMA `mu`/`sigma` and a
-  sample size `n` over the account's recent finished matches (half-life 10).
-  Computed at link time, refreshed on settlement (Phase 3) and nightly. `n` below
-  a floor makes the metric **provisional** (no stat duels/pools on it). Mutable —
-  refreshed in place, so no append-only trigger here.
-- `raw_payloads` — every host-API response used in a grading/profile decision,
-  kept with a content hash so a derived record can reference its exact proof.
-  **Append-only** (immutable audit trail): the shared `mm_reject_mutation`
-  trigger rejects UPDATE/DELETE (00-README §3.2).
-"""
+"""Skill & audit substrate."""
 
 from __future__ import annotations
 
@@ -51,7 +40,6 @@ class MetricModel(Base, TimestampMixin):
         index=True,
     )
     game: Mapped[str] = mapped_column(String(32), nullable=False)
-    # A typed rate metric key, e.g. "cs2_kd_ratio", "dota2_gpm".
     metric: Mapped[str] = mapped_column(String(48), nullable=False)
     mu: Mapped[float] = mapped_column(
         Float, default=0.0, server_default="0", nullable=False
@@ -59,7 +47,6 @@ class MetricModel(Base, TimestampMixin):
     sigma: Mapped[float] = mapped_column(
         Float, default=0.0, server_default="0", nullable=False
     )
-    # Number of matches that fed the model — below the floor ⇒ provisional.
     n: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )
@@ -71,12 +58,10 @@ class RawPayload(Base):
     __tablename__ = "raw_payloads"
 
     id = uuid_pk()
-    # Where it came from, e.g. "lichess:user", "faceit:match_stats".
     source: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     # sha256 of the canonical payload bytes — dedupe + tamper-evidence.
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    # Total bytes of the stored payload (a cheap retention/ops signal).
     size_bytes: Mapped[int] = mapped_column(
         BigInteger, default=0, server_default="0", nullable=False
     )

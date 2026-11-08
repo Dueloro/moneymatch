@@ -1,9 +1,6 @@
-"""Play schemas: the pairing disclosures plus the `/play/*` + `/activity` wire types.
-
-`Bracket` and `Forecast` are the honest, no-odds pairing disclosures shown on the
+"""`Bracket` and `Forecast` are the honest, no-odds pairing disclosures shown on the
 matched card ("Even duel — model gives you 52%"), the P2P analog of rake
-disclosure (06-phase-3 · deliverable 2). Requests carry **ids/presets only** —
-never amounts or timestamps (00-README §3); the server owns every number.
+disclosure.
 """
 
 from __future__ import annotations
@@ -20,52 +17,47 @@ class Bracket(BaseModel):
     your_rating: int
     band_low: int
     band_high: int
-    match_quality: float  # 1.0 at a coin-flip, decays as the matchup gets lopsided
+    match_quality: float
     label: str
 
 
 class Forecast(BaseModel):
-    """The duel-forecast disclosure for a stat/chess pairing.
-
-    `you_win_prob` is `P(you beat opponent)` from the model (held near 0.50 by
-    the eligibility window); `label` is the honest one-liner for the matched card.
-    """
-
     you_win_prob: float
     label: str
 
 
-# --- markets -------------------------------------------------------------- #
+class SpeedClock(BaseModel):
+    """The clock a brokered game is created with, in seconds."""
+
+    speed: str
+    limit_seconds: int
+    increment_seconds: int
 
 
 class MarketRow(BaseModel):
-    """One market row on the Play screen (design PDF p.1)."""
+    """One market row on the Play screen."""
 
     key: str
     label: str
-    kind: str  # win_h2h | win_next | stat_race
-    metric: str | None
+    kind: str
     requires_speed: bool
-    speeds: list[str]  # chess time controls (empty for other games)
+    speeds: list[str]
+    clocks: list[SpeedClock] = []
     # Derived pot multiplier in basis points (2·(1 − rake)); NEVER an odds line.
     multiplier_bps: int
-    queue_depth: int  # players currently waiting on this market
-    provisional: bool  # the viewer can't duel this stat yet (n below the floor)
-    resolution_note: str  # honest one-liner on how it settles (+ forfeit rule)
+    queue_depth: int
+    resolution_note: str
 
 
 class MarketsResponse(BaseModel):
     game: str
-    linked: bool  # whether the viewer has linked this game
+    linked: bool
     entry_presets_cents: list[int]
     markets: list[MarketRow]
 
 
-# --- queue / match -------------------------------------------------------- #
-
-
 class QueueRequest(BaseModel):
-    """Join the queue. Ids + a server preset only — no amounts, no timestamps."""
+    """Join the queue."""
 
     game: str
     market: str
@@ -99,32 +91,44 @@ class MatchView(BaseModel):
     rake_cents: int
     multiplier_bps: int
     state: str
-    brokered: bool
     host_game_id: str | None
     matched_at: datetime | None
     window_ends_at: datetime | None
     players: list[MatchPlayerView]
     you_confirmed: bool
     your_play_url: str | None
-    forecast: Forecast | None  # honest matched-card disclosure, from your view
+    forecast: Forecast | None
+    winner_user_id: UUID | None = None
+    # A friendly refunds both entries whoever wins (only the record is kept).
+    friendly: bool = False
+    # How the game ended (checkmate | resignation | time | draw | stalemate |
+    # abandoned | aborted | other), when Lichess said so.
+    termination: str | None = None
+    # When the game ended on Lichess, and when we settled it; null when unknown.
+    game_ended_at: datetime | None = None
+    resolved_at: datetime | None = None
+    # The viewer-oriented board (moves, clocks, turn, result); null when stale or
+    # unavailable.
+    live: dict | None = None
 
 
 class GradingExplanation(BaseModel):
-    """ "Why this result" — the transparent grading record for a contest the
-    viewer was in: the rule, what each side produced, and the decision."""
+    """ "Why this result" — the transparent grading record for a contest the viewer
+    was in: the rule, what each side produced, and the decision.
+    """
 
     match_id: UUID
     state: str
     settled: bool
-    result: str  # you_won | you_lost | push | canceled | pending
+    result: str
     market_label: str
-    rule: str  # how the winner is decided (the market's resolution note)
+    rule: str
     engine_version: str | None
     resolved_at: datetime | None
     winner_username: str | None
     your_stat_line: dict | None
     opponent_stat_line: dict | None
-    outcome_detail: dict | None  # the raw grading decision (audit back-ref)
+    outcome_detail: dict | None
 
 
 class FileDisputeRequest(BaseModel):
@@ -145,22 +149,32 @@ class DisputeView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    ref_type: str  # match | pool | tournament
+    ref_type: str
     ref_id: UUID
     reason: str
-    status: str  # open | resolved | rejected
+    status: str
     admin_note: str | None
     created_at: datetime
     resolved_at: datetime | None
 
 
-class QueueStatusResponse(BaseModel):
-    """Where the viewer stands: idle, searching (band + wait), or matched."""
+class QueueTicketView(BaseModel):
+    """The viewer's own search ticket, recapped on the searching screen."""
 
-    status: str  # idle | searching | matched
+    market: str
+    speed: str | None
+    clock: SpeedClock | None
+    entry_cents: int
+    rating: int | None
+
+
+class QueueStatusResponse(BaseModel):
+    """Where the viewer stands: idle, searching (with wait), or matched."""
+
+    status: str
     match: MatchView | None = None
     waited_seconds: int | None = None
-    tolerance_stage: int | None = None
+    ticket: QueueTicketView | None = None
     can_cancel: bool = True
 
 
@@ -182,13 +196,10 @@ class WaitingResponse(BaseModel):
     waiting: list[WaitingRow]
 
 
-# --- activity ------------------------------------------------------------- #
-
-
 class ActivityItem(BaseModel):
     """One row in the unified Activity feed (H2H matches, pools, tournaments)."""
 
-    type: str  # "match" | "pool" | "tournament"
+    type: str
     id: UUID
     game: str
     market: str
@@ -196,22 +207,15 @@ class ActivityItem(BaseModel):
     kind: str
     state: str
     entry_cents: int
-    # Pool/tournament rows supply a title (matches build theirs from opponent).
     title: str | None = None
-    # Your realized net once resolved (+prize−entry on a win, −entry on a loss,
-    # 0 on push/refund); null while the match is still in flight.
+    # Your realized net once resolved (+prize−entry on a win, −entry on a loss, 0 on
+    # push/refund); null while the match is still in flight.
     net_cents: int | None
     opponent_username: str | None
     your_stat_line: dict | None
     opponent_stat_line: dict | None
-    # Best-effort live in-game view for an in-flight contest (worker-cached host
-    # read, oriented to the viewer); null when there's nothing live to show.
     live: dict | None = None
-    # Structured "learn more" payload for the expanded card (per-match stats,
-    # map/mode, prize/entry, host link). Shape depends on the contest kind.
     detail: dict | None = None
-    # The viewer's dispute status on this contest, if they've filed one:
-    # "open" | "resolved" | "rejected"; null when not contested.
     dispute_status: str | None = None
     created_at: datetime
     resolved_at: datetime | None

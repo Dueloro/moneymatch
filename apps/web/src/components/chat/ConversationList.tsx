@@ -3,11 +3,11 @@ import type { ReactNode } from 'react';
 import type { Conversation } from '../../hooks/useChat';
 import { formatRelativeTime } from '../../lib/format';
 import { Badge } from '../ui/Badge';
+import { Skeleton } from '../ui/Skeleton';
 import { Avatar } from './Avatar';
 import { BellIcon } from '../ui/icons';
 import { LifebuoyIcon, PlusIcon } from './icons';
 
-/** What the right pane is showing. `notifications` is the pinned feed. */
 export type Selection =
   { type: 'notifications' } | { type: 'conversation'; id: string };
 
@@ -64,13 +64,11 @@ function Row({
   );
 }
 
-/**
- * The left rail: the pinned Notifications feed and Support thread, then every
- * direct message. Notifications keep their home here — the Inbox now holds both
- * the feed and the conversations.
- */
 export function ConversationList({
   conversations,
+  loading = false,
+  loadFailed = false,
+  onRetry,
   selection,
   onSelect,
   notificationsUnread,
@@ -81,6 +79,9 @@ export function ConversationList({
   error,
 }: {
   conversations: Conversation[];
+  loading?: boolean;
+  loadFailed?: boolean;
+  onRetry?: () => void;
   selection: Selection;
   onSelect: (selection: Selection) => void;
   notificationsUnread: number;
@@ -97,7 +98,7 @@ export function ConversationList({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-hairline px-4 pb-3.5 pt-4">
-        <h2 className="label-money !text-xs">Inbox</h2>
+        <h2 className="label-neutral">Inbox</h2>
         <button
           type="button"
           onClick={onNewMessage}
@@ -145,7 +146,7 @@ export function ConversationList({
           title="Dueloro Support"
           subline={
             support?.last_message_preview ??
-            (supportPending ? 'Opening…' : 'Questions about a contest or payout')
+            (supportPending ? 'Opening…' : 'Questions about a contest or winnings')
           }
           meta={
             support?.last_message_at
@@ -160,8 +161,27 @@ export function ConversationList({
           }
         />
 
-        <p className="label-money px-4 pb-1.5 pt-5">Direct messages</p>
-        {dms.length === 0 ? (
+        <p className="label-neutral px-4 pb-1.5 pt-5">Direct messages</p>
+        {loading ? (
+          <div
+            className="flex flex-col gap-2 px-3 py-2"
+            data-testid="conversations-skeleton"
+          >
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : loadFailed ? (
+          <div className="px-4 py-2 text-xs text-text-secondary">
+            Couldn't load conversations.{' '}
+            <button
+              type="button"
+              onClick={onRetry}
+              className="underline hover:text-text"
+            >
+              Try again
+            </button>
+          </div>
+        ) : dms.length === 0 ? (
           <p className="px-4 py-2 text-xs text-text-secondary">
             No conversations yet. Start one with a friend.
           </p>

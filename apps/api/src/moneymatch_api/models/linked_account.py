@@ -1,33 +1,11 @@
-"""Linked host-game accounts (01-architecture §2 · Identity).
-
-A `linked_accounts` row binds one host account (Lichess/FaceIt/OpenDota) to one
-platform user. Two DB-enforced uniqueness rules make the binding immutable and
-non-shareable (05-phase-2 · deliverable 2):
-
-- `(user_id, game)` — a user links at most one account per game;
-- `(game, host_account_id)` — a host account binds to at most one user, so a
-  second user racing to claim it fails on the constraint, not an app check.
-
-`profile_snapshot` caches the last-fetched `ProfileSnapshot`; `link_method`
-reserves the OAuth path (the next step after MVP). `status` freezes a binding
-independently of the per-game feature flag; either one renders BLOCKED on Profile.
-"""
+"""Linked host-game accounts."""
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
-from sqlalchemy import (
-    BigInteger,
-    CheckConstraint,
-    DateTime,
-    ForeignKey,
-    Index,
-    String,
-    text,
-)
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -35,16 +13,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ..db.base import Base, TimestampMixin, uuid_pk
 
 LINK_METHODS = ("username", "oauth")
-# `unbound` is a soft-unbind (admin action): the row is retained so its contest
-# history (match_players / queue_tickets FKs) stays intact, but it releases the
-# uniqueness slots (the unique indexes are partial on `status <> 'unbound'`) so
-# the host account can be rebound to a fresh row (backlog · soft-unbind).
 LINKED_ACCOUNT_STATUSES = ("active", "frozen", "unbound")
 
-# Only a live (non-unbound) binding holds the slot, so an account that has *played*
-# can be soft-unbound and re-linked without a hard delete (which FK RESTRICT
-# forbids). Names match the pre-existing constraints so `bind()`'s IntegrityError
-# mapping is unchanged.
 _ACTIVE_BINDING = text("status <> 'unbound'")
 
 
@@ -82,11 +52,8 @@ class LinkedAccount(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    # Canonical `<game>.<host>` id (constants.REGISTERED_GAMES).
     game: Mapped[str] = mapped_column(String(32), nullable=False)
-    # The host's stable account id (the settlement poll key).
     host_account_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    # The host's display handle (what the user typed / sees).
     host_username: Mapped[str] = mapped_column(String(128), nullable=False)
     link_method: Mapped[str] = mapped_column(
         String(16), default="username", server_default="username", nullable=False
@@ -96,24 +63,4 @@ class LinkedAccount(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(
         String(16), default="active", server_default="active", nullable=False
-    )
-    # When this account's metric models were bootstrapped. NULL = "bootstrap
-    # still owed": deferred-host links (PUBG) leave it NULL for the worker to
-    # claim; cheap hosts bootstrap inline at link and stamp it immediately.
-    models_bootstrapped_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
-    )
-    # Background match ingestion (services/match_ingestion.py). `attempted`
-    # moves on every try so a failing account cannot hog the front of the
-    # queue; `polled` moves only on success, and a tournament settles only once
-    # every entrant has been polled after its end. `cursor_ms` is where the
-    # next history page starts (hosts that page by time).
-    ingest_attempted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
-    )
-    ingest_polled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None
-    )
-    ingest_cursor_ms: Mapped[int | None] = mapped_column(
-        BigInteger, nullable=True, default=None
     )

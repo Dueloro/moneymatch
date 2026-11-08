@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
-import { useInboxUnread } from '../../hooks/useChat';
+import { useInboxBadge } from '../../hooks/useInbox';
 import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useMe } from '../../hooks/useMe';
 import { AnimatedBalance } from './AnimatedBalance';
@@ -9,24 +9,21 @@ import { Logo } from './brand';
 import { BellIcon, NavIcon } from './icons';
 import { NAV, isPlayPath } from './nav';
 
-/**
- * Sticky top bar on mobile: logo left, balance and account right. The balance
- * moves here because the rail doesn't render on a phone, and it is the number a
- * returning player checks first.
- */
 export function MobileTopBar() {
   const me = useMe();
   const available = useDisplayBalance();
-  const unread = useInboxUnread();
+  const unread = useInboxBadge();
   const username = me.data?.user.username ?? '…';
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-hairline bg-bg px-4 py-3 md:hidden">
-      <Logo />
+      <Link to="/play" aria-label="Money Match home">
+        <Logo />
+      </Link>
       <div className="flex items-center gap-2">
         <NavLink
           to="/wallet"
-          className="rounded-pill bg-panel px-3 py-1.5 text-xs font-semibold text-green"
+          className="inline-flex min-h-11 items-center rounded-pill bg-panel px-3 text-xs font-semibold text-green"
         >
           <AnimatedBalance cents={available} testId="mobile-balance" />
         </NavLink>
@@ -45,21 +42,19 @@ export function MobileTopBar() {
         <NavLink
           to="/profile"
           aria-label="Profile"
-          className="grid h-9 w-9 place-items-center rounded-full bg-panel-raised text-xs font-semibold"
+          className="grid h-11 w-11 place-items-center"
         >
-          {username.slice(0, 1).toUpperCase()}
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-panel-raised text-xs font-semibold">
+            {username.slice(0, 1).toUpperCase()}
+          </span>
         </NavLink>
       </div>
     </header>
   );
 }
 
-/**
- * Fixed bottom tab bar on mobile. Four tabs at ~94px each on a 375px screen,
- * down from six at ~62px, so every target clears 44px comfortably.
- */
 export function MobileTabBar() {
-  const unread = useInboxUnread();
+  const unread = useInboxBadge();
   const { pathname } = useLocation();
 
   return (

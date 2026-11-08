@@ -71,7 +71,7 @@ async def test_demo_withdrawal_below_minimum_refused(client):
     r = await client.post(
         "/api/v1/wallet/demo-withdrawal",
         headers=auth_headers("w6"),
-        json={"amount_cents": 500},  # $5 — under the $20 Phase-1 minimum
+        json={"amount_cents": 500},
     )
     assert r.status_code == 422
     assert r.json()["code"] == "withdrawal_below_min"
@@ -79,7 +79,6 @@ async def test_demo_withdrawal_below_minimum_refused(client):
 
 async def test_ledger_pagination_walks_all_rows(client):
     h = auth_headers("w6")
-    # 1 grant + 25 deposits = 26 rows → 2 pages of 20/6.
     for _ in range(25):
         await client.post(
             "/api/v1/wallet/demo-deposit", headers=h, json={"amount_preset_cents": 1000}
@@ -100,7 +99,7 @@ async def test_ledger_pagination_walks_all_rows(client):
             break
     assert pages == 2
     assert len(seen) == 26
-    assert len(set(seen)) == 26  # no duplicates or gaps across the cursor
+    assert len(set(seen)) == 26
 
 
 async def test_bad_cursor_is_422(client):
@@ -109,11 +108,6 @@ async def test_bad_cursor_is_422(client):
     )
     assert r.status_code == 422
     assert r.json()["code"] == "invalid_cursor"
-
-
-# --------------------------------------------------------------------------- #
-# Limits + self-exclude via /me
-# --------------------------------------------------------------------------- #
 
 
 async def _onboard(client, sub):
@@ -137,7 +131,7 @@ async def test_lowering_loss_cap_is_instant(client):
     )
     assert r.status_code == 200
     limits = r.json()["limits"]
-    assert limits["daily_loss_cap_cents"] == 5_000  # applied now
+    assert limits["daily_loss_cap_cents"] == 5_000
     assert limits["pending_limits"] is None
 
 
@@ -150,7 +144,7 @@ async def test_raising_loss_cap_is_deferred(client):
     )
     assert r.status_code == 200
     limits = r.json()["limits"]
-    assert limits["daily_loss_cap_cents"] == 20_000  # unchanged until cooldown
+    assert limits["daily_loss_cap_cents"] == 20_000
     assert limits["pending_limits"]["daily_loss_cap_cents"] == 40_000
     assert limits["pending_effective_at"] is not None
 

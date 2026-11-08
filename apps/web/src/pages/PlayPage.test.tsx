@@ -1,19 +1,48 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../test/testUtils';
+import { renderWithProviders, pts } from '../test/testUtils';
 import { PlayPage } from './PlayPage';
 
-vi.mock('../hooks/useLinks', () => ({ useLinks: vi.fn() }));
-// useGameSelection reads the play set from /me. Gating is fail-closed: an empty
-// set now falls back to Chess only, so these CS2 fixtures set an explicit play
-// set of ['cs2.steam'] — how a real CS2 player is configured after the backfill.
-vi.mock('../hooks/useMe', () => ({
-  useMe: () => ({ data: { user: { active_games: ['cs2.steam'] } } }),
+const store = new Map<string, string>();
+Object.defineProperty(window, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  },
+});
+
+vi.mock('../auth/useAuth', () => ({
+  useAuth: () => ({ session: null }),
 }));
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({
     data: { available_cents: 100_000, escrow_cents: 0, lifetime_net_cents: 0 },
+  }),
+}));
+vi.mock('../hooks/useLinks', () => ({
+  useConnectLichess: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useLinks: () => ({
+    data: {
+      games: [
+        {
+          game: 'chess.lichess',
+          status: 'LINKED',
+          host_username: 'ana',
+          profile: {
+            username: 'ana',
+            rating: 1712,
+            formats: [
+              { speed: 'blitz', rating: 1712, games: 900, provisional: false },
+              { speed: 'rapid', rating: 1790, games: 40, provisional: true },
+            ],
+          },
+        },
+      ],
+    },
   }),
 }));
 vi.mock('../hooks/useMatchmaking', async () => {
@@ -35,7 +64,6 @@ vi.mock('../hooks/useMatchmaking', async () => {
   };
 });
 
-import { useLinks } from '../hooks/useLinks';
 import {
   prizeForEntry,
   useConfirmMatch,
@@ -52,18 +80,82 @@ import {
 const joinMutate = vi.fn();
 const confirmMutate = vi.fn();
 
-const KD_MARKET = {
-  key: 'kd_ratio',
-  label: 'K/D ratio',
-  kind: 'stat_race' as const,
-  metric: 'cs2_kd_ratio',
-  requires_speed: false,
-  speeds: [],
+const H2H_MARKET = {
+  key: 'win_h2h',
+  label: 'Win the game',
+  kind: 'win_h2h' as const,
+  requires_speed: true,
+  speeds: ['bullet', 'blitz', 'rapid', 'classical'],
+  clocks: [
+    { speed: 'bullet', limit_seconds: 60, increment_seconds: 0 },
+    { speed: 'blitz', limit_seconds: 300, increment_seconds: 0 },
+    { speed: 'rapid', limit_seconds: 600, increment_seconds: 0 },
+    { speed: 'classical', limit_seconds: 1800, increment_seconds: 0 },
+  ],
   multiplier_bps: 18000,
   queue_depth: 0,
-  provisional: false,
-  resolution_note: 'Higher K/D ratio wins · equal = push.',
+  resolution_note: 'Win the game · draw = push.',
 };
+
+const MATCH = {
+  game: 'chess.lichess',
+  market: 'win_h2h',
+  market_label: 'Win the game',
+  kind: 'win_h2h',
+  speed: 'blitz',
+  entry_cents: 1000,
+  pot_cents: 2000,
+  prize_cents: 1800,
+  rake_cents: 200,
+  multiplier_bps: 18000,
+  state: 'PENDING',
+  host_game_id: null,
+  matched_at: null,
+  window_ends_at: null,
+  you_confirmed: false,
+  your_play_url: null,
+};
+
+const PLAYERS = [
+  {
+    user_id: 'u1',
+    username: 'ana',
+    rating: 1712,
+    color: 'black',
+    confirmed: true,
+    payout_cents: 0,
+    stat_line: null,
+    is_you: true,
+  },
+  {
+    user_id: 'u2',
+    username: 'kvem_',
+    rating: 1779,
+    color: 'white',
+    confirmed: true,
+    payout_cents: 0,
+    stat_line: null,
+    is_you: false,
+  },
+];
+
+function stageMatch(over: Record<string, unknown>) {
+  const data = {
+    ...MATCH,
+    id: 'mx',
+    host_game_id: 'abcd1234',
+    players: PLAYERS,
+    you_confirmed: true,
+    your_play_url: 'https://lichess.org/abcd1234/black',
+    forecast: null,
+    matched_at: new Date().toISOString(),
+    ...over,
+  };
+  vi.mocked(useMatch).mockImplementation(
+    (id) => ({ data: id ? data : undefined }) as unknown as ReturnType<typeof useMatch>,
+  );
+  renderWithProviders(<PlayPage />, { route: '/play?match=mx' });
+}
 
 function mockStatus(status: unknown) {
   vi.mocked(useQueueStatus).mockReturnValue({ data: status } as ReturnType<
@@ -74,26 +166,13 @@ function mockStatus(status: unknown) {
 describe('PlayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useLinks).mockReturnValue({
-      data: {
-        games: [
-          {
-            game: 'cs2.steam',
-            display_name: 'CS2 — FACEIT',
-            status: 'LINKED',
-            host_username: 'me',
-            linked_at: null,
-            profile: null,
-          },
-        ],
-      },
-    } as unknown as ReturnType<typeof useLinks>);
+    window.localStorage.clear();
     vi.mocked(useMarkets).mockReturnValue({
       data: {
-        game: 'cs2.steam',
+        game: 'chess.lichess',
         linked: true,
         entry_presets_cents: [500, 1000, 2500],
-        markets: [KD_MARKET],
+        markets: [H2H_MARKET],
       },
     } as unknown as ReturnType<typeof useMarkets>);
     mockStatus({ status: 'idle', match: null, can_cancel: false });
@@ -125,58 +204,238 @@ describe('PlayPage', () => {
     } as unknown as ReturnType<typeof useLeaveQueue>);
   });
 
-  it('renders one 1v1 card per market with the derived payout inside it', () => {
+  it('sets the desk with defaults: blitz, the middle stake, payout and fee', () => {
     renderWithProviders(<PlayPage />);
-    // 1 market = 1 card. Entry is a control inside it, not a grid dimension.
-    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
-    // 2 x $10 x (1 - 0.10) = $18.00, derived. Never an odds line.
-    expect(screen.getByText('$18.00')).toBeInTheDocument();
-  });
-
-  it('joining a card finds a match with the entry selected inside it', () => {
-    renderWithProviders(<PlayPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Find match' }));
+    expect(screen.getByRole('radio', { name: /Blitz/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByTestId('desk-rating')).toHaveTextContent('1712');
+    expect(screen.getByText('Matched with someone at your skill level')).toBeVisible();
+    expect(screen.getByText(pts('1,800 pts'))).toBeInTheDocument();
+    expect(screen.getByText(/Fee/)).toHaveTextContent('Fee 200 pts');
+    fireEvent.click(screen.getByRole('button', { name: 'Find match · 1,000 pts' }));
     expect(joinMutate).toHaveBeenCalledWith({
-      game: 'cs2.steam',
-      market: 'kd_ratio',
-      speed: undefined,
+      game: 'chess.lichess',
+      market: 'win_h2h',
+      speed: 'blitz',
       entry_preset_cents: 1000,
     });
   });
 
-  it('shows the searching state with a cancel affordance', () => {
+  it('time control and stake change the rating, payout and the join', () => {
+    renderWithProviders(<PlayPage />);
+    fireEvent.click(screen.getByRole('radio', { name: /Rapid/ }));
+    expect(screen.getByTestId('desk-rating')).toHaveTextContent('1790?');
+    fireEvent.click(screen.getByRole('radio', { name: '2,500 pts' }));
+    expect(screen.getByText(pts('4,500 pts'))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Find match · 2,500 pts' }));
+    expect(joinMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ speed: 'rapid', entry_preset_cents: 2500 }),
+    );
+  });
+
+  it('says where the rating comes from when there are no games at that speed', () => {
+    renderWithProviders(<PlayPage />);
+    fireEvent.click(screen.getByRole('radio', { name: /Classical/ }));
+    expect(screen.getByTestId('desk-rating')).toHaveTextContent('1712From blitz');
+  });
+
+  it('degrades to a Link Lichess prompt when unlinked', () => {
+    vi.mocked(useMarkets).mockReturnValue({
+      data: {
+        game: 'chess.lichess',
+        linked: false,
+        entry_presets_cents: [500, 1000, 2500],
+        markets: [H2H_MARKET],
+      },
+    } as unknown as ReturnType<typeof useMarkets>);
+    renderWithProviders(<PlayPage />);
+    expect(screen.queryByTestId('match-desk')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect Lichess' })).toBeInTheDocument();
+  });
+
+  it('lists open seats with rating and time control', () => {
+    vi.mocked(useWaiting).mockReturnValue({
+      data: {
+        waiting: [
+          {
+            ticket_id: 't1',
+            game: 'chess.lichess',
+            market: 'win_h2h',
+            market_label: 'Win the game',
+            speed: 'blitz',
+            entry_cents: 1000,
+            username: 'dana',
+            rating: 1689,
+            waited_seconds: 40,
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useWaiting>);
+    renderWithProviders(<PlayPage />);
+    expect(screen.getByText('1689')).toBeInTheDocument();
+    expect(screen.getByText('Blitz 5+0 · 1,000 pts')).toBeInTheDocument();
+  });
+
+  it('searching shows the waited time and your current range on the ruler', () => {
     mockStatus({
       status: 'searching',
       match: null,
-      waited_seconds: 12,
-      tolerance_stage: 0,
+      waited_seconds: 30,
+      can_cancel: true,
+      ticket: {
+        market: 'win_h2h',
+        speed: 'blitz',
+        clock: { speed: 'blitz', limit_seconds: 300, increment_seconds: 0 },
+        entry_cents: 2500,
+        rating: 1712,
+      },
+    });
+    renderWithProviders(<PlayPage />);
+    expect(screen.getByText('Searching')).toBeInTheDocument();
+    expect(screen.getByText('Blitz 5+0 · 2,500 pts stake')).toBeInTheDocument();
+    expect(screen.getByTestId('waited')).toHaveTextContent('0:30');
+    expect(screen.getByTestId('band-range')).toHaveTextContent('1252–2172');
+    expect(screen.getByTestId('skill-band-ruler')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
+  });
+
+  it('searching without a ticket recap shows the band width only', () => {
+    mockStatus({
+      status: 'searching',
+      match: null,
+      waited_seconds: 0,
       can_cancel: true,
     });
     renderWithProviders(<PlayPage />);
-    expect(screen.getByText('Searching…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
+    expect(screen.getByTestId('band-range')).toHaveTextContent('±100');
+  });
+
+  it('puts the match on the stage once both confirm, with the Lichess link', () => {
+    mockStatus({
+      status: 'matched',
+      match: {
+        ...MATCH,
+        id: 'm2',
+        state: 'ACTIVE',
+        players: PLAYERS,
+        you_confirmed: true,
+        your_play_url: 'https://lichess.org/abcd1234',
+        forecast: null,
+        matched_at: new Date().toISOString(),
+        live: null,
+      },
+      can_cancel: false,
+    });
+    renderWithProviders(<PlayPage />);
+    expect(screen.getByTestId('match-stage')).toHaveAttribute('data-state', 'waiting');
+    expect(screen.getByRole('link', { name: /Open game on Lichess/ })).toHaveAttribute(
+      'href',
+      'https://lichess.org/abcd1234',
+    );
+    expect(screen.getByText('Blitz 5+0')).toBeInTheDocument();
+    expect(screen.getByTestId('stage-line')).toHaveTextContent(
+      'Waiting for the first move',
+    );
+  });
+
+  it('shows the live board, the move and whose turn it is', async () => {
+    stageMatch({
+      state: 'ACTIVE',
+      live: {
+        kind: 'match',
+        format: 'chess',
+        status: 'live',
+        moves: 2,
+        your_color: 'black',
+        turn: 'you',
+        result: null,
+        termination: null,
+        san: ['e4', 'e5', 'Nf3'],
+        clocks: { white_ms: 291_000, black_ms: 300_000 },
+        clock: { limit: 300, increment: 0 },
+        last_move_at: new Date().toISOString(),
+      },
+    });
+    expect(screen.getByTestId('stage-line')).toHaveTextContent('Move 2 · your move');
+    expect(
+      await screen.findByRole('img', { name: 'Board after 2. Nf3' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('strip-you')).toHaveTextContent('Black');
+    expect(screen.getByLabelText(/^Your clock [45]:/)).toHaveAttribute(
+      'data-running',
+      'true',
+    );
+  });
+
+  it('falls back to just the Lichess link when the board is unavailable', () => {
+    stageMatch({
+      state: 'AWAITING_RESULT',
+      live: null,
+      matched_at: '2020-01-01T00:00:00Z',
+    });
+    expect(screen.queryByTestId('board-frame')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Open game on Lichess/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('turns into a result card on a win: winnings, how it ended, settle time', () => {
+    stageMatch({
+      state: 'SETTLED',
+      winner_user_id: 'u1',
+      termination: 'resignation',
+      game_ended_at: '2025-01-08T10:00:00Z',
+      resolved_at: '2025-01-08T10:00:38Z',
+    });
+    const card = screen.getByTestId('result-card');
+    expect(card).toHaveAttribute('data-outcome', 'win');
+    expect(screen.getByTestId('result-headline')).toHaveTextContent('You won');
+    expect(screen.getByText('vs kvem_ · by resignation')).toBeInTheDocument();
+    expect(screen.getByTestId('result-amount')).toHaveTextContent('1,800 pts');
+    expect(card).toHaveTextContent('fee 200 pts');
+    expect(screen.getByTestId('settled-in')).toHaveTextContent(
+      'Settled from Lichess in 38s',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'You won 1,800 points by resignation',
+    );
+    expect(screen.getByRole('button', { name: 'Rematch' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /View game on Lichess/ })).toHaveAttribute(
+      'href',
+      'https://lichess.org/abcd1234/black',
+    );
+  });
+
+  it('a loss is calm: the stake, how it ended, no settle claim without an end time', () => {
+    stageMatch({ state: 'SETTLED', winner_user_id: 'u2', termination: 'time' });
+    expect(screen.getByTestId('result-headline')).toHaveTextContent('You lost');
+    expect(screen.getByText('vs kvem_ · on time')).toBeInTheDocument();
+    expect(screen.getByTestId('result-amount')).toHaveTextContent('-1,000 pts');
+    expect(screen.queryByTestId('settled-in')).not.toBeInTheDocument();
+  });
+
+  it('a draw refunds both stakes with no fee', () => {
+    stageMatch({ state: 'PUSHED', termination: 'draw' });
+    expect(screen.getByTestId('result-headline')).toHaveTextContent('Draw');
+    expect(screen.getByTestId('result-card')).toHaveTextContent(
+      'Both stakes refunded · no fee',
+    );
+  });
+
+  it('play again returns to the desk', () => {
+    stageMatch({ state: 'PUSHED' });
+    fireEvent.click(screen.getByRole('button', { name: 'Play again' }));
+    expect(screen.getByTestId('match-desk')).toBeInTheDocument();
   });
 
   it('shows the matched card with the honest forecast and confirms', () => {
     mockStatus({
       status: 'matched',
       match: {
+        ...MATCH,
         id: 'm1',
-        game: 'cs2.steam',
-        market: 'kd_ratio',
-        market_label: 'K/D ratio',
-        kind: 'stat_race',
-        speed: null,
-        entry_cents: 1000,
-        pot_cents: 2000,
-        prize_cents: 1800,
-        rake_cents: 200,
-        multiplier_bps: 18000,
-        state: 'PENDING',
-        brokered: false,
-        host_game_id: null,
-        matched_at: null,
-        window_ends_at: null,
         players: [
           {
             user_id: 'u2',
@@ -189,8 +448,6 @@ describe('PlayPage', () => {
             is_you: false,
           },
         ],
-        you_confirmed: false,
-        your_play_url: null,
         forecast: { you_win_prob: 0.52, label: 'Even duel — model gives you 52%' },
       },
       can_cancel: false,
@@ -202,26 +459,11 @@ describe('PlayPage', () => {
   });
 
   it('opens the confirm card for a ?match= deep-link (Inbox "Respond")', () => {
-    // Queue is idle — the accepted-challenge match only comes from ?match=.
     mockStatus({ status: 'idle', match: null, can_cancel: false });
     vi.mocked(useMatch).mockReturnValue({
       data: {
+        ...MATCH,
         id: 'deep1',
-        game: 'cs2.steam',
-        market: 'kd_ratio',
-        market_label: 'K/D ratio',
-        kind: 'stat_race',
-        speed: null,
-        entry_cents: 1000,
-        pot_cents: 2000,
-        prize_cents: 1800,
-        rake_cents: 200,
-        multiplier_bps: 18000,
-        state: 'PENDING',
-        brokered: false,
-        host_game_id: null,
-        matched_at: null,
-        window_ends_at: null,
         players: [
           {
             user_id: 'u3',
@@ -234,8 +476,6 @@ describe('PlayPage', () => {
             is_you: false,
           },
         ],
-        you_confirmed: false,
-        your_play_url: null,
         forecast: null,
       },
     } as unknown as ReturnType<typeof useMatch>);
@@ -243,49 +483,6 @@ describe('PlayPage', () => {
     renderWithProviders(<PlayPage />, { route: '/play?match=deep1' });
     fireEvent.click(screen.getByRole('button', { name: /Confirm & stake/ }));
     expect(confirmMutate).toHaveBeenCalledWith('deep1');
-  });
-
-  it('the filter menu is collapsed until the hamburger toggle is clicked', () => {
-    // A single market hides the filter bar entirely, so use two here.
-    vi.mocked(useMarkets).mockReturnValue({
-      data: {
-        game: 'cs2.steam',
-        linked: true,
-        entry_presets_cents: [500, 1000, 2500],
-        markets: [KD_MARKET, { ...KD_MARKET, key: 'adr', label: 'ADR' }],
-      },
-    } as unknown as ReturnType<typeof useMarkets>);
-    renderWithProviders(<PlayPage />);
-    expect(screen.queryByTestId('play-filters')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('play-filters-toggle'));
-    expect(screen.getByTestId('play-filters')).toBeInTheDocument();
-  });
-
-  it('market filter trims the grid to the chosen market', () => {
-    // Two open markets so the Market chip row appears (hidden for a single one).
-    vi.mocked(useMarkets).mockReturnValue({
-      data: {
-        game: 'cs2.steam',
-        linked: true,
-        entry_presets_cents: [500, 1000, 2500],
-        markets: [
-          KD_MARKET,
-          {
-            ...KD_MARKET,
-            key: 'headshot_pct',
-            label: 'Headshot %',
-            metric: 'cs2_headshot_pct',
-          },
-        ],
-      },
-    } as unknown as ReturnType<typeof useMarkets>);
-    renderWithProviders(<PlayPage />);
-    // Baseline: 2 markets = 2 cards.
-    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(2);
-    fireEvent.click(screen.getByTestId('play-filters-toggle'));
-    const filters = screen.getByTestId('play-filters');
-    fireEvent.click(within(filters).getByRole('button', { name: 'Headshot %' }));
-    expect(screen.getAllByRole('button', { name: 'Find match' })).toHaveLength(1);
   });
 });
 

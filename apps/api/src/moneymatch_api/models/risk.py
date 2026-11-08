@@ -1,12 +1,4 @@
-"""Risk flags — the sandbagging trail (07-phase-4 · deliverable 10).
-
-Tanking a baseline is the attack the personal-bar feature invites (a low frozen
-μ makes your bar trivially clearable), so the sandbagging detector ships *with*
-it. When a player's recent-form mean drops markedly below their lifetime mean
-(z below a threshold), we write a `risk_flags` row and block metric wagers on
-that game/metric until an admin clears it. The admin review queue lands in
-Phase 6; this table is the durable signal it will read.
-"""
+"""Risk flags — the sandbagging trail."""
 
 from __future__ import annotations
 
@@ -28,9 +20,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db.base import Base, uuid_pk
 
-# `sandbagging` blocks metric wagers until cleared; `win_streak` and `pair_cap`
-# are informational derived signals (nightly detectors) that only surface in the
-# admin risk queue and never block play.
 RISK_FLAG_KINDS = ("sandbagging", "win_streak", "pair_cap")
 
 
@@ -56,7 +45,6 @@ class RiskFlag(Base):
     detail: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=dict, server_default="{}", nullable=False
     )
-    # An admin clears it in Phase 6; while false, metric wagers are blocked.
     resolved: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )

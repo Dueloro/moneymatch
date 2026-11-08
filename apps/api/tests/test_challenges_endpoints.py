@@ -1,6 +1,7 @@
-"""`/challenges` HTTP surface: direct challenge → accept forms a PENDING match;
-the invite-link flow returns a shareable path with a public preview; and
-rematch re-challenges the same opponent (08-phase-5 · deliverables 3, 6)."""
+"""`/challenges` HTTP surface: direct challenge → accept forms a PENDING match; the
+invite-link flow returns a shareable path with a public preview; and rematch re-
+challenges the same opponent.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ from .factories import create_linked_account
 pytestmark = pytest.mark.asyncio
 
 V1 = "/api/v1"
-CS2 = "cs2.steam"
+CHESS = "chess.lichess"
 
 
 async def _onboard(client, auth_id, name, *, link=True):
@@ -25,14 +26,13 @@ async def _onboard(client, auth_id, name, *, link=True):
         user = await s.scalar(select(User).where(User.auth_id == auth_id))
         user.username = name
         if link:
-            await create_linked_account(s, user, CS2, host_account_id=f"host_{name}")
+            await create_linked_account(s, user, CHESS, host_account_id=f"host_{name}")
         await s.commit()
         return user.id
 
 
 async def _befriend(client, a_auth, b_auth):
     r = await client.get(f"{V1}/friends", headers=auth_headers(b_auth))
-    # a adds b, b accepts.
     await client.post(
         f"{V1}/friends",
         headers=auth_headers(a_auth),
@@ -53,8 +53,9 @@ async def test_direct_challenge_and_accept(client):
         headers=auth_headers("auth_a"),
         json={
             "challengee_id": str(b_id),
-            "game": CS2,
-            "market": "kd_ratio",
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "blitz",
             "entry_preset_cents": 1000,
         },
     )
@@ -62,7 +63,6 @@ async def test_direct_challenge_and_accept(client):
     challenge_id = r.json()["challenge"]["id"]
     assert r.json()["challenge"]["state"] == "sent"
 
-    # bob accepts → gets a match id, and the match is his to confirm.
     r = await client.post(
         f"{V1}/challenges/{challenge_id}/accept", headers=auth_headers("auth_b")
     )
@@ -81,20 +81,23 @@ async def test_invite_link_preview_is_public_and_acceptable(client):
     r = await client.post(
         f"{V1}/challenges",
         headers=auth_headers("auth_a"),
-        json={"game": CS2, "market": "kd_ratio", "entry_preset_cents": 1000},
+        json={
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "blitz",
+            "entry_preset_cents": 1000,
+        },
     )
     assert r.status_code == 200, r.text
     body = r.json()
     token = body["invite_token"]
     assert body["invite_path"] == f"/i/{token}"
 
-    # Public preview: no auth header.
     r = await client.get(f"{V1}/challenges/token/{token}")
     assert r.status_code == 200
     assert r.json()["challenger_username"] == "alice"
     assert r.json()["valid"] is True
 
-    # A fresh, linked user accepts the invite.
     await _onboard(client, "auth_c", "carol")
     r = await client.post(
         f"{V1}/challenges/token/{token}/accept", headers=auth_headers("auth_c")
@@ -108,14 +111,14 @@ async def test_rematch_recreates_challenge(client):
     b_id = await _onboard(client, "auth_b", "bob")
     await _befriend(client, "auth_a", "auth_b")
 
-    # First contest via a direct challenge → accept.
     r = await client.post(
         f"{V1}/challenges",
         headers=auth_headers("auth_a"),
         json={
             "challengee_id": str(b_id),
-            "game": CS2,
-            "market": "kd_ratio",
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "blitz",
             "entry_preset_cents": 1000,
         },
     )
@@ -125,7 +128,6 @@ async def test_rematch_recreates_challenge(client):
     )
     match_id = r.json()["match_id"]
 
-    # Rematch: one field, same opponent/market/entry.
     r = await client.post(
         f"{V1}/challenges",
         headers=auth_headers("auth_a"),
@@ -134,5 +136,6 @@ async def test_rematch_recreates_challenge(client):
     assert r.status_code == 200, r.text
     ch = r.json()["challenge"]
     assert ch["challengee_id"] == str(b_id)
-    assert ch["market"] == "kd_ratio"
+    assert ch["market"] == "win_h2h"
+    assert ch["speed"] == "blitz"
     assert ch["entry_cents"] == 1000

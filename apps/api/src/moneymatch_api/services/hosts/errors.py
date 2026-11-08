@@ -1,11 +1,4 @@
-"""Typed upstream (host-API) errors.
-
-Adapters and their host clients raise these — never raw `httpx` exceptions — so
-the linking router can translate a host failure into a clean API response
-(05-phase-2 · adapter resilience): `HostNotFound` → 404, `HostUnavailable` → 502.
-They are deliberately *not* `APIError`s: the service layer stays transport-shaped
-and the router owns the HTTP mapping.
-"""
+"""Typed upstream (host-API) errors."""
 
 from __future__ import annotations
 
@@ -17,14 +10,6 @@ class HostError(Exception):
         super().__init__(f"[{host}] {message}")
         self.host = host
         self.message = message
-        #: The upstream HTTP status, where there was one.
-        #:
-        #: Most callers only need "did this fail". Valve's share-code chain
-        #: needs more: 412 means the cursor is not this player's and must never
-        #: be retried, 403 means their auth code is dead and they have to be
-        #: told, 429 means back off. Those are three different actions, and
-        #: recovering them by parsing an error string would be a decision about
-        #: money made by substring match.
         self.status_code = status_code
 
 
@@ -37,16 +22,10 @@ class HostNotFound(HostError):
 
 
 class HostRateLimited(HostUnavailable):
-    """The host rejected the call with 429 (rate limit).
-
-    A transient, budget-shaped failure. It subclasses `HostUnavailable` so the
-    grading watchdog extends the settlement window instead of consuming it, but
-    it is deliberately not retried in-call (an immediate retry only spends more
-    of the same budget)."""
+    """The host rejected the call with 429 (rate limit)."""
 
 
 class HostNotConfigured(HostError):
-    """The host integration has no API key configured — a deploy/config gap, not
-    a transient outage or a missing player. Raised (never swallowed to ``None``)
-    so linking surfaces an actionable message and ops can see the misconfig,
-    instead of every lookup masquerading as "player not found"."""
+    """The host integration has no API key configured — a deploy/config gap, not a
+    transient outage or a missing player.
+    """

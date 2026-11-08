@@ -1,13 +1,13 @@
-# Pre-commit hooks. Install with `pre-commit install` (see DEVELOPMENT.md).
+# Pre-commit hooks. Install with `pre-commit install` (see docs/development.md).
 # Mirrors the CI gates in .github/workflows/ci.yml so failures surface locally.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^poc-reference/
+        exclude: ^future-expansion/
       - id: end-of-file-fixer
-        exclude: ^poc-reference/
+        exclude: ^future-expansion/
       - id: check-merge-conflict
       - id: check-yaml
       - id: check-added-large-files
@@ -29,4 +29,4 @@ repos:
         entry: pnpm exec prettier --write
         language: system
         files: \.(ts|tsx|js|jsx|css|json|md|yaml|yml)$
-        exclude: ^(poc-reference/|packages/api-client/src/generated/|pnpm-lock\.yaml)
+        exclude: ^(future-expansion/|packages/api-client/src/generated/|pnpm-lock\.yaml)

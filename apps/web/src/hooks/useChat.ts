@@ -5,14 +5,10 @@ import { api } from '../lib/api';
 import { track } from '../lib/telemetry';
 import { useNotifications } from './useNotifications';
 
-// Mirrors schemas/chat.py. The client sends a body, a friend id, or a preset
-// choice — the server owns timestamps, invite state, and match formation.
-
 export type MessageKind = 'text' | 'invite' | 'system';
 export type InviteKind = 'pool' | 'tournament' | 'h2h';
 export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 
-/** The invite card's whole contract, carried on an `invite` message. */
 export interface InvitePayload {
   invite_kind?: InviteKind;
   title?: string;
@@ -76,7 +72,6 @@ function useChatKeys() {
   };
 }
 
-/** The conversation list. Polls like the other social surfaces. */
 export function useConversations() {
   const { session } = useAuth();
   const keys = useChatKeys();
@@ -92,18 +87,12 @@ export function useConversations() {
   });
 }
 
-/**
- * Everything the Inbox would badge you for: unread notifications **and** unread
- * messages. Both queries poll on their own, so this is live wherever it's
- * mounted — the nav bell, and the Social page's Inbox tab.
- */
 export function useInboxUnread(): number {
   const chat = useConversations();
   const notifications = useNotifications();
   return (chat.data?.unread_total ?? 0) + (notifications.data?.unread ?? 0);
 }
 
-/** One open thread. Polls faster — this is the surface you watch. */
 export function useThread(conversationId: string | null) {
   const { session } = useAuth();
   const keys = useChatKeys();
@@ -127,13 +116,13 @@ function useChatInvalidation() {
   const keys = useChatKeys();
   return (conversationId?: string) => {
     qc.invalidateQueries({ queryKey: keys.conversations });
+    qc.invalidateQueries({ queryKey: ['inbox-badge'] });
     if (conversationId) {
       qc.invalidateQueries({ queryKey: keys.thread(conversationId) });
     }
   };
 }
 
-/** Get-or-create a thread: a friend DM, or the support thread. */
 export function useOpenConversation() {
   const invalidate = useChatInvalidation();
   return useMutation({
@@ -164,7 +153,6 @@ export interface SendVars {
   };
 }
 
-/** Post a typed line or an invite card. Returns the refreshed thread. */
 export function useSendMessage() {
   const qc = useQueryClient();
   const keys = useChatKeys();
@@ -182,7 +170,6 @@ export function useSendMessage() {
       return data as Thread;
     },
     onSuccess: (thread, vars) => {
-      // Paint the server's thread immediately, then refresh the list ordering.
       qc.setQueryData(keys.thread(vars.conversationId), thread);
       if (vars.invite) track('chat_invite_sent', { kind: vars.invite.invite_kind });
       invalidate();
@@ -190,7 +177,6 @@ export function useSendMessage() {
   });
 }
 
-/** Accept or decline an invite card inside a thread. */
 export function useRespondInvite() {
   const invalidate = useChatInvalidation();
   return useMutation({
@@ -213,7 +199,6 @@ export function useRespondInvite() {
   });
 }
 
-/** Clear a thread's unread badge (fired when you open it). */
 export function useMarkConversationRead() {
   const invalidate = useChatInvalidation();
   return useMutation({

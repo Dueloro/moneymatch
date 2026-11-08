@@ -1,5 +1,6 @@
-"""Solo-pool wire types (07-phase-4). Ids + preset choices only on the way in;
-every bar, room bar, and payout is server-derived on the way out."""
+"""Solo-pool wire types. Ids + preset choices only on the way in; every bar, room
+bar, and payout is server-derived on the way out.
+"""
 
 from __future__ import annotations
 
@@ -10,12 +11,12 @@ from pydantic import BaseModel
 
 
 class DifficultyCard(BaseModel):
-    """One difficulty quoted from the viewer's own baseline (design PDF p.4)."""
+    """One difficulty quoted from the viewer's own baseline."""
 
     difficulty: str
-    bar: float  # your personal bar = round(μ + k·σ)
-    clear_rate: float  # disclosed difficulty 1 − Φ(k), NOT an odds line
-    est_multiplier_bps: int  # estimated share-of-pool multiplier (display only)
+    bar: float
+    clear_rate: float
+    est_multiplier_bps: int
 
 
 class PoolMetric(BaseModel):
@@ -33,7 +34,7 @@ class PoolMarketsResponse(BaseModel):
 
 
 class PoolEnterRequest(BaseModel):
-    """Enter a pool = enqueue. Ids + preset only — no bar, no amount."""
+    """Enter a pool = enqueue."""
 
     game: str
     metric: str
@@ -48,10 +49,6 @@ class PoolMemberView(BaseModel):
     status: str
     payout_cents: int
     is_you: bool
-    # What they actually did on the graded match, once the pool has settled.
-    # `None` while the window is open, or for an entry that never produced a
-    # qualifying match. The bar alone cannot say who beat whom by how much, and
-    # a settled room is the one place a player is owed both numbers.
     result_value: float | None = None
 
 
@@ -63,9 +60,7 @@ class PoolView(BaseModel):
     difficulty: str
     room_bar: float
     your_bar: float | None
-    bar_delta: float | None  # room_bar − your_bar (shown on the room card)
-    # Live result while the window runs (from the cached snapshot, not settlement):
-    # whether your played match cleared the room bar, and the value it hit.
+    bar_delta: float | None
     your_cleared: bool | None = None
     your_current: float | None = None
     entry_cents: int
@@ -82,7 +77,7 @@ class PoolView(BaseModel):
 
 
 class PoolStatusResponse(BaseModel):
-    status: str  # idle | searching | formed
+    status: str
     pool: PoolView | None = None
     difficulty: str | None = None
     metric: str | None = None

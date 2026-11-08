@@ -1,14 +1,6 @@
-"""Contest disputes — file (participant) and resolve (admin).
-
-The trust valve on settlement: a participant who thinks a settled contest graded
-wrong files a dispute with a reason; an admin resolves or rejects it and the
-outcome is pushed back to the user as a notification. Money movement (a manual
-regrade/refund) stays an explicit admin action — resolving a dispute records the
-decision, it does not itself move funds.
-
-Disputes are **polymorphic**: a `(ref_type, ref_id)` pair points at a match, a
-solo pool, or a tournament. There is no single FK target, so this module owns the
-"is this a real, settled contest the user actually played?" check for each type.
+"""Contest disputes — file (participant) and resolve (admin). Money movement (a
+manual regrade/refund) stays an explicit admin action — resolving a dispute
+records the decision, it does not itself move funds.
 """
 
 from __future__ import annotations
@@ -28,7 +20,6 @@ from ..models.tournaments import Tournament, TournamentEntry
 from ..models.user import User
 from . import notifications_service
 
-# A contest can only be disputed once it has a graded outcome to contest.
 _DISPUTABLE_MATCH_STATES = {"SETTLED", "PUSHED"}
 _DISPUTABLE_CONTEST_STATES = {"SETTLED", "CANCELED"}
 _RESOLUTIONS = {"resolved", "rejected"}
@@ -38,7 +29,6 @@ _REF_TYPES = ("match", "pool", "tournament")
 async def _match_participant(
     session: AsyncSession, ref_id: uuid.UUID, user_id: uuid.UUID
 ) -> tuple[bool, bool]:
-    """(is_disputable, is_participant) for a match ref."""
     match = await session.get(Match, ref_id)
     if match is None:
         raise APIError("not_found", "Contest not found.", status_code=404)
@@ -93,10 +83,7 @@ async def file_dispute(
     ref_id: uuid.UUID,
     reason: str,
 ) -> Dispute:
-    """File a dispute against a settled contest (participant-only, once).
-
-    Works for any contest type; the per-type check enforces "you were in it" and
-    "it has a graded outcome to contest"."""
+    """File a dispute against a settled contest (participant-only, once)."""
     if ref_type not in _CHECKS:
         raise APIError("bad_ref_type", "Unknown contest type.", status_code=422)
     disputable, is_participant = await _CHECKS[ref_type](session, ref_id, user.id)
@@ -144,9 +131,7 @@ async def get_for(
 async def statuses_for_user(
     session: AsyncSession, user_id: uuid.UUID
 ) -> dict[tuple[str, uuid.UUID], str]:
-    """Every dispute the user has filed, keyed by (ref_type, ref_id) → status.
-
-    One query so the Activity feed can flag "already contested" without an N+1."""
+    """Every dispute the user has filed, keyed by (ref_type, ref_id) → status."""
     rows = await session.execute(
         select(Dispute.ref_type, Dispute.ref_id, Dispute.status).where(
             Dispute.user_id == user_id

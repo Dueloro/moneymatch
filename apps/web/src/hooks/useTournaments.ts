@@ -2,23 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
-
-// Wire types mirror `schemas/tournaments.py`. Scores, ranks, and payouts are all
-// server-computed; the client only picks a metric + a preset entry.
-
-export interface OpenTable {
-  entry_cents: number;
-  /** Players already in the open tournament at this entry. */
-  players: number;
-}
+import { CHESS } from '../lib/games';
 
 export interface TournamentMetric {
   metric: string;
   label: string;
   provisional: boolean;
-  /** Plain-words rules for the card. */
-  rules: string;
-  open_tables: OpenTable[];
 }
 
 export interface TournamentMarkets {
@@ -26,12 +15,7 @@ export interface TournamentMarkets {
   linked: boolean;
   entry_presets_cents: number[];
   prize_split: number[];
-  /** The most players one tournament takes. */
   field_size: number;
-  min_players: number;
-  score_matches: number;
-  join_window_seconds: number;
-  duration_seconds: number;
   metrics: TournamentMetric[];
 }
 
@@ -45,18 +29,6 @@ export interface StandingRow {
   payout_cents: number;
 }
 
-/** One of your games around the tournament, and whether/why it counted. */
-export interface TournamentGame {
-  host_match_id: string;
-  started_at: string;
-  ended_at: string | null;
-  mode: string | null;
-  result: string | null;
-  reason: string;
-  reason_text: string;
-  value: number | null;
-}
-
 export interface TournamentView {
   id: string;
   game: string;
@@ -68,21 +40,14 @@ export interface TournamentView {
   rake_cents: number;
   prize_split: number[];
   field_size: number;
-  players: number;
-  score_matches: number;
   state: string;
-  /** Null while waiting for a second player (the clock hasn't started). */
-  window_starts_at: string | null;
-  window_ends_at: string | null;
-  join_closes_at: string | null;
-  your_entered_at: string | null;
+  window_starts_at: string;
+  window_ends_at: string;
   field_mu_low: number | null;
   field_mu_high: number | null;
   standings: StandingRow[];
   your_rank: number | null;
   your_payout_cents: number | null;
-  your_games: TournamentGame[];
-  outcome_reason: string | null;
   resolved_at: string | null;
 }
 
@@ -98,9 +63,7 @@ function messageOf(error: unknown, fallback: string): string {
   return typeof msg === 'string' && msg ? msg : fallback;
 }
 
-const CS2 = 'cs2.steam';
-
-export function useTournamentMarkets(game: string = CS2) {
+export function useTournamentMarkets(game: string = CHESS) {
   const { session } = useAuth();
   return useQuery({
     queryKey: ['tournament-markets', game],
@@ -120,11 +83,8 @@ export function useTournamentStatus() {
   return useQuery({
     queryKey: ['tournament-status', session?.user.id],
     enabled: !!session,
-    // While you are in a tournament, refresh often enough that new players,
-    // your games and the standings feel live (each read is cheap: the server
-    // scores from stored games, never calling the game's API).
     refetchInterval: (query) =>
-      query.state.data?.status === 'formed' ? 15_000 : 30_000,
+      query.state.data?.status === 'searching' ? 2500 : 10_000,
     queryFn: async (): Promise<TournamentStatus> => {
       const { data, error } = await api.GET('/api/v1/tournaments/queue/status');
       if (error) throw new Error('Failed to load tournament status');
@@ -138,28 +98,11 @@ function useInvalidate() {
   const { session } = useAuth();
   return () => {
     qc.invalidateQueries({ queryKey: ['tournament-status', session?.user.id] });
-    qc.invalidateQueries({ queryKey: ['tournaments-mine', session?.user.id] });
     qc.invalidateQueries({ queryKey: ['wallet', session?.user.id] });
     qc.invalidateQueries({ queryKey: ['activity'] });
   };
 }
 
-/** Your recent tournaments (newest first), including finished ones. */
-export function useMyTournaments() {
-  const { session } = useAuth();
-  return useQuery({
-    queryKey: ['tournaments-mine', session?.user.id],
-    enabled: !!session,
-    refetchInterval: 30_000,
-    queryFn: async (): Promise<TournamentView[]> => {
-      const { data, error } = await api.GET('/api/v1/tournaments');
-      if (error) throw new Error('Failed to load your tournaments');
-      return (data as { tournaments: TournamentView[] }).tournaments;
-    },
-  });
-}
-
-/** One tournament by id, for the notification feed's expanded standings. */
 export function useTournament(tournamentId: string | null) {
   const { session } = useAuth();
   return useQuery({
@@ -199,7 +142,7 @@ export function useLeaveTournament() {
   return useMutation({
     mutationFn: async (): Promise<TournamentStatus> => {
       const { data, error } = await api.DELETE('/api/v1/tournaments/queue');
-      if (error) throw new Error(messageOf(error, 'Could not leave the tournament.'));
+      if (error) throw new Error('Could not leave the tournament queue.');
       return data as TournamentStatus;
     },
     onSuccess: invalidate,

@@ -1,5 +1,6 @@
-"""Security hardening (10-phase-7 §2): headers on every response, an oversized
-body rejected with 413, and write requests rate-limited with 429."""
+"""Security hardening: headers on every response, an oversized body rejected with
+413, and write requests rate-limited with 429.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +13,6 @@ from moneymatch_api.main import create_app
 
 @pytest_asyncio.fixture
 async def hardened_client() -> AsyncClient:
-    # A tiny rate window + body cap so the limits are cheap to exercise.
     settings = get_settings().model_copy(
         update={"rate_limit_writes_per_minute": 2, "max_request_bytes": 100}
     )
@@ -23,7 +23,6 @@ async def hardened_client() -> AsyncClient:
 
 
 async def test_security_headers_on_every_response(hardened_client: AsyncClient) -> None:
-    # A 404 needs no DB/auth and still exits through the header middleware.
     r = await hardened_client.get("/api/v1/does-not-exist")
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["x-frame-options"] == "DENY"
@@ -38,7 +37,6 @@ async def test_oversized_body_rejected(hardened_client: AsyncClient) -> None:
 
 
 async def test_write_rate_limit(hardened_client: AsyncClient) -> None:
-    # Under the small body cap so we exercise the limiter, not the size guard.
     body = {"content": b"{}"}
     ok1 = await hardened_client.post("/api/v1/does-not-exist", **body)
     ok2 = await hardened_client.post("/api/v1/does-not-exist", **body)
@@ -51,7 +49,30 @@ async def test_write_rate_limit(hardened_client: AsyncClient) -> None:
 
 
 async def test_reads_not_rate_limited(hardened_client: AsyncClient) -> None:
-    # GETs bypass the write limiter entirely.
     for _ in range(5):
         r = await hardened_client.get("/api/v1/does-not-exist")
         assert r.status_code != 429
+
+
+async def _post_as(client: AsyncClient, sub: str | None):
+    from .conftest import auth_headers
+
+    headers = auth_headers(sub) if sub else {}
+    return await client.post("/api/v1/does-not-exist", content=b"{}", headers=headers)
+
+
+async def test_rate_limit_is_per_user(hardened_client: AsyncClient) -> None:
+    for _ in range(2):
+        assert (await _post_as(hardened_client, "rl-a")).status_code != 429
+    assert (await _post_as(hardened_client, "rl-a")).status_code == 429
+    assert (await _post_as(hardened_client, "rl-b")).status_code != 429
+    assert (await _post_as(hardened_client, None)).status_code != 429
+
+
+async def test_invalid_token_falls_back_to_ip(hardened_client: AsyncClient) -> None:
+    bad = {"Authorization": "Bearer not-a-jwt"}
+    for _ in range(2):
+        r = await hardened_client.post("/api/v1/x", content=b"{}", headers=bad)
+        assert r.status_code != 429
+    anon = await hardened_client.post("/api/v1/x", content=b"{}")
+    assert anon.status_code == 429

@@ -1,9 +1,4 @@
-"""`/disputes` — file / read a contest dispute for any contest type.
-
-The polymorphic sibling of the match-only `/play/matches/{id}/dispute` shim: the
-Activity feed's "Contest" action posts here with `{ref_type, ref_id, reason}` so
-one code path serves matches, pools, and tournaments.
-"""
+"""`/disputes` — file / read a contest dispute for any contest type."""
 
 from __future__ import annotations
 
@@ -40,6 +35,5 @@ async def get_contest_dispute(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> DisputeView | None:
-    """The viewer's dispute for this contest, if any."""
     dispute = await dispute_service.get_for(session, ref_type, ref_id, user.id)
     return DisputeView.model_validate(dispute) if dispute else None

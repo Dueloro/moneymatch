@@ -9,28 +9,27 @@ function match(overrides: Partial<ActivityItem> = {}): ActivityItem {
   return {
     type: 'match',
     id: 'm1',
-    game: 'cs2.steam',
-    market: 'kd_ratio',
-    market_label: 'K/D ratio',
-    kind: 'stat_race',
+    game: 'chess.lichess',
+    market: 'win_h2h',
+    market_label: 'Win the game',
+    kind: 'win_h2h',
     state: 'SETTLED',
     entry_cents: 1000,
     title: null,
     net_cents: 800,
-    opponent_username: 's1mple_fan',
-    your_stat_line: { cs2_kd_ratio: 1.63, game_id: 'g' },
-    opponent_stat_line: { cs2_kd_ratio: 1.11, game_id: 'g' },
+    opponent_username: 'knight_rider',
+    your_stat_line: { result: 1, game_id: 'g' },
+    opponent_stat_line: { result: 0, game_id: 'g' },
     live: null,
     detail: {
       kind: 'match',
-      game: 'cs2.steam',
-      opponent: 's1mple_fan',
+      game: 'chess.lichess',
+      opponent: 'knight_rider',
       entry_cents: 1000,
       prize_cents: 1800,
-      map: 'de_dust2',
-      mode: 'Competitive',
-      your_stats: { 'K/D': 1.63, Kills: 31 },
-      opponent_stats: { 'K/D': 1.11, Kills: 24 },
+      host_game_id: 'abcd1234',
+      your_stats: { Moves: 31, Accuracy: 88 },
+      opponent_stats: { Moves: 31, Accuracy: 74 },
     },
     dispute_status: null,
     created_at: new Date().toISOString(),
@@ -40,37 +39,29 @@ function match(overrides: Partial<ActivityItem> = {}): ActivityItem {
 }
 
 describe('ActivityCard', () => {
-  it('names the host game on the row', () => {
-    renderWithProviders(<ActivityCard item={match()} />);
-    // The CS2 match carries a game badge so the row is not game-ambiguous.
-    expect(screen.getByText('CS2')).toBeInTheDocument();
-  });
-
   it('expands to show per-match stats and a contest action', () => {
     renderWithProviders(<ActivityCard item={match()} />);
-    // Collapsed: detail not shown yet.
-    expect(screen.queryByText('de_dust2')).not.toBeInTheDocument();
+    expect(screen.queryByText('abcd1234')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /details/i }));
 
-    expect(screen.getByText('de_dust2 · Competitive')).toBeInTheDocument();
-    // Stat table shows the shared keys with your + opponent values.
-    expect(screen.getByText('Kills')).toBeInTheDocument();
-    expect(screen.getByText('31')).toBeInTheDocument();
-    expect(screen.getByText('24')).toBeInTheDocument();
-    // A settled contest can be contested.
+    expect(screen.getByRole('link', { name: 'View on Lichess ↗' })).toHaveAttribute(
+      'href',
+      'https://lichess.org/abcd1234',
+    );
+    expect(screen.getByText('Accuracy')).toBeInTheDocument();
+    expect(screen.getByText('88')).toBeInTheDocument();
+    expect(screen.getByText('74')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Contest this result' }),
+      screen.getByRole('button', { name: 'Report a problem' }),
     ).toBeInTheDocument();
   });
 
   it('opens the contest form when the action is clicked', () => {
     renderWithProviders(<ActivityCard item={match()} />);
     fireEvent.click(screen.getByRole('button', { name: /details/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Contest this result' }));
-    expect(
-      screen.getByPlaceholderText(/last round wasn't counted/i),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Report a problem' }));
+    expect(screen.getByPlaceholderText(/my game wasn't counted/i)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Submit for review' }),
     ).toBeInTheDocument();
@@ -79,9 +70,9 @@ describe('ActivityCard', () => {
   it('shows the review status once contested', () => {
     renderWithProviders(<ActivityCard item={match({ dispute_status: 'open' })} />);
     fireEvent.click(screen.getByRole('button', { name: /details/i }));
-    expect(screen.getByText('Contested · under review')).toBeInTheDocument();
+    expect(screen.getByText('Reported · under review')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Contest this result' }),
+      screen.queryByRole('button', { name: 'Report a problem' }),
     ).not.toBeInTheDocument();
   });
 });

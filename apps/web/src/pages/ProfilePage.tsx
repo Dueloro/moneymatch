@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '../auth/useAuth';
-import { Cs2SetupCard } from '../components/cs2/Cs2SetupCard';
-import { DemoHandles } from '../components/DemoHandles';
 import { LinkGames } from '../components/LinkGames';
 import { ErrorState } from '../components/ui/ErrorState';
-import { Loader } from '../components/ui/Loader';
+import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { useResetDemo } from '../hooks/useResetDemo';
-import { formatCurrency } from '../lib/format';
+import { formatPoints, formatPointsValue } from '../lib/format';
 
 export function ProfilePage() {
   usePageTitle('Profile');
-  const { signOut, isDemo } = useAuth();
+  const { signOut } = useAuth();
   const me = useMe();
   const selfExclude = useSelfExclude();
   const [confirming, setConfirming] = useState(false);
@@ -23,9 +20,15 @@ export function ProfilePage() {
   const user = me.data?.user;
   const limits = me.data?.limits;
   const excluded = user?.status === 'self_excluded';
-  const showCs2 = (user?.active_games ?? []).includes('cs2.steam');
 
-  if (me.isLoading) return <Loader />;
+  if (me.isLoading)
+    return (
+      <div className="max-w-read" data-testid="profile-skeleton">
+        <SectionHeader level="page">Profile</SectionHeader>
+        <Skeleton className="h-28 w-full rounded-card" />
+        <SkeletonList rows={3} />
+      </div>
+    );
   if (me.isError || !user) {
     return (
       <div className="max-w-read">
@@ -57,32 +60,12 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <Section title="Games">
+      <Section title="Lichess account">
         <p className="mb-3 text-sm text-text-secondary">
-          Check the games you play to add them to your bar. Link an account when you're
-          ready to play for real.
+          Your matches settle from this account's games.
         </p>
-        <LinkGames context={isDemo ? 'demo' : 'production'} />
+        <LinkGames />
       </Section>
-
-      {showCs2 && (
-        <Section title="Counter-Strike 2">
-          <p className="mb-3 text-sm text-text-secondary">
-            Connect Steam and your matches settle your wagers automatically.
-          </p>
-          <Cs2SetupCard />
-        </Section>
-      )}
-
-      {isDemo && (
-        <Section title="Test with real accounts">
-          <p className="mb-3 text-sm text-text-secondary">
-            The demo is linked to placeholder handles. Swap in a real account per game
-            to pull its live profile and stats.
-          </p>
-          <DemoHandles />
-        </Section>
-      )}
 
       <Section title="Limits">
         {limits ? (
@@ -92,11 +75,9 @@ export function ProfilePage() {
         )}
       </Section>
 
-      {!isDemo && (
-        <Section title="Security">
-          <ChangePassword />
-        </Section>
-      )}
+      <Section title="Security">
+        <ChangePassword />
+      </Section>
 
       <div className="mt-10 flex flex-col items-start gap-4">
         <PillButton variant="outline" onClick={() => void signOut()}>
@@ -116,14 +97,14 @@ export function ProfilePage() {
               type="button"
               onClick={() => selfExclude.mutate()}
               disabled={selfExclude.isPending}
-              className="text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
+              className="inline-flex touch:min-h-11 items-center text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
             >
               {selfExclude.isPending ? 'Excluding…' : 'Yes, self-exclude'}
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="text-sm text-text-secondary hover:text-text"
+              className="inline-flex touch:min-h-11 items-center text-sm text-text-secondary hover:text-text"
             >
               Cancel
             </button>
@@ -132,74 +113,16 @@ export function ProfilePage() {
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="text-sm font-semibold text-red hover:opacity-80"
+            className="inline-flex touch:min-h-11 items-center text-sm font-semibold text-red hover:opacity-80"
           >
             Self-exclude
           </button>
         )}
       </div>
-
-      {isDemo && <ResetDemo />}
     </div>
   );
 }
 
-/**
- * Reset the shared demo to its fresh-login state. This replaces the old per-room
- * "New pool" escape hatch: formed rooms are (correctly) uncancelable, so testers
- * get one deliberate "start over" here instead. Inline two-step confirm, matching
- * the page's other irreversible actions.
- */
-function ResetDemo() {
-  const reset = useResetDemo();
-  const [confirming, setConfirming] = useState(false);
-
-  return (
-    <div className="mt-10 border-t border-hairline pt-6">
-      <p className="text-sm font-medium text-text">Reset demo</p>
-      <p className="mt-1 max-w-read text-xs text-text-secondary">
-        Clear any in-flight contests, restore your $1,000 demo balance, and refresh the
-        sample activity. This resets the shared demo account for everyone.
-      </p>
-      {confirming ? (
-        <div className="mt-3 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              reset.mutate(undefined, { onSettled: () => setConfirming(false) })
-            }
-            disabled={reset.isPending}
-            className="text-sm font-semibold text-text hover:opacity-80 disabled:opacity-40"
-          >
-            {reset.isPending ? 'Resetting…' : 'Yes, reset the demo'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirming(false)}
-            className="text-sm text-text-secondary hover:text-text"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <PillButton
-          variant="outline"
-          className="mt-3"
-          onClick={() => setConfirming(true)}
-        >
-          Reset demo
-        </PillButton>
-      )}
-    </div>
-  );
-}
-
-/**
- * Change the account password via Supabase. A "Change password" button opens a
- * two-step flow: confirm the current password, then set + confirm the new one.
- * Accounts sign in by username (no email on file), so there is no email-based
- * reset; this only re-auths and sets the new password on the signed-in account.
- */
 function ChangePassword() {
   const { verifyCurrentPassword, changePassword } = useAuth();
   const [step, setStep] = useState<'closed' | 'current' | 'new'>('closed');
@@ -332,9 +255,6 @@ function ChangePassword() {
   );
 }
 
-/** Editable protective caps. Lowering applies instantly; raising is staged 24 h
- * server-side and surfaced here as a pending note. Max-concurrent is
- * system-owned, shown read-only. */
 function LimitsEditor({ limits }: { limits: Limits }) {
   const update = useUpdateLimits();
   const [loss, setLoss] = useState('');
@@ -343,11 +263,10 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Seed the dollar inputs from the live caps whenever they change.
   useEffect(() => {
-    setLoss(dollars(limits.daily_loss_cap_cents));
-    setEntry(dollars(limits.daily_entry_cap_cents));
-    setDeposit(dollars(limits.daily_deposit_cap_cents));
+    setLoss(formatPointsValue(limits.daily_loss_cap_cents));
+    setEntry(formatPointsValue(limits.daily_entry_cap_cents));
+    setDeposit(formatPointsValue(limits.daily_deposit_cap_cents));
   }, [
     limits.daily_loss_cap_cents,
     limits.daily_entry_cap_cents,
@@ -393,15 +312,15 @@ function LimitsEditor({ limits }: { limits: Limits }) {
         effect after 24 hours.
       </p>
       <div className="flex flex-col gap-4">
-        <DollarField label="Daily loss cap" value={loss} onChange={setLoss} />
+        <PointsField label="Daily loss cap" value={loss} onChange={setLoss} />
         {pending?.daily_loss_cap_cents != null && effectiveAt && (
           <PendingNote cents={pending.daily_loss_cap_cents} at={effectiveAt} />
         )}
-        <DollarField label="Daily entries cap" value={entry} onChange={setEntry} />
+        <PointsField label="Daily entries cap" value={entry} onChange={setEntry} />
         {pending?.daily_entry_cap_cents != null && effectiveAt && (
           <PendingNote cents={pending.daily_entry_cap_cents} at={effectiveAt} />
         )}
-        <DollarField label="Daily deposit cap" value={deposit} onChange={setDeposit} />
+        <PointsField label="Daily top-up cap" value={deposit} onChange={setDeposit} />
         {pending?.daily_deposit_cap_cents != null && effectiveAt && (
           <PendingNote cents={pending.daily_deposit_cap_cents} at={effectiveAt} />
         )}
@@ -433,7 +352,6 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   );
 }
 
-/** A self-imposed break: staking is refused until it ends (extend-only). */
 function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
   const update = useUpdateLimits();
   const [confirming, setConfirming] = useState<number | null>(null);
@@ -463,14 +381,14 @@ function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
                     type="button"
                     onClick={() => start(days)}
                     disabled={update.isPending}
-                    className="text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
+                    className="inline-flex touch:min-h-11 items-center text-sm font-semibold text-red hover:opacity-80 disabled:opacity-40"
                   >
                     Confirm {days}-day break
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirming(null)}
-                    className="text-sm text-text-secondary hover:text-text"
+                    className="inline-flex touch:min-h-11 items-center text-sm text-text-secondary hover:text-text"
                   >
                     Cancel
                   </button>
@@ -488,7 +406,7 @@ function CoolOff({ timeoutUntil }: { timeoutUntil: string | null }) {
   );
 }
 
-function DollarField({
+function PointsField({
   label,
   value,
   onChange,
@@ -500,14 +418,14 @@ function DollarField({
   return (
     <label className="flex items-center justify-between gap-4 text-sm">
       <span className="text-text-secondary">{label}</span>
-      <span className="flex items-center gap-1">
-        <span className="text-text-secondary">$</span>
+      <span className="flex items-center gap-2">
         <input
-          inputMode="decimal"
+          inputMode="numeric"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-24 rounded-pill border border-hairline bg-panel-raised px-4 py-1.5 text-right text-sm text-text transition-colors hover:border-line-strong"
+          className="num w-28 rounded-pill border border-hairline bg-panel-raised px-4 py-1.5 text-right text-sm text-text transition-colors hover:border-line-strong"
         />
+        <span className="text-xs text-text-tertiary">pts</span>
       </span>
     </label>
   );
@@ -516,21 +434,15 @@ function DollarField({
 function PendingNote({ cents, at }: { cents: number; at: string }) {
   return (
     <p className="-mt-2 text-xs text-text-secondary">
-      Raise to {formatCurrency(cents)} takes effect {at}.
+      Raise to {formatPoints(cents, { long: true })} takes effect {at}.
     </p>
   );
 }
 
-/** Dollars string (no trailing .00 for whole amounts) from integer cents. */
-function dollars(cents: number): string {
-  return (cents / 100).toFixed(2).replace(/\.00$/, '');
-}
-
-/** Parse a dollar input to integer cents; null when not a positive number. */
 function toCents(value: string): number | null {
-  const n = Number(value.trim());
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 100);
+  const n = Number(value.trim().replace(/,/g, ''));
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return n;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

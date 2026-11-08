@@ -11,22 +11,14 @@ from .config import Settings
 
 
 def configure_logging(settings: Settings) -> None:
-    """Configure stdlib + structlog once at startup."""
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
         level=logging.INFO,
     )
 
-    # httpx logs every request at INFO *with the full URL*, query string and
-    # all. Steam takes its API key and a player's match-history auth code as
-    # query parameters, because it accepts nothing else, so leaving this on
-    # writes both into stdout — and from there into Sentry and whatever
-    # aggregates logs in production.
-    #
-    # Our own `host.request` event records method, host, status and latency
-    # without the query, which is the part worth keeping. Warnings and errors
-    # from httpx still come through.
+    # httpx logs full URLs (query strings may carry secrets); our own `host.request`
+    # event logs method, host, status and latency instead.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 

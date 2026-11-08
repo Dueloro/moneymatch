@@ -1,6 +1,5 @@
-"""Admin audit log (01-architecture §2 · Social & ops).
-
-Every admin action lands here — an append-only trail for disputes and ops.
+"""Admin audit log. Every admin action lands here — an append-only trail for disputes
+and ops.
 """
 
 from __future__ import annotations

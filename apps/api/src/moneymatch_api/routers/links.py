@@ -1,32 +1,36 @@
-"""`/links` — linked host accounts + the link/refresh/unlink flow.
-
-The server owns verification: POST carries only `{game, username}`; the adapter
-fetches and validates the account, and the binding is immutable to users (DELETE
-is admin-only in MVP). GET returns a row per registered game so the Profile
-screen can render LINKED / BLOCKED / UNLINKED directly.
-"""
+"""`/links` — linked host accounts + the link/refresh/unlink flow."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import Settings
 from ..constants import (
-    CATALOG_GAMES,
+    REGISTERED_GAMES,
     game_display_name,
     game_flag_key,
-    is_coming_soon,
 )
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
-from ..schemas.links import CreateLinkRequest, GameLink, LinksResponse
+from ..schemas.links import (
+    CreateLinkRequest,
+    GameLink,
+    LichessOAuthCallbackRequest,
+    LichessOAuthStartResponse,
+    LinksResponse,
+)
 from ..schemas.profile import ProfileSnapshot
-from ..services import game_stats_service, linking_service
+from ..services import game_stats_service, lichess_oauth_service, linking_service
 from ..services.feature_flags import get_boolean_flags
 
 router = APIRouter(prefix="/links", tags=["links"])
+
+
+def _settings(request: Request) -> Settings:
+    return request.app.state.settings
 
 
 def _profile_of(link: LinkedAccount) -> ProfileSnapshot | None:
@@ -43,10 +47,7 @@ def _game_link(
     win_streak: int = 0,
 ) -> GameLink:
     blocked = (not flag_enabled) or (link is not None and link.status == "frozen")
-    if is_coming_soon(game):
-        # No adapter yet: selectable in the catalog but not linkable.
-        status = "COMING_SOON"
-    elif blocked:
+    if blocked:
         status = "BLOCKED"
     elif link is not None:
         status = "LINKED"
@@ -75,7 +76,7 @@ async def _links_response(session: AsyncSession, user_id) -> LinksResponse:
                 flags.get(game_flag_key(game), True),
                 streaks.get(game, 0),
             )
-            for game in CATALOG_GAMES
+            for game in REGISTERED_GAMES
         ]
     )
 
@@ -92,8 +93,36 @@ async def create_link(
     body: CreateLinkRequest,
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(_settings),
 ) -> LinksResponse:
+    """Unverified typed-username link: dev/e2e seam only (E2E_AUTH_ENABLED, never prod).
+
+    Real users link through the Lichess OAuth endpoints below, which prove ownership.
+    """
+    if settings.env == "prod" or not settings.e2e_auth_enabled:
+        raise APIError("not_found", "Not found.", status_code=404)
     await linking_service.bind(session, user, body.game, body.username)
+    return await _links_response(session, user.id)
+
+
+@router.post("/lichess/oauth/start", response_model=LichessOAuthStartResponse)
+async def start_lichess_oauth(
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(_settings),
+) -> LichessOAuthStartResponse:
+    url = await lichess_oauth_service.start(session, user, settings)
+    return LichessOAuthStartResponse(authorize_url=url)
+
+
+@router.post("/lichess/oauth/callback", response_model=LinksResponse)
+async def complete_lichess_oauth(
+    body: LichessOAuthCallbackRequest,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(_settings),
+) -> LinksResponse:
+    await lichess_oauth_service.complete(session, user, body.code, body.state, settings)
     return await _links_response(session, user.id)
 
 
@@ -113,7 +142,6 @@ async def delete_link(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> LinksResponse:
-    # Bindings are immutable to users; unlink is an admin action in MVP.
     if user.role != "admin":
         raise APIError(
             "admin_only",

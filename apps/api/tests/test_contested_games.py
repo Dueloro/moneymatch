@@ -20,12 +20,6 @@ async def test_contested_games_is_per_game(client, session):
     await client.get(f"{V1}/me", headers=auth_headers(auth))
     user = await session.scalar(select(User).where(User.auth_id == auth))
 
-    # Active on two games, but only ever entered a chess contest.
-    await client.patch(
-        f"{V1}/me",
-        json={"active_games": ["chess.lichess", "cs2.steam"]},
-        headers=auth_headers(auth),
-    )
     link = await create_linked_account(
         session, user, "chess.lichess", host_account_id="cg_ch"
     )
@@ -58,7 +52,6 @@ async def test_contested_games_is_per_game(client, session):
     await session.commit()
 
     me = (await client.get(f"{V1}/me", headers=auth_headers(auth))).json()
-    # Chess entered → contested; CS2 active but never entered → not contested.
     assert me["contested_games"] == ["chess.lichess"]
 
 

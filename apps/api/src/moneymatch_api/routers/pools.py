@@ -1,10 +1,4 @@
-"""`/pools` — queue-matched solo pools (07-phase-4).
-
-Pools are **not** browse-and-join: a player picks metric + difficulty + entry and
-enqueues; the matcher forms a fair room. "Open pools" = your in-flight rooms +
-your queue state. Entering escrows only at formation (no escrow while waiting).
-No endpoint accepts a bar, room bar, or payout — the server owns every number.
-"""
+"""`/pools` — queue-matched solo pools."""
 
 from __future__ import annotations
 
@@ -20,7 +14,6 @@ from ..constants import (
     POOL_GAMES,
     POOL_METRICS,
     POOL_ROOM_SIZE,
-    SOLO_POOLS_OPEN,
     metric_label,
 )
 from ..db.session import get_session
@@ -40,7 +33,7 @@ from ..schemas.pools import (
     PoolStatusResponse,
     PoolView,
 )
-from ..services import live_activity_service, money_math, pool_engine, test_opponents
+from ..services import live_activity_service, money_math, pool_engine
 from ..services.pool_engine import PoolEnqueueResult
 
 router = APIRouter(prefix="/pools", tags=["pools"])
@@ -72,8 +65,6 @@ async def _pool_view(session: AsyncSession, pool: SoloPool, user: User) -> PoolV
         for e in entries
     ]
     your_bar = your.personal_bar if your else None
-    # Reflect the live result while the window runs, read host-free from the cached
-    # snapshot the worker maintains (never a host call on the request path).
     your_cleared: bool | None = None
     your_current: float | None = None
     if pool.state == "LOCKED":
@@ -179,29 +170,6 @@ async def enter_pool(
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> PoolStatusResponse:
-    # Solo pools are closed to new entries: a platform-set bar is not a format
-    # we offer. Pools already running still settle through the worker, and
-    # their history stays readable.
-    if not SOLO_POOLS_OPEN:
-        raise APIError(
-            "pools_closed",
-            "Solo pools are closed. Try a tournament or a head-to-head instead.",
-            status_code=410,
-        )
-    # Practice opponents join *first* (scaffolding, delete before launch). The
-    # matcher can only build a room out of tickets that already exist, so
-    # filling afterwards would leave them stranded while you formed a room of
-    # one. Demo account only; a real signup never takes this branch.
-    if test_opponents.is_enabled(user):
-        await test_opponents.fill_pool(
-            session,
-            user,
-            game=body.game,
-            metric=body.metric,
-            difficulty=body.difficulty,
-            entry_cents=body.entry_preset_cents,
-        )
-
     result = await pool_engine.enqueue(
         session,
         user,
