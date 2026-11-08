@@ -121,12 +121,12 @@ export function MatchStage({
       <div
         className={
           hasBoard
-            ? 'grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_17.5rem]'
+            ? 'grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17.5rem]'
             : 'grid grid-cols-1'
         }
       >
         {hasBoard && (
-          <div className="order-2 px-4 py-4 md:order-1 md:px-6 md:py-5">
+          <div className="order-2 px-4 py-4 md:px-6 lg:order-1 lg:py-5">
             <BoardColumn
               match={match}
               state={state}
@@ -141,7 +141,7 @@ export function MatchStage({
             'flex flex-col',
             settled ? '' : 'px-5 py-5 md:px-6',
             hasBoard
-              ? 'order-1 border-b border-hairline md:order-2 md:border-b-0 md:border-l'
+              ? 'order-1 border-b border-hairline lg:order-2 lg:border-b-0 lg:border-l'
               : '',
           ].join(' ')}
         >
@@ -416,7 +416,7 @@ function MoveList({ san }: { san: string[] }) {
   const lastPly = san.length - 1;
   const tone = (ply: number) => (ply === lastPly ? 'text-text' : 'text-text-tertiary');
   return (
-    <div className="hidden md:block" data-testid="move-list">
+    <div className="hidden lg:block" data-testid="move-list">
       <p className="label-neutral mb-1.5">Moves</p>
       <ol className="num grid grid-cols-[2.25rem_1fr_1fr] gap-y-1 rounded-inset border border-hairline px-3 py-2 text-xs">
         {shown.map((r) => (
@@ -546,7 +546,7 @@ function ResultPanel({
         </p>
       )}
 
-      <div className="mt-6 flex flex-col gap-2 md:mt-auto md:pt-6">
+      <div className="mt-6 flex flex-col gap-2 lg:mt-auto lg:pt-6">
         <div className="flex gap-2">
           <PillButton className="flex-1" onClick={onPlayAgain}>
             Play again

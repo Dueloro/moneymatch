@@ -76,11 +76,11 @@ export function ChatPanel() {
   return (
     <div
       data-testid="chat-panel"
-      className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:grid md:h-[calc(100vh-11rem)] md:min-h-[36rem] md:grid-cols-[20rem_minmax(0,1fr)]"
+      className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:h-[calc(100vh-11rem)] md:min-h-[36rem] lg:grid lg:grid-cols-[20rem_minmax(0,1fr)]"
     >
       <div
         className={[
-          'h-full min-h-0 border-hairline bg-bg md:block md:border-r',
+          'h-full min-h-0 border-hairline bg-bg lg:block lg:border-r',
           mobilePane === 'list' ? 'block' : 'hidden',
         ].join(' ')}
       >
@@ -102,7 +102,7 @@ export function ChatPanel() {
 
       <div
         className={[
-          'h-full min-h-0 min-w-0 md:block',
+          'h-full min-h-0 min-w-0 lg:block',
           mobilePane === 'detail' ? 'block' : 'hidden',
         ].join(' ')}
       >
@@ -112,7 +112,7 @@ export function ChatPanel() {
               <button
                 type="button"
                 onClick={() => setMobilePane('list')}
-                className="text-sm font-semibold text-text-secondary md:hidden"
+                className="text-sm font-semibold text-text-secondary lg:hidden"
               >
                 ← Inbox
               </button>

@@ -72,7 +72,7 @@ export function MessageThread({
           type="button"
           onClick={onBack}
           aria-label="Back to conversations"
-          className="grid h-9 w-9 place-items-center rounded-full text-text-secondary transition hover:bg-panel-raised hover:text-text md:hidden"
+          className="grid h-9 w-9 place-items-center rounded-full text-text-secondary transition hover:bg-panel-raised hover:text-text lg:hidden"
         >
           <BackIcon className="h-5 w-5" />
         </button>
