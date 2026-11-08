@@ -17,10 +17,20 @@ export function setLinkReturnTo(path: string): void {
   }
 }
 
+function isSameSitePath(path: string): boolean {
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\'))
+    return false;
+  try {
+    return new URL(path, window.location.origin).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 export function peekLinkReturnTo(): string {
   try {
     const path = sessionStorage.getItem(KEY);
-    if (path && path.startsWith('/') && !path.startsWith('//')) return path;
+    if (path && isSameSitePath(path)) return path;
   } catch {
     /* ignore */
   }
