@@ -1,3 +1,10 @@
+const token =
+  (name) =>
+  ({ opacityValue }) =>
+    opacityValue === undefined || opacityValue === '1'
+      ? `var(--${name})`
+      : `color-mix(in srgb, var(--${name}) calc(${opacityValue} * 100%), transparent)`;
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
@@ -13,22 +20,22 @@ export default {
     },
     extend: {
       colors: {
-        bg: 'var(--bg)',
-        panel: 'var(--panel)',
-        'panel-raised': 'var(--panel-raised)',
-        overlay: 'var(--overlay)',
-        hairline: 'var(--hairline)',
-        'line-strong': 'var(--line-strong)',
-        text: 'var(--text)',
-        'text-secondary': 'var(--text-secondary)',
-        'text-tertiary': 'var(--text-tertiary)',
-        green: 'var(--green)',
-        'green-dim': 'var(--green-dim)',
-        action: 'var(--action)',
-        live: 'var(--live)',
-        red: 'var(--red)',
-        warn: 'var(--warn)',
-        focus: 'var(--focus)',
+        bg: token('bg'),
+        panel: token('panel'),
+        'panel-raised': token('panel-raised'),
+        overlay: token('overlay'),
+        hairline: token('hairline'),
+        'line-strong': token('line-strong'),
+        text: token('text'),
+        'text-secondary': token('text-secondary'),
+        'text-tertiary': token('text-tertiary'),
+        green: token('green'),
+        'green-dim': token('green-dim'),
+        action: token('action'),
+        live: token('live'),
+        red: token('red'),
+        warn: token('warn'),
+        focus: token('focus'),
       },
       borderRadius: {
         pill: 'var(--radius-pill)',
