@@ -68,6 +68,16 @@ Chess (`adapters/chess_lichess.py`, id `chess.lichess`) is the only adapter.
 Its host client is `services/hosts/lichess.py`. Lichess needs no API key for
 the endpoints used.
 
+Linking proves ownership with Lichess OAuth (Authorization Code + PKCE, no
+scopes; `services/lichess_oauth_service.py`). `POST /links/lichess/oauth/start`
+stores a single-use `state` + `code_verifier` row (`lichess_oauth_states`,
+bound to the user, 10-minute expiry) and returns the authorize URL; the web
+sends the user to Lichess, which redirects to `/link/lichess/callback`; `POST
+/links/lichess/oauth/callback` consumes the state, exchanges the code, reads
+`/api/account`, revokes the token and binds the Lichess-confirmed username.
+The token is never stored. Typed-username `POST /links` exists only under
+`E2E_AUTH_ENABLED` (never prod) for the e2e and load fixtures.
+
 Adding a title means one adapter plus its constants and markets. Start from
 [`future-expansion/README.md`](../future-expansion/README.md).
 
@@ -125,6 +135,7 @@ Models in `models/`; schema in `apps/api/migrations/versions/0001_baseline.py`.
 | `platform_ledger` | Append-only `platform:rake` and `platform:promo` rows |
 | `limits` | Per-user staking caps, with delayed raises |
 | `linked_accounts` | Bound Lichess accounts; soft-unbind keeps history |
+| `lichess_oauth_states` | Pending Lichess OAuth attempts (single use, 10-minute expiry) |
 | `metric_models` | Per user/game/metric skill model (μ/σ) behind personal bars |
 | `raw_payloads` | Append-only raw host JSON kept as settlement evidence |
 | `queue_tickets` | The matchmaking queue (all three play models) |

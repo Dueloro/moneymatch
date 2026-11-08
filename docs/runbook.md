@@ -79,6 +79,15 @@ In Supabase enable Auth → Providers → Google with its client ID and secret,
 and add the web origin under Auth → URL Configuration (Site URL and Redirect
 URLs).
 
+### Lichess linking
+
+Linking uses Lichess OAuth with PKCE. Lichess needs no app registration and
+no secret: `LICHESS_OAUTH_CLIENT_ID` (optional, default `moneymatch`) is just
+the name shown on the Lichess consent screen. The redirect is
+`<first WEB_ORIGIN>/link/lichess/callback`, so the first `WEB_ORIGIN` entry
+must be the web address users are on. Tokens are revoked right after reading
+the account and never stored.
+
 ### Supabase email (via Resend)
 
 Do these only after the sending domain (`send.dueloro.com`) shows Verified in
