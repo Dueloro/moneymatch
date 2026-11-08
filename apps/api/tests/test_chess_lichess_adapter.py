@@ -109,3 +109,20 @@ async def test_match_winner_requires_both_our_accounts():
     )
     assert await ADAPTER.match_winner("g1", ["alice", "bob"]) == "alice"
     assert await ADAPTER.match_winner("g1", ["alice", "carol"]) is None
+
+
+@respx.mock
+async def test_grading_fetch_is_strict_about_outages_but_not_missing_games():
+    from moneymatch_api.services.hosts.errors import HostUnavailable
+
+    url = "https://lichess.org/game/export/g404"
+    respx.get(url).mock(return_value=httpx.Response(404))
+    assert (await ADAPTER.match_result("g404", ["a", "b"])).finished is False
+
+    respx.get("https://lichess.org/game/export/g503").mock(
+        return_value=httpx.Response(503)
+    )
+    with pytest.raises(HostUnavailable):
+        await ADAPTER.match_result("g503", ["a", "b"])
+    # The display path stays best-effort.
+    assert await ADAPTER.live_match("g503", ["a", "b"]) is None

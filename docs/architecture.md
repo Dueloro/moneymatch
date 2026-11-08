@@ -119,8 +119,10 @@ re-claimable and nothing double-settles. `run_cycle`:
    needs no extra call: grading reads the Lichess export with moves and clocks
    (`/game/export/{id}?moves=true&clocks=true`) and writes the board to
    `live_snapshots` from that same response, so the board refreshes every cycle
-   at one Lichess call per active match. Lichess shares ongoing games 3 moves
-   late. Settlement stores the termination and the game's end time
+   at one Lichess call per active match. An outage, rate limit or malformed
+   body raises and extends the window (only a missing game reads as "no game").
+   Colours on the board are the ones Lichess actually seated. Lichess shares
+   ongoing games 3 moves late. Settlement stores the termination and the game's end time
    (`lastMoveAt`) in `outcome_detail`; `MatchView` exposes them with
    `resolved_at` and the viewer's board (withheld once older than 90 s).
 5. Expire unconfirmed matches (refunding whoever escrowed), stale tickets,

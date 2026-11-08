@@ -57,10 +57,9 @@ async def _grade_brokered(
         "termination": result.termination,
         "game_ended_at": _ended_at(result.ended_at_ms),
     }
-    if result.finished and result.winner is None and result.termination == "aborted":
-        return GradeOutcome(
-            CANCEL, detail={"reason": "game_aborted", **ending}, live=live
-        )
+    if result.finished and result.winner is None:
+        reason = "game_aborted" if result.termination == "aborted" else "unknown_finish"
+        return GradeOutcome(CANCEL, detail={"reason": reason, **ending}, live=live)
     if not result.finished or result.winner is None:
         if _deadline_passed(match, now):
             return GradeOutcome(

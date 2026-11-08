@@ -109,26 +109,38 @@ async def create_open_challenge(
     }
 
 
-async def get_live_game(game_id: str) -> dict | None:
-    """One game with its SAN moves and clocks (centiseconds per ply). Grading and the
-    live board share this call. Lichess delays ongoing games by 3 moves.
+_GAME_PARAMS = {
+    "moves": "true",
+    "clocks": "true",
+    "evals": "false",
+    "opening": "false",
+}
+
+
+async def get_game_for_grading(game_id: str) -> dict | None:
+    """One game with its SAN moves and clocks (centiseconds per ply), for grading
+    and the live board alike. Only a missing game is None; an outage, a rate limit
+    or a malformed body raises `HostUnavailable` so the worker extends the window.
+    Lichess delays ongoing games by 3 moves.
     """
-    params = {
-        "moves": "true",
-        "clocks": "true",
-        "evals": "false",
-        "opening": "false",
-    }
     try:
         response = await request_json(
             HOST,
             "GET",
             f"https://lichess.org/game/export/{game_id}",
             headers={**HEADERS, "Accept": "application/json"},
-            params=params,
+            params=_GAME_PARAMS,
         )
-        return response.json()
-    except (HostError, ValueError):
+    except HostNotFound:
+        return None
+    return _json_object(response)
+
+
+async def get_live_game(game_id: str) -> dict | None:
+    """Best-effort `get_game_for_grading` for display: any host error is None."""
+    try:
+        return await get_game_for_grading(game_id)
+    except HostError:
         return None
 
 

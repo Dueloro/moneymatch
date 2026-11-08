@@ -73,7 +73,7 @@ async def players(session: AsyncSession, match_id: uuid.UUID) -> list[MatchPlaye
     rows = await session.scalars(
         select(MatchPlayer)
         .where(MatchPlayer.match_id == match_id)
-        .order_by(MatchPlayer.created_at.asc())
+        .order_by(MatchPlayer.created_at.asc(), MatchPlayer.user_id.asc())
     )
     return list(rows)
 
@@ -126,7 +126,9 @@ async def _activate(
     now = clock.now()
 
     adapter = registry.get(match.game)
-    handles = [s.host_account_id for s in seats]
+    # Lichess seats the first handle as white, so send them in seat-colour order.
+    ordered = sorted(seats, key=lambda s: s.color != "white")
+    handles = [s.host_account_id for s in ordered]
     try:
         broker = await adapter.create_match(match.speed or "blitz", handles)
     except HostUnavailable as exc:

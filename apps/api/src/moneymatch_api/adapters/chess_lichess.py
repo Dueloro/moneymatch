@@ -111,21 +111,24 @@ class ChessLichessAdapter(GameAdapter):
 
     async def match_result(self, game_id: str, players: list[str]) -> MatchResult:
         """Grade a brokered game, verifying both accounts played it. One export call
-        also carries the live board, so grading doubles as the live refresh.
+        also carries the live board, so grading doubles as the live refresh. Host
+        outages raise (the worker extends the window); they never read as unfinished.
         """
-        live = await self.live_match(game_id, players)
+        live = self._view(await lichess.get_game_for_grading(game_id), players)
         if live is None or not live["finished"]:
             return MatchResult(finished=False, live=live)
         winner = live["winner"]
         handle: str | None
         if winner in ("white", "black"):
-            handle = live[winner]
+            handle = next(p for p in players if p.lower() == live[winner].lower())
         elif live["termination"] == "aborted":
-            handle = None
+            if live["plies"] >= 2:
+                return MatchResult(finished=False, live=live)  # deadline decides
+            handle = None  # never really started -> refund now
+        elif live["status"] == "unknownFinish":
+            handle = None  # no result to grade -> refund
         else:
             handle = ""  # draw -> refund
-        if handle:
-            handle = next((p for p in players if p.lower() == handle.lower()), None)
         return MatchResult(
             finished=True,
             winner=handle,
@@ -135,10 +138,13 @@ class ChessLichessAdapter(GameAdapter):
         )
 
     async def live_match(self, game_id: str, players: list[str]) -> dict | None:
-        """Colour-neutral view: the moves (SAN), clocks, whose turn, and the result
-        and termination once finished. Lichess delays ongoing games by 3 moves.
+        """Colour-neutral view for display (any host error is None)."""
+        return self._view(await lichess.get_live_game(game_id), players)
+
+    def _view(self, g: dict | None, players: list[str]) -> dict | None:
+        """The moves (SAN), clocks, whose turn, and the result and termination once
+        finished, for a game played by exactly these two accounts.
         """
-        g = await lichess.get_live_game(game_id)
         if not g:
             return None
         players_j = g.get("players", {}) or {}
@@ -146,23 +152,27 @@ class ChessLichessAdapter(GameAdapter):
         black = (((players_j.get("black") or {}).get("user")) or {}).get("name")
         if not white or not black:
             return None
-        want = {p.lower() for p in players}
-        if white.lower() not in want or black.lower() not in want:
+        if {white.lower(), black.lower()} != {p.lower() for p in players}:
             return None
         status = g.get("status")
         finished = status in _FINISHED or status in _ABORTED
         san = (g.get("moves") or "").split()
         plies = len(san)
         winner = g.get("winner") if finished else None
+        if winner not in ("white", "black"):
+            winner = None
         result = winner
         if finished and winner is None:
-            result = None if status in _ABORTED else "draw"
+            result = None if status in _ABORTED or status == "unknownFinish" else "draw"
+        termination = termination_of(status)
+        if status in _ABORTED and winner:
+            termination = "abandoned"
         clock = g.get("clock") or {}
         last_move_at = g.get("lastMoveAt")
         return {
             "status": status,
             "finished": finished,
-            "termination": termination_of(status),
+            "termination": termination,
             "plies": plies,
             "moves": _move_count(g.get("moves")),
             "san": san,

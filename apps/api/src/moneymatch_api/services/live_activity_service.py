@@ -126,7 +126,16 @@ def snapshot_from_live(
         "clocks": live.get("clocks"),
         "clock": live.get("clock"),
         "last_move_at": _iso_ms(live.get("last_move_at")),
-        "colors": {str(s.user_id): (s.color or "") for s in seats},
+        "colors": _played_colors(live, seats),
+    }
+
+
+def _played_colors(live: dict[str, Any], seats: list[MatchPlayer]) -> dict[str, str]:
+    """Each seat's colour in the game actually played (seat colour as a fallback)."""
+    played = {(live.get(c) or "").lower(): c for c in ("white", "black") if live.get(c)}
+    return {
+        str(s.user_id): played.get(s.host_account_id.lower(), s.color or "")
+        for s in seats
     }
 
 
