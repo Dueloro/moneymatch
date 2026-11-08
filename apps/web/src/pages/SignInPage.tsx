@@ -452,11 +452,12 @@ function ResetPasswordStep() {
 
 function OnboardingStep({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const derived = emailToUsername(session?.user.email);
   const [username, setUsername] = useState(derived ?? '');
   const [state, setState] = useState('');
   const [attested, setAttested] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const valid = USERNAME_RE.test(username) && state !== '' && attested;
@@ -544,6 +545,19 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
         </PillButton>
         {error && <p className="text-center text-sm text-red">{error}</p>}
       </form>
+      <div className="text-center">
+        <button
+          type="button"
+          className="mt-6 inline-flex touch:min-h-11 items-center text-sm text-text-secondary hover:text-text"
+          disabled={signingOut || mutation.isPending}
+          onClick={() => {
+            setSigningOut(true);
+            void signOut().finally(() => setSigningOut(false));
+          }}
+        >
+          ← {signingOut ? 'Signing out…' : 'Back to sign in'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -105,9 +105,15 @@ Resend. An unverified domain makes every auth email fail.
 2. Auth → Providers → Email: enable Confirm email; keep email OTP on.
 3. Auth → URL Configuration: Site URL = `https://play.dueloro.com`; add
    `https://play.dueloro.com/**` and `http://localhost:5173/**` to Redirect URLs.
-4. Auth → Email Templates: paste `supabase/email-templates/confirm-signup.html`,
-   `magic-link.html` (must keep `{{ .Token }}`), `reset-password.html`.
-5. Sign up with a real address and check the verify, code and reset emails.
+4. Auth → Email Templates → Authentication: paste the corresponding file from
+   `supabase/email-templates/` for Confirm sign up, Invite user, Magic link,
+   Change email address, Reset password and Reauthentication. Keep every
+   `{{ .… }}` template variable intact.
+5. Under Security notifications, paste and enable Password changed, Email
+   address changed, Phone number changed, Sign-in method linked/removed and
+   Verification method added/removed. These messages are transactional account
+   alerts, not marketing email.
+6. Sign up with a real address and check the verify, code and reset emails.
 
 ### Support email replies (via Resend Inbound)
 

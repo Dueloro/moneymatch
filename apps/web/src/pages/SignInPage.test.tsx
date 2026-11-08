@@ -26,11 +26,14 @@ const mockUseMe = vi.mocked(useMe);
 
 const signInWithEmail = vi.fn();
 const signInWithGoogle = vi.fn();
+const signOut = vi.fn();
 
 describe('SignInPage', () => {
   beforeEach(() => {
     signInWithEmail.mockReset();
     signInWithGoogle.mockReset();
+    signOut.mockReset();
+    signOut.mockResolvedValue(undefined);
     mockUseAuth.mockReturnValue({
       session: null,
       loading: false,
@@ -44,7 +47,7 @@ describe('SignInPage', () => {
       signInWithGoogle,
       verifyCurrentPassword: vi.fn(),
       changePassword: vi.fn(),
-      signOut: vi.fn(),
+      signOut,
     });
     mockUseMe.mockReturnValue({ data: undefined, isLoading: false } as ReturnType<
       typeof useMe
@@ -203,6 +206,7 @@ describe('SignInPage', () => {
         session: { user: { id: 'u1' } } as never,
         loading: false,
         isPasswordRecovery: false,
+        signOut,
       } as unknown as ReturnType<typeof useAuth>);
       mockUseMe.mockImplementation(
         () =>
@@ -212,6 +216,7 @@ describe('SignInPage', () => {
             isError: false,
           }) as unknown as ReturnType<typeof useMe>,
       );
+      vi.mocked(api.PATCH).mockReset();
       vi.mocked(api.PATCH).mockImplementation(async () => {
         needsOnboarding = false;
         return { data: {}, error: undefined } as never;
@@ -254,6 +259,13 @@ describe('SignInPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Connect Lichess' }));
       expect(connectMutate).toHaveBeenCalledWith('/i/tok123');
       window.history.replaceState(null, '', '/');
+    });
+
+    it('can return to sign in before claiming a username', async () => {
+      renderFlow();
+      await userEvent.click(screen.getByRole('button', { name: /back to sign in/i }));
+      expect(signOut).toHaveBeenCalledOnce();
+      expect(api.PATCH).not.toHaveBeenCalled();
     });
 
     it('reaches the link step with a real profile refetch', async () => {

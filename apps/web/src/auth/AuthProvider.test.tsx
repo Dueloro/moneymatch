@@ -72,4 +72,18 @@ describe('AuthProvider email methods', () => {
       type: 'email',
     });
   });
+
+  it('asks Google to show the account chooser', async () => {
+    auth.signInWithOAuth.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.signInWithGoogle());
+    expect(auth.signInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/signin`,
+        queryParams: { prompt: 'select_account' },
+      },
+    });
+  });
 });
