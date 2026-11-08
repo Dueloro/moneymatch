@@ -31,7 +31,9 @@ export function SidebarNav() {
       className="hidden w-56 shrink-0 flex-col border-r border-hairline px-3 py-5 md:flex"
     >
       <div className="mb-8 shrink-0 px-2">
-        <Logo />
+        <Link to="/play" aria-label="Money Match home" className="inline-flex">
+          <Logo />
+        </Link>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">

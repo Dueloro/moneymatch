@@ -17,7 +17,9 @@ export function MobileTopBar() {
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-hairline bg-bg px-4 py-3 md:hidden">
-      <Logo />
+      <Link to="/play" aria-label="Money Match home">
+        <Logo />
+      </Link>
       <div className="flex items-center gap-2">
         <NavLink
           to="/wallet"

@@ -58,11 +58,21 @@ describe('AppShell', () => {
     expect(screen.getByText('kvem_')).toBeInTheDocument();
   });
 
+  it('points Play and the logo at /play, the one home', () => {
+    renderShell();
+    for (const el of screen.getAllByRole('link', { name: 'Play' })) {
+      expect(el).toHaveAttribute('href', '/play');
+    }
+    for (const el of screen.getAllByRole('link', { name: 'Money Match home' })) {
+      expect(el).toHaveAttribute('href', '/play');
+    }
+  });
+
   it('keeps Play lit on every contest route', () => {
-    renderShell('/play');
+    renderShell('/pools');
     const play = screen.getAllByRole('link', { name: 'Play' });
     expect(play.some((el) => el.getAttribute('aria-current') === 'page')).toBe(true);
-    expect(screen.getByText('PLAY CONTENT')).toBeInTheDocument();
+    expect(screen.getByText('POOLS CONTENT')).toBeInTheDocument();
   });
 
   it('shows the balance in the sidebar footer', () => {

@@ -1,5 +1,5 @@
 const NAV_GLYPHS: Record<string, JSX.Element> = {
-  '/pools': (
+  '/play': (
     <path
       d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"
       strokeLinejoin="round"
