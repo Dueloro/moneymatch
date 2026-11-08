@@ -17,7 +17,7 @@ from moneymatch_api.services.hosts import lichess
 from moneymatch_api.workers import settlement_worker
 
 from .conftest import new_sessionmaker
-from .test_play_endpoints import V1, _hdr, _queue, setup_player
+from .test_play_endpoints import CHESS, V1, _hdr, _queue, setup_player
 
 ADAPTER = ChessLichessAdapter()
 ENDED_MS = 1_760_000_000_000
@@ -188,3 +188,33 @@ async def test_aborted_game_cancels_and_refunds_promptly(client, monkeypatch):
         match = await s.get(Match, match_id)
         assert match.state == "CANCELED"
         assert match.outcome_detail["reason"] == "game_aborted"
+
+
+async def test_searching_status_recaps_the_ticket(client):
+    await setup_player(client, "auth_s", "solo", rating=1640)
+    await _queue(client, "auth_s", speed="rapid", entry=2500)
+    body = (await client.get(f"{V1}/play/queue/status", headers=_hdr("auth_s"))).json()
+    assert body["status"] == "searching"
+    assert body["ticket"] == {
+        "market": "win_h2h",
+        "speed": "rapid",
+        "clock": {"speed": "rapid", "limit_seconds": 600, "increment_seconds": 0},
+        "entry_cents": 2500,
+        "rating": 1640,
+    }
+
+
+async def test_markets_publish_each_speeds_clock(client):
+    await setup_player(client, "auth_k", "clocky")
+    body = (
+        await client.get(
+            f"{V1}/play/markets", params={"game": CHESS}, headers=_hdr("auth_k")
+        )
+    ).json()
+    clocks = {c["speed"]: c for c in body["markets"][0]["clocks"]}
+    assert clocks["blitz"] == {
+        "speed": "blitz",
+        "limit_seconds": 300,
+        "increment_seconds": 0,
+    }
+    assert set(clocks) == {"bullet", "blitz", "rapid", "classical"}

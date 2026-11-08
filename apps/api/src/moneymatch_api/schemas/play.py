@@ -26,6 +26,14 @@ class Forecast(BaseModel):
     label: str
 
 
+class SpeedClock(BaseModel):
+    """The clock a brokered game is created with, in seconds."""
+
+    speed: str
+    limit_seconds: int
+    increment_seconds: int
+
+
 class MarketRow(BaseModel):
     """One market row on the Play screen."""
 
@@ -34,6 +42,7 @@ class MarketRow(BaseModel):
     kind: str
     requires_speed: bool
     speeds: list[str]
+    clocks: list[SpeedClock] = []
     # Derived pot multiplier in basis points (2·(1 − rake)); NEVER an odds line.
     multiplier_bps: int
     queue_depth: int
@@ -146,12 +155,23 @@ class DisputeView(BaseModel):
     resolved_at: datetime | None
 
 
+class QueueTicketView(BaseModel):
+    """The viewer's own search ticket, recapped on the searching screen."""
+
+    market: str
+    speed: str | None
+    clock: SpeedClock | None
+    entry_cents: int
+    rating: int | None
+
+
 class QueueStatusResponse(BaseModel):
     """Where the viewer stands: idle, searching (with wait), or matched."""
 
     status: str
     match: MatchView | None = None
     waited_seconds: int | None = None
+    ticket: QueueTicketView | None = None
     can_cancel: bool = True
 
 

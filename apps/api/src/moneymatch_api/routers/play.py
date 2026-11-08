@@ -35,6 +35,8 @@ from ..schemas.play import (
     MatchView,
     QueueRequest,
     QueueStatusResponse,
+    QueueTicketView,
+    SpeedClock,
     WaitingResponse,
     WaitingRow,
 )
@@ -55,6 +57,13 @@ _CHESS_SPEEDS = list(CHESS_CLOCKS)
 
 
 _RESOLUTION_NOTE = "Brokered game between you both · draw = push, entries refunded."
+
+
+def _speed_clock(speed: str | None) -> SpeedClock | None:
+    if speed not in CHESS_CLOCKS:
+        return None
+    limit, increment = CHESS_CLOCKS[speed]
+    return SpeedClock(speed=speed, limit_seconds=limit, increment_seconds=increment)
 
 
 def _when(value: object) -> datetime | None:
@@ -158,9 +167,17 @@ async def _status_view(
         )
     if result.status == "searching" and result.ticket is not None:
         waited = int((clock.now() - result.ticket.created_at).total_seconds())
+        t = result.ticket
         return QueueStatusResponse(
             status="searching",
             waited_seconds=waited,
+            ticket=QueueTicketView(
+                market=t.market,
+                speed=t.speed,
+                clock=_speed_clock(t.speed),
+                entry_cents=t.entry_cents,
+                rating=t.rating,
+            ),
         )
     return QueueStatusResponse(status="idle", can_cancel=False)
 
@@ -203,6 +220,9 @@ async def get_markets(
             kind=market.kind,
             requires_speed=market.requires_speed,
             speeds=_CHESS_SPEEDS if market.requires_speed else [],
+            clocks=[c for s in _CHESS_SPEEDS if (c := _speed_clock(s))]
+            if market.requires_speed
+            else [],
             multiplier_bps=market.multiplier_bps,
             queue_depth=depths.get(market.key, 0),
             resolution_note=_RESOLUTION_NOTE,
