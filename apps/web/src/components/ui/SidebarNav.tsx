@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
-import { useInboxUnread } from '../../hooks/useChat';
+import { useInboxBadge } from '../../hooks/useInbox';
 import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useMe } from '../../hooks/useMe';
 import { AnimatedBalance } from './AnimatedBalance';
@@ -12,7 +12,7 @@ import { NAV, isPlayPath } from './nav';
 export function SidebarNav() {
   const me = useMe();
   const available = useDisplayBalance();
-  const unread = useInboxUnread();
+  const unread = useInboxBadge();
   const { pathname } = useLocation();
   const username = me.data?.user.username ?? '…';
   const isAdmin = me.data?.user.role === 'admin';

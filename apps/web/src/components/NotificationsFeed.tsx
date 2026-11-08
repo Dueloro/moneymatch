@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -19,14 +18,21 @@ import { useAcceptChallenge, useDeclineChallenge } from '../hooks/useChallenges'
 export function NotificationsFeed() {
   const { data, isLoading, isError, refetch } = useNotifications();
   const markRead = useMarkNotificationsRead();
-
-  useEffect(() => {
-    if (data && data.unread > 0) markRead.mutate(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.unread]);
+  const unread = data?.unread ?? 0;
 
   return (
     <div className="max-w-xl">
+      {unread > 0 && (
+        <div className="mb-3 flex justify-end">
+          <PillButton
+            variant="text"
+            onClick={() => markRead.mutate(undefined)}
+            disabled={markRead.isPending}
+          >
+            Mark all read
+          </PillButton>
+        </div>
+      )}
       {isLoading ? (
         <SkeletonList rows={4} />
       ) : isError ? (
@@ -39,7 +45,14 @@ export function NotificationsFeed() {
       ) : (
         <div className="flex flex-col gap-2">
           {data?.items.map((n) => (
-            <NotificationRow key={n.id} note={n} />
+            <div
+              key={n.id}
+              onClickCapture={() => {
+                if (!n.read) markRead.mutate([n.id]);
+              }}
+            >
+              <NotificationRow note={n} />
+            </div>
           ))}
         </div>
       )}

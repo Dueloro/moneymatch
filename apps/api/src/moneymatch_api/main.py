@@ -24,6 +24,7 @@ from .routers import (
     events,
     friends,
     health,
+    inbox,
     leaderboard,
     links,
     me,
@@ -114,6 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(chat.router, prefix=API_V1_PREFIX)
     app.include_router(leaderboard.router, prefix=API_V1_PREFIX)
     app.include_router(notifications.router, prefix=API_V1_PREFIX)
+    app.include_router(inbox.router, prefix=API_V1_PREFIX)
     app.include_router(admin.router, prefix=API_V1_PREFIX)
 
     if settings.e2e_auth_enabled and settings.env != "prod":

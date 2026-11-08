@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 
-import { useInboxUnread } from '../../hooks/useChat';
+import { useInboxBadge } from '../../hooks/useInbox';
 import { useDisplayBalance } from '../../hooks/useDisplayBalance';
 import { useMe } from '../../hooks/useMe';
 import { AnimatedBalance } from './AnimatedBalance';
@@ -12,7 +12,7 @@ import { NAV, isPlayPath } from './nav';
 export function MobileTopBar() {
   const me = useMe();
   const available = useDisplayBalance();
-  const unread = useInboxUnread();
+  const unread = useInboxBadge();
   const username = me.data?.user.username ?? '…';
 
   return (
@@ -54,7 +54,7 @@ export function MobileTopBar() {
 }
 
 export function MobileTabBar() {
-  const unread = useInboxUnread();
+  const unread = useInboxBadge();
   const { pathname } = useLocation();
 
   return (

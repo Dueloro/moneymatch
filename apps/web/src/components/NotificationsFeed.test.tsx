@@ -100,7 +100,7 @@ describe('NotificationsFeed', () => {
     } as unknown as ReturnType<typeof useDeclineChallenge>);
   });
 
-  it('renders a challenge notification with Accept and marks read on view', () => {
+  it('keeps unread dots on view; opening a row or "Mark all read" clears them', () => {
     vi.mocked(useNotifications).mockReturnValue({
       data: {
         unread: 1,
@@ -119,10 +119,15 @@ describe('NotificationsFeed', () => {
 
     expect(screen.getByText(/jordn_cs challenged you/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
-    expect(markMutate).toHaveBeenCalledWith(undefined);
+    expect(screen.getByLabelText('unread')).toBeInTheDocument();
+    expect(markMutate).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
     expect(declineMutate).toHaveBeenCalledWith('c1');
+    expect(markMutate).toHaveBeenCalledWith(['n1']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all read' }));
+    expect(markMutate).toHaveBeenLastCalledWith(undefined);
   });
 
   it('shows the empty state with no notifications', () => {

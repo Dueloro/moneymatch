@@ -21,9 +21,9 @@ vi.mock('./SettlementProvider', () => ({
 vi.mock('../hooks/useWallet', () => ({
   useWallet: () => ({ data: { available_cents: 100_800, escrow_cents: 0 } }),
 }));
-vi.mock('../hooks/useChat', () => ({ useInboxUnread: vi.fn(() => 0) }));
+vi.mock('../hooks/useInbox', () => ({ useInboxBadge: vi.fn(() => 0) }));
 
-import { useInboxUnread } from '../hooks/useChat';
+import { useInboxBadge } from '../hooks/useInbox';
 import { useMe } from '../hooks/useMe';
 
 vi.mocked(useMe).mockReturnValue({
@@ -99,11 +99,11 @@ describe('AppShell', () => {
       isLoading: false,
     } as ReturnType<typeof useMe>);
 
-    vi.mocked(useInboxUnread).mockReturnValue(0);
+    vi.mocked(useInboxBadge).mockReturnValue(0);
     renderShell().unmount();
     expect(screen.queryByTestId('inbox-unread-dot')).not.toBeInTheDocument();
 
-    vi.mocked(useInboxUnread).mockReturnValue(2);
+    vi.mocked(useInboxBadge).mockReturnValue(2);
     renderShell();
     expect(screen.getByTestId('inbox-unread-dot')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Inbox, 2 unread' })).toBeInTheDocument();

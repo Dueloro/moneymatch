@@ -57,6 +57,9 @@ class User(Base, TimestampMixin):
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    inbox_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     residence_state: Mapped[str | None] = mapped_column(String(2), nullable=True)
     dob_attested_18plus: Mapped[bool] = mapped_column(

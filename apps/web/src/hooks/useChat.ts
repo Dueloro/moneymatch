@@ -116,6 +116,7 @@ function useChatInvalidation() {
   const keys = useChatKeys();
   return (conversationId?: string) => {
     qc.invalidateQueries({ queryKey: keys.conversations });
+    qc.invalidateQueries({ queryKey: ['inbox-badge'] });
     if (conversationId) {
       qc.invalidateQueries({ queryKey: keys.thread(conversationId) });
     }

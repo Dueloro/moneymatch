@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { FriendsPanel } from '../components/FriendsPanel';
 import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { SubTabs } from '../components/ui/SubTabs';
 import { useInboxUnread } from '../hooks/useChat';
+import { useInboxBadge, useMarkInboxSeen } from '../hooks/useInbox';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { InboxPage } from './InboxPage';
 
@@ -19,6 +20,18 @@ export function SocialPage() {
     TABS.includes(initial as SocialTab) ? (initial as SocialTab) : 'inbox',
   );
   const inboxUnread = useInboxUnread();
+  const badge = useInboxBadge();
+  const seen = useMarkInboxSeen();
+  const stamped = useRef(false);
+
+  // Being on Social is "seen": stamp on mount, and again if something new arrives
+  // while the page is open. Per-item unread dots stay until each item is opened.
+  useEffect(() => {
+    if (stamped.current && badge === 0) return;
+    stamped.current = true;
+    seen.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [badge]);
 
   useEffect(() => {
     if (TABS.includes(initial as SocialTab)) setTab(initial as SocialTab);

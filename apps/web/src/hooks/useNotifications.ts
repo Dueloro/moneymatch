@@ -44,6 +44,7 @@ export function useMarkNotificationsRead() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications', session?.user.id] });
       qc.invalidateQueries({ queryKey: ['me', session?.user.id] });
+      qc.invalidateQueries({ queryKey: ['inbox-badge'] });
     },
   });
 }

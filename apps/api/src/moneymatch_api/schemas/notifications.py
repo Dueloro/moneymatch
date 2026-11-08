@@ -29,3 +29,9 @@ class MarkReadRequest(BaseModel):
 
 class MarkReadResponse(BaseModel):
     unread: int
+
+
+class InboxBadgeResponse(BaseModel):
+    """Unread items that arrived since the user last opened Social."""
+
+    badge: int

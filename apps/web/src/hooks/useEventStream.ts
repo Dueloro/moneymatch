@@ -12,6 +12,7 @@ const REFRESH_KEYS = [
   ['waiting'],
   ['wallet'],
   ['notifications'],
+  ['inbox-badge'],
 ] as const;
 
 const RECONNECT_MS = 3000;

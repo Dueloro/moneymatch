@@ -160,6 +160,11 @@ Models in `models/`; schema in `apps/api/migrations/versions/0001_baseline.py`.
 
 Migrations are forward-only. Ship each schema change with its migration.
 
+The Social nav badge (`GET /inbox/badge`) counts unread DMs and notifications
+newer than `users.inbox_seen_at`; opening Social calls `POST /inbox/seen`. Item
+"new" dots use the per-item read state (thread cursor, `notifications.read_at`)
+and clear only when that thread or row is opened, or via "Mark all read".
+
 ## Auth
 
 Supabase Auth handles sign-in (email and Google). The web app sends the
