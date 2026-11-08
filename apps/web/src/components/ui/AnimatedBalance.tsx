@@ -6,7 +6,7 @@ import { Skeleton } from './Skeleton';
 
 const DELTA_MS = 2200;
 
-const TINT_MS = 1400;
+const TINT_MS = 1200;
 
 export function AnimatedBalance({
   cents,
@@ -47,6 +47,7 @@ function LoadedBalance({
 }) {
   const shown = useCountUp(cents);
   const [delta, setDelta] = useState<number | null>(null);
+  const [tinted, setTinted] = useState(false);
   const previous = useRef(cents);
   const seeded = useRef(false);
 
@@ -58,19 +59,21 @@ function LoadedBalance({
       return;
     }
     if (from === cents) return;
-
     setDelta(cents - from);
-    const timer = setTimeout(() => setDelta(null), DELTA_MS);
-    return () => clearTimeout(timer);
+    setTinted(true);
   }, [cents]);
 
-  const [tinted, setTinted] = useState(false);
+  // Both timers belong to the flash, so only a newer flash (or unmount) cancels
+  // them; the balance always returns to its resting colour.
   useEffect(() => {
     if (delta === null) return;
-    setTinted(true);
-    const timer = setTimeout(() => setTinted(false), TINT_MS);
-    return () => clearTimeout(timer);
-  }, [delta]);
+    const tintTimer = setTimeout(() => setTinted(false), TINT_MS);
+    const deltaTimer = setTimeout(() => setDelta(null), DELTA_MS);
+    return () => {
+      clearTimeout(tintTimer);
+      clearTimeout(deltaTimer);
+    };
+  }, [delta, cents]);
 
   const up = (delta ?? 0) > 0;
   const tint = tinted ? (up ? 'text-green' : 'text-red') : '';
@@ -78,7 +81,7 @@ function LoadedBalance({
   return (
     <span className={`relative inline-block ${className}`} data-testid={testId}>
       <span
-        className={`num transition-colors duration-300 ${tint}`}
+        className={`num transition-colors duration-150 ${tint}`}
         data-direction={delta === null ? 'none' : up ? 'up' : 'down'}
       >
         {formatPointsValue(shown)}

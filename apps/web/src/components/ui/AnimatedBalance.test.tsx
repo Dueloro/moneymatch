@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { act } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AnimatedBalance } from './AnimatedBalance';
 
@@ -72,5 +72,27 @@ describe('AnimatedBalance', () => {
     const { rerender } = render(<AnimatedBalance cents={10_000} testId="bal" />);
     act(() => rerender(<AnimatedBalance cents={11_000} testId="bal" />));
     expect(screen.getByTestId('bal-delta')).toHaveAttribute('aria-hidden');
+  });
+
+  describe('flash', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('settles back to the resting colour after repeat losses', () => {
+      vi.useFakeTimers();
+      const { rerender } = render(<AnimatedBalance cents={10_000} testId="bal" />);
+      const figure = () => screen.getByTestId('bal').querySelector('.num')!;
+      act(() => rerender(<AnimatedBalance cents={7_500} testId="bal" />));
+      expect(figure()).toHaveClass('text-red');
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      act(() => rerender(<AnimatedBalance cents={5_000} testId="bal" />));
+      expect(figure()).toHaveClass('text-red');
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(figure()).not.toHaveClass('text-red');
+      expect(screen.queryByTestId('bal-delta')).not.toBeInTheDocument();
+    });
   });
 });

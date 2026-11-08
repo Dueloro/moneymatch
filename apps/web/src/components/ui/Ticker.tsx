@@ -1,5 +1,12 @@
 import { formatPoints } from '../../lib/format';
+import { speedName } from '../../lib/timeControl';
 import { useWaiting } from '../../hooks/useMatchmaking';
+
+export function lookingFor(speed: string | null | undefined): string {
+  if (!speed) return 'is looking for a game';
+  const name = speedName(speed).toLowerCase();
+  return `is looking for ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name} game`;
+}
 
 export function Ticker() {
   const { data } = useWaiting(undefined);
@@ -10,7 +17,10 @@ export function Ticker() {
     <span key={key} className="mx-5 inline-flex items-center gap-2 text-xs">
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-live" aria-hidden />
       <span className="font-medium text-text">{w.username ?? 'A player'}</span>
-      <span className="text-text-secondary">wants {w.market_label}</span>
+      <span className="text-text-secondary">{lookingFor(w.speed)}</span>
+      <span aria-hidden className="text-text-tertiary">
+        ·
+      </span>
       <span className="font-medium text-text">{formatPoints(w.entry_cents)}</span>
     </span>
   );
