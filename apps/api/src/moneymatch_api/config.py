@@ -52,6 +52,7 @@ class Settings(BaseSettings):
 
     resend_api_key: str | None = None
     email_from: str = Field(default="Money Match <noreply@send.dueloro.com>")
+    support_email: str = Field(default="support@dueloro.com")
 
     payments_live: bool = Field(default=False)
     kyc_live: bool = Field(default=False)

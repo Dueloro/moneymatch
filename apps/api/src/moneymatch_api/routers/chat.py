@@ -22,7 +22,7 @@ from ..schemas.chat import (
     SendMessageRequest,
     ThreadResponse,
 )
-from ..services import chat_service, friends_service
+from ..services import chat_service, friends_service, support_alerts
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -141,7 +141,15 @@ async def send_message(
             difficulty=body.invite.difficulty,
         )
     else:
-        await chat_service.send_text(session, user, conversation_id, body.body or "")
+        message = await chat_service.send_text(
+            session, user, conversation_id, body.body or ""
+        )
+        conversation = await session.get(Conversation, conversation_id)
+        if conversation is not None and conversation.kind == "support":
+            await session.commit()
+            support_alerts.notify(
+                user, conversation_id, message.body or "", message.created_at
+            )
     await chat_service.mark_read(session, user, conversation_id)
     return await _thread(session, user, conversation_id)
 

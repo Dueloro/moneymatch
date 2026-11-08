@@ -51,6 +51,10 @@ marketing site's CTAs point to `https://app.dueloro.com`.
    Environment tab.
    - `SUPABASE_URL` and a non-localhost `WEB_ORIGIN` are required on both.
    - `EMAIL_FROM` = `Money Match <noreply@send.dueloro.com>`.
+   - `SUPPORT_EMAIL` (optional, API only, default `support@dueloro.com`): each
+     user message in a support thread is emailed there (subject
+     `Support: <username>`, reply-to the user), at most one email per thread per
+     minute with later lines batched. Needs `RESEND_API_KEY`.
    - Blank `SUPABASE_JWT_SECRET` means verify via JWKS. Blank `SENTRY_DSN`,
      `POSTHOG_API_KEY` or `VAPID_*` just disables that feature.
 3. Region: every service and the database must be in the same region as the

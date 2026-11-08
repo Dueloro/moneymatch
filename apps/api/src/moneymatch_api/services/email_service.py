@@ -120,3 +120,32 @@ async def send_to_user(
     except Exception as exc:  # noqa: BLE001 — best-effort; mail never breaks caller
         log.warning("email.send_failed", user_id=str(user_id), error=str(exc))
         return False
+
+
+async def send_plain(
+    *, to: str, subject: str, text: str, reply_to: str | None = None
+) -> bool:
+    """Plain-text mail to an operator address (no template). Best-effort."""
+    if not is_enabled():
+        return False
+    settings = get_settings()
+    payload: dict[str, object] = {
+        "from": settings.email_from,
+        "to": [to],
+        "subject": subject,
+        "text": text,
+    }
+    if reply_to:
+        payload["reply_to"] = reply_to
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                _RESEND_ENDPOINT,
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                json=payload,
+            )
+            resp.raise_for_status()
+        return True
+    except Exception as exc:  # noqa: BLE001 — best-effort; mail never breaks caller
+        log.warning("email.send_failed", to="operator", error=str(exc))
+        return False
