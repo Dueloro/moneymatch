@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
@@ -253,6 +254,26 @@ describe('SignInPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Connect Lichess' }));
       expect(connectMutate).toHaveBeenCalledWith('/i/tok123');
       window.history.replaceState(null, '', '/');
+    });
+
+    it('reaches the link step with a real profile refetch', async () => {
+      mockUseMe.mockImplementation(
+        () =>
+          useQuery({
+            queryKey: ['me'],
+            queryFn: async () => ({
+              needs_onboarding: needsOnboarding,
+              user: { username: null },
+            }),
+          }) as unknown as ReturnType<typeof useMe>,
+      );
+      renderFlow();
+      await screen.findByPlaceholderText('player_name');
+      await finishProfile();
+      expect(
+        await screen.findByRole('button', { name: 'Connect Lichess' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('play page')).not.toBeInTheDocument();
     });
 
     it('skips the link step when Lichess is already linked', async () => {

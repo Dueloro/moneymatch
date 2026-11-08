@@ -480,8 +480,8 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['me'] });
       onDone();
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
     },
     onError: (e: Error) => setError(e.message),
   });
