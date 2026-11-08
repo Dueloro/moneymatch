@@ -81,6 +81,14 @@ CHESS_BASE_BAND = 100
 CHESS_BAND_GROWTH_PER_SEC = 12
 CHESS_MAX_BAND = 800
 
+# The clock each brokered Lichess game is created with: (limit, increment) seconds.
+CHESS_CLOCKS: dict[str, tuple[int, int]] = {
+    "bullet": (60, 0),
+    "blitz": (300, 0),
+    "rapid": (600, 0),
+    "classical": (1800, 0),
+}
+
 REPAIR_COOLDOWN_SECONDS = (
     24 * 3600
 )  # accounts that just played can't be re-paired inside this
@@ -167,6 +175,8 @@ TOURNAMENT_DISPERSION_CAP = 1.0  # max(mu) - min(mu) <= cap * pooled sigma
 TOURNAMENT_WINDOW_SECONDS = 48 * 3600
 TOURNAMENT_STANDINGS_REFRESH_SECONDS = 10 * 60
 LIVE_SNAPSHOT_REFRESH_SECONDS = 30
+# An in-flight board older than this is withheld (the stage shows only the link).
+LIVE_SNAPSHOT_STALE_SECONDS = 90
 
 # Engine-version stamps for pool/tournament settlements (dispute replay).
 POOL_ENGINE_VERSION = "pool-1"

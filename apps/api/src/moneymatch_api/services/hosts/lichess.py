@@ -109,32 +109,13 @@ async def create_open_challenge(
     }
 
 
-async def get_game(game_id: str) -> dict | None:
-    """Fetch a single game by id (Phase-3 grading of a brokered head-to-head)."""
-    params = {
-        "moves": "false",
-        "clocks": "false",
-        "evals": "false",
-        "opening": "false",
-    }
-    try:
-        response = await request_json(
-            HOST,
-            "GET",
-            f"https://lichess.org/game/export/{game_id}",
-            headers={**HEADERS, "Accept": "application/json"},
-            params=params,
-        )
-        return response.json()
-    except (HostError, ValueError):
-        return None
-
-
 async def get_live_game(game_id: str) -> dict | None:
-    """Fetch a game **with its move list** for a live under-the-card view."""
+    """One game with its SAN moves and clocks (centiseconds per ply). Grading and the
+    live board share this call. Lichess delays ongoing games by 3 moves.
+    """
     params = {
         "moves": "true",
-        "clocks": "false",
+        "clocks": "true",
         "evals": "false",
         "opening": "false",
     }

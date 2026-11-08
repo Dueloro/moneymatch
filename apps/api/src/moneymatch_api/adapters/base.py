@@ -37,6 +37,20 @@ class TelemetrySample:
     metrics: dict[str, float]
 
 
+@dataclass
+class MatchResult:
+    """A brokered game's state for grading. ``winner`` is the winning handle, ``""``
+    for a draw, or ``None``; ``finished`` with no winner and ``termination ==
+    "aborted"`` means the game never really happened (refund).
+    """
+
+    finished: bool
+    winner: str | None = None
+    termination: str | None = None
+    ended_at_ms: int | None = None
+    live: dict | None = None
+
+
 class GameAdapter(abc.ABC):
     """Contract every supported title implements."""
 
@@ -67,6 +81,10 @@ class GameAdapter(abc.ABC):
         ``""`` for a draw, or ``None`` while unfinished / unverifiable.
         """
         raise NotImplementedError
+
+    async def match_result(self, game_id: str, players: list[str]) -> MatchResult:
+        winner = await self.match_winner(game_id, players)
+        return MatchResult(finished=winner is not None, winner=winner)
 
     async def live_match(self, game_id: str, players: list[str]) -> dict | None:
         return None

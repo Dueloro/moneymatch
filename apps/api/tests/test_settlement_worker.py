@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import select, update
 
 from moneymatch_api.adapters import registry
+from moneymatch_api.adapters.base import MatchResult
 from moneymatch_api.constants import (
     FLAG_QUEUE_PAUSED,
     FLAG_SETTLEMENT_PAUSED,
@@ -44,6 +45,10 @@ class FakeChessAdapter:
         if self.raise_host:
             raise HostUnavailable("lichess", "down")
         return self.winner
+
+    async def match_result(self, game_id, players):
+        winner = await self.match_winner(game_id, players)
+        return MatchResult(finished=winner is not None, winner=winner)
 
     async def poll_eligible_games(self, host, since_ms, filters):
         return []

@@ -89,6 +89,15 @@ class MatchView(BaseModel):
     you_confirmed: bool
     your_play_url: str | None
     forecast: Forecast | None
+    # How the game ended (checkmate | resignation | time | draw | stalemate |
+    # abandoned | aborted | other), when Lichess said so.
+    termination: str | None = None
+    # When the game ended on Lichess, and when we settled it; null when unknown.
+    game_ended_at: datetime | None = None
+    resolved_at: datetime | None = None
+    # The viewer-oriented board (moves, clocks, turn, result); null when stale or
+    # unavailable.
+    live: dict | None = None
 
 
 class GradingExplanation(BaseModel):

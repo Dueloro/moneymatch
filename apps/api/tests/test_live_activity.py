@@ -5,13 +5,9 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-import pytest
-
 from moneymatch_api.models.play import Match, MatchPlayer
 from moneymatch_api.services import live_activity_service
 from moneymatch_api.services.hosts import lichess
-
-pytestmark = pytest.mark.asyncio
 
 CHESS = "chess.lichess"
 
@@ -95,3 +91,26 @@ async def test_chess_finished_maps_result_per_viewer(monkeypatch):
 async def test_no_snapshot_before_pairing():
     match = Match(game=CHESS, market="win_h2h", matched_at=None)
     assert await live_activity_service.build_match_snapshot(None, match, []) is None
+
+
+def test_board_fields_only_on_the_match_stage_view():
+    viewer = uuid.uuid4()
+    snap = live_activity_service.snapshot_from_live(
+        {
+            "finished": True,
+            "moves": 1,
+            "plies": 1,
+            "turn": None,
+            "winner": "white",
+            "termination": "resignation",
+            "san": ["e4"],
+            "clocks": {"white_ms": 1, "black_ms": 2},
+            "clock": {"limit": 60, "increment": 0},
+            "last_move_at": 1_760_000_000_000,
+        },
+        [_seat(viewer, "alice", "white")],
+    )
+    feed = live_activity_service.view_for("match", snap, viewer)
+    stage = live_activity_service.view_for("match", snap, viewer, board=True)
+    assert feed["termination"] == "resignation" and "san" not in feed
+    assert stage["san"] == ["e4"] and stage["last_move_at"].startswith("2025-")

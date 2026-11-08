@@ -131,6 +131,8 @@ def _match_detail(
         "entry_cents": match.entry_cents,
         "prize_cents": match.prize_cents,
         "host_game_id": match.host_game_id,
+        "termination": (match.outcome_detail or {}).get("termination"),
+        "game_ended_at": (match.outcome_detail or {}).get("game_ended_at"),
         "your_stats": _seat_stats(match, yours),
         "opponent_stats": _seat_stats(match, opp),
     }

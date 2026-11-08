@@ -5,6 +5,7 @@ the settlement.
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -12,11 +13,16 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import clock
-from ..constants import ENTRY_PRESETS_CENTS
+from ..constants import (
+    CHESS_CLOCKS,
+    ENTRY_PRESETS_CENTS,
+    LIVE_SNAPSHOT_STALE_SECONDS,
+)
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
 from ..models.linked_account import LinkedAccount
+from ..models.live import LiveSnapshot
 from ..models.play import Match, MatchPlayer, QueueTicket
 from ..models.user import User
 from ..schemas.play import (
@@ -32,17 +38,47 @@ from ..schemas.play import (
     WaitingResponse,
     WaitingRow,
 )
-from ..services import dispute_service, matchmaking, money_math
+from ..services import (
+    dispute_service,
+    live_activity_service,
+    matchmaking,
+    money_math,
+)
 from ..services.markets import for_game as markets_for_game
 from ..services.markets import get as get_market
 from ..services.match_lifecycle import cancel_pending, confirm, players
+from ..services.match_states import is_terminal
 
 router = APIRouter(prefix="/play", tags=["play"])
 
-_CHESS_SPEEDS = ["bullet", "blitz", "rapid", "classical"]
+_CHESS_SPEEDS = list(CHESS_CLOCKS)
 
 
 _RESOLUTION_NOTE = "Brokered game between you both · draw = push, entries refunded."
+
+
+def _when(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+async def _live_view(session: AsyncSession, match: Match, user: User) -> dict | None:
+    """The stored board for this viewer; an in-flight board that stopped refreshing
+    is withheld so the stage falls back to the Lichess link.
+    """
+    if match.matched_at is None:
+        return None
+    row = await session.get(LiveSnapshot, ("match", match.id))
+    if row is None:
+        return None
+    age = (clock.now() - row.updated_at).total_seconds()
+    if not is_terminal(match.state) and age > LIVE_SNAPSHOT_STALE_SECONDS:
+        return None
+    return live_activity_service.view_for("match", row.data, user.id, board=True)
 
 
 async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
@@ -85,6 +121,7 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
             your_seat.baseline_snapshot, opp_seat.baseline_snapshot
         )
 
+    detail = match.outcome_detail or {}
     return MatchView(
         id=match.id,
         game=match.game,
@@ -105,6 +142,10 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
         you_confirmed=your_seat.confirmed_at is not None if your_seat else False,
         your_play_url=your_seat.play_url if your_seat else None,
         forecast=forecast,
+        termination=detail.get("termination"),
+        game_ended_at=_when(detail.get("game_ended_at")),
+        resolved_at=match.resolved_at,
+        live=await _live_view(session, match, user),
     )
 
 

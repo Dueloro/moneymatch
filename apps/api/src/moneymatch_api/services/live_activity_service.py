@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -99,23 +100,19 @@ def pool_all_decided(snapshot: dict[str, Any]) -> bool:
     )
 
 
-async def build_match_snapshot(
-    session: AsyncSession, match: Match, seats: list[MatchPlayer]
-) -> dict[str, Any] | None:
-    """A neutral H2H snapshot of the chess board."""
-    if match.matched_at is None or match.window_ends_at is None:
-        return None
-    if not match.host_game_id:
-        return {"kind": "match", "format": "chess", "status": "waiting"}
-    adapter = registry.get(match.game)
-    handles = [s.host_account_id for s in seats]
-    try:
-        live = await adapter.live_match(match.host_game_id, handles)
-    except HostError:
-        live = None
+_WAITING: dict[str, Any] = {"kind": "match", "format": "chess", "status": "waiting"}
+
+
+def _iso_ms(ms: int | None) -> str | None:
+    return datetime.fromtimestamp(ms / 1000, tz=UTC).isoformat() if ms else None
+
+
+def snapshot_from_live(
+    live: dict[str, Any] | None, seats: list[MatchPlayer]
+) -> dict[str, Any]:
+    """The neutral stored snapshot for an adapter's live view (or `waiting`)."""
     if not live:
-        return {"kind": "match", "format": "chess", "status": "waiting"}
-    colors = {str(s.user_id): (s.color or "") for s in seats}
+        return dict(_WAITING)
     return {
         "kind": "match",
         "format": "chess",
@@ -124,8 +121,30 @@ async def build_match_snapshot(
         "plies": live["plies"],
         "turn": live["turn"],
         "winner": live["winner"],
-        "colors": colors,
+        "termination": live.get("termination"),
+        "san": live.get("san") or [],
+        "clocks": live.get("clocks"),
+        "clock": live.get("clock"),
+        "last_move_at": _iso_ms(live.get("last_move_at")),
+        "colors": {str(s.user_id): (s.color or "") for s in seats},
     }
+
+
+async def build_match_snapshot(
+    session: AsyncSession, match: Match, seats: list[MatchPlayer]
+) -> dict[str, Any] | None:
+    """A neutral H2H snapshot of the chess board."""
+    if match.matched_at is None or match.window_ends_at is None:
+        return None
+    if not match.host_game_id:
+        return dict(_WAITING)
+    adapter = registry.get(match.game)
+    handles = [s.host_account_id for s in seats]
+    try:
+        live = await adapter.live_match(match.host_game_id, handles)
+    except HostError:
+        live = None
+    return snapshot_from_live(live, seats)
 
 
 def _pool_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:
@@ -143,11 +162,13 @@ def _pool_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | 
     }
 
 
-def _match_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] | None:
+def _match_view(
+    snapshot: dict[str, Any], viewer: uuid.UUID, board: bool = False
+) -> dict[str, Any] | None:
     if snapshot.get("format") != "chess":
         return None
     if snapshot.get("status") == "waiting":
-        return {"kind": "match", "format": "chess", "status": "waiting"}
+        return dict(_WAITING)
     colors = snapshot.get("colors") or {}
     your_color = colors.get(str(viewer))
     turn = snapshot.get("turn")
@@ -158,7 +179,7 @@ def _match_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] |
     elif winner:
         result = "you" if winner == your_color else "opp"
     your_turn = None if turn is None else ("you" if turn == your_color else "opp")
-    return {
+    view: dict[str, Any] = {
         "kind": "match",
         "format": "chess",
         "status": snapshot.get("status"),
@@ -166,7 +187,16 @@ def _match_view(snapshot: dict[str, Any], viewer: uuid.UUID) -> dict[str, Any] |
         "your_color": your_color,
         "turn": your_turn,
         "result": result,
+        "termination": snapshot.get("termination"),
     }
+    if board:
+        view.update(
+            san=snapshot.get("san") or [],
+            clocks=snapshot.get("clocks"),
+            clock=snapshot.get("clock"),
+            last_move_at=snapshot.get("last_move_at"),
+        )
+    return view
 
 
 def tournament_view(
@@ -198,13 +228,15 @@ def tournament_view(
 
 
 def view_for(
-    ref_type: str, snapshot: dict[str, Any], viewer: uuid.UUID
+    ref_type: str, snapshot: dict[str, Any], viewer: uuid.UUID, board: bool = False
 ) -> dict[str, Any] | None:
-    """Orient a stored neutral snapshot (`pool` | `match`) to one viewer."""
+    """Orient a stored neutral snapshot (`pool` | `match`) to one viewer; `board`
+    adds the moves and clocks for the match stage.
+    """
     if not snapshot:
         return None
     if ref_type == "pool":
         return _pool_view(snapshot, viewer)
     if ref_type == "match":
-        return _match_view(snapshot, viewer)
+        return _match_view(snapshot, viewer, board)
     return None

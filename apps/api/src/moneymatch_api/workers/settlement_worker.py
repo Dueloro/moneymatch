@@ -112,6 +112,7 @@ async def resolve_match(session: AsyncSession, match: Match, now: datetime) -> s
 async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> str:
     seats = await match_lifecycle.players(session, match.id)
     outcome = await grading.grade(match, seats, now)
+    await _record_live(session, match, seats, outcome.live, now)
 
     if outcome.status == grading.PENDING:
         # Hard ceiling from matched_at → CANCEL + refund (outage can't strand money).
@@ -163,6 +164,26 @@ async def _resolve_match(session: AsyncSession, match: Match, now: datetime) -> 
         ),
     )
     return {"win": "settled", "push": "pushed", "cancel": "canceled"}[kind]
+
+
+async def _record_live(
+    session: AsyncSession,
+    match: Match,
+    seats: list[MatchPlayer],
+    live: dict | None,
+    now: datetime,
+) -> None:
+    """Grading's host call doubles as the live-board refresh (no extra Lichess call).
+    A failed fetch leaves the last board in place to age out; a match Lichess hasn't
+    shown yet starts as `waiting`.
+    """
+    if match.matched_at is None or not match.host_game_id:
+        return
+    if live is None:
+        if await session.get(LiveSnapshot, ("match", match.id)) is not None:
+            return
+    snapshot = live_activity_service.snapshot_from_live(live, seats)
+    await _upsert_live(session, "match", match.id, snapshot, now)
 
 
 def _extend_window(match: Match, now: datetime) -> None:
@@ -492,6 +513,7 @@ async def _refresh_live_snapshots(
                 select(Match.id).where(
                     Match.state.in_(("ACTIVE", "AWAITING_RESULT")),
                     Match.matched_at.isnot(None),
+                    Match.host_game_id.is_(None),  # brokered games: see _record_live
                 )
             )
         )
