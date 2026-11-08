@@ -2,14 +2,16 @@ import { useState } from 'react';
 
 import { useAdminFlags, useUpdateFlag } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminFlagsPage() {
   const flags = useAdminFlags();
   const update = useUpdateFlag();
   const [geoText, setGeoText] = useState<string | null>(null);
 
-  if (flags.isLoading) return <div style={styles.page}>Loading…</div>;
-  if (flags.error) return <div style={styles.page}>Failed to load flags.</div>;
+  if (flags.isLoading) return <AdminLoading />;
+  if (flags.isError)
+    return <AdminError what="flags" onRetry={() => void flags.refetch()} />;
 
   const rows = flags.data ?? [];
   const geo = rows.find((f) => f.key === 'geo_config');

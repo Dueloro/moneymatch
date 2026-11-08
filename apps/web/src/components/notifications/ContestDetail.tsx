@@ -3,17 +3,36 @@ import { useTournament } from '../../hooks/useTournaments';
 import { formatPoints } from '../../lib/format';
 import { formatMetric, isLowerBetter } from '../../lib/metrics';
 import { AmountText } from '../ui/AmountText';
+import { ErrorState } from '../ui/ErrorState';
 import { ListRow } from '../ui/ListRow';
+import { Skeleton } from '../ui/Skeleton';
+
+function DetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-2" data-testid="detail-skeleton">
+      <Skeleton className="h-3.5 w-48" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+    </div>
+  );
+}
 
 function Line({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-text-secondary">{children}</p>;
 }
 
 export function PoolDetail({ poolId }: { poolId: string }) {
-  const { data: pool, isPending, isError } = usePool(poolId);
+  const { data: pool, isPending, isError, refetch } = usePool(poolId);
 
-  if (isPending) return <Line>Loading the room…</Line>;
-  if (isError || !pool) return <Line>Could not load this room.</Line>;
+  if (isPending) return <DetailSkeleton />;
+  if (isError || !pool)
+    return (
+      <ErrorState
+        title="Couldn't load this room"
+        subline="Try again in a moment."
+        onRetry={() => void refetch()}
+      />
+    );
 
   const settled = pool.state === 'SETTLED' || pool.state === 'CANCELED';
   const lower = isLowerBetter(pool.metric);
@@ -109,10 +128,17 @@ function Outcome({ status }: { status: string }) {
 }
 
 export function TournamentDetail({ tournamentId }: { tournamentId: string }) {
-  const { data: t, isPending, isError } = useTournament(tournamentId);
+  const { data: t, isPending, isError, refetch } = useTournament(tournamentId);
 
-  if (isPending) return <Line>Loading standings…</Line>;
-  if (isError || !t) return <Line>Could not load this tournament.</Line>;
+  if (isPending) return <DetailSkeleton />;
+  if (isError || !t)
+    return (
+      <ErrorState
+        title="Couldn't load this tournament"
+        subline="Try again in a moment."
+        onRetry={() => void refetch()}
+      />
+    );
 
   const settled = t.state === 'SETTLED' || t.state === 'CANCELED';
   const stat = (n: number) => formatMetric(t.metric, n);

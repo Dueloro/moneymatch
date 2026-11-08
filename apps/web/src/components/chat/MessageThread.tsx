@@ -9,6 +9,7 @@ import { ChallengeDialog } from '../ChallengeDialog';
 import { Skeleton } from '../ui/Skeleton';
 import { Avatar } from './Avatar';
 import { Composer, type InviteChoice } from './Composer';
+import { ErrorState } from '../ui/ErrorState';
 import { InviteSheet } from './InviteSheet';
 import { MessageBubble } from './MessageBubble';
 import { BackIcon, ChatIcon } from './icons';
@@ -42,7 +43,7 @@ export function MessageThread({
   conversationId: string;
   onBack: () => void;
 }) {
-  const { data, isLoading } = useThread(conversationId);
+  const { data, isLoading, isError, refetch } = useThread(conversationId);
   const markRead = useMarkConversationRead();
   const [invite, setInvite] = useState<InviteChoice | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -111,7 +112,14 @@ export function MessageThread({
           </div>
         )}
 
-        {!isLoading && messages.length === 0 && (
+        {isError && !data && (
+          <ErrorState
+            title="Couldn't load this conversation"
+            onRetry={() => void refetch()}
+          />
+        )}
+
+        {!isLoading && !isError && messages.length === 0 && (
           <div className="m-auto max-w-xs text-center">
             <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full border border-hairline bg-panel-raised text-text-tertiary">
               <ChatIcon className="h-6 w-6" />

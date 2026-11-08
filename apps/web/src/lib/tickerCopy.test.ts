@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { lookingFor } from './Ticker';
+import { lookingFor } from './tickerCopy';
 
 describe('lookingFor', () => {
   it('names the speed in plain language', () => {

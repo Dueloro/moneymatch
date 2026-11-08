@@ -8,6 +8,7 @@ import {
   useFreezeUser,
 } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminUsersPage() {
   const [q, setQ] = useState('');
@@ -28,6 +29,10 @@ export function AdminUsersPage() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
+      {users.isLoading && <AdminLoading bare />}
+      {users.isError && (
+        <AdminError bare what="users" onRetry={() => void users.refetch()} />
+      )}
       <div style={styles.scroll}>
         <table style={{ ...styles.table, marginTop: 12 }}>
           <thead>
@@ -85,7 +90,9 @@ function UserDetail({ userId }: { userId: string }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
 
-  if (detail.isLoading) return <div style={{ marginTop: 16 }}>Loading detail…</div>;
+  if (detail.isLoading) return <AdminLoading bare />;
+  if (detail.isError)
+    return <AdminError bare what="this user" onRetry={() => void detail.refetch()} />;
   const d = detail.data as
     | {
         username: string | null;

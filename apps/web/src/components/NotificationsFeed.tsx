@@ -10,12 +10,14 @@ import { formatPoints, formatRelativeTime } from '../lib/format';
 import { formatMetric } from '../lib/metrics';
 import { PoolDetail, TournamentDetail } from './notifications/ContestDetail';
 import { EmptyState } from './ui/EmptyState';
+import { ErrorState } from './ui/ErrorState';
+import { SkeletonList } from './ui/Skeleton';
 import { ExpandableCard } from './ui/ExpandableCard';
 import { PillButton } from './ui/PillButton';
 import { useAcceptChallenge, useDeclineChallenge } from '../hooks/useChallenges';
 
 export function NotificationsFeed() {
-  const { data } = useNotifications();
+  const { data, isLoading, isError, refetch } = useNotifications();
   const markRead = useMarkNotificationsRead();
 
   useEffect(() => {
@@ -25,7 +27,14 @@ export function NotificationsFeed() {
 
   return (
     <div className="max-w-xl">
-      {data && data.items.length === 0 ? (
+      {isLoading ? (
+        <SkeletonList rows={4} />
+      ) : isError ? (
+        <ErrorState
+          title="Couldn't load notifications"
+          onRetry={() => void refetch()}
+        />
+      ) : data && data.items.length === 0 ? (
         <EmptyState title="No notifications" subline="You're all caught up." />
       ) : (
         <div className="flex flex-col gap-2">

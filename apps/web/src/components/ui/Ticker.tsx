@@ -1,12 +1,6 @@
 import { formatPoints } from '../../lib/format';
-import { speedName } from '../../lib/timeControl';
+import { lookingFor } from '../../lib/tickerCopy';
 import { useWaiting } from '../../hooks/useMatchmaking';
-
-export function lookingFor(speed: string | null | undefined): string {
-  if (!speed) return 'is looking for a game';
-  const name = speedName(speed).toLowerCase();
-  return `is looking for ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name} game`;
-}
 
 export function Ticker() {
   const { data } = useWaiting(undefined);

@@ -1,11 +1,14 @@
 import { formatPoints, formatPct } from '../../lib/format';
 import { useClearFlag, useRisk } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminRiskPage() {
   const risk = useRisk();
   const clear = useClearFlag();
-  if (risk.isLoading) return <div style={styles.page}>Loading…</div>;
+  if (risk.isLoading) return <AdminLoading />;
+  if (risk.isError)
+    return <AdminError what="risk data" onRetry={() => void risk.refetch()} />;
   const d = risk.data as
     | {
         rates: {

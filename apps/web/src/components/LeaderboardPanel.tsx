@@ -1,11 +1,21 @@
 import { formatRoi, useLeaderboard } from '../hooks/useLeaderboard';
 import { EmptyState } from './ui/EmptyState';
+import { ErrorState } from './ui/ErrorState';
+import { SkeletonList } from './ui/Skeleton';
 import { ListRow } from './ui/ListRow';
 
 export function LeaderboardPanel() {
-  const { data } = useLeaderboard();
+  const { data, isLoading, isError, refetch } = useLeaderboard();
 
-  if (!data) return null;
+  if (isLoading) return <SkeletonList rows={5} />;
+  if (isError || !data) {
+    return (
+      <ErrorState
+        title="Couldn't load the leaderboard"
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
   if (data.rows.length === 0) {
     return (

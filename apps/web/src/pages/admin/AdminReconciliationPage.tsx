@@ -1,10 +1,13 @@
 import { formatPoints } from '../../lib/format';
 import { useReconciliation } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminReconciliationPage() {
   const recon = useReconciliation();
-  if (recon.isLoading) return <div style={styles.page}>Running checks…</div>;
+  if (recon.isLoading) return <AdminLoading />;
+  if (recon.isError)
+    return <AdminError what="reconciliation" onRetry={() => void recon.refetch()} />;
   const d = recon.data as
     | {
         ok: boolean;

@@ -10,13 +10,15 @@ import {
 } from '../hooks/useFriends';
 import { ChallengeDialog } from './ChallengeDialog';
 import { EmptyState } from './ui/EmptyState';
+import { ErrorState } from './ui/ErrorState';
+import { SkeletonList } from './ui/Skeleton';
 import { TextInput } from './ui/Field';
 import { ListRow } from './ui/ListRow';
 import { PillButton } from './ui/PillButton';
 import { SectionHeader } from './ui/SectionHeader';
 
 export function FriendsPanel() {
-  const { data } = useFriends();
+  const { data, isLoading, isError, refetch } = useFriends();
   const add = useAddFriend();
   const [query, setQuery] = useState('');
   const [challengeFriend, setChallengeFriend] = useState<FriendItem | null>(null);
@@ -65,7 +67,14 @@ export function FriendsPanel() {
 
       <div className="mt-8">
         <SectionHeader level="sub">Friends</SectionHeader>
-        {data && data.friends.length === 0 ? (
+        {isLoading ? (
+          <SkeletonList rows={3} />
+        ) : isError ? (
+          <ErrorState
+            title="Couldn't load your friends"
+            onRetry={() => void refetch()}
+          />
+        ) : data && data.friends.length === 0 ? (
           <EmptyState
             title="No friends yet"
             subline="Add someone by username or MM code and you can message and challenge them."

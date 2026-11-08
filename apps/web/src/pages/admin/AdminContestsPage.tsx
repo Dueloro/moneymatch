@@ -8,6 +8,7 @@ import {
   useVoidMatch,
 } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminContestsPage() {
   const [state, setState] = useState('');
@@ -35,6 +36,10 @@ export function AdminContestsPage() {
           onChange={(e) => setGame(e.target.value)}
         />
       </div>
+      {contests.isLoading && <AdminLoading bare />}
+      {contests.isError && (
+        <AdminError bare what="contests" onRetry={() => void contests.refetch()} />
+      )}
       <div style={styles.scroll}>
         <table style={styles.table}>
           <thead>
@@ -81,7 +86,9 @@ function ContestDetail({ type, id }: { type: string; id: string }) {
   const voidMatch = useVoidMatch();
   const [reason, setReason] = useState('');
 
-  if (detail.isLoading) return <div style={{ marginTop: 16 }}>Loading…</div>;
+  if (detail.isLoading) return <AdminLoading bare />;
+  if (detail.isError)
+    return <AdminError bare what="this match" onRetry={() => void detail.refetch()} />;
   const d = detail.data as
     | {
         state: string;

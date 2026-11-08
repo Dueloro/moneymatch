@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { useAdminDisputes, useResolveDispute } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminDisputesPage() {
   const disputes = useAdminDisputes();
@@ -14,7 +15,10 @@ export function AdminDisputesPage() {
   return (
     <div style={styles.page}>
       <h1 style={styles.h1}>Disputes</h1>
-      {disputes.isError && <p style={styles.alert}>Failed to load disputes.</p>}
+      {disputes.isLoading && <AdminLoading bare />}
+      {disputes.isError && (
+        <AdminError bare what="disputes" onRetry={() => void disputes.refetch()} />
+      )}
       {disputes.data && disputes.data.length === 0 && (
         <p style={styles.ok}>No open disputes.</p>
       )}

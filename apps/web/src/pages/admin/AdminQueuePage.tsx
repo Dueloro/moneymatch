@@ -1,10 +1,13 @@
 import { formatPoints, formatPct } from '../../lib/format';
 import { useAdminQueue } from '../../hooks/useAdmin';
 import { styles } from './adminStyles';
+import { AdminError, AdminLoading } from './AdminStates';
 
 export function AdminQueuePage() {
   const queue = useAdminQueue();
-  if (queue.isLoading) return <div style={styles.page}>Loading…</div>;
+  if (queue.isLoading) return <AdminLoading />;
+  if (queue.isError)
+    return <AdminError what="the queue" onRetry={() => void queue.refetch()} />;
   const d = queue.data as
     | {
         waiting: number;

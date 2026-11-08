@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { LinkGames } from '../components/LinkGames';
 import { ErrorState } from '../components/ui/ErrorState';
-import { Loader } from '../components/ui/Loader';
+import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { useMe, useSelfExclude, useUpdateLimits, type Limits } from '../hooks/useMe';
@@ -21,7 +21,14 @@ export function ProfilePage() {
   const limits = me.data?.limits;
   const excluded = user?.status === 'self_excluded';
 
-  if (me.isLoading) return <Loader />;
+  if (me.isLoading)
+    return (
+      <div className="max-w-read" data-testid="profile-skeleton">
+        <SectionHeader level="page">Profile</SectionHeader>
+        <Skeleton className="h-28 w-full rounded-card" />
+        <SkeletonList rows={3} />
+      </div>
+    );
   if (me.isError || !user) {
     return (
       <div className="max-w-read">

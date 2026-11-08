@@ -11,7 +11,7 @@ import { NewMessageSheet } from './NewMessageSheet';
 
 export function ChatPanel() {
   const [params, setParams] = useSearchParams();
-  const { data, isLoading } = useConversations();
+  const { data, isLoading, isError, refetch } = useConversations();
   const notifications = useNotifications();
   const open = useOpenConversation();
 
@@ -87,6 +87,9 @@ export function ChatPanel() {
         <ConversationList
           error={showPicker ? null : openError}
           conversations={conversations}
+          loading={isLoading}
+          loadFailed={isError}
+          onRetry={() => void refetch()}
           selection={selection}
           onSelect={select}
           notificationsUnread={unreadNotifications}

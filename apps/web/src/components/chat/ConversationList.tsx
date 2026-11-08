@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Conversation } from '../../hooks/useChat';
 import { formatRelativeTime } from '../../lib/format';
 import { Badge } from '../ui/Badge';
+import { Skeleton } from '../ui/Skeleton';
 import { Avatar } from './Avatar';
 import { BellIcon } from '../ui/icons';
 import { LifebuoyIcon, PlusIcon } from './icons';
@@ -65,6 +66,9 @@ function Row({
 
 export function ConversationList({
   conversations,
+  loading = false,
+  loadFailed = false,
+  onRetry,
   selection,
   onSelect,
   notificationsUnread,
@@ -75,6 +79,9 @@ export function ConversationList({
   error,
 }: {
   conversations: Conversation[];
+  loading?: boolean;
+  loadFailed?: boolean;
+  onRetry?: () => void;
   selection: Selection;
   onSelect: (selection: Selection) => void;
   notificationsUnread: number;
@@ -155,7 +162,26 @@ export function ConversationList({
         />
 
         <p className="label-neutral px-4 pb-1.5 pt-5">Direct messages</p>
-        {dms.length === 0 ? (
+        {loading ? (
+          <div
+            className="flex flex-col gap-2 px-3 py-2"
+            data-testid="conversations-skeleton"
+          >
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : loadFailed ? (
+          <div className="px-4 py-2 text-xs text-text-secondary">
+            Couldn't load conversations.{' '}
+            <button
+              type="button"
+              onClick={onRetry}
+              className="underline hover:text-text"
+            >
+              Try again
+            </button>
+          </div>
+        ) : dms.length === 0 ? (
           <p className="px-4 py-2 text-xs text-text-secondary">
             No conversations yet. Start one with a friend.
           </p>
