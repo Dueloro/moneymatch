@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { subscribeToasts, type ToastMessage } from '../../lib/toast';
 
 const DURATION_MS = 4000;
+const WITH_ACTION_MS = 6000;
 
 const DOT: Record<ToastMessage['kind'], string> = {
   success: 'bg-green',
   error: 'bg-red',
   info: 'bg-live',
+  neutral: 'bg-text-tertiary',
 };
 
 export function Toaster() {
@@ -17,10 +20,13 @@ export function Toaster() {
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const unsubscribe = subscribeToasts((message) => {
       setToasts((prev) => [...prev, message].slice(-3));
-      const timer = setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== message.id));
-        timers.delete(timer);
-      }, DURATION_MS);
+      const timer = setTimeout(
+        () => {
+          setToasts((prev) => prev.filter((t) => t.id !== message.id));
+          timers.delete(timer);
+        },
+        message.action ? WITH_ACTION_MS : DURATION_MS,
+      );
       timers.add(timer);
     });
     return () => {
@@ -47,6 +53,14 @@ export function Toaster() {
             className={`h-2 w-2 shrink-0 rounded-full ${DOT[t.kind]}`}
           />
           {t.text}
+          {t.action && (
+            <Link
+              to={t.action.to}
+              className="ml-1 shrink-0 rounded-pill px-1 text-text-secondary underline-offset-2 hover:text-text hover:underline"
+            >
+              {t.action.label}
+            </Link>
+          )}
         </div>
       ))}
     </div>

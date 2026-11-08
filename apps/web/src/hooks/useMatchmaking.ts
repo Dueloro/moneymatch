@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import type { SpeedClock } from '../lib/timeControl';
 import { toast } from '../lib/toast';
 
 export interface MarketRow {
@@ -10,6 +11,7 @@ export interface MarketRow {
   kind: 'win_h2h';
   requires_speed: boolean;
   speeds: string[];
+  clocks: SpeedClock[];
   multiplier_bps: number;
   queue_depth: number;
   resolution_note: string;
@@ -38,6 +40,32 @@ export interface MatchPlayerView {
   is_you: boolean;
 }
 
+export type Termination =
+  | 'checkmate'
+  | 'resignation'
+  | 'time'
+  | 'draw'
+  | 'stalemate'
+  | 'abandoned'
+  | 'aborted'
+  | 'other';
+
+/** The board as the viewer sees it. Lichess shares ongoing games a few moves late. */
+export interface MatchLive {
+  kind: 'match';
+  format: 'chess';
+  status: 'waiting' | 'live' | 'finished';
+  moves?: number;
+  your_color?: 'white' | 'black' | null;
+  turn?: 'you' | 'opp' | null;
+  result?: 'you' | 'opp' | 'draw' | null;
+  termination?: Termination | null;
+  san?: string[];
+  clocks?: { white_ms: number; black_ms: number } | null;
+  clock?: { limit: number; increment: number } | null;
+  last_move_at?: string | null;
+}
+
 export interface MatchView {
   id: string;
   game: string;
@@ -58,12 +86,27 @@ export interface MatchView {
   you_confirmed: boolean;
   your_play_url: string | null;
   forecast: Forecast | null;
+  winner_user_id?: string | null;
+  friendly?: boolean;
+  termination?: Termination | null;
+  game_ended_at?: string | null;
+  resolved_at?: string | null;
+  live?: MatchLive | null;
+}
+
+export interface QueueTicketView {
+  market: string;
+  speed: string | null;
+  clock: SpeedClock | null;
+  entry_cents: number;
+  rating: number | null;
 }
 
 export interface QueueStatus {
   status: 'idle' | 'searching' | 'matched';
   match: MatchView | null;
   waited_seconds: number | null;
+  ticket?: QueueTicketView | null;
   can_cancel: boolean;
 }
 
@@ -104,6 +147,8 @@ export function useMarkets(game: string | undefined) {
   });
 }
 
+export const TERMINAL_MATCH_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
+
 export function useQueueStatus() {
   const { session } = useAuth();
   return useQuery({
@@ -123,7 +168,10 @@ export function useMatch(matchId: string | undefined) {
   return useQuery({
     queryKey: ['match', matchId],
     enabled: !!session && !!matchId,
-    refetchInterval: 2000,
+    refetchInterval: (query) =>
+      query.state.data && TERMINAL_MATCH_STATES.has(query.state.data.state)
+        ? false
+        : 2000,
     queryFn: async (): Promise<MatchView> => {
       const { data, error } = await api.GET('/api/v1/play/matches/{match_id}', {
         params: { path: { match_id: matchId! } },

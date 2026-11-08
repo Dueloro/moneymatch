@@ -86,6 +86,12 @@ const H2H_MARKET = {
   kind: 'win_h2h' as const,
   requires_speed: true,
   speeds: ['bullet', 'blitz', 'rapid', 'classical'],
+  clocks: [
+    { speed: 'bullet', limit_seconds: 60, increment_seconds: 0 },
+    { speed: 'blitz', limit_seconds: 300, increment_seconds: 0 },
+    { speed: 'rapid', limit_seconds: 600, increment_seconds: 0 },
+    { speed: 'classical', limit_seconds: 1800, increment_seconds: 0 },
+  ],
   multiplier_bps: 18000,
   queue_depth: 0,
   resolution_note: 'Win the game · draw = push.',
@@ -109,6 +115,47 @@ const MATCH = {
   you_confirmed: false,
   your_play_url: null,
 };
+
+const PLAYERS = [
+  {
+    user_id: 'u1',
+    username: 'ana',
+    rating: 1712,
+    color: 'black',
+    confirmed: true,
+    payout_cents: 0,
+    stat_line: null,
+    is_you: true,
+  },
+  {
+    user_id: 'u2',
+    username: 'kvem_',
+    rating: 1779,
+    color: 'white',
+    confirmed: true,
+    payout_cents: 0,
+    stat_line: null,
+    is_you: false,
+  },
+];
+
+function stageMatch(over: Record<string, unknown>) {
+  const data = {
+    ...MATCH,
+    id: 'mx',
+    host_game_id: 'abcd1234',
+    players: PLAYERS,
+    you_confirmed: true,
+    your_play_url: 'https://lichess.org/abcd1234/black',
+    forecast: null,
+    matched_at: new Date().toISOString(),
+    ...over,
+  };
+  vi.mocked(useMatch).mockImplementation(
+    (id) => ({ data: id ? data : undefined }) as unknown as ReturnType<typeof useMatch>,
+  );
+  renderWithProviders(<PlayPage />, { route: '/play?match=mx' });
+}
 
 function mockStatus(status: unknown) {
   vi.mocked(useQueueStatus).mockReturnValue({ data: status } as ReturnType<
@@ -237,16 +284,14 @@ describe('PlayPage', () => {
       match: null,
       waited_seconds: 30,
       can_cancel: true,
-    });
-    window.localStorage.setItem(
-      'mm.h2h.ticket.anon',
-      JSON.stringify({
+      ticket: {
+        market: 'win_h2h',
         speed: 'blitz',
+        clock: { speed: 'blitz', limit_seconds: 300, increment_seconds: 0 },
         entry_cents: 2500,
         rating: 1712,
-        at: Date.now(),
-      }),
-    );
+      },
+    });
     renderWithProviders(<PlayPage />);
     expect(screen.getByText('Searching')).toBeInTheDocument();
     expect(screen.getByText('Blitz 5+0 · 2,500 pts stake')).toBeInTheDocument();
@@ -256,7 +301,7 @@ describe('PlayPage', () => {
     expect(screen.getByRole('button', { name: 'Cancel search' })).toBeInTheDocument();
   });
 
-  it('searching without a remembered ticket shows the band width only', () => {
+  it('searching without a ticket recap shows the band width only', () => {
     mockStatus({
       status: 'searching',
       match: null,
@@ -267,37 +312,122 @@ describe('PlayPage', () => {
     expect(screen.getByTestId('band-range')).toHaveTextContent('±100');
   });
 
-  it('finding a match remembers the ticket for the searching recap', () => {
-    renderWithProviders(<PlayPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Find match · 1,000 pts' }));
-    expect(
-      JSON.parse(window.localStorage.getItem('mm.h2h.ticket.anon')!),
-    ).toMatchObject({
-      speed: 'blitz',
-      entry_cents: 1000,
-      rating: 1712,
-    });
-  });
-
-  it('links to the Lichess game once the match is on', () => {
+  it('puts the match on the stage once both confirm, with the Lichess link', () => {
     mockStatus({
       status: 'matched',
       match: {
         ...MATCH,
         id: 'm2',
         state: 'ACTIVE',
-        players: [],
+        players: PLAYERS,
         you_confirmed: true,
         your_play_url: 'https://lichess.org/abcd1234',
         forecast: null,
+        matched_at: new Date().toISOString(),
+        live: null,
       },
       can_cancel: false,
     });
     renderWithProviders(<PlayPage />);
-    expect(screen.getByRole('link', { name: /Go play your game/ })).toHaveAttribute(
+    expect(screen.getByTestId('match-stage')).toHaveAttribute('data-state', 'waiting');
+    expect(screen.getByRole('link', { name: /Open game on Lichess/ })).toHaveAttribute(
       'href',
       'https://lichess.org/abcd1234',
     );
+    expect(screen.getByText('Blitz 5+0')).toBeInTheDocument();
+    expect(screen.getByTestId('stage-line')).toHaveTextContent(
+      'Waiting for the first move',
+    );
+  });
+
+  it('shows the live board, the move and whose turn it is', async () => {
+    stageMatch({
+      state: 'ACTIVE',
+      live: {
+        kind: 'match',
+        format: 'chess',
+        status: 'live',
+        moves: 2,
+        your_color: 'black',
+        turn: 'you',
+        result: null,
+        termination: null,
+        san: ['e4', 'e5', 'Nf3'],
+        clocks: { white_ms: 291_000, black_ms: 300_000 },
+        clock: { limit: 300, increment: 0 },
+        last_move_at: new Date().toISOString(),
+      },
+    });
+    expect(screen.getByTestId('stage-line')).toHaveTextContent('Move 2 · your move');
+    expect(
+      await screen.findByRole('img', { name: 'Board after 2. Nf3' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('strip-you')).toHaveTextContent('Black');
+    expect(screen.getByLabelText(/^Your clock [45]:/)).toHaveAttribute(
+      'data-running',
+      'true',
+    );
+  });
+
+  it('falls back to just the Lichess link when the board is unavailable', () => {
+    stageMatch({
+      state: 'AWAITING_RESULT',
+      live: null,
+      matched_at: '2020-01-01T00:00:00Z',
+    });
+    expect(screen.queryByTestId('board-frame')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Open game on Lichess/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('turns into a result card on a win: winnings, how it ended, settle time', () => {
+    stageMatch({
+      state: 'SETTLED',
+      winner_user_id: 'u1',
+      termination: 'resignation',
+      game_ended_at: '2025-01-08T10:00:00Z',
+      resolved_at: '2025-01-08T10:00:38Z',
+    });
+    const card = screen.getByTestId('result-card');
+    expect(card).toHaveAttribute('data-outcome', 'win');
+    expect(screen.getByTestId('result-headline')).toHaveTextContent('You won');
+    expect(screen.getByText('vs kvem_ · by resignation')).toBeInTheDocument();
+    expect(screen.getByTestId('result-amount')).toHaveTextContent('1,800 pts');
+    expect(card).toHaveTextContent('fee 200 pts');
+    expect(screen.getByTestId('settled-in')).toHaveTextContent(
+      'Settled from Lichess in 38s',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'You won 1,800 points by resignation',
+    );
+    expect(screen.getByRole('button', { name: 'Rematch' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /View game on Lichess/ })).toHaveAttribute(
+      'href',
+      'https://lichess.org/abcd1234/black',
+    );
+  });
+
+  it('a loss is calm: the stake, how it ended, no settle claim without an end time', () => {
+    stageMatch({ state: 'SETTLED', winner_user_id: 'u2', termination: 'time' });
+    expect(screen.getByTestId('result-headline')).toHaveTextContent('You lost');
+    expect(screen.getByText('vs kvem_ · on time')).toBeInTheDocument();
+    expect(screen.getByTestId('result-amount')).toHaveTextContent('-1,000 pts');
+    expect(screen.queryByTestId('settled-in')).not.toBeInTheDocument();
+  });
+
+  it('a draw refunds both stakes with no fee', () => {
+    stageMatch({ state: 'PUSHED', termination: 'draw' });
+    expect(screen.getByTestId('result-headline')).toHaveTextContent('Draw');
+    expect(screen.getByTestId('result-card')).toHaveTextContent(
+      'Both stakes refunded · no fee',
+    );
+  });
+
+  it('play again returns to the desk', () => {
+    stageMatch({ state: 'PUSHED' });
+    fireEvent.click(screen.getByRole('button', { name: 'Play again' }));
+    expect(screen.getByTestId('match-desk')).toBeInTheDocument();
   });
 
   it('shows the matched card with the honest forecast and confirms', () => {

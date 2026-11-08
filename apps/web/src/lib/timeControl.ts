@@ -1,29 +1,40 @@
 import type { ProfileSnapshot } from '../hooks/useLinks';
 
-// Mirror of the clock the server creates the Lichess game with
-// (apps/api adapters/chess_lichess.py: _CLOCK_FOR_SPEED, no increment).
-const CLOCK_SECONDS: Record<string, number> = {
-  bullet: 60,
-  blitz: 300,
-  rapid: 600,
-  classical: 1800,
-};
+/** The clock a speed's games are created with (the server publishes it per market). */
+export interface SpeedClock {
+  speed: string;
+  limit_seconds: number;
+  increment_seconds: number;
+}
 
 export function speedName(speed: string): string {
   return speed.charAt(0).toUpperCase() + speed.slice(1);
 }
 
-/** "5+0", or null when the server's clock for this speed isn't known. */
-export function clockLabel(speed: string): string | null {
-  const s = CLOCK_SECONDS[speed];
-  return s ? `${s / 60}+0` : null;
+function minutes(seconds: number): string {
+  return seconds % 60 === 0 ? String(seconds / 60) : (seconds / 60).toFixed(1);
 }
 
-/** "Blitz 5+0". */
-export function timeControlLabel(speed: string | null | undefined): string {
+/** "5+0", or null when the clock isn't known. */
+export function clockLabel(clock: SpeedClock | null | undefined): string | null {
+  return clock ? `${minutes(clock.limit_seconds)}+${clock.increment_seconds}` : null;
+}
+
+export function clockFor(
+  speed: string | null | undefined,
+  clocks: SpeedClock[] | null | undefined,
+): SpeedClock | null {
+  return clocks?.find((c) => c.speed === speed) ?? null;
+}
+
+/** "Blitz 5+0" (or just "Blitz" when the clock isn't known). */
+export function timeControlLabel(
+  speed: string | null | undefined,
+  clock?: SpeedClock | null,
+): string {
   if (!speed) return '';
-  const clock = clockLabel(speed);
-  return clock ? `${speedName(speed)} ${clock}` : speedName(speed);
+  const label = clockLabel(clock);
+  return label ? `${speedName(speed)} ${label}` : speedName(speed);
 }
 
 export function defaultSpeed(speeds: string[]): string | undefined {

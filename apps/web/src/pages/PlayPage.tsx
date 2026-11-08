@@ -1,8 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { useAuth } from '../auth/useAuth';
 import { PlayHeader } from '../components/PlayHeader';
 import { LinkLichessDesk, MatchDesk } from '../components/play/MatchDesk';
+import { MatchStage } from '../components/play/MatchStage';
 import { PlaySlip } from '../components/play/PlaySlip';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
@@ -14,8 +15,8 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { useLinks } from '../hooks/useLinks';
 import { formatPoints } from '../lib/format';
 import { CHESS } from '../lib/games';
-import { recallTicket, rememberTicket } from '../lib/h2hTicket';
-import { timeControlLabel } from '../lib/timeControl';
+import { clockFor, timeControlLabel } from '../lib/timeControl';
+import { toast } from '../lib/toast';
 import {
   useJoinQueue,
   useMarkets,
@@ -23,10 +24,14 @@ import {
   useQueueStatus,
   useTakeWaiting,
   useWaiting,
-  type QueueStatus,
+  type MatchView,
 } from '../hooks/useMatchmaking';
 
-const DEEP_LINK_STATES = new Set(['PENDING', 'ACTIVE', 'AWAITING_RESULT']);
+const STAGE_STATES = new Set(['ACTIVE', 'AWAITING_RESULT', 'SETTLED', 'PUSHED']);
+
+/** Both staked and then nothing could be graded: the stage shows the refund. */
+const refundedAfterStart = (m: MatchView) =>
+  m.state === 'CANCELED' && m.players.length > 0 && m.players.every((p) => p.confirmed);
 
 export function PlayPage() {
   usePageTitle('Head to head');
@@ -36,25 +41,40 @@ export function PlayPage() {
     isError: marketsError,
     refetch: refetchMarkets,
   } = useMarkets(CHESS);
-  const { session } = useAuth();
-  const userId = session?.user.id;
   const { data: links } = useLinks();
   const chessLink = links?.games.find((g) => g.game === CHESS);
 
-  const [searchParams] = useSearchParams();
-  const deepLinkMatchId = searchParams.get('match') ?? undefined;
-  const { data: deepLinkMatch } = useMatch(deepLinkMatchId);
-
+  // The match you're in is pinned to the URL, so its result stays on screen after
+  // the queue goes idle (and survives a refresh) until you choose to play again.
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: liveStatus } = useQueueStatus();
-  const status: QueueStatus | undefined =
-    deepLinkMatch && DEEP_LINK_STATES.has(deepLinkMatch.state)
-      ? {
-          status: 'matched',
-          match: deepLinkMatch,
-          waited_seconds: null,
-          can_cancel: false,
-        }
-      : liveStatus;
+  const queued = liveStatus?.status === 'matched' ? liveStatus.match : null;
+  const pinnedId = searchParams.get('match') ?? undefined;
+  const matchId = pinnedId ?? queued?.id;
+  const { data: fetched } = useMatch(matchId);
+  const match = fetched ?? (queued?.id === matchId ? queued : undefined);
+
+  useEffect(() => {
+    if (!pinnedId && queued) setSearchParams({ match: queued.id }, { replace: true });
+  }, [pinnedId, queued, setSearchParams]);
+
+  const seenPending = useRef(new Set<string>());
+  const dropped = match?.state === 'CANCELED' && !refundedAfterStart(match);
+  useEffect(() => {
+    if (!match) return;
+    if (match.state === 'PENDING') seenPending.current.add(match.id);
+    if (dropped) {
+      if (seenPending.current.has(match.id))
+        toast.neutral(
+          match.you_confirmed ? 'Match canceled · stake refunded' : 'Match canceled',
+        );
+      setSearchParams({}, { replace: true });
+    }
+  }, [match, dropped, setSearchParams]);
+
+  const onStage = match && (STAGE_STATES.has(match.state) || refundedAfterStart(match));
+  const confirming = match?.state === 'PENDING';
+  const playAgain = () => setSearchParams({}, { replace: true });
 
   const waiting = useWaiting(CHESS);
   const join = useJoinQueue();
@@ -62,7 +82,8 @@ export function PlayPage() {
 
   const linked = markets?.linked ?? false;
   const presets = markets?.entry_presets_cents ?? [];
-  const inFlight = status?.status === 'searching' || status?.status === 'matched';
+  const searching = liveStatus?.status === 'searching';
+  const inFlight = !!onStage || confirming || searching;
   const market =
     markets?.markets.find((m) => m.kind === 'win_h2h') ?? markets?.markets[0];
   const open = waiting.data?.waiting ?? [];
@@ -84,11 +105,15 @@ export function PlayPage() {
         />
       ) : !linked ? (
         <LinkLichessDesk />
-      ) : inFlight ? (
+      ) : onStage && match ? (
+        <MatchStage match={match} clocks={market?.clocks} onPlayAgain={playAgain} />
+      ) : confirming && match ? (
         <PlaySlip
-          status={status}
-          ticket={status?.status === 'searching' ? recallTicket(userId) : null}
+          status={{ status: 'matched', match, waited_seconds: null, can_cancel: false }}
+          clocks={market?.clocks}
         />
+      ) : searching ? (
+        <PlaySlip status={liveStatus} />
       ) : market && presets.length > 0 ? (
         <MatchDesk
           market={market}
@@ -96,13 +121,7 @@ export function PlayPage() {
           profile={chessLink?.profile}
           username={chessLink?.host_username}
           joining={join.isPending}
-          onFind={({ speed, entry, rating }) => {
-            rememberTicket(userId, {
-              speed: speed ?? null,
-              entry_cents: entry,
-              rating,
-              at: Date.now(),
-            });
+          onFind={({ speed, entry }) => {
             join.mutate({
               game: CHESS,
               market: market.key,
@@ -147,7 +166,10 @@ export function PlayPage() {
                   )}
                 </>
               }
-              subline={[timeControlLabel(w.speed), formatPoints(w.entry_cents)]
+              subline={[
+                timeControlLabel(w.speed, clockFor(w.speed, market?.clocks)),
+                formatPoints(w.entry_cents),
+              ]
                 .filter(Boolean)
                 .join(' · ')}
               right={

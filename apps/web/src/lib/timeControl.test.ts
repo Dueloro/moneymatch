@@ -1,16 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ProfileSnapshot } from '../hooks/useLinks';
-import { defaultSpeed, ratingForSpeed, timeControlLabel } from './timeControl';
+import {
+  clockFor,
+  defaultSpeed,
+  ratingForSpeed,
+  timeControlLabel,
+} from './timeControl';
 
 const profile = (formats: ProfileSnapshot['formats'], rating: number | null = null) =>
   ({ formats, rating }) as ProfileSnapshot;
 
 describe('timeControlLabel', () => {
-  it('names the speed with the clock the server creates', () => {
-    expect(timeControlLabel('blitz')).toBe('Blitz 5+0');
-    expect(timeControlLabel('classical')).toBe('Classical 30+0');
-    expect(timeControlLabel('atomic')).toBe('Atomic');
+  const clocks = [
+    { speed: 'blitz', limit_seconds: 300, increment_seconds: 0 },
+    { speed: 'classical', limit_seconds: 1800, increment_seconds: 20 },
+    { speed: 'bullet', limit_seconds: 90, increment_seconds: 1 },
+  ];
+  it("names the speed with the server's clock", () => {
+    expect(timeControlLabel('blitz', clockFor('blitz', clocks))).toBe('Blitz 5+0');
+    expect(timeControlLabel('classical', clockFor('classical', clocks))).toBe(
+      'Classical 30+20',
+    );
+    expect(timeControlLabel('bullet', clockFor('bullet', clocks))).toBe('Bullet 1.5+1');
+    expect(timeControlLabel('rapid', clockFor('rapid', clocks))).toBe('Rapid');
     expect(timeControlLabel(null)).toBe('');
   });
 });

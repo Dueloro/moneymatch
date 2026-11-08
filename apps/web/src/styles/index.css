@@ -35,6 +35,10 @@
   --warn: #f5b93c; /* pending, caution */
   --focus: #a8c7ff; /* focus ring only, never decorative */
 
+  /* The live board: cool slate squares that sit quietly on the ink page. */
+  --board-light: #b9c0cc;
+  --board-dark: #6f7889;
+
   /* Shape: `card` on the page, `inset` inside a card, `pill` for controls. */
   --radius-card: 12px;
   --radius-inset: 8px;
@@ -240,9 +244,49 @@ body {
   animation: money-delta 2.2s ease-out forwards;
 }
 
+/* The settlement moment: a faint lime light behind a win, the check drawing in,
+   and the settle-time line arriving last. */
+.mm-result-glow {
+  background-image: radial-gradient(
+    120% 70% at 50% 0%,
+    rgb(198 244 64 / 0.09),
+    transparent 70%
+  );
+}
+@keyframes draw-check {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.mm-draw-check {
+  stroke-dasharray: 24;
+  animation: draw-check 0.45s 0.15s var(--ease-standard) both;
+}
+@keyframes fade-late {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.mm-fade-late {
+  animation: fade-late 0.4s 0.7s ease-out both;
+}
+.mm-last-move {
+  transition: opacity var(--dur-base) var(--ease-standard);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee,
-  .animate-rise {
+  .animate-rise,
+  .mm-draw-check,
+  .mm-fade-late {
     animation: none;
   }
   /* Reduced motion: keep the delta visible; it is information. */

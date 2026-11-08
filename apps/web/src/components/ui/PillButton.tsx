@@ -1,22 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'text' | 'danger';
-type Size = 'sm' | 'md' | 'lg';
-
-const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-action text-bg hover:opacity-90 active:opacity-80',
-  secondary:
-    'bg-panel-raised text-text border border-hairline hover:border-line-strong',
-  outline: 'border border-hairline text-text hover:border-line-strong',
-  text: 'text-text-secondary hover:text-text',
-  danger: 'border border-red/40 text-red hover:border-red hover:bg-red/10',
-};
-
-const SIZES: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-xs touch:min-h-11',
-  md: 'px-4 py-2 text-sm touch:min-h-11',
-  lg: 'px-5 py-3 text-sm touch:min-h-11',
-};
+import { SIZES, VARIANTS, type Size, type Variant } from './pillClass';
 
 interface PillButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;

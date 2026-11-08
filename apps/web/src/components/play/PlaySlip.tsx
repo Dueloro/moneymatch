@@ -2,10 +2,9 @@ import { PillButton } from '../ui/PillButton';
 import { SkillBandRuler } from './SkillBandRuler';
 import { VersusCard } from './VersusCard';
 import { useWaitedSeconds } from '../../hooks/useWaitedSeconds';
-import type { QueuedTicket } from '../../lib/h2hTicket';
 import { bandAt, bandRange, formatWaited, MAX_BAND } from '../../lib/skillBand';
 import { dashless, formatPoints } from '../../lib/format';
-import { timeControlLabel } from '../../lib/timeControl';
+import { clockFor, timeControlLabel, type SpeedClock } from '../../lib/timeControl';
 import {
   prizeForEntry,
   useConfirmMatch,
@@ -15,18 +14,19 @@ import {
   type QueueStatus,
 } from '../../hooks/useMatchmaking';
 
+/** Searching, then the confirm card. Once both confirm, the match stage takes over. */
 export function PlaySlip({
   status,
-  ticket = null,
+  clocks,
 }: {
   status: QueueStatus | undefined;
-  ticket?: QueuedTicket | null;
+  clocks?: SpeedClock[];
 }) {
   if (status?.status === 'matched' && status.match) {
-    return <MatchedSlip match={status.match} />;
+    return <MatchedSlip match={status.match} clocks={clocks} />;
   }
   if (status?.status === 'searching') {
-    return <SearchingSlip status={status} ticket={ticket} />;
+    return <SearchingSlip status={status} />;
   }
   return null;
 }
@@ -59,19 +59,17 @@ function RakeLine({
   );
 }
 
-function SearchingSlip({
-  status,
-  ticket,
-}: {
-  status: QueueStatus;
-  ticket: QueuedTicket | null;
-}) {
+function SearchingSlip({ status }: { status: QueueStatus }) {
+  const ticket = status.ticket ?? null;
   const leave = useLeaveQueue();
   const seconds = useWaitedSeconds(status.waited_seconds);
   const rating = ticket?.rating ?? null;
   const band = bandAt(seconds);
   const recap = ticket
-    ? [timeControlLabel(ticket.speed), `${formatPoints(ticket.entry_cents)} stake`]
+    ? [
+        timeControlLabel(ticket.speed, ticket.clock),
+        `${formatPoints(ticket.entry_cents)} stake`,
+      ]
         .filter(Boolean)
         .join(' · ')
     : null;
@@ -131,18 +129,20 @@ function SearchingSlip({
   );
 }
 
-function MatchedSlip({ match }: { match: MatchView }) {
+function MatchedSlip({ match, clocks }: { match: MatchView; clocks?: SpeedClock[] }) {
   const confirm = useConfirmMatch();
   const decline = useDeclineMatch();
   const you = match.players.find((p) => p.is_you);
   const opponent = match.players.find((p) => !p.is_you);
-  const active = match.state === 'ACTIVE' || match.state === 'AWAITING_RESULT';
 
   return (
     <SlipShell>
       <VersusCard
-        marketLabel={timeControlLabel(match.speed) || match.market_label}
-        status={active ? 'Match on' : 'Opponent found'}
+        marketLabel={
+          timeControlLabel(match.speed, clockFor(match.speed, clocks)) ||
+          match.market_label
+        }
+        status="Opponent found"
         you={{ name: you?.username ?? 'You', rating: you?.rating }}
         opponent={{ name: opponent?.username ?? 'Opponent', rating: opponent?.rating }}
         potCents={match.pot_cents}
@@ -157,59 +157,30 @@ function MatchedSlip({ match }: { match: MatchView }) {
 
       <RakeLine entryCents={match.entry_cents} multiplierBps={match.multiplier_bps} />
 
-      {active ? (
-        <GoPlay match={match} />
-      ) : (
-        <div className="mt-5 space-y-2">
-          {match.you_confirmed ? (
-            <p className="text-xs text-text-secondary">
-              Waiting for {opponent?.username ?? 'your opponent'} to confirm…
-            </p>
-          ) : (
-            <PillButton
-              fullWidth
-              size="lg"
-              onClick={() => confirm.mutate(match.id)}
-              disabled={confirm.isPending}
-            >
-              Confirm &amp; stake {formatPoints(match.entry_cents)}
-            </PillButton>
-          )}
+      <div className="mt-5 space-y-2">
+        {match.you_confirmed ? (
+          <p className="text-xs text-text-secondary">
+            Waiting for {opponent?.username ?? 'your opponent'} to confirm…
+          </p>
+        ) : (
           <PillButton
-            variant="text"
             fullWidth
-            onClick={() => decline.mutate(match.id)}
-            disabled={decline.isPending}
+            size="lg"
+            onClick={() => confirm.mutate(match.id)}
+            disabled={confirm.isPending}
           >
-            Decline
+            Confirm &amp; stake {formatPoints(match.entry_cents)}
           </PillButton>
-        </div>
-      )}
-    </SlipShell>
-  );
-}
-
-function GoPlay({ match }: { match: MatchView }) {
-  if (match.your_play_url) {
-    return (
-      <div className="mt-5">
-        <a href={match.your_play_url} target="_blank" rel="noreferrer">
-          <PillButton fullWidth>Go play your game ↗</PillButton>
-        </a>
-        <p className="mt-2 text-xs text-text-secondary">
-          Only you and your opponent can take these seats. We settle this exact game
-          automatically.
-        </p>
+        )}
+        <PillButton
+          variant="text"
+          fullWidth
+          onClick={() => decline.mutate(match.id)}
+          disabled={decline.isPending}
+        >
+          Decline
+        </PillButton>
       </div>
-    );
-  }
-  return (
-    <div className="mt-5 rounded-inset bg-bg p-3">
-      <p className="text-sm font-medium text-text">Game link unavailable</p>
-      <p className="mt-1 text-xs text-text-secondary">
-        Your entry is held safely and the link should arrive shortly. Contact support
-        with your match ID if this persists.
-      </p>
-    </div>
+    </SlipShell>
   );
 }

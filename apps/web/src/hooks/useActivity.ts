@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import type { Termination } from './useMatchmaking';
 
 export interface ActivityItem {
   type: 'match' | 'pool' | 'tournament';
@@ -33,6 +34,8 @@ export interface ActivityDetail {
   entry_cents?: number;
   prize_cents?: number;
   host_game_id?: string | null;
+  termination?: Termination | null;
+  game_ended_at?: string | null;
   your_stats?: Record<string, number | string> | null;
   opponent_stats?: Record<string, number | string> | null;
   difficulty?: string;
@@ -58,6 +61,7 @@ export interface LiveInfo {
   your_color?: string | null;
   turn?: 'you' | 'opp' | null;
   result?: 'you' | 'opp' | 'draw' | null;
+  termination?: Termination | null;
   score?: number | null;
   rank?: number | null;
   field?: number;

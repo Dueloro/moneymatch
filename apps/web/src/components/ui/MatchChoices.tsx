@@ -1,13 +1,20 @@
-import { clockLabel, speedName } from '../../lib/timeControl';
+import {
+  clockFor,
+  clockLabel,
+  speedName,
+  type SpeedClock,
+} from '../../lib/timeControl';
 import { AmountText, PointsFigure } from './AmountText';
 import { Segmented } from './Segmented';
 
 export function TimeControlChoice({
   speeds,
+  clocks,
   value,
   onChange,
 }: {
   speeds: string[];
+  clocks?: SpeedClock[];
   value: string;
   onChange: (speed: string) => void;
 }) {
@@ -23,9 +30,9 @@ export function TimeControlChoice({
           label: (
             <span className="flex flex-col items-center leading-tight">
               <span>{speedName(s)}</span>
-              {clockLabel(s) && (
+              {clockLabel(clockFor(s, clocks)) && (
                 <span className="num text-micro font-medium text-text-tertiary">
-                  {clockLabel(s)}
+                  {clockLabel(clockFor(s, clocks))}
                 </span>
               )}
             </span>

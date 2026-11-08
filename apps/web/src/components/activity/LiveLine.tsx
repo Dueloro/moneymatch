@@ -1,10 +1,10 @@
 import type { LiveInfo } from '../../hooks/useActivity';
+import { resultLine } from '../../lib/matchResult';
 import { formatMetric } from '../../lib/metrics';
 
 type Tone = 'live' | 'good' | 'bad' | 'muted';
 
-// The live payload carries the winner but not how the game ended, so a result
-// line never names checkmate, resignation or time.
+// A result line names how the game ended only when Lichess said so.
 function liveDescriptor(
   live: LiveInfo,
   metric: string,
@@ -40,10 +40,9 @@ function liveDescriptor(
     if (live.status === 'waiting')
       return { text: `game not started yet`, tone: 'muted' };
     if (live.status === 'finished') {
-      if (live.result === 'you') return { text: `you won`, tone: 'good' };
-      if (live.result === 'opp') return { text: `you lost`, tone: 'bad' };
-      if (live.result === 'draw') return { text: `draw`, tone: 'muted' };
-      return { text: `game over`, tone: 'muted' };
+      const tone =
+        live.result === 'you' ? 'good' : live.result === 'opp' ? 'bad' : 'muted';
+      return { text: resultLine(live.result, live.termination), tone };
     }
     const whose =
       live.turn === 'you' ? 'your move' : live.turn === 'opp' ? "opponent's move" : '';

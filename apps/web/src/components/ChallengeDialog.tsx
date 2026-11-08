@@ -118,7 +118,12 @@ export function ChallengeDialog({
             )}
 
             {speed && speeds.length > 1 && (
-              <TimeControlChoice speeds={speeds} value={speed} onChange={setSpeed} />
+              <TimeControlChoice
+                speeds={speeds}
+                clocks={market?.clocks}
+                value={speed}
+                onChange={setSpeed}
+              />
             )}
 
             {entry != null && (
