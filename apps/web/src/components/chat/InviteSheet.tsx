@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useSendMessage } from '../../hooks/useChat';
+import { useMarkets } from '../../hooks/useMatchmaking';
 import { CHESS } from '../../lib/games';
+import { middlePreset } from '../../lib/stake';
 import { PointsFigure } from '../ui/AmountText';
 import { Dialog } from '../ui/Dialog';
 import { PillButton } from '../ui/PillButton';
 import { StakeChoice } from '../ui/MatchChoices';
 import { Segmented } from '../ui/Segmented';
 
-const ENTRY_PRESETS = [500, 1000, 2500];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 const COPY = {
@@ -42,12 +43,21 @@ export function InviteSheet({
 }) {
   const navigate = useNavigate();
   const send = useSendMessage();
+  const { data: markets } = useMarkets(CHESS);
   const copy = COPY[kind];
 
-  const [entryCents, setEntryCents] = useState<number>(ENTRY_PRESETS[1]);
+  const [entryPick, setEntryCents] = useState<number | null>(null);
   const [difficulty, setDifficulty] = useState<string>('medium');
+  const presets = markets?.entry_presets_cents ?? [];
+  const entryCents =
+    entryPick != null && presets.includes(entryPick)
+      ? entryPick
+      : presets.length
+        ? middlePreset(presets)
+        : null;
 
   async function sendInvite() {
+    if (entryCents == null) return;
     await send.mutateAsync({
       conversationId,
       invite: {
@@ -77,6 +87,7 @@ export function InviteSheet({
               size="lg"
               fullWidth
               ariaLabel="Difficulty"
+              selectionRole="radiogroup"
               options={DIFFICULTIES.map((d) => ({
                 value: d,
                 label: <span className="capitalize">{d}</span>,
@@ -87,11 +98,9 @@ export function InviteSheet({
           </div>
         )}
 
-        <StakeChoice
-          presets={ENTRY_PRESETS}
-          value={entryCents}
-          onChange={setEntryCents}
-        />
+        {entryCents != null && (
+          <StakeChoice presets={presets} value={entryCents} onChange={setEntryCents} />
+        )}
 
         {send.error && (
           <p className="text-xs text-red">{(send.error as Error).message}</p>
@@ -102,14 +111,20 @@ export function InviteSheet({
         <PillButton
           size="lg"
           className="mm-glow md:flex-1"
-          disabled={send.isPending}
+          disabled={send.isPending || entryCents == null}
           onClick={sendInvite}
         >
           {send.isPending ? (
             'Sending…'
           ) : (
             <>
-              Send to {peerName} · <PointsFigure cents={entryCents} />
+              Send to {peerName}
+              {entryCents != null && (
+                <>
+                  {' '}
+                  · <PointsFigure cents={entryCents} />
+                </>
+              )}
             </>
           )}
         </PillButton>

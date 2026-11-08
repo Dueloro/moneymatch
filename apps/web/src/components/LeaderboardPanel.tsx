@@ -44,7 +44,7 @@ export function LeaderboardPanel() {
           }
           subline={`${row.contests} played`}
           right={
-            <span className={row.roi_bps >= 0 ? 'text-green' : 'text-text-secondary'}>
+            <span className={row.roi_bps >= 0 ? 'text-green' : 'text-red'}>
               {formatRoi(row.roi_bps)}
             </span>
           }

@@ -21,10 +21,10 @@ token. The `/admin` web pages call the same endpoints.
 
 Order: Vercel project, Render Blueprint, custom domain, first admin. `WEB_ORIGIN`
 is entered at Blueprint creation and must be the exact production origin,
-`https://app.dueloro.com`, on both Render services; the API refuses to boot in
+`https://play.dueloro.com`, on both Render services; the API refuses to boot in
 prod if it is localhost. The marketing site and the app are separate Vercel
-projects under one domain: apex/`www` = marketing, `app.` = this app. The
-marketing site's CTAs point to `https://app.dueloro.com`.
+projects under one domain: apex/`www` = marketing, `play.` = this app. The
+marketing site's CTAs point to `https://play.dueloro.com`.
 
 ### 1. Vercel project
 
@@ -36,7 +36,7 @@ marketing site's CTAs point to `https://app.dueloro.com`.
 - The CSP in `apps/web/vercel.json` hardcodes `https://api.dueloro.com` and the
   Supabase project `bxjzxvujyveucyfvmmto`. If your Supabase project differs,
   update `connect-src` first or auth calls are blocked.
-- Domains: add `app.dueloro.com` to this project (CNAME `app` to the target
+- Domains: add `play.dueloro.com` to this project (CNAME `play` to the target
   Vercel shows, or automatic if dueloro.com DNS is on Vercel). `vercel.json`
   permanently redirects the old beta host to it.
 
@@ -47,14 +47,16 @@ marketing site's CTAs point to `https://app.dueloro.com`.
    API and the worker the same values): `SUPABASE_URL`, `SUPABASE_JWT_SECRET`,
    `WEB_ORIGIN`, `SENTRY_DSN`, `POSTHOG_API_KEY`, `RESEND_API_KEY`,
    `EMAIL_FROM`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+   The API also needs `RESEND_WEBHOOK_SECRET`; the worker does not.
    `DATABASE_URL` is wired from the database. Edit later in each service's
    Environment tab.
    - `SUPABASE_URL` and a non-localhost `WEB_ORIGIN` are required on both.
    - `EMAIL_FROM` = `Money Match <noreply@send.dueloro.com>`.
-   - `SUPPORT_EMAIL` (optional, API only, default `support@dueloro.com`): each
-     user message in a support thread is emailed there (subject
-     `Support: <username>`, reply-to the user), at most one email per thread per
-     minute with later lines batched. Needs `RESEND_API_KEY`.
+   - `SUPPORT_EMAIL` defaults to `support@dueloro.com` and
+     `SUPPORT_INBOUND_DOMAIN` to `reply.dueloro.com`. Each user message in a
+     support thread is emailed to support, at most once per thread per minute
+     with later lines batched. The reply-to address routes the response back
+     into that in-app thread. Needs the Resend inbound setup below.
    - Blank `SUPABASE_JWT_SECRET` means verify via JWKS. Blank `SENTRY_DSN`,
      `POSTHOG_API_KEY` or `VAPID_*` just disables that feature.
 3. Region: every service and the database must be in the same region as the
@@ -78,7 +80,7 @@ connections). Rewrite the scheme to `postgresql+asyncpg://` and add
 
 The web offers Google via Supabase. Create a Google OAuth client with
 authorized redirect `https://<supabase-ref>.supabase.co/auth/v1/callback` and
-`https://app.dueloro.com` under Authorized JavaScript origins.
+`https://play.dueloro.com` under Authorized JavaScript origins.
 In Supabase enable Auth → Providers → Google with its client ID and secret,
 and add the web origin under Auth → URL Configuration (Site URL and Redirect
 URLs).
@@ -101,11 +103,27 @@ Resend. An unverified domain makes every auth email fail.
    user `resend`, password a Resend API key, sender `Money Match`
    `<noreply@send.dueloro.com>`.
 2. Auth → Providers → Email: enable Confirm email; keep email OTP on.
-3. Auth → URL Configuration: Site URL = `https://app.dueloro.com`; add
-   `https://app.dueloro.com/**` and `http://localhost:5173/**` to Redirect URLs.
+3. Auth → URL Configuration: Site URL = `https://play.dueloro.com`; add
+   `https://play.dueloro.com/**` and `http://localhost:5173/**` to Redirect URLs.
 4. Auth → Email Templates: paste `supabase/email-templates/confirm-signup.html`,
    `magic-link.html` (must keep `{{ .Token }}`), `reset-password.html`.
 5. Sign up with a real address and check the verify, code and reset emails.
+
+### Support email replies (via Resend Inbound)
+
+1. In Resend Receiving, add the custom inbound domain `reply.dueloro.com` and
+   publish the DNS records Resend supplies.
+2. In Resend Webhooks, add
+   `https://api.dueloro.com/api/v1/webhooks/resend` for `email.received`.
+3. Copy its signing secret into `RESEND_WEBHOOK_SECRET` on the API service only.
+4. Send a support message in the app, reply to the alert received at
+   `support@dueloro.com`, and confirm the reply appears in the same in-app
+   thread. Reply to the user notification too; that response should return to
+   the thread and alert support.
+
+Inbound replies accept only the configured support address or the email on the
+user account, verify the webhook signature against the raw request, and ignore
+attachments. The admin Support page provides the other reply path.
 
 ## Deploy
 

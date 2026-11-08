@@ -34,6 +34,32 @@ export interface AdminContestListItem {
   resolved_at: string | null;
 }
 
+export interface AdminSupportThread {
+  conversation_id: string;
+  user_id: string;
+  username: string | null;
+  email: string | null;
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  awaiting_reply: boolean;
+}
+
+export interface AdminSupportMessage {
+  id: string;
+  sender: 'user' | 'support' | 'system';
+  body: string | null;
+  created_at: string;
+  source: string | null;
+}
+
+export interface AdminSupportDetail {
+  conversation_id: string;
+  user_id: string;
+  username: string | null;
+  email: string | null;
+  messages: AdminSupportMessage[];
+}
+
 export function useAdminFlags() {
   return useQuery({
     queryKey: ['admin', 'flags'],
@@ -41,6 +67,57 @@ export function useAdminFlags() {
       const { data, error } = await api.GET('/api/v1/admin/flags');
       if (error) throw new Error('Failed to load flags');
       return (data as { flags: FlagItem[] }).flags;
+    },
+  });
+}
+
+export function useAdminSupportThreads() {
+  return useQuery({
+    queryKey: ['admin', 'support'],
+    refetchInterval: 10000,
+    queryFn: async (): Promise<AdminSupportThread[]> => {
+      const { data, error } = await api.GET('/api/v1/admin/support');
+      if (error) throw new Error('Failed to load support threads');
+      return data as AdminSupportThread[];
+    },
+  });
+}
+
+export function useAdminSupportThread(conversationId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'support', conversationId],
+    enabled: !!conversationId,
+    refetchInterval: 6000,
+    queryFn: async (): Promise<AdminSupportDetail> => {
+      const { data, error } = await api.GET('/api/v1/admin/support/{conversation_id}', {
+        params: { path: { conversation_id: conversationId! } },
+      });
+      if (error) throw new Error('Failed to load support thread');
+      return data as AdminSupportDetail;
+    },
+  });
+}
+
+export function useReplyToSupport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      conversationId: string;
+      body: string;
+    }): Promise<AdminSupportDetail> => {
+      const { data, error } = await api.POST(
+        '/api/v1/admin/support/{conversation_id}/reply',
+        {
+          params: { path: { conversation_id: input.conversationId } },
+          body: { body: input.body },
+        },
+      );
+      if (error) throw new Error('Reply failed');
+      return data as AdminSupportDetail;
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(['admin', 'support', data.conversation_id], data);
+      qc.invalidateQueries({ queryKey: ['admin', 'support'] });
     },
   });
 }

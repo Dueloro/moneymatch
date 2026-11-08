@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 import { Link } from 'react-router-dom';
 
@@ -9,45 +9,12 @@ import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { formatPoints } from '../lib/format';
-import { toast } from '../lib/toast';
-import { useActivity, type ActivityItem } from '../hooks/useActivity';
-
-function toastFor(item: ActivityItem): string {
-  const what =
-    item.type === 'match'
-      ? `vs ${item.opponent_username ?? 'opponent'}`
-      : (item.title ?? item.market_label);
-  const net = item.net_cents ?? 0;
-  if (item.state === 'SETTLED') {
-    if (net > 0) return `You won ${formatPoints(net, { long: true })} ${what}`;
-    if (net < 0)
-      return `You lost ${formatPoints(Math.abs(net), { long: true })} ${what}`;
-    return `Settled · ${what}`;
-  }
-  if (item.state === 'PUSHED') return `Push ${what} · entry refunded`;
-  return `Refunded · ${what}`;
-}
+import { useActivity } from '../hooks/useActivity';
 
 export function ActivityPage() {
   usePageTitle('Activity');
   const { data, isLoading, isError, refetch } = useActivity();
   const items = useMemo(() => data?.items ?? [], [data]);
-
-  const seen = useRef<Set<string> | null>(null);
-
-  useEffect(() => {
-    const resolved = items.filter((i) => i.resolved_at != null);
-    if (seen.current === null) {
-      seen.current = new Set(resolved.map((i) => i.id));
-      return;
-    }
-    const fresh = resolved.find((i) => !seen.current!.has(i.id));
-    if (fresh) {
-      resolved.forEach((i) => seen.current!.add(i.id));
-      toast.info(toastFor(fresh));
-    }
-  }, [items]);
 
   const newestFinished = items.find((i) => i.resolved_at != null);
 

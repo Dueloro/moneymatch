@@ -206,8 +206,8 @@ describe('PlayPage', () => {
 
   it('sets the desk with defaults: blitz, the middle stake, payout and fee', () => {
     renderWithProviders(<PlayPage />);
-    expect(screen.getByRole('tab', { name: /Blitz/ })).toHaveAttribute(
-      'aria-selected',
+    expect(screen.getByRole('radio', { name: /Blitz/ })).toHaveAttribute(
+      'aria-checked',
       'true',
     );
     expect(screen.getByTestId('desk-rating')).toHaveTextContent('1712');
@@ -225,9 +225,9 @@ describe('PlayPage', () => {
 
   it('time control and stake change the rating, payout and the join', () => {
     renderWithProviders(<PlayPage />);
-    fireEvent.click(screen.getByRole('tab', { name: /Rapid/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Rapid/ }));
     expect(screen.getByTestId('desk-rating')).toHaveTextContent('1790?');
-    fireEvent.click(screen.getByRole('tab', { name: '2,500 pts' }));
+    fireEvent.click(screen.getByRole('radio', { name: '2,500 pts' }));
     expect(screen.getByText(pts('4,500 pts'))).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Find match · 2,500 pts' }));
     expect(joinMutate).toHaveBeenCalledWith(
@@ -237,7 +237,7 @@ describe('PlayPage', () => {
 
   it('says where the rating comes from when there are no games at that speed', () => {
     renderWithProviders(<PlayPage />);
-    fireEvent.click(screen.getByRole('tab', { name: /Classical/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Classical/ }));
     expect(screen.getByTestId('desk-rating')).toHaveTextContent('1712From blitz');
   });
 

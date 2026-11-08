@@ -48,16 +48,16 @@ describe('ChallengeDialog', () => {
 
   it('defaults to blitz and the middle stake, so the action is enabled', () => {
     open();
-    expect(screen.getByRole('tab', { name: /Blitz/ })).toHaveAttribute(
-      'aria-selected',
+    expect(screen.getByRole('radio', { name: /Blitz/ })).toHaveAttribute(
+      'aria-checked',
       'true',
     );
-    expect(screen.getByRole('tab', { name: '2,500 pts' })).toHaveAttribute(
-      'aria-selected',
+    expect(screen.getByRole('radio', { name: '2,500 pts' })).toHaveAttribute(
+      'aria-checked',
       'true',
     );
     expect(
-      screen.getByRole('button', { name: /Challenge bob · 2,500 pts/ }),
+      screen.getByRole('button', { name: /Send challenge · 2,500 pts/ }),
     ).toBeEnabled();
   });
 
@@ -65,14 +65,14 @@ describe('ChallengeDialog', () => {
     open();
     expect(screen.getByTestId('desk-prize')).toHaveTextContent('4,500 pts');
     expect(screen.getByText(/a draw refunds both/)).toHaveTextContent('Fee 500 pts');
-    await userEvent.click(screen.getByRole('tab', { name: '5,000 pts' }));
+    await userEvent.click(screen.getByRole('radio', { name: '5,000 pts' }));
     expect(screen.getByTestId('desk-prize')).toHaveTextContent('9,000 pts');
   });
 
   it('sends the defaults to the friend', async () => {
     const onClose = vi.fn();
     open(onClose);
-    await userEvent.click(screen.getByRole('button', { name: /Challenge bob/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Send challenge/ }));
     expect(mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
         challengee_id: 'u2',

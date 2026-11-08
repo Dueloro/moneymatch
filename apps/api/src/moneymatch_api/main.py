@@ -33,6 +33,7 @@ from .routers import (
     pools,
     tournaments,
     wallet,
+    webhooks,
 )
 from .security import (
     MaxBodySizeMiddleware,
@@ -117,6 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(notifications.router, prefix=API_V1_PREFIX)
     app.include_router(inbox.router, prefix=API_V1_PREFIX)
     app.include_router(admin.router, prefix=API_V1_PREFIX)
+    app.include_router(webhooks.router, prefix=API_V1_PREFIX)
 
     if settings.e2e_auth_enabled and settings.env != "prod":
         from .routers import dev

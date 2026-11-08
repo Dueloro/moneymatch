@@ -89,6 +89,13 @@ Adding a title means one adapter plus its constants and markets. Start from
 | Solo pool | 3–4 players at a similar personal bar, metric `chess_moves` (lower is better, must be a win), 24h window | Clearers split pot minus fee; nobody clears → full refund |
 | Tournament | Field of 6–10, aggregate metric (`chess_win_streak`, `chess_wins`, `chess_fastest_win`), 48h window | Top places split 50/30/20 minus fee |
 
+Deferred tournament infrastructure: after this launch, consider storing a
+durable history of eligible Lichess games, scoring tournaments from that
+history, writing an immutable settlement log for operator inspection, and
+starting a tournament's clock only after a second entrant joins. A prior
+multi-game implementation explored these ideas, but it is intentionally not
+being merged into the chess-only launch branch.
+
 Friends, challenges, invites and rematches create head-to-head matches
 (`services/challenge_service.py`, `matchmaking.create_challenge_match`).
 Friendly matches are zero-fee and refund both entries.

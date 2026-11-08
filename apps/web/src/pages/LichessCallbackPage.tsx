@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { NotAffiliated } from '../components/ConnectLichess';
@@ -10,6 +10,7 @@ import { clearLinkReturnTo, peekLinkReturnTo } from '../lib/linkReturnTo';
 import { clearReturnTo, peekReturnTo } from '../lib/returnTo';
 
 const REDIRECT_MS = 1500;
+const CALLBACK_TIMEOUT_MS = 15000;
 
 function lichessErrorMessage(error: string): string {
   return error === 'access_denied'
@@ -23,6 +24,7 @@ export function LichessCallbackPage() {
   const complete = useCompleteLichessLink();
   const connect = useConnectLichess();
   const sent = useRef(false);
+  const [timedOut, setTimedOut] = useState(false);
 
   const code = params.get('code');
   const state = params.get('state');
@@ -33,6 +35,13 @@ export function LichessCallbackPage() {
     sent.current = true;
     complete.mutate({ code, state });
   }, [code, state, lichessError, complete]);
+
+  useEffect(() => {
+    if (lichessError || !code || !state || complete.isSuccess || complete.isError)
+      return;
+    const timer = window.setTimeout(() => setTimedOut(true), CALLBACK_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [code, state, lichessError, complete.isError, complete.isSuccess]);
 
   const finish = () => {
     const to = peekLinkReturnTo();
@@ -52,9 +61,11 @@ export function LichessCallbackPage() {
     ? lichessErrorMessage(lichessError)
     : !code || !state
       ? 'That Lichess link is incomplete.'
-      : complete.isError
-        ? complete.error.message
-        : null;
+      : timedOut
+        ? 'Lichess is taking too long to respond. Try connecting again.'
+        : complete.isError
+          ? complete.error.message
+          : null;
 
   const linked = complete.data?.games.find((g) => g.status === 'LINKED');
 

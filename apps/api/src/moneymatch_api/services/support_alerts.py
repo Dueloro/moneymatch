@@ -18,7 +18,7 @@ import structlog
 
 from ..config import get_settings
 from ..models.user import User
-from . import email_service
+from . import email_service, support_mail
 
 log = structlog.get_logger(__name__)
 
@@ -76,8 +76,7 @@ def _render(
     for line in shown:
         stamp = line.at.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         parts += [f"[{stamp}]", _clean(line.text, MAX_LINE_CHARS), ""]
-    if thread.reply_to:
-        parts.append("Replying to this email writes to the user directly.")
+    parts.append("Replying to this email posts your response in the support thread.")
     return f"Support: {name}", "\n".join(parts)
 
 
@@ -94,7 +93,7 @@ async def _run(conversation_id: uuid.UUID) -> None:
                     to=get_settings().support_email,
                     subject=subject,
                     text=text,
-                    reply_to=thread.reply_to,
+                    reply_to=support_mail.reply_address(conversation_id),
                 )
             except Exception as exc:  # noqa: BLE001 — never surfaces to the user
                 log.warning(

@@ -25,6 +25,7 @@ export function TimeControlChoice({
         size="lg"
         fullWidth
         ariaLabel="Time control"
+        selectionRole="radiogroup"
         options={speeds.map((s) => ({
           value: s,
           label: (
@@ -61,6 +62,7 @@ export function StakeChoice({
         size="lg"
         fullWidth
         ariaLabel="Stake"
+        selectionRole="radiogroup"
         options={presets.map((cents) => ({
           value: cents,
           label: (
@@ -85,7 +87,7 @@ export function PayoutSummary({ prize, fee }: { prize: number; fee: number }) {
       </p>
       <p className="mt-1 text-xs text-text-secondary">
         Fee{' '}
-        <span className="num text-red">
+        <span className="num text-text-secondary">
           <PointsFigure cents={fee} />
         </span>{' '}
         · a draw refunds both

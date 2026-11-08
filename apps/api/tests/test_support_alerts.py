@@ -64,13 +64,14 @@ async def test_user_message_emails_support_once(client):
     payload = json.loads(route.calls.last.request.content)
     assert payload["to"] == ["support@dueloro.com"]
     assert payload["subject"] == "Support: alice"
-    assert payload["reply_to"] == "player@example.com"
+    assert payload["reply_to"] == f"support-{conversation_id}@reply.dueloro.com"
     assert "html" not in payload
     text = payload["text"]
     assert "my payout is stuck" in text and "\x07" not in text
     assert user_id in text and conversation_id in text and "UTC" in text
     assert chat_service.SUPPORT_AUTO_REPLY not in text
     assert chat_service.SUPPORT_GREETING not in text
+    assert "posts your response in the support thread" in text
 
 
 async def test_dm_does_not_email(client):

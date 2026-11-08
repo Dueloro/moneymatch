@@ -1,13 +1,3 @@
-const ACCENTS = ['#7fd4ff', '#f0a5ff', '#ffc46b', '#8ef0b0', '#ff9c8a'] as const;
-
-function accentFor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  }
-  return ACCENTS[hash % ACCENTS.length];
-}
-
 function initials(name: string): string {
   const words = name
     .trim()
@@ -31,7 +21,6 @@ export function Avatar({
   brand?: boolean;
   size?: 'sm' | 'md';
 }) {
-  const accent = brand ? 'var(--green)' : accentFor(name);
   const box = size === 'sm' ? 'h-10 w-10 text-xs' : 'h-10 w-10 text-sm';
 
   return (
@@ -41,13 +30,10 @@ export function Avatar({
         className={[
           box,
           'inline-flex items-center justify-center rounded-full border font-bold tracking-wide',
+          brand
+            ? 'border-line-strong bg-action text-bg'
+            : 'border-hairline bg-panel-raised text-text-secondary',
         ].join(' ')}
-        style={{
-          color: accent,
-          borderColor: `color-mix(in srgb, ${accent} 55%, transparent)`,
-          background: `radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, ${accent} 22%, var(--panel-raised)), var(--panel-raised))`,
-          boxShadow: `0 0 0 1px color-mix(in srgb, ${accent} 14%, transparent), 0 6px 18px -10px ${accent}`,
-        }}
       >
         {initials(name)}
       </span>

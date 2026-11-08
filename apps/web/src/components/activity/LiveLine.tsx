@@ -67,14 +67,22 @@ const TONE_TEXT: Record<Tone, string> = {
   muted: 'text-text-secondary',
 };
 
-export function LiveLine({ live, metric = '' }: { live: LiveInfo; metric?: string }) {
+export function LiveLine({
+  live,
+  metric = '',
+  final = false,
+}: {
+  live: LiveInfo;
+  metric?: string;
+  final?: boolean;
+}) {
   const d = liveDescriptor(live, metric);
   if (!d) return null;
   return (
     <div className="flex items-center gap-2 text-xs">
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[d.tone]}`} />
       <span className="uppercase tracking-wide text-text-secondary">
-        {live.status === 'finished' ? 'Final' : 'Live'}
+        {final || live.status === 'finished' ? 'Final' : 'Live'}
       </span>
       <span className={TONE_TEXT[d.tone]}>{d.text}</span>
     </div>

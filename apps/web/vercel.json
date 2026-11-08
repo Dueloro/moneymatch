@@ -4,7 +4,7 @@
     {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "moneymatch-beta.vercel.app" }],
-      "destination": "https://app.dueloro.com/:path*",
+      "destination": "https://play.dueloro.com/:path*",
       "permanent": true
     }
   ],

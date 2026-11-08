@@ -14,6 +14,7 @@ export function Segmented<T extends string | number>({
   fullWidth = false,
   ariaLabel,
   renderBadge,
+  selectionRole = 'tablist',
 }: {
   options: SegmentOption<T>[];
   value: T;
@@ -22,6 +23,7 @@ export function Segmented<T extends string | number>({
   fullWidth?: boolean;
   ariaLabel?: string;
   renderBadge?: (badge: number) => ReactNode;
+  selectionRole?: 'tablist' | 'radiogroup';
 }) {
   const pad = {
     sm: 'px-2.5 py-1 text-xs touch:min-h-11',
@@ -30,7 +32,7 @@ export function Segmented<T extends string | number>({
   }[size];
   return (
     <div
-      role="tablist"
+      role={selectionRole}
       aria-label={ariaLabel}
       className={[
         'inline-flex gap-1 rounded-pill border border-hairline bg-panel p-1',
@@ -42,8 +44,10 @@ export function Segmented<T extends string | number>({
         return (
           <button
             key={String(option.value)}
-            role="tab"
-            aria-selected={active}
+            type="button"
+            role={selectionRole === 'radiogroup' ? 'radio' : 'tab'}
+            aria-selected={selectionRole === 'tablist' ? active : undefined}
+            aria-checked={selectionRole === 'radiogroup' ? active : undefined}
             onClick={() => onChange(option.value)}
             className={[
               'inline-flex items-center justify-center gap-2 rounded-pill font-semibold',

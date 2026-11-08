@@ -366,7 +366,7 @@ function LivePanel({
         </p>
         <p className="mt-1 text-xs text-text-secondary">
           Pot {formatPoints(match.pot_cents)} · fee{' '}
-          <span className="num text-red">{formatPoints(fee)}</span>
+          <span className="num text-text-secondary">{formatPoints(fee)}</span>
         </p>
       </div>
 
@@ -517,7 +517,7 @@ function ResultPanel({
           {win && !friendly ? (
             <>
               Pot {formatPoints(match.pot_cents)} · fee{' '}
-              <span className="num text-red">{formatPoints(fee)}</span>
+              <span className="num text-text-secondary">{formatPoints(fee)}</span>
             </>
           ) : (
             note

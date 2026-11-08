@@ -373,10 +373,10 @@ Audit: session scratchpad `ui-audit.md`. The user approved all top-10 items, all
 - Wallet: free "Add points" top-ups; no cash-out in the UI.
 - Invites stay friends-only.
 - Keep "Dueloro Support"; every user message to support emails support@dueloro.com (Resend).
-- Domain: app at `app.dueloro.com`, API at `api.dueloro.com`; the marketing site (`Dueloro/web`) stays separate.
+- Domain: app at `play.dueloro.com`, API at `api.dueloro.com`; the marketing site (`Dueloro/web`) stays separate.
 
 Tasks, in order:
-1. Domain: email logo URLs → app.dueloro.com, redirect moneymatch-beta → app.dueloro.com, runbook.
+1. Domain: email logo URLs → play.dueloro.com, redirect moneymatch-beta → play.dueloro.com, runbook.
 2. Admin theme fix + global type fixes + numeric display face for money.
 3. Points currency everywhere (web formatting/copy, API email/push/notification text), wallet top-up only.
 4. How-it-works: first-visit only, minimal.
@@ -539,4 +539,3 @@ Cost: API Starter (~$7) + Worker Starter (~$7) + Postgres basic-256mb (~$6) ≈ 
 2026-11-06 at tag `pre-chess-only`: API 1210 passed; web 40 files / 222 tests passed; web typecheck + lint clean. No pre-existing failures.
 
 Local env notes: run API tests as `cd apps/api && SUPABASE_URL=https://example.supabase.co uv run pytest -q` (repo `.env` can't be shell-sourced: line 72 `EMAIL_FROM` is unquoted). Test DB container `mm-test-db` on :5433, dev DB `moneymatch-db-1` on :5544.
-

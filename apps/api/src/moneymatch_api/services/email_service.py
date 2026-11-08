@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from html import escape
 
 import httpx
 import structlog
@@ -46,9 +47,11 @@ def _app_url(link_path: str | None) -> str | None:
 
 
 def _render_html(body: str, url: str | None) -> str:
-    logo_url = f"{_web_origin()}/email/logo.png"
+    logo_url = escape(f"{_web_origin()}/email/logo.png", quote=True)
+    safe_body = escape(body).replace("\n", "<br>")
+    safe_url = escape(url, quote=True) if url else None
     button = (
-        f'<tr><td style="padding:8px 0 4px"><a href="{url}" '
+        f'<tr><td style="padding:8px 0 4px"><a href="{safe_url}" '
         'style="display:inline-block;background:#C6F440;color:#0B0B0C;'
         "padding:12px 22px;border-radius:9999px;text-decoration:none;"
         'font-weight:700;font-size:15px">Open Money Match</a></td></tr>'
@@ -57,7 +60,7 @@ def _render_html(body: str, url: str | None) -> str:
     )
     fallback = (
         f'<tr><td style="padding:12px 0 0;font-size:12px;color:#6b7280">'
-        f"Button not working? Paste this link: <br>{url}</td></tr>"
+        f"Button not working? Paste this link: <br>{safe_url}</td></tr>"
         if url
         else ""
     )
@@ -75,7 +78,8 @@ def _render_html(body: str, url: str | None) -> str:
         "</td></tr>"
         '<tr><td style="padding:28px">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
-        f'<tr><td style="font-size:16px;line-height:1.5;color:#111827">{body}</td></tr>'
+        '<tr><td style="font-size:16px;line-height:1.5;color:#111827">'
+        f"{safe_body}</td></tr>"
         f"{button}{fallback}"
         "</table></td></tr>"
         '<tr><td style="background:#0B0B0C;padding:16px 28px;font-size:12px;'
@@ -92,6 +96,7 @@ async def send_to_user(
     subject: str,
     body: str,
     link_path: str | None = None,
+    reply_to: str | None = None,
 ) -> bool:
     if not is_enabled():
         return False
@@ -108,6 +113,8 @@ async def send_to_user(
         "text": body if url is None else f"{body}\n\nOpen Money Match: {url}",
         "html": _render_html(body, url),
     }
+    if reply_to:
+        payload["reply_to"] = reply_to
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(

@@ -41,8 +41,14 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: SUPPORT_EMAIL
+        value: support@dueloro.com
+      - key: SUPPORT_INBOUND_DOMAIN
+        value: reply.dueloro.com
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY

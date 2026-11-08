@@ -73,12 +73,20 @@ describe('ActivityPage', () => {
         net_cents: 800,
         opponent_username: null,
         resolved_at: new Date().toISOString(),
+        live: {
+          kind: 'pool',
+          status: 'cleared',
+          current: 24,
+          target: 30,
+        },
       }),
     ]);
     renderWithProviders(<ActivityPage />);
     expect(screen.getByText('Moves to win · Medium pool')).toBeInTheDocument();
     expect(screen.getByText(/Won/)).toBeInTheDocument();
     expect(screen.getByText(pts('+800 pts'))).toBeInTheDocument();
+    expect(screen.getByText('Final')).toBeInTheDocument();
+    expect(screen.queryByText('Live')).not.toBeInTheDocument();
   });
 
   it('labels a push as refunded and an in-flight match as in play', () => {
@@ -166,7 +174,7 @@ describe('ActivityPage', () => {
     expect(screen.queryByText(/checkmate/)).not.toBeInTheDocument();
   });
 
-  it('pops a settlement toast when a match newly resolves', () => {
+  it('leaves settlement feedback to the global settlement provider', () => {
     const view = () => (
       <>
         <ActivityPage />
@@ -187,6 +195,6 @@ describe('ActivityPage', () => {
       }),
     ]);
     rerender(view());
-    expect(screen.getByText('You won 800 points vs kvem_')).toBeInTheDocument();
+    expect(screen.queryByText('You won 800 points vs kvem_')).not.toBeInTheDocument();
   });
 });

@@ -51,8 +51,10 @@ class Settings(BaseSettings):
     slow_host_ms: int = Field(default=2_000)
 
     resend_api_key: str | None = None
+    resend_webhook_secret: str | None = None
     email_from: str = Field(default="Money Match <noreply@send.dueloro.com>")
     support_email: str = Field(default="support@dueloro.com")
+    support_inbound_domain: str = Field(default="reply.dueloro.com")
 
     payments_live: bool = Field(default=False)
     kyc_live: bool = Field(default=False)

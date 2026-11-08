@@ -326,7 +326,13 @@ export function ActivityCard({
         )
       }
       footer={
-        item.live ? <LiveLine live={item.live} metric={item.market} /> : undefined
+        item.live ? (
+          <LiveLine
+            live={item.live}
+            metric={item.market}
+            final={TERMINAL_STATES.has(item.state)}
+          />
+        ) : undefined
       }
     >
       <DetailBody item={item} />

@@ -168,7 +168,7 @@ export function ChallengeDialog({
                     'Sending…'
                   ) : (
                     <>
-                      Challenge {name}
+                      Send challenge
                       {ready && (
                         <>
                           {' '}

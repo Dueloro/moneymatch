@@ -46,13 +46,13 @@ export function Toaster() {
         <div
           key={t.id}
           role="status"
-          className="pointer-events-auto flex max-w-sm items-center gap-2.5 rounded-pill border border-line-strong bg-overlay px-4 py-2.5 text-sm font-medium text-text shadow-overlay"
+          className="pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-card border border-line-strong bg-overlay px-4 py-2.5 text-sm font-medium text-text shadow-overlay md:w-auto md:rounded-pill"
         >
           <span
             aria-hidden
             className={`h-2 w-2 shrink-0 rounded-full ${DOT[t.kind]}`}
           />
-          {t.text}
+          <span className="min-w-0 flex-1 break-words">{t.text}</span>
           {t.action && (
             <Link
               to={t.action.to}

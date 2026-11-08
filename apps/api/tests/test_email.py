@@ -98,7 +98,7 @@ async def test_html_uses_hybrid_brand(session, monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "resend_api_key", "re_test_key")
     monkeypatch.setattr(
-        settings, "web_origin", "https://app.dueloro.com,https://other.example"
+        settings, "web_origin", "https://play.dueloro.com,https://other.example"
     )
     user = await _make_user(session, email="real@example.com")
     with respx.mock:
@@ -113,6 +113,13 @@ async def test_html_uses_hybrid_brand(session, monkeypatch):
             link_path="/activity",
         )
     html = json.loads(route.calls.last.request.content)["html"]
-    assert 'src="https://app.dueloro.com/email/logo.png"' in html
+    assert 'src="https://play.dueloro.com/email/logo.png"' in html
     assert "Open Money Match" in html
     assert "Dueloro" in html
+
+
+def test_render_html_escapes_message_content():
+    html = email_service._render_html('<script>alert("x")</script>\nThanks', None)
+
+    assert "<script>" not in html
+    assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;<br>Thanks" in html

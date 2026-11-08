@@ -6,6 +6,7 @@ const TABS = [
   ['users', 'Users'],
   ['contests', 'Contests'],
   ['disputes', 'Disputes'],
+  ['support', 'Support'],
   ['queue', 'Queue'],
   ['flags', 'Flags'],
   ['reconciliation', 'Reconciliation'],
