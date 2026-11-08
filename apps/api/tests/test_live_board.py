@@ -165,6 +165,8 @@ async def test_settlement_records_termination_and_timing(client, monkeypatch):
     ).json()
     assert body["state"] == "SETTLED"
     assert body["termination"] == "time"
+    assert body["friendly"] is False
+    assert (body["winner_user_id"] is not None) and body["players"]
     ended = datetime.fromisoformat(body["game_ended_at"])
     settled = datetime.fromisoformat(body["resolved_at"])
     assert timedelta(0) < settled - ended < timedelta(minutes=1)

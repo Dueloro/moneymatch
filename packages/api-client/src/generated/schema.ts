@@ -2292,6 +2292,11 @@ export interface components {
             requires_speed: boolean;
             /** Speeds */
             speeds: string[];
+            /**
+             * Clocks
+             * @default []
+             */
+            clocks: components["schemas"]["SpeedClock"][];
             /** Multiplier Bps */
             multiplier_bps: number;
             /** Queue Depth */
@@ -2379,6 +2384,23 @@ export interface components {
             /** Your Play Url */
             your_play_url: string | null;
             forecast: components["schemas"]["Forecast"] | null;
+            /** Winner User Id */
+            winner_user_id?: string | null;
+            /**
+             * Friendly
+             * @default false
+             */
+            friendly: boolean;
+            /** Termination */
+            termination?: string | null;
+            /** Game Ended At */
+            game_ended_at?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Live */
+            live?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * MeResponse
@@ -2725,11 +2747,27 @@ export interface components {
             match?: components["schemas"]["MatchView"] | null;
             /** Waited Seconds */
             waited_seconds?: number | null;
+            ticket?: components["schemas"]["QueueTicketView"] | null;
             /**
              * Can Cancel
              * @default true
              */
             can_cancel: boolean;
+        };
+        /**
+         * QueueTicketView
+         * @description The viewer's own search ticket, recapped on the searching screen.
+         */
+        QueueTicketView: {
+            /** Market */
+            market: string;
+            /** Speed */
+            speed: string | null;
+            clock: components["schemas"]["SpeedClock"] | null;
+            /** Entry Cents */
+            entry_cents: number;
+            /** Rating */
+            rating: number | null;
         };
         /** ReconViolationRow */
         ReconViolationRow: {
@@ -2858,6 +2896,18 @@ export interface components {
             /** Body */
             body?: string | null;
             invite?: components["schemas"]["InviteDraft"] | null;
+        };
+        /**
+         * SpeedClock
+         * @description The clock a brokered game is created with, in seconds.
+         */
+        SpeedClock: {
+            /** Speed */
+            speed: string;
+            /** Limit Seconds */
+            limit_seconds: number;
+            /** Increment Seconds */
+            increment_seconds: number;
         };
         /** StandingRow */
         StandingRow: {

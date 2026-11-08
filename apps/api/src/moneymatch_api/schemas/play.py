@@ -98,6 +98,9 @@ class MatchView(BaseModel):
     you_confirmed: bool
     your_play_url: str | None
     forecast: Forecast | None
+    winner_user_id: UUID | None = None
+    # A friendly refunds both entries whoever wins (only the record is kept).
+    friendly: bool = False
     # How the game ended (checkmate | resignation | time | draw | stalemate |
     # abandoned | aborted | other), when Lichess said so.
     termination: str | None = None

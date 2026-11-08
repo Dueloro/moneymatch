@@ -151,6 +151,8 @@ async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchV
         you_confirmed=your_seat.confirmed_at is not None if your_seat else False,
         your_play_url=your_seat.play_url if your_seat else None,
         forecast=forecast,
+        winner_user_id=match.winner_user_id,
+        friendly=match.friendly,
         termination=detail.get("termination"),
         game_ended_at=_when(detail.get("game_ended_at")),
         resolved_at=match.resolved_at,
