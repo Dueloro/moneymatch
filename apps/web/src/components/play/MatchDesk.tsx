@@ -3,16 +3,12 @@ import { Link } from 'react-router-dom';
 
 import { prizeForEntry, type MarketRow } from '../../hooks/useMatchmaking';
 import type { ProfileSnapshot } from '../../hooks/useLinks';
-import {
-  clockLabel,
-  defaultSpeed,
-  ratingForSpeed,
-  speedName,
-} from '../../lib/timeControl';
-import { AmountText, PointsFigure } from '../ui/AmountText';
+import { middlePreset } from '../../lib/stake';
+import { defaultSpeed, ratingForSpeed, speedName } from '../../lib/timeControl';
+import { PointsFigure } from '../ui/AmountText';
 import { Card } from '../ui/Card';
 import { PillButton } from '../ui/PillButton';
-import { Segmented } from '../ui/Segmented';
+import { PayoutSummary, StakeChoice, TimeControlChoice } from '../ui/MatchChoices';
 
 const CHOICE_KEY = 'mm.h2h.desk';
 
@@ -58,7 +54,7 @@ export function MatchDesk({
   const entry =
     entryPick != null && presets.includes(entryPick)
       ? entryPick
-      : (presets[Math.floor(presets.length / 2)] ?? presets[0]);
+      : middlePreset(presets);
 
   const prize = prizeForEntry(entry, market.multiplier_bps);
   const fee = entry * 2 - prize;
@@ -94,71 +90,28 @@ export function MatchDesk({
 
       <div className="flex flex-col gap-5 px-5 py-5 md:px-6">
         {speed && speeds.length > 1 && (
-          <div>
-            <p className="label-neutral mb-2">Time control</p>
-            <Segmented
-              size="lg"
-              fullWidth
-              ariaLabel="Time control"
-              options={speeds.map((s) => ({
-                value: s,
-                label: (
-                  <span className="flex flex-col items-center leading-tight">
-                    <span>{speedName(s)}</span>
-                    {clockLabel(s) && (
-                      <span className="num text-micro font-medium text-text-tertiary">
-                        {clockLabel(s)}
-                      </span>
-                    )}
-                  </span>
-                ),
-              }))}
-              value={speed}
-              onChange={(s) => {
-                setSpeed(s);
-                saveChoice({ speed: s, entry });
-              }}
-            />
-          </div>
-        )}
-
-        <div>
-          <p className="label-money mb-2">Stake</p>
-          <Segmented
-            size="lg"
-            fullWidth
-            ariaLabel="Stake"
-            options={presets.map((cents) => ({
-              value: cents,
-              label: (
-                <span className="num">
-                  <PointsFigure cents={cents} />
-                </span>
-              ),
-            }))}
-            value={entry}
-            onChange={(cents) => {
-              setEntry(cents);
-              saveChoice({ speed, entry: cents });
+          <TimeControlChoice
+            speeds={speeds}
+            value={speed}
+            onChange={(s) => {
+              setSpeed(s);
+              saveChoice({ speed: s, entry });
             }}
           />
-        </div>
+        )}
+
+        <StakeChoice
+          presets={presets}
+          value={entry}
+          onChange={(cents) => {
+            setEntry(cents);
+            saveChoice({ speed, entry: cents });
+          }}
+        />
       </div>
 
       <div className="flex flex-col gap-4 border-t border-hairline px-5 py-5 md:flex-row md:items-end md:justify-between md:px-6">
-        <div>
-          <p className="label-money">Winner takes</p>
-          <p className="text-3xl font-semibold" data-testid="desk-prize">
-            <AmountText cents={prize} signed={false} money />
-          </p>
-          <p className="mt-1 text-xs text-text-secondary">
-            Fee{' '}
-            <span className="num text-red">
-              <PointsFigure cents={fee} />
-            </span>{' '}
-            · a draw refunds both
-          </p>
-        </div>
+        <PayoutSummary prize={prize} fee={fee} />
         <PillButton
           className="mm-glow md:min-w-64"
           size="lg"

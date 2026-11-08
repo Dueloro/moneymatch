@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 
 import { useSendMessage } from '../../hooks/useChat';
 import { CHESS } from '../../lib/games';
+import { PointsFigure } from '../ui/AmountText';
 import { Dialog } from '../ui/Dialog';
 import { PillButton } from '../ui/PillButton';
-import { PresetSelector } from '../ui/PresetSelector';
+import { StakeChoice } from '../ui/MatchChoices';
+import { Segmented } from '../ui/Segmented';
 
 const ENTRY_PRESETS = [500, 1000, 2500];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
@@ -42,11 +44,10 @@ export function InviteSheet({
   const send = useSendMessage();
   const copy = COPY[kind];
 
-  const [entryCents, setEntryCents] = useState<number | null>(ENTRY_PRESETS[1]);
+  const [entryCents, setEntryCents] = useState<number>(ENTRY_PRESETS[1]);
   const [difficulty, setDifficulty] = useState<string>('medium');
 
   async function sendInvite() {
-    if (!entryCents) return;
     await send.mutateAsync({
       conversationId,
       invite: {
@@ -66,51 +67,60 @@ export function InviteSheet({
       testId="invite-sheet"
       width="md:max-w-lg"
     >
-      <div className="overflow-y-auto px-5 pb-5 pt-2 md:px-6 md:pb-6">
-        <p className="mb-6 text-xs leading-relaxed text-text-secondary">{copy.blurb}</p>
+      <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4 md:px-6">
+        <p className="text-xs leading-relaxed text-text-secondary">{copy.blurb}</p>
 
         {kind === 'pool' && (
-          <>
-            <p className="label-neutral mb-2.5">Difficulty</p>
-            <div className="mb-6 flex flex-wrap gap-2">
-              {DIFFICULTIES.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDifficulty(d)}
-                  className={[
-                    'rounded-pill border px-4 py-1.5 text-xs font-semibold capitalize transition',
-                    d === difficulty
-                      ? 'is-selected text-text'
-                      : 'border-hairline text-text-secondary hover:text-text',
-                  ].join(' ')}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </>
+          <div>
+            <p className="label-neutral mb-2">Difficulty</p>
+            <Segmented
+              size="lg"
+              fullWidth
+              ariaLabel="Difficulty"
+              options={DIFFICULTIES.map((d) => ({
+                value: d,
+                label: <span className="capitalize">{d}</span>,
+              }))}
+              value={difficulty}
+              onChange={setDifficulty}
+            />
+          </div>
         )}
 
-        <p className="label-money mb-2.5">Entry</p>
-        <PresetSelector
-          presetsCents={ENTRY_PRESETS}
-          selectedCents={entryCents}
-          onSelect={setEntryCents}
+        <StakeChoice
+          presets={ENTRY_PRESETS}
+          value={entryCents}
+          onChange={setEntryCents}
         />
 
         {send.error && (
-          <p className="mt-3 text-xs text-red">{(send.error as Error).message}</p>
+          <p className="text-xs text-red">{(send.error as Error).message}</p>
         )}
+      </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          <PillButton disabled={!entryCents || send.isPending} onClick={sendInvite}>
-            {send.isPending ? 'Sending…' : `Send to ${peerName}`}
-          </PillButton>
-          <PillButton variant="outline" onClick={() => navigate(copy.path)}>
-            Open {copy.tab} ↗
-          </PillButton>
-        </div>
+      <div className="flex flex-col gap-2 border-t border-hairline px-5 py-5 md:flex-row-reverse md:px-6">
+        <PillButton
+          size="lg"
+          className="mm-glow md:flex-1"
+          disabled={send.isPending}
+          onClick={sendInvite}
+        >
+          {send.isPending ? (
+            'Sending…'
+          ) : (
+            <>
+              Send to {peerName} · <PointsFigure cents={entryCents} />
+            </>
+          )}
+        </PillButton>
+        <PillButton
+          size="lg"
+          variant="outline"
+          className="md:flex-1"
+          onClick={() => navigate(copy.path)}
+        >
+          Open {copy.tab} ↗
+        </PillButton>
       </div>
     </Dialog>
   );
