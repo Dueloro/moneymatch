@@ -1,16 +1,12 @@
-import { useState } from 'react';
-
 import {
-  useCreateLink,
   useLinks,
   useRefreshLink,
   type GameLink,
   type ProfileSnapshot,
 } from '../hooks/useLinks';
 import { CHESS, gameMeta } from '../lib/games';
-import { TextInput } from './ui/Field';
+import { ConnectLichessButton, NotAffiliated } from './ConnectLichess';
 import { SkeletonList } from './ui/Skeleton';
-import { PillButton } from './ui/PillButton';
 
 function unlinkedLink(id: string): GameLink {
   return {
@@ -66,38 +62,10 @@ export function LinkGames() {
 }
 
 function GameRow({ link }: { link: GameLink }) {
-  const [editing, setEditing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const create = useCreateLink();
   const refresh = useRefreshLink();
-  const [username, setUsername] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const meta = gameMeta(link.game, link.display_name);
 
   const { Icon } = meta;
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
-    create.mutate(
-      { game: link.game, username: username.trim() },
-      {
-        onSuccess: () => {
-          setEditing(false);
-          setConfirming(false);
-          setUsername('');
-        },
-        onError: (err: Error) => {
-          setError(err.message);
-          setConfirming(false);
-        },
-      },
-    );
-  };
 
   return (
     <div className="py-3">
@@ -157,79 +125,17 @@ function GameRow({ link }: { link: GameLink }) {
               Blocked
             </span>
           )}
-          {link.status === 'UNLINKED' && !editing && (
-            <PillButton variant="outline" onClick={() => setEditing(true)}>
-              Link
-            </PillButton>
-          )}
+          {link.status === 'UNLINKED' && <ConnectLichessButton size="sm" />}
         </div>
       </div>
 
-      {link.status === 'UNLINKED' && editing && (
-        <form className="mt-3 flex flex-col gap-2" onSubmit={submit}>
-          {!confirming ? (
-            <>
-              <div className="flex items-center gap-2">
-                <TextInput
-                  autoFocus
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  aria-label={`Your ${meta.name} username`}
-                  placeholder="Your Lichess username"
-                />
-                <PillButton
-                  type="submit"
-                  variant="primary"
-                  disabled={!username.trim() || create.isPending}
-                >
-                  Verify
-                </PillButton>
-                <PillButton
-                  type="button"
-                  variant="text"
-                  onClick={() => {
-                    setEditing(false);
-                    setError(null);
-                  }}
-                >
-                  Cancel
-                </PillButton>
-              </div>
-              <p className="text-xs text-text-secondary">
-                Find yours at{' '}
-                <a
-                  href="https://lichess.org"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline hover:text-text"
-                >
-                  lichess.org
-                </a>
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-xs text-text-secondary">
-                This permanently links{' '}
-                <span className="font-medium text-text">{username}</span> to your
-                account. Contact support if you ever need to change it.
-              </p>
-              <div className="flex items-center gap-2">
-                <PillButton type="submit" variant="primary" disabled={create.isPending}>
-                  {create.isPending ? 'Linking…' : 'Link account'}
-                </PillButton>
-                <PillButton
-                  type="button"
-                  variant="text"
-                  onClick={() => setConfirming(false)}
-                >
-                  Back
-                </PillButton>
-              </div>
-            </>
-          )}
-          {error && <p className="text-xs text-red">{error}</p>}
-        </form>
+      {link.status === 'UNLINKED' && (
+        <div className="mt-2 flex flex-col gap-0.5">
+          <p className="text-xs text-text-secondary">
+            We read your games from Lichess to settle matches.
+          </p>
+          <NotAffiliated />
+        </div>
       )}
     </div>
   );

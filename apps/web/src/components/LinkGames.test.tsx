@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/testUtils';
 import { LinkGames } from './LinkGames';
 
-const createMutate = vi.fn();
+const connectMutate = vi.fn();
 const refreshMutate = vi.fn();
 
 const UNLINKED = {
@@ -22,13 +22,13 @@ let games: Array<Record<string, unknown>> = [UNLINKED];
 
 vi.mock('../hooks/useLinks', () => ({
   useLinks: () => ({ isLoading: false, isError: false, data: { games } }),
-  useCreateLink: () => ({ mutate: createMutate, isPending: false }),
+  useConnectLichess: () => ({ mutate: connectMutate, isPending: false, error: null }),
   useRefreshLink: () => ({ mutate: refreshMutate, isPending: false }),
 }));
 
 describe('LinkGames', () => {
   beforeEach(() => {
-    createMutate.mockClear();
+    connectMutate.mockClear();
     refreshMutate.mockClear();
     games = [UNLINKED];
   });
@@ -39,18 +39,14 @@ describe('LinkGames', () => {
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
-  it('links a Lichess username after a confirm step', async () => {
+  it('connects Lichess through OAuth, returning to the current page', async () => {
+    window.history.replaceState(null, '', '/profile');
     const user = userEvent.setup();
     renderWithProviders(<LinkGames />);
-    await user.click(screen.getByRole('button', { name: 'Link' }));
-    await user.type(screen.getByPlaceholderText('Your Lichess username'), 'magnus');
-    await user.click(screen.getByRole('button', { name: 'Verify' }));
-    expect(createMutate).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Link account' }));
-    expect(createMutate).toHaveBeenCalledWith(
-      { game: 'chess.lichess', username: 'magnus' },
-      expect.anything(),
-    );
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText(/not affiliated with lichess/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Connect Lichess' }));
+    expect(connectMutate).toHaveBeenCalledWith('/profile');
   });
 
   it('shows the linked handle, rating, and a refresh action', async () => {

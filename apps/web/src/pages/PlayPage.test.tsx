@@ -24,6 +24,7 @@ vi.mock('../hooks/useWallet', () => ({
   }),
 }));
 vi.mock('../hooks/useLinks', () => ({
+  useConnectLichess: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useLinks: () => ({
     data: {
       games: [
@@ -204,10 +205,7 @@ describe('PlayPage', () => {
     } as unknown as ReturnType<typeof useMarkets>);
     renderWithProviders(<PlayPage />);
     expect(screen.queryByTestId('match-desk')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Link Lichess' })).toHaveAttribute(
-      'href',
-      '/profile',
-    );
+    expect(screen.getByRole('button', { name: 'Connect Lichess' })).toBeInTheDocument();
   });
 
   it('lists open seats with rating and time control', () => {

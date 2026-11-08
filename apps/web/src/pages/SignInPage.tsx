@@ -9,6 +9,7 @@ import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
 import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
+import { useLinks } from '../hooks/useLinks';
 import { useMe } from '../hooks/useMe';
 import { api } from '../lib/api';
 import { clearReturnTo, peekReturnTo, takeReturnTo } from '../lib/returnTo';
@@ -555,6 +556,8 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
 
 function LinkGameStep() {
   const navigate = useNavigate();
+  const links = useLinks();
+  const linked = links.data?.games.some((g) => g.status === 'LINKED') ?? false;
   return (
     <div>
       <AuthHeading
@@ -566,11 +569,11 @@ function LinkGameStep() {
       </div>
       <div className="mt-8">
         <PillButton
-          variant="primary"
+          variant={linked ? 'primary' : 'text'}
           fullWidth
           onClick={() => navigate(takeReturnTo() ?? '/play')}
         >
-          Enter Money Match
+          {linked ? 'Enter Money Match' : 'Skip for now'}
         </PillButton>
       </div>
     </div>

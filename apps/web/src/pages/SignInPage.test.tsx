@@ -9,6 +9,7 @@ import { SignInPage } from './SignInPage';
 vi.mock('../auth/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../hooks/useMe', () => ({ useMe: vi.fn() }));
 vi.mock('../components/LinkGames', () => ({ LinkGames: () => null }));
+vi.mock('../hooks/useLinks', () => ({ useLinks: () => ({ data: { games: [] } }) }));
 vi.mock('../lib/api', () => ({ api: { PATCH: vi.fn() } }));
 
 import { useAuth } from '../auth/useAuth';
@@ -223,7 +224,7 @@ describe('SignInPage', () => {
       await userEvent.click(screen.getByRole('checkbox'));
       await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
       await userEvent.click(
-        await screen.findByRole('button', { name: 'Enter Money Match' }),
+        await screen.findByRole('button', { name: 'Skip for now' }),
       );
     }
 

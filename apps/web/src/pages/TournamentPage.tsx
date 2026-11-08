@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 
 import { PlayHeader } from '../components/PlayHeader';
 import { AmountText } from '../components/ui/AmountText';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
+import { ConnectLichessButton } from '../components/ConnectLichess';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
@@ -67,11 +67,7 @@ export function TournamentPage() {
         <EmptyState
           title="Link your Lichess account"
           subline="Tournaments score your Lichess games automatically, so we need to know which account is yours."
-          action={
-            <Link to="/profile">
-              <PillButton>Link Lichess</PillButton>
-            </Link>
-          }
+          action={<ConnectLichessButton />}
         />
       </div>
     );

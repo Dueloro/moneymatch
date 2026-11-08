@@ -134,8 +134,47 @@ export interface paths {
         /** List Links */
         get: operations["list_links_api_v1_links_get"];
         put?: never;
-        /** Create Link */
+        /**
+         * Create Link
+         * @description Unverified typed-username link: dev/e2e seam only (E2E_AUTH_ENABLED, never prod).
+         *
+         *     Real users link through the Lichess OAuth endpoints below, which prove ownership.
+         */
         post: operations["create_link_api_v1_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/links/lichess/oauth/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Lichess Oauth */
+        post: operations["start_lichess_oauth_api_v1_links_lichess_oauth_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/links/lichess/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Lichess Oauth */
+        post: operations["complete_lichess_oauth_api_v1_links_lichess_oauth_callback_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -255,7 +294,6 @@ export interface paths {
         /**
          * Get Match Grading
          * @description Transparent grading record: the rule, each side's stat line, the decision.
-         *     Only a participant can read it.
          */
         get: operations["get_match_grading_api_v1_play_matches__match_id__grading_get"];
         put?: never;
@@ -273,10 +311,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Dispute
-         * @description The viewer's dispute for this match, if any.
-         */
+        /** Get Dispute */
         get: operations["get_dispute_api_v1_play_matches__match_id__dispute_get"];
         put?: never;
         /**
@@ -611,10 +646,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Contest Dispute
-         * @description The viewer's dispute for this contest, if any.
-         */
+        /** Get Contest Dispute */
         get: operations["get_contest_dispute_api_v1_disputes__ref_type___ref_id__get"];
         put?: never;
         post?: never;
@@ -899,11 +931,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Respond Invite
-         * @description Accept or decline an invite card. Accepting a head-to-head forms a PENDING
-         *     match (same lifecycle as the Inbox Respond pill).
-         */
+        /** Respond Invite */
         post: operations["respond_invite_api_v1_chat_messages__message_id__respond_post"];
         delete?: never;
         options?: never;
@@ -1424,7 +1452,7 @@ export interface components {
         };
         /**
          * AdjustRequest
-         * @description Manual ledger adjustment. Signed cents (credit/debit); reason required.
+         * @description Manual ledger adjustment.
          */
         AdjustRequest: {
             /**
@@ -1798,8 +1826,8 @@ export interface components {
         };
         /**
          * ChatReadResponse
-         * @description Named apart from the notifications mark-read so the two never collide in
-         *     the generated OpenAPI component map.
+         * @description Named apart from the notifications mark-read so the two never collide in the
+         *     generated OpenAPI component map.
          */
         ChatReadResponse: {
             /** Unread Total */
@@ -1854,13 +1882,7 @@ export interface components {
             /** Conversations */
             conversations: components["schemas"]["ConversationView"][];
         };
-        /**
-         * CreateChallengeRequest
-         * @description One shape for all three flows (the server picks based on which fields are
-         *     set): direct (`challengee_id`), rematch (`rematch_of`), or invite link
-         *     (neither). game/market/entry are ignored for a rematch (copied from the
-         *     original match). Entry is a preset choice — the server owns the cents.
-         */
+        /** CreateChallengeRequest */
         CreateChallengeRequest: {
             /** Challengee Id */
             challengee_id?: string | null;
@@ -1877,8 +1899,7 @@ export interface components {
         };
         /**
          * CreateLinkRequest
-         * @description Intent to bind a host account. The server fetches + verifies everything;
-         *     the client only names the game and the handle to claim.
+         * @description Intent to bind a host account.
          */
         CreateLinkRequest: {
             /** Game */
@@ -1907,7 +1928,7 @@ export interface components {
         };
         /**
          * DifficultyCard
-         * @description One difficulty quoted from the viewer's own baseline (design PDF p.4).
+         * @description One difficulty quoted from the viewer's own baseline.
          */
         DifficultyCard: {
             /** Difficulty */
@@ -1971,13 +1992,7 @@ export interface components {
             /** Flags */
             flags: components["schemas"]["FlagItem"][];
         };
-        /**
-         * Forecast
-         * @description The Elo-forecast disclosure for a chess pairing.
-         *
-         *     `you_win_prob` is `P(you beat opponent)` from the model (held near 0.50 by
-         *     the eligibility window); `label` is the honest one-liner for the matched card.
-         */
+        /** Forecast */
         Forecast: {
             /** You Win Prob */
             you_win_prob: number;
@@ -2006,7 +2021,7 @@ export interface components {
         };
         /**
          * FriendItem
-         * @description One person in the friends list or a pending request (design PDF p.8).
+         * @description One person in the friends list or a pending request.
          */
         FriendItem: {
             /**
@@ -2038,9 +2053,6 @@ export interface components {
         /**
          * GameLink
          * @description One game's row on Profile: linked snapshot or an empty/blocked slot.
-         *
-         *     `status`: LINKED (active binding), BLOCKED (game flag off or binding frozen),
-         *     UNLINKED (available to link).
          */
         GameLink: {
             /** Game */
@@ -2078,8 +2090,8 @@ export interface components {
         };
         /**
          * GradingExplanation
-         * @description "Why this result" — the transparent grading record for a contest the
-         *     viewer was in: the rule, what each side produced, and the decision.
+         * @description "Why this result" — the transparent grading record for a contest the viewer
+         *     was in: the rule, what each side produced, and the decision.
          */
         GradingExplanation: {
             /**
@@ -2139,8 +2151,8 @@ export interface components {
         };
         /**
          * InviteDraft
-         * @description The client's half of an invite card. Entry is a preset choice — the
-         *     server validates it against the offered presets and owns the cents.
+         * @description The client's half of an invite card. Entry is a preset choice — the server
+         *     validates it against the offered presets and owns the cents.
          */
         InviteDraft: {
             /** Invite Kind */
@@ -2213,6 +2225,18 @@ export interface components {
              */
             created_at: string;
         };
+        /** LichessOAuthCallbackRequest */
+        LichessOAuthCallbackRequest: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** LichessOAuthStartResponse */
+        LichessOAuthStartResponse: {
+            /** Authorize Url */
+            authorize_url: string;
+        };
         /** LimitsResponse */
         LimitsResponse: {
             /** Daily Loss Cap Cents */
@@ -2255,7 +2279,7 @@ export interface components {
         };
         /**
          * MarketRow
-         * @description One market row on the Play screen (design PDF p.1).
+         * @description One market row on the Play screen.
          */
         MarketRow: {
             /** Key */
@@ -2376,7 +2400,7 @@ export interface components {
         };
         /**
          * MessageView
-         * @description One rendered message. `payload` is populated for invite cards only.
+         * @description One rendered message.
          */
         MessageView: {
             /**
@@ -2439,8 +2463,8 @@ export interface components {
         };
         /**
          * OpenConversationRequest
-         * @description Open (or reopen) a thread: a friend's `user_id` for a DM, or
-         *     `kind='support'` for the support thread.
+         * @description Open (or reopen) a thread: a friend's `user_id` for a DM, or `kind='support'`
+         *     for the support thread.
          */
         OpenConversationRequest: {
             /** User Id */
@@ -2453,7 +2477,7 @@ export interface components {
         };
         /**
          * PoolEnterRequest
-         * @description Enter a pool = enqueue. Ids + preset only — no bar, no amount.
+         * @description Enter a pool = enqueue.
          */
         PoolEnterRequest: {
             /** Game */
@@ -2585,8 +2609,6 @@ export interface components {
         /**
          * ProfileSnapshot
          * @description Verified skill profile for one linked host account.
-         *
-         *     `game` is the adapter id.
          */
         ProfileSnapshot: {
             /** Username */
@@ -2666,7 +2688,7 @@ export interface components {
         };
         /**
          * QueueRequest
-         * @description Join the queue. Ids + a server preset only — no amounts, no timestamps.
+         * @description Join the queue.
          */
         QueueRequest: {
             /** Game */
@@ -2965,7 +2987,7 @@ export interface components {
         /**
          * UpdateFlagRequest
          * @description Patch a flag: toggle `enabled` and/or replace its `payload` (e.g.
-         *     `geo_config`'s excluded-state list). At least one field must be present.
+         *     `geo_config`'s excluded-state list).
          */
         UpdateFlagRequest: {
             /** Enabled */
@@ -2978,9 +3000,6 @@ export interface components {
         /**
          * UpdateMeRequest
          * @description Onboarding (username + state + 18+, set once) and/or limit edits.
-         *
-         *     All fields optional so the endpoint serves both onboarding and later limit
-         *     changes. Lowering a cap is instant; raising is delayed (see limits_service).
          */
         UpdateMeRequest: {
             /**
@@ -3090,7 +3109,7 @@ export interface components {
         };
         /**
          * WalletLedgerPage
-         * @description Cursor-paginated ledger. `next_cursor` is null on the last page.
+         * @description Cursor-paginated ledger.
          */
         WalletLedgerPage: {
             /** Entries */
@@ -3441,6 +3460,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinksResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_lichess_oauth_api_v1_links_lichess_oauth_start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LichessOAuthStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_lichess_oauth_api_v1_links_lichess_oauth_callback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LichessOAuthCallbackRequest"];
             };
         };
         responses: {

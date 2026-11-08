@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 
 import { GettingStarted } from '../components/GettingStarted';
 import { PlayHeader } from '../components/PlayHeader';
 import { Card } from '../components/ui/Card';
 import { CardGrid } from '../components/ui/CardGrid';
 import { ClearBar } from '../components/ui/ClearBar';
+import { ConnectLichessButton } from '../components/ConnectLichess';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
@@ -101,11 +101,7 @@ export function PoolsPage() {
         <EmptyState
           title="Link your Lichess account"
           subline="Pools settle from your Lichess games, so we need to know which account is yours."
-          action={
-            <Link to="/profile">
-              <PillButton>Link Lichess</PillButton>
-            </Link>
-          }
+          action={<ConnectLichessButton />}
         />
       </div>
     );

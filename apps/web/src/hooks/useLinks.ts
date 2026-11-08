@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { setLinkReturnTo } from '../lib/linkReturnTo';
 
 export interface FormatStat {
   speed: string;
@@ -70,15 +71,28 @@ function useLinksInvalidation() {
   };
 }
 
-export function useCreateLink() {
+export function useConnectLichess() {
+  return useMutation({
+    mutationFn: async (returnTo: string | null): Promise<void> => {
+      const { data, error } = await api.POST('/api/v1/links/lichess/oauth/start');
+      if (error || !data) throw new Error(messageOf(error, 'Could not reach Lichess.'));
+      if (returnTo) setLinkReturnTo(returnTo);
+      window.location.assign(data.authorize_url);
+    },
+  });
+}
+
+export function useCompleteLichessLink() {
   const invalidate = useLinksInvalidation();
   return useMutation({
     mutationFn: async (vars: {
-      game: string;
-      username: string;
+      code: string;
+      state: string;
     }): Promise<LinksResponse> => {
-      const { data, error } = await api.POST('/api/v1/links', { body: vars });
-      if (error) throw new Error(messageOf(error, 'Could not link that account.'));
+      const { data, error } = await api.POST('/api/v1/links/lichess/oauth/callback', {
+        body: vars,
+      });
+      if (error) throw new Error(messageOf(error, 'Could not connect Lichess.'));
       return data as LinksResponse;
     },
     onSuccess: invalidate,

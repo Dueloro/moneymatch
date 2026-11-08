@@ -7,6 +7,7 @@ import { AppShell } from './components/AppShell';
 import { Loader } from './components/ui/Loader';
 import { ActivityPage } from './pages/ActivityPage';
 import { InvitePage } from './pages/InvitePage';
+import { LichessCallbackPage } from './pages/LichessCallbackPage';
 import { PlayPage } from './pages/PlayPage';
 import { PoolsPage } from './pages/PoolsPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -30,6 +31,7 @@ export function App() {
       <Route path="/signin" element={<SignInPage />} />
       <Route path="/i/:token" element={<InvitePage />} />
       <Route element={<RequireAuth />}>
+        <Route path="link/lichess/callback" element={<LichessCallbackPage />} />
         <Route element={<AppShell />}>
           <Route path="play" element={<PlayPage />} />
           <Route path="pools" element={<PoolsPage />} />

@@ -18,7 +18,7 @@ vi.mock('../hooks/useLinks', async () => {
   return {
     ...actual,
     useLinks: vi.fn(),
-    useCreateLink: vi.fn(),
+    useConnectLichess: vi.fn(),
     useRefreshLink: vi.fn(),
   };
 });
@@ -26,13 +26,13 @@ vi.mock('../hooks/useLinks', async () => {
 import { useAuth } from '../auth/useAuth';
 import { useMe, useSelfExclude } from '../hooks/useMe';
 import {
-  useCreateLink,
+  useConnectLichess,
   useLinks,
   useRefreshLink,
   type GameLink,
 } from '../hooks/useLinks';
 
-const createMutate = vi.fn();
+const connectMutate = vi.fn();
 const selfExcludeMutate = vi.fn();
 const verifyCurrentPassword = vi.fn();
 const changePassword = vi.fn();
@@ -96,10 +96,11 @@ describe('ProfilePage', () => {
       mutate: selfExcludeMutate,
       isPending: false,
     } as unknown as ReturnType<typeof useSelfExclude>);
-    vi.mocked(useCreateLink).mockReturnValue({
-      mutate: createMutate,
+    vi.mocked(useConnectLichess).mockReturnValue({
+      mutate: connectMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof useCreateLink>);
+      error: null,
+    } as unknown as ReturnType<typeof useConnectLichess>);
     vi.mocked(useRefreshLink).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
@@ -143,20 +144,11 @@ describe('ProfilePage', () => {
     expect(screen.getByText('Blocked')).toBeInTheDocument();
   });
 
-  it('runs the link flow for an unlinked account', () => {
+  it('offers Connect Lichess for an unlinked account', () => {
     mockLinks(gameLink({ status: 'UNLINKED' }));
     renderWithProviders(<ProfilePage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Link' }));
-    fireEvent.change(screen.getByPlaceholderText('Your Lichess username'), {
-      target: { value: 'magnus' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Verify' }));
-    expect(screen.getByText(/permanently links/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Link account' }));
-    expect(createMutate).toHaveBeenCalledWith(
-      { game: 'chess.lichess', username: 'magnus' },
-      expect.anything(),
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Lichess' }));
+    expect(connectMutate).toHaveBeenCalled();
   });
 
   it('confirms before self-excluding', () => {

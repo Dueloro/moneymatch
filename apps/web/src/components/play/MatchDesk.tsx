@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 
 import { prizeForEntry, type MarketRow } from '../../hooks/useMatchmaking';
 import type { ProfileSnapshot } from '../../hooks/useLinks';
 import { middlePreset } from '../../lib/stake';
 import { defaultSpeed, ratingForSpeed, speedName } from '../../lib/timeControl';
+import { ConnectLichessButton, NotAffiliated } from '../ConnectLichess';
 import { PointsFigure } from '../ui/AmountText';
 import { Card } from '../ui/Card';
 import { PillButton } from '../ui/PillButton';
@@ -146,9 +146,10 @@ export function LinkLichessDesk() {
             you&apos;re matched with.
           </p>
         </div>
-        <Link to="/profile" className="shrink-0">
-          <PillButton size="lg">Link Lichess</PillButton>
-        </Link>
+        <div className="flex shrink-0 flex-col items-start gap-1 md:items-end">
+          <ConnectLichessButton size="lg" />
+          <NotAffiliated />
+        </div>
       </div>
     </Card>
   );
