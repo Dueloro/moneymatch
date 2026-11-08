@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 
+import httpx
+
 from ._client import request_json
-from .errors import HostError, HostNotFound
+from .errors import HostError, HostNotFound, HostUnavailable
 
 HOST = "lichess"
 LICHESS_BASE = "https://lichess.org/api"
@@ -152,6 +154,16 @@ async def get_live_game(game_id: str) -> dict | None:
 LICHESS_OAUTH_AUTHORIZE = "https://lichess.org/oauth"
 
 
+def _json_object(response: httpx.Response) -> dict:
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise HostUnavailable(HOST, "malformed JSON") from exc
+    if not isinstance(data, dict):
+        raise HostUnavailable(HOST, "unexpected JSON shape")
+    return data
+
+
 async def exchange_oauth_code(
     code: str, code_verifier: str, redirect_uri: str, client_id: str
 ) -> str:
@@ -168,8 +180,9 @@ async def exchange_oauth_code(
             "redirect_uri": redirect_uri,
             "client_id": client_id,
         },
+        retry=False,
     )
-    token = response.json().get("access_token")
+    token = _json_object(response).get("access_token")
     if not isinstance(token, str) or not token:
         raise HostError(HOST, "token response had no access_token")
     return token
@@ -183,7 +196,7 @@ async def get_account(token: str) -> dict:
         f"{LICHESS_BASE}/account",
         headers={**HEADERS, "Authorization": f"Bearer {token}"},
     )
-    return response.json()
+    return _json_object(response)
 
 
 async def revoke_token(token: str) -> None:

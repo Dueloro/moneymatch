@@ -50,7 +50,10 @@ async def start(session: AsyncSession, user: User, settings: Settings) -> str:
             status_code=409,
         )
     await session.execute(
-        delete(LichessOAuthState).where(LichessOAuthState.expires_at < now())
+        delete(LichessOAuthState).where(
+            (LichessOAuthState.expires_at < now())
+            | (LichessOAuthState.user_id == user.id)
+        )
     )
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)

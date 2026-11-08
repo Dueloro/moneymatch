@@ -271,3 +271,51 @@ async def test_username_linking_stays_closed_in_prod(client, app, monkeypatch):
         headers=auth_headers("o-typed-prod"),
     )
     assert r.status_code == 404
+
+
+async def test_new_start_supersedes_the_previous_flow(client, session):
+    first = await _start(client, "o-twice")
+    second = await _start(client, "o-twice")
+    other = await _start(client, "o-bystander")
+    assert await session.get(LichessOAuthState, first["state"]) is None
+    assert await session.get(LichessOAuthState, second["state"]) is not None
+    assert await session.get(LichessOAuthState, other["state"]) is not None
+
+
+@respx.mock
+async def test_code_exchange_is_not_retried(client):
+    q = await _start(client, "o-noretry")
+    token = respx.post(TOKEN).mock(return_value=httpx.Response(503))
+    r = await client.post(
+        CALLBACK,
+        json={"code": "c", "state": q["state"]},
+        headers=auth_headers("o-noretry"),
+    )
+    assert r.status_code == 502
+    assert token.call_count == 1
+
+
+@respx.mock
+async def test_malformed_token_json_is_host_unavailable(client):
+    q = await _start(client, "o-badjson")
+    respx.post(TOKEN).mock(return_value=httpx.Response(200, text="<html>"))
+    r = await client.post(
+        CALLBACK,
+        json={"code": "c", "state": q["state"]},
+        headers=auth_headers("o-badjson"),
+    )
+    assert r.status_code == 502 and r.json()["code"] == "host_unavailable"
+
+
+@respx.mock
+async def test_malformed_account_json_is_host_unavailable_and_revokes(client):
+    q = await _start(client, "o-badacct")
+    _, _, revoke = _mock_lichess()
+    respx.get(ACCOUNT).mock(return_value=httpx.Response(200, text="not json"))
+    r = await client.post(
+        CALLBACK,
+        json={"code": "c", "state": q["state"]},
+        headers=auth_headers("o-badacct"),
+    )
+    assert r.status_code == 502 and r.json()["code"] == "host_unavailable"
+    assert revoke.called

@@ -8,6 +8,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from .auth import AuthError, extract_bearer_token, verify_token
+from .config import Settings
+
 # Methods that mutate state — the ones worth rate-limiting and body-capping.
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
@@ -52,17 +55,32 @@ class MaxBodySizeMiddleware(BaseHTTPMiddleware):
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Fixed-window per-(client, method, path) cap on write requests."""
+    """Fixed-window per-(caller, method, path) cap on write requests.
+
+    The caller is the verified user (same check as `auth.verify_token`) when the
+    request carries a valid bearer token, else the client IP. Unverified tokens never
+    pick the bucket, so nobody can spend another user's budget.
+    """
 
     WINDOW_SECONDS = 60
 
-    def __init__(self, app, *, per_minute: int) -> None:
+    def __init__(
+        self, app, *, per_minute: int, settings: Settings | None = None
+    ) -> None:
         super().__init__(app)
         self.per_minute = per_minute
+        self.settings = settings
         self._buckets: dict[str, tuple[int, int]] = {}
 
     def _client(self, request: Request) -> str:
-        return request.client.host if request.client else "unknown"
+        authorization = request.headers.get("authorization")
+        if authorization:
+            try:
+                token = extract_bearer_token(authorization)
+                return "user:" + verify_token(token, self.settings).auth_id
+            except AuthError:
+                pass
+        return "ip:" + (request.client.host if request.client else "unknown")
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if request.method not in WRITE_METHODS:

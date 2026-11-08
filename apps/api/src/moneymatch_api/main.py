@@ -84,7 +84,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestLogMiddleware)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=settings.max_request_bytes)
     app.add_middleware(
-        RateLimitMiddleware, per_minute=settings.rate_limit_writes_per_minute
+        RateLimitMiddleware,
+        per_minute=settings.rate_limit_writes_per_minute,
+        settings=settings,
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(

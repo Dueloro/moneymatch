@@ -17,4 +17,5 @@ COPY apps/api/ ./
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn moneymatch_api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Render services are reachable only through Render's proxy, so trust its X-Forwarded-For.
+CMD ["sh", "-c", "uvicorn moneymatch_api.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

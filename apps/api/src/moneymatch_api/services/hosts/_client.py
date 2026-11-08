@@ -38,10 +38,11 @@ async def request_json(
     params: dict[str, Any] | None = None,
     data: dict[str, Any] | None = None,
     timeout_s: float = _DEFAULT_TIMEOUT,
+    retry: bool = True,
 ) -> httpx.Response:
     attempt = 0
-    async for retry in AsyncRetrying(
-        stop=stop_after_attempt(_MAX_ATTEMPTS),
+    async for attempt_ctx in AsyncRetrying(
+        stop=stop_after_attempt(_MAX_ATTEMPTS if retry else 1),
         wait=wait_random_exponential(multiplier=0.2, max=2.0),
         retry=(
             retry_if_exception_type(HostUnavailable)
@@ -49,7 +50,7 @@ async def request_json(
         ),
         reraise=True,
     ):
-        with retry:
+        with attempt_ctx:
             attempt += 1
             started = time.perf_counter()
             status_code: int | None = None

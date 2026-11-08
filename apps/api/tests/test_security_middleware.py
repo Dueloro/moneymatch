@@ -52,3 +52,27 @@ async def test_reads_not_rate_limited(hardened_client: AsyncClient) -> None:
     for _ in range(5):
         r = await hardened_client.get("/api/v1/does-not-exist")
         assert r.status_code != 429
+
+
+async def _post_as(client: AsyncClient, sub: str | None):
+    from .conftest import auth_headers
+
+    headers = auth_headers(sub) if sub else {}
+    return await client.post("/api/v1/does-not-exist", content=b"{}", headers=headers)
+
+
+async def test_rate_limit_is_per_user(hardened_client: AsyncClient) -> None:
+    for _ in range(2):
+        assert (await _post_as(hardened_client, "rl-a")).status_code != 429
+    assert (await _post_as(hardened_client, "rl-a")).status_code == 429
+    assert (await _post_as(hardened_client, "rl-b")).status_code != 429
+    assert (await _post_as(hardened_client, None)).status_code != 429
+
+
+async def test_invalid_token_falls_back_to_ip(hardened_client: AsyncClient) -> None:
+    bad = {"Authorization": "Bearer not-a-jwt"}
+    for _ in range(2):
+        r = await hardened_client.post("/api/v1/x", content=b"{}", headers=bad)
+        assert r.status_code != 429
+    anon = await hardened_client.post("/api/v1/x", content=b"{}")
+    assert anon.status_code == 429
