@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useSendMessage } from '../../hooks/useChat';
 import { CHESS } from '../../lib/games';
+import { Dialog } from '../ui/Dialog';
 import { PillButton } from '../ui/PillButton';
 import { PresetSelector } from '../ui/PresetSelector';
 
@@ -59,22 +60,13 @@ export function InviteSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={copy.title}
+    <Dialog
+      title={copy.title}
+      onClose={onClose}
+      testId="invite-sheet"
+      width="md:max-w-lg"
     >
-      <div
-        className="w-full max-w-lg rounded-card border border-hairline bg-panel p-7 shadow-overlay"
-        data-testid="invite-sheet"
-      >
-        <div className="mb-1 flex items-start justify-between gap-4">
-          <h3 className="text-xl font-bold text-text">{copy.title}</h3>
-          <PillButton variant="text" className="!px-2" onClick={onClose}>
-            Close
-          </PillButton>
-        </div>
+      <div className="overflow-y-auto px-5 pb-5 pt-2 md:px-6 md:pb-6">
         <p className="mb-6 text-xs leading-relaxed text-text-secondary">{copy.blurb}</p>
 
         {kind === 'pool' && (
@@ -120,6 +112,6 @@ export function InviteSheet({
           </PillButton>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { useFriends } from '../../hooks/useFriends';
-import { PillButton } from '../ui/PillButton';
+import { Dialog } from '../ui/Dialog';
 import { Avatar } from './Avatar';
 
 export function NewMessageSheet({
@@ -23,28 +23,14 @@ export function NewMessageSheet({
   );
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="New message"
-    >
-      <div
-        className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-card border border-hairline bg-panel p-7 shadow-overlay"
-        data-testid="new-message-sheet"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-text">New message</h3>
-          <PillButton variant="text" className="!px-2" onClick={onClose}>
-            Close
-          </PillButton>
-        </div>
-
+    <Dialog title="New message" onClose={onClose} testId="new-message-sheet">
+      <div className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-4 md:px-6 md:pb-6">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search friends"
           aria-label="Search friends"
+          data-autofocus
           className="mb-4 rounded-pill border border-hairline bg-bg px-4 py-2.5 text-sm text-text transition placeholder:text-text-tertiary focus:border-line-strong focus:outline-none"
         />
 
@@ -85,6 +71,6 @@ export function NewMessageSheet({
           )}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

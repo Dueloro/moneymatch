@@ -120,6 +120,10 @@ status, a fact label) uses `.label-neutral`: 12px, medium, sentence case, tertia
   borderless panels. Overlays get 1px `line-strong`.
 - **Elevation.** Exactly one shadow token, used only by dialogs, menus, toasts.
   Cards never cast shadows — they separate by surface value and border.
+- **Dialogs.** All modals use `ui/Dialog`: focus trap, Escape/backdrop close,
+  focus restored to the trigger, body scroll lock, `aria-labelledby` title. A
+  bottom sheet below `md`, a centred panel at `md+`; transitions are `motion-safe`.
+  Mount to open. Mark the preferred first-focus control `data-autofocus`.
 - **Motion.** Four animations only, all disabled under `prefers-reduced-motion`
   (which also clamps transitions to 0.01ms): the ticker marquee, the 0.28s rise
   on a matched card, `animate-pulse` on live dots/skeletons, and the money-delta

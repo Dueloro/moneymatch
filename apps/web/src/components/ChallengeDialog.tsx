@@ -4,7 +4,7 @@ import { useCreateChallenge } from '../hooks/useChallenges';
 import { prizeForEntry, useMarkets, type MarketRow } from '../hooks/useMatchmaking';
 import { formatPoints } from '../lib/format';
 import { CHESS } from '../lib/games';
-import { Card } from './ui/Card';
+import { Dialog } from './ui/Dialog';
 import { RadioRow } from './ui/Field';
 import { PillButton } from './ui/PillButton';
 import { PresetSelector } from './ui/PresetSelector';
@@ -70,25 +70,12 @@ export function ChallengeDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
-      role="dialog"
-      aria-modal="true"
+    <Dialog
+      title={friend ? `Challenge ${friend.username ?? 'friend'}` : 'Invite a friend'}
+      onClose={onClose}
+      testId="challenge-dialog"
     >
-      <Card
-        tone="overlay"
-        className="w-full max-w-md p-6"
-        data-testid="challenge-dialog"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-text">
-            {friend ? `Challenge ${friend.username ?? 'friend'}` : 'Invite a friend'}
-          </h3>
-          <PillButton variant="text" onClick={onClose}>
-            Close
-          </PillButton>
-        </div>
-
+      <div className="overflow-y-auto px-5 pb-5 pt-4 md:px-6 md:pb-6">
         {markets && !markets.linked ? (
           <p className="text-sm text-text-secondary">
             Link your Lichess account first (Profile).
@@ -190,7 +177,7 @@ export function ChallengeDialog({
             )}
           </>
         )}
-      </Card>
-    </div>
+      </div>
+    </Dialog>
   );
 }
