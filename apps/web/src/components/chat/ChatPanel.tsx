@@ -76,7 +76,7 @@ export function ChatPanel() {
   return (
     <div
       data-testid="chat-panel"
-      className="h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:h-[calc(100vh-11rem)] md:min-h-[36rem] lg:grid lg:grid-cols-[20rem_minmax(0,1fr)]"
+      className="h-[calc(100dvh-20rem)] min-h-[22rem] overflow-hidden rounded-card border border-hairline bg-panel shadow-overlay md:h-[calc(100vh-11rem)] md:min-h-[36rem] lg:grid lg:grid-cols-[20rem_minmax(0,1fr)]"
     >
       <div
         className={[

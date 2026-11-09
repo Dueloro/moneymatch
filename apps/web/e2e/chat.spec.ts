@@ -56,10 +56,10 @@ test('friends → DM → unread badge → reply', async ({ browser }) => {
   await pageB.getByRole('button').filter({ hasText: a.username }).first().click(POLL);
   const threadB = pageB.getByLabel(`Chat with ${a.username}`);
   await expect(threadB.getByText('run it back?')).toBeVisible(POLL);
-  // The unread DM clears; the friend-request notification stays until the Notifications row is opened.
-  await expect(pageB.getByRole('link', { name: 'Social 1' })).toBeVisible(POLL);
+  // Opening Social clears the global nav badge; unread state stays inside the Inbox.
+  await expect(pageB.getByRole('link', { name: 'Social' })).toBeVisible(POLL);
 
-  await pageB.getByLabel('Message').fill('yeah, $10 blitz');
+  await pageB.getByLabel('Message').fill('yeah, 1,000 pt blitz');
   await pageB.getByLabel('Message').press('Enter');
   await expect(threadA.getByText('yeah, $10 blitz')).toBeVisible(POLL);
 

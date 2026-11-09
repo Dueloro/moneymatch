@@ -1,13 +1,14 @@
 # End-to-end tests (Playwright)
 
-| Spec                 | Covers                                                           | Needs Lichess handles |
-| -------------------- | ---------------------------------------------------------------- | --------------------- |
-| `chat.spec.ts`       | friends → DM → unread badge → reply                              | no                    |
-| `chat.spec.ts`       | head-to-head invite from chat → accept → PENDING match           | yes                   |
-| `h2h.spec.ts`        | queue blitz at $10 → paired → both confirm → game link           | yes                   |
-| `invite.spec.ts`     | invite link → preview → accept → both confirm → game link        | yes                   |
-| `pools.spec.ts`      | fee shown → join via confirm → queued → leave, balance untouched | A only                |
-| `tournament.spec.ts` | fee shown → join → queued → leave, balance untouched             | A only                |
+| Spec                    | Covers                                                           | Needs Lichess handles |
+| ----------------------- | ---------------------------------------------------------------- | --------------------- |
+| `release-audit.spec.ts` | every route at 390/768/1440 px; auth, errors, match, chat        | no                    |
+| `chat.spec.ts`          | friends → DM → unread badge → reply                              | no                    |
+| `chat.spec.ts`          | head-to-head invite from chat → accept → PENDING match           | yes                   |
+| `h2h.spec.ts`           | queue blitz at 1,000 pts → paired → confirm → game link          | yes                   |
+| `invite.spec.ts`        | invite link → preview → accept → both confirm → game link        | yes                   |
+| `pools.spec.ts`         | fee shown → join via confirm → queued → leave, balance untouched | A only                |
+| `tournament.spec.ts`    | fee shown → join → queued → leave, balance untouched             | A only                |
 
 Settlement is not driven end to end: it needs the game played to a
 result on Lichess, and a formed pool room or tournament field needs several
