@@ -7,6 +7,7 @@ import {
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { formatPoints } from '../lib/format';
 import { toast } from '../lib/toast';
 
@@ -85,7 +86,7 @@ export function usePlayMoneyDeposit() {
       const { data, error } = await api.POST('/api/v1/wallet/demo-deposit', {
         body: { amount_preset_cents: amountPresetCents },
       });
-      if (error) throw new Error('Could not add points');
+      if (error) throw new Error(messageOf(error, 'Could not add points'));
       return data as Wallet;
     },
     onSuccess: (_data, amountPresetCents) => {
