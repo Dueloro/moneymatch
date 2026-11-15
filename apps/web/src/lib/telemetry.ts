@@ -1,4 +1,4 @@
-import posthog from 'posthog-js';
+import type { PostHog } from 'posthog-js';
 
 import { env } from './env';
 
@@ -31,20 +31,22 @@ export type TelemetryEvent =
   | 'first_settlement'
   | 'contest_filed';
 
-let initialized = false;
+let loading: Promise<PostHog> | null = null;
 
-function client(): typeof posthog | null {
-  if (!env.posthogKey) return null;
-  if (!initialized) {
-    posthog.init(env.posthogKey, {
+// Loaded on first use so the analytics library stays out of the entry bundle.
+// Calls chain on one promise, so events still arrive in order.
+function withClient(use: (posthog: PostHog) => void): void {
+  if (!env.posthogKey) return;
+  loading ??= import('posthog-js').then(({ default: posthog }) => {
+    posthog.init(env.posthogKey!, {
       api_host: env.posthogHost,
       capture_pageview: false,
       autocapture: false,
       persistence: 'localStorage',
     });
-    initialized = true;
-  }
-  return posthog;
+    return posthog;
+  });
+  void loading.then(use, () => {});
 }
 
 export function track(
@@ -54,13 +56,13 @@ export function track(
   if (import.meta.env.DEV) {
     console.debug(`[telemetry] ${event}`, props);
   }
-  client()?.capture(event, props);
+  withClient((posthog) => posthog.capture(event, props));
 }
 
 export function identify(userId: string): void {
-  client()?.identify(userId);
+  withClient((posthog) => posthog.identify(userId));
 }
 
 export function resetIdentity(): void {
-  client()?.reset();
+  withClient((posthog) => posthog.reset());
 }
