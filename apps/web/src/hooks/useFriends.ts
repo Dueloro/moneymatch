@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { track } from '../lib/telemetry';
 
 export interface FriendItem {
@@ -16,11 +17,6 @@ export interface FriendsResponse {
   friends: FriendItem[];
   incoming: FriendItem[];
   outgoing: FriendItem[];
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
 }
 
 export function useFriends() {

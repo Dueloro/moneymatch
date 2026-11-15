@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { track } from '../lib/telemetry';
 
 export interface ChallengeView {
@@ -47,11 +48,6 @@ export interface CreateChallengeVars {
   market?: string;
   speed?: string;
   entry_preset_cents?: number;
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
 }
 
 function useInvalidate() {

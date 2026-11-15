@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import type { SpeedClock } from '../lib/timeControl';
 import { toast } from '../lib/toast';
 
@@ -125,11 +126,6 @@ export interface WaitingRow {
 /** Derived "You'd win" figure: entry × 2 × (1 − rake). */
 export function prizeForEntry(entryCents: number, multiplierBps: number): number {
   return Math.floor((entryCents * multiplierBps) / 10000);
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
 }
 
 export function useMarkets(game: string | undefined) {

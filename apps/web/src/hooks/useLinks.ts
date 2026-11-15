@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { setLinkReturnTo } from '../lib/linkReturnTo';
 
 export interface FormatStat {
@@ -56,11 +57,6 @@ export function useLinks() {
       return data as LinksResponse;
     },
   });
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
 }
 
 function useLinksInvalidation() {

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { track } from '../lib/telemetry';
 import { useNotifications } from './useNotifications';
 
@@ -57,11 +58,6 @@ export interface ConversationsResponse {
 export interface Thread {
   conversation: Conversation;
   messages: ChatMessage[];
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
 }
 
 function useChatKeys() {
