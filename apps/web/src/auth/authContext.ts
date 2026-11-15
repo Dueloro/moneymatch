@@ -11,8 +11,6 @@ export interface AuthContextValue {
   ) => Promise<{ needsVerification: boolean }>;
   resendVerification: (email: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  sendLoginCode: (email: string) => Promise<void>;
-  verifyLoginCode: (email: string, token: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   setNewPassword: (password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;

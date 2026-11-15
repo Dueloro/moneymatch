@@ -13,8 +13,6 @@ const auth = vi.hoisted(() => ({
   signUp: vi.fn(),
   resend: vi.fn(),
   signInWithPassword: vi.fn(),
-  signInWithOtp: vi.fn(),
-  verifyOtp: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   updateUser: vi.fn(),
   signInWithOAuth: vi.fn(),
@@ -62,29 +60,6 @@ describe('AuthProvider email methods', () => {
       options: { emailRedirectTo: `${window.location.origin}/signin` },
     });
     expect(auth.signUp).not.toHaveBeenCalled();
-  });
-
-  it('sendLoginCode requests an OTP without creating a user', async () => {
-    auth.signInWithOtp.mockResolvedValue({ error: null });
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    await act(async () => result.current.sendLoginCode('a@b.com'));
-    expect(auth.signInWithOtp).toHaveBeenCalledWith({
-      email: 'a@b.com',
-      options: { shouldCreateUser: false },
-    });
-  });
-
-  it('verifyLoginCode verifies the emailed token', async () => {
-    auth.verifyOtp.mockResolvedValue({ error: null });
-    const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    await act(async () => result.current.verifyLoginCode('a@b.com', '123456'));
-    expect(auth.verifyOtp).toHaveBeenCalledWith({
-      email: 'a@b.com',
-      token: '123456',
-      type: 'email',
-    });
   });
 
   it('asks Google to show the account chooser', async () => {

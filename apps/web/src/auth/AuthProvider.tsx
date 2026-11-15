@@ -86,21 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
-      sendLoginCode: async (email: string) => {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { shouldCreateUser: false },
-        });
-        if (error) throw error;
-      },
-      verifyLoginCode: async (email: string, token: string) => {
-        const { error } = await supabase.auth.verifyOtp({
-          email,
-          token,
-          type: 'email',
-        });
-        if (error) throw error;
-      },
       sendPasswordReset: async (email: string) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/signin`,
