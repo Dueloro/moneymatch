@@ -145,6 +145,24 @@ async def test_refresh_updates_snapshot(client):
     assert _game(r.json(), CHESS)["profile"]["formats"][0]["rating"] == 2850
 
 
+@respx.mock
+async def test_refresh_maps_any_host_failure_to_502(client):
+    respx.get(f"{LI}/magnus").mock(
+        return_value=httpx.Response(200, json=_lichess_user())
+    )
+    _lichess_games()
+    await client.post(
+        "/api/v1/links",
+        json={"game": CHESS, "username": "magnus"},
+        headers=auth_headers("refresh403"),
+    )
+    respx.get(f"{LI}/magnus").mock(return_value=httpx.Response(403))
+    r = await client.get(
+        f"/api/v1/links/{CHESS}/profile", headers=auth_headers("refresh403")
+    )
+    assert r.status_code == 502 and r.json()["code"] == "host_unavailable"
+
+
 async def test_disabled_flag_blocks_and_marks_blocked(client, session):
     await session.execute(
         text("UPDATE feature_flags SET enabled = false WHERE key = :k"),

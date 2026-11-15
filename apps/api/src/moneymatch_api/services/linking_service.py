@@ -178,7 +178,7 @@ async def refresh(session: AsyncSession, user: User, game: str) -> LinkedAccount
     adapter = registry.get(game)
     try:
         profile = await adapter.fetch_profile(link.host_account_id)
-    except HostUnavailable as exc:
+    except HostError as exc:
         raise LinkError(
             "host_unavailable",
             "The game's servers are unavailable right now — try again shortly.",
