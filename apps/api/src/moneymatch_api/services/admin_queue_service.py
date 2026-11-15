@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..models.play import QueueTicket
 
 
@@ -33,7 +34,7 @@ class QueueStats:
 async def queue_stats(
     session: AsyncSession, *, now: datetime | None = None
 ) -> QueueStats:
-    now = now or datetime.now(UTC)
+    now = now or clock.now()
     stats = QueueStats()
 
     by_state = await session.execute(

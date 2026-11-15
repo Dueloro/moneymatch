@@ -5,11 +5,10 @@ ledger trail.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ... import clock
 from ...constants import WORKER_HEARTBEAT_STALE_SECONDS
 from ...db.session import get_session
 from ...dependencies import AdminUser
@@ -33,7 +32,7 @@ async def reconciliation(
     heartbeat = await feature_flags.get_worker_heartbeat(session)
     stale = True
     if heartbeat is not None:
-        age = (datetime.now(UTC) - heartbeat).total_seconds()
+        age = (clock.now() - heartbeat).total_seconds()
         stale = age > WORKER_HEARTBEAT_STALE_SECONDS
 
     return ReconciliationResponse(

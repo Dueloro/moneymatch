@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     PAIR_RAKE_CONTESTS_PER_DAY,
     PAIR_RAKE_CONTESTS_PER_WEEK,
@@ -109,7 +110,7 @@ async def detect_pair_cap_breaches(
     """Flag pairs whose rake-bearing contest count strictly *exceeds* the pair cap in
     the daily or weekly window.
     """
-    now = now or datetime.now(UTC)
+    now = now or clock.now()
     day_since = now - timedelta(days=1)
     week_since = now - timedelta(days=7)
 

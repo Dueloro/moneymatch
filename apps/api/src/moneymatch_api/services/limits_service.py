@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..caps import CAPS
 from ..errors import APIError
 from ..kyc import KycAction, enforce_kyc
@@ -54,7 +55,7 @@ async def get_or_create_limits(session: AsyncSession, user_id: uuid.UUID) -> Lim
 
 def promote_pending(limit: Limit, *, now: datetime | None = None) -> Limit:
     """Apply a due cap raise into the live caps (lazy promotion on read)."""
-    now = now or datetime.now(UTC)
+    now = now or clock.now()
     if (
         limit.pending_limits
         and limit.pending_effective_at is not None
@@ -81,7 +82,7 @@ async def request_limit_change(
     """Apply limit edits: lowering (more protective) is instant; raising a cap is
     staged behind a 24 h cooldown (`pending_limits` + `pending_effective_at`).
     """
-    now = now or datetime.now(UTC)
+    now = now or clock.now()
     limit = await get_or_create_limits(session, user_id)
     promote_pending(limit, now=now)
 
@@ -121,7 +122,7 @@ async def request_limit_change(
 async def daily_usage(
     session: AsyncSession, wallet: Wallet, *, now: datetime | None = None
 ) -> DailyUsage:
-    now = now or datetime.now(UTC)
+    now = now or clock.now()
     since = now - WINDOW
 
     entry = await session.scalar(
@@ -174,7 +175,7 @@ async def assert_can_deposit(
     """Raise `StakeBlockedError` if `amount_cents` would breach the trailing-24 h
     deposit cap — the responsible-gaming guard on funding velocity.
     """
-    now = now or datetime.now(UTC)
+    now = now or clock.now()
     if amount_cents <= 0:
         raise StakeBlockedError("invalid_amount", "Amount must be positive.")
 
@@ -264,7 +265,7 @@ async def assert_can_stake(
     limit = await get_or_create_limits(session, user.id)
     promote_pending(limit, now=now)
 
-    _now = now or datetime.now(UTC)
+    _now = now or clock.now()
     if limit.timeout_until is not None and limit.timeout_until > _now:
         raise StakeBlockedError(
             "account_timeout",

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..db.session import get_session
 from ..dependencies import CurrentUser
 from ..errors import APIError
@@ -120,7 +121,7 @@ async def update_me(
         or body.cooloff_days is not None
     ):
         timeout_until = (
-            datetime.now(UTC) + timedelta(days=body.cooloff_days)
+            clock.now() + timedelta(days=body.cooloff_days)
             if body.cooloff_days is not None
             else None
         )

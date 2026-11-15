@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -13,6 +12,7 @@ from sqlalchemy import event, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from .. import clock
 from ..db.session import get_sessionmaker
 from ..models.notification import Notification
 from . import email_service, push_service
@@ -192,7 +192,7 @@ async def mark_read(
     if ids is not None:
         conds.append(Notification.id.in_(ids))
     await session.execute(
-        update(Notification).where(*conds).values(read_at=datetime.now(UTC))
+        update(Notification).where(*conds).values(read_at=clock.now())
     )
     await session.flush()
     return await unread_count(session, user_id)

@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 
 import structlog
 
+from .. import clock
 from ..config import get_settings
 from ..models.user import User
 from . import email_service, support_mail
@@ -112,7 +113,7 @@ def notify(
     """Queue an alert for a committed user message in their support thread."""
     if not email_service.is_enabled() or not get_settings().support_email:
         return
-    line = _Line(at=at or datetime.now(UTC), text=text)
+    line = _Line(at=at or clock.now(), text=text)
     thread = _threads.get(conversation_id)
     if thread is not None:
         thread.lines.append(line)
