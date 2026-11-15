@@ -72,22 +72,26 @@ async def test_file_dispute_and_dedupe(session, client):
     await session.commit()
 
     r = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "My last round wasn't counted."},
+        f"{V1}/disputes",
+        json={
+            "ref_type": "match",
+            "ref_id": str(match.id),
+            "reason": "My last round wasn't counted.",
+        },
         headers=auth_headers("auth_da"),
     )
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "open"
 
     r2 = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "again"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "again"},
         headers=auth_headers("auth_da"),
     )
     assert r2.status_code == 409 and r2.json()["code"] == "already_disputed"
 
     r3 = await client.get(
-        f"{V1}/play/matches/{match.id}/dispute", headers=auth_headers("auth_da")
+        f"{V1}/disputes/match/{match.id}", headers=auth_headers("auth_da")
     )
     assert r3.status_code == 200 and r3.json()["status"] == "open"
 
@@ -100,8 +104,8 @@ async def test_non_participant_cannot_dispute(session, client):
     await session.commit()
 
     r = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "not mine"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "not mine"},
         headers=auth_headers("auth_de"),
     )
     assert r.status_code == 403
@@ -114,8 +118,8 @@ async def test_cannot_dispute_unsettled(session, client):
     await session.commit()
 
     r = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "too early"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "too early"},
         headers=auth_headers("auth_df"),
     )
     assert r.status_code == 409 and r.json()["code"] == "not_disputable"
@@ -129,8 +133,8 @@ async def test_admin_resolves_and_notifies(session, client):
     await session.commit()
 
     await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "regrade please"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "regrade please"},
         headers=auth_headers("auth_dh"),
     )
     lst = await client.get(f"{V1}/admin/disputes", headers=auth_headers("auth_admin_d"))

@@ -48,7 +48,3 @@ class DemoDepositRequest(BaseModel):
         ...,
         description=f"One of the presets: {list(DEMO_DEPOSIT_PRESETS_CENTS)}",
     )
-
-
-class DemoWithdrawalRequest(BaseModel):
-    amount_cents: int = Field(..., gt=0, description="Cents; must be ≤ available")

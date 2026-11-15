@@ -101,29 +101,6 @@ class MatchView(BaseModel):
     live: dict | None = None
 
 
-class GradingExplanation(BaseModel):
-    """ "Why this result" — the transparent grading record for a contest the viewer
-    was in: the rule, what each side produced, and the decision.
-    """
-
-    match_id: UUID
-    state: str
-    settled: bool
-    result: str
-    market_label: str
-    rule: str
-    engine_version: str | None
-    resolved_at: datetime | None
-    winner_username: str | None
-    your_stat_line: dict | None
-    opponent_stat_line: dict | None
-    outcome_detail: dict | None
-
-
-class FileDisputeRequest(BaseModel):
-    reason: str = Field(..., min_length=1, max_length=1000)
-
-
 class ContestRequest(BaseModel):
     """File a dispute against any contest type (match | pool | tournament)."""
 
