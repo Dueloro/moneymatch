@@ -75,6 +75,23 @@ async def test_direct_challenge_and_accept(client):
     assert r.json()["state"] == "PENDING"
 
 
+async def test_invite_rejects_an_unoffered_time_control(client):
+    await _onboard(client, "auth_a", "alice")
+
+    r = await client.post(
+        f"{V1}/challenges",
+        headers=auth_headers("auth_a"),
+        json={
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "ultrabullet",
+            "entry_preset_cents": 1000,
+        },
+    )
+    assert r.status_code == 422
+    assert r.json()["code"] == "invalid_speed"
+
+
 async def test_invite_link_preview_is_public_and_acceptable(client):
     await _onboard(client, "auth_a", "alice")
 

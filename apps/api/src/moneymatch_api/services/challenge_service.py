@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import clock
 from ..constants import (
     CHALLENGE_TTL_SECONDS,
+    CHESS_CLOCKS,
     ENTRY_PRESETS_CENTS,
     PAIR_RAKE_CONTESTS_PER_DAY,
     PAIR_RAKE_CONTESTS_PER_WEEK,
@@ -94,6 +95,13 @@ def _resolve_market(game: str, market_key: str, speed: str | None) -> MarketDef:
     if market.requires_speed and not speed:
         raise ChallengeError(
             "speed_required", "This market needs a time control.", status_code=422
+        )
+    if market.requires_speed and speed not in CHESS_CLOCKS:
+        raise ChallengeError(
+            "invalid_speed",
+            "That time control isn't offered.",
+            status_code=422,
+            detail={"allowed": list(CHESS_CLOCKS)},
         )
     return market
 

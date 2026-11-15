@@ -140,6 +140,13 @@ async def test_queue_rejects_non_preset_entry(client):
     assert r.json()["code"] == "invalid_entry"
 
 
+async def test_queue_rejects_an_unoffered_time_control(client):
+    await setup_player(client, "auth_t2", "t2")
+    r = await _queue(client, "auth_t2", speed="ultrabullet")
+    assert r.status_code == 422
+    assert r.json()["code"] == "invalid_speed"
+
+
 async def test_there_is_no_settle_endpoint(client):
     await setup_player(client, "auth_ns", "ns")
     r = await client.post(
