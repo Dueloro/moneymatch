@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 import { messageOf } from '../lib/apiError';
+import { queuePollMs, useStreamConnected } from '../lib/streamStatus';
 import type { SpeedClock } from '../lib/timeControl';
 import { toast } from '../lib/toast';
 
@@ -147,10 +148,11 @@ export const TERMINAL_MATCH_STATES = new Set(['SETTLED', 'PUSHED', 'CANCELED']);
 
 export function useQueueStatus() {
   const { session } = useAuth();
+  const live = useStreamConnected();
   return useQuery({
     queryKey: ['queue-status', session?.user.id],
     enabled: !!session,
-    refetchInterval: 2000,
+    refetchInterval: (query) => queuePollMs(query.state.data?.status, live),
     queryFn: async (): Promise<QueueStatus> => {
       const { data, error } = await api.GET('/api/v1/play/queue/status');
       if (error) throw new Error('Failed to load queue status');
