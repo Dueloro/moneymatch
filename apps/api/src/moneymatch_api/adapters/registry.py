@@ -10,8 +10,6 @@ _ADAPTERS: dict[str, GameAdapter] = {
     ChessLichessAdapter.id: ChessLichessAdapter(),
 }
 
-DEFAULT_GAME = ChessLichessAdapter.id
-
 
 def get(game_id: str) -> GameAdapter:
     """Resolve the adapter for a game id, or raise `ValueError` if unregistered."""

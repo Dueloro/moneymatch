@@ -1,4 +1,4 @@
-"""Elo expectancy + chess bracket labels."""
+"""Elo expectancy and per-speed rating."""
 
 from __future__ import annotations
 
@@ -34,15 +34,3 @@ def test_rating_for_speed_prefers_exact_then_most_played_then_default():
     assert skill_rating.rating_for_speed(p, "blitz") == 1600
     assert skill_rating.rating_for_speed(p, "bullet") in (1600, 1700)
     assert skill_rating.rating_for_speed(_profile(), "blitz") == 1500
-
-
-def test_make_bracket_labels_even_and_lopsided():
-    assert skill_rating.make_bracket(1500, 1500).label == "Even match"
-    assert skill_rating.make_bracket(1900, 1400).label == "You're favored"
-    assert skill_rating.make_bracket(1400, 1900).label == "Reach"
-
-
-def test_make_bracket_band_and_quality():
-    b = skill_rating.make_bracket(1500, 1500, band=100)
-    assert (b.band_low, b.band_high) == (1400, 1600)
-    assert b.match_quality == 1.0

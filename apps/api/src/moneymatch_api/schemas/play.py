@@ -1,6 +1,5 @@
-"""`Bracket` and `Forecast` are the honest, no-odds pairing disclosures shown on the
-matched card ("Even duel — model gives you 52%"), the P2P analog of rake
-disclosure.
+"""`Forecast` is the honest, no-odds pairing disclosure shown on the matched card
+("Even duel — model gives you 52%"), the P2P analog of rake disclosure.
 """
 
 from __future__ import annotations
@@ -9,16 +8,6 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-
-
-class Bracket(BaseModel):
-    """How fair a chess pairing is, for honest pre-match disclosure (Elo-based)."""
-
-    your_rating: int
-    band_low: int
-    band_high: int
-    match_quality: float
-    label: str
 
 
 class Forecast(BaseModel):

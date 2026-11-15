@@ -1,14 +1,9 @@
-"""Elo skill rating + bracketing for chess head-to-head. Rake is not here anymore:
-it's config on each `MarketDef` (`services/markets.py`) computed in integer basis
-points (`services/money_math`).
-"""
+"""Elo skill rating for chess head-to-head."""
 
 from __future__ import annotations
 
 import math
 
-from ..constants import CHESS_BASE_BAND
-from ..schemas.play import Bracket
 from ..schemas.profile import ProfileSnapshot
 
 _REFERENCE_RATING = 1500
@@ -26,30 +21,3 @@ def rating_for_speed(profile: ProfileSnapshot, speed: str | None) -> int:
 
 def win_expectancy(your_rating: int, opp_rating: int) -> float:
     return 1.0 / (1.0 + math.pow(10, (opp_rating - your_rating) / 400))
-
-
-def make_bracket(
-    your_rating: int, opp_rating: int, band: int = CHESS_BASE_BAND
-) -> Bracket:
-    """Describe how fair a pairing is, for honest pre-match disclosure."""
-    expe = win_expectancy(your_rating, opp_rating)
-    quality = round(1.0 - 2.0 * abs(expe - 0.5), 2)
-
-    if expe >= 0.62:
-        label = "You're favored"
-    elif expe >= 0.55:
-        label = "Slight edge to you"
-    elif expe <= 0.38:
-        label = "Reach"
-    elif expe <= 0.45:
-        label = "Slight underdog"
-    else:
-        label = "Even match"
-
-    return Bracket(
-        your_rating=your_rating,
-        band_low=your_rating - band,
-        band_high=your_rating + band,
-        match_quality=quality,
-        label=label,
-    )
