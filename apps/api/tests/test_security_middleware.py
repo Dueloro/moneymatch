@@ -94,4 +94,3 @@ async def test_rate_limit_buckets_are_dropped_when_the_window_rolls(
     while not isinstance(node, security.RateLimitMiddleware):
         node = node.app
     assert len(node._buckets) == 1
-

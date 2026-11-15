@@ -30,6 +30,36 @@ async def test_defaults_created_and_stake_allowed(session):
     assert limit.max_concurrent_contests == 3
 
 
+async def test_losing_the_create_race_keeps_the_callers_pending_work(
+    session, monkeypatch
+):
+    user = await create_user(session)
+    await create_limit(session, user)
+    user.status = "frozen"
+    await session.flush()
+
+    real_execute = session.execute
+    calls = 0
+
+    class _Miss:
+        def scalar_one_or_none(self):
+            return None
+
+    async def stale_first_read(statement, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        result = await real_execute(statement, *args, **kwargs)
+        return _Miss() if calls == 1 else result
+
+    monkeypatch.setattr(session, "execute", stale_first_read)
+    limit = await ls.get_or_create_limits(session, user.id)
+    monkeypatch.undo()
+
+    assert limit.user_id == user.id
+    await session.refresh(user)
+    assert user.status == "frozen"
+
+
 async def test_insufficient_funds_blocks(session):
     user = await create_user(session)
     await create_wallet(session, user, available_cents=5_00)

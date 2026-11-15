@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..caps import CAPS
@@ -38,18 +38,17 @@ class DailyUsage:
 
 
 async def get_or_create_limits(session: AsyncSession, user_id: uuid.UUID) -> Limit:
-    result = await session.execute(select(Limit).where(Limit.user_id == user_id))
-    limit = result.scalar_one_or_none()
-    if limit is not None:
-        return limit
-    limit = Limit(user_id=user_id)
-    session.add(limit)
-    try:
-        await session.flush()
-    except IntegrityError:
-        await session.rollback()
-        result = await session.execute(select(Limit).where(Limit.user_id == user_id))
-        limit = result.scalar_one()
+    stmt = select(Limit).where(Limit.user_id == user_id)
+    limit = (await session.execute(stmt)).scalar_one_or_none()
+    if limit is None:
+        # A concurrent request may insert first. The no-op conflict leaves this
+        # transaction, and whatever the caller already did in it, intact.
+        await session.execute(
+            pg_insert(Limit)
+            .values(user_id=user_id)
+            .on_conflict_do_nothing(index_elements=[Limit.user_id])
+        )
+        limit = (await session.execute(stmt)).scalar_one()
     return limit
 
 
