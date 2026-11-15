@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 
 export interface FlagItem {
   key: string;
@@ -112,7 +113,7 @@ export function useReplyToSupport() {
           body: { body: input.body },
         },
       );
-      if (error) throw new Error('Reply failed');
+      if (error) throw new Error(messageOf(error, 'Reply failed'));
       return data as AdminSupportDetail;
     },
     onSuccess: (data) => {
@@ -134,7 +135,7 @@ export function useUpdateFlag() {
         params: { path: { key: input.key } },
         body: { enabled: input.enabled ?? null, payload: input.payload ?? null },
       });
-      if (error) throw new Error('Failed to update flag');
+      if (error) throw new Error(messageOf(error, 'Failed to update flag'));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'flags'] }),
   });
@@ -183,7 +184,7 @@ export function useFreezeUser(userId: string | null) {
       const { error } = freeze
         ? await api.POST('/api/v1/admin/users/{user_id}/freeze', params)
         : await api.POST('/api/v1/admin/users/{user_id}/unfreeze', params);
-      if (error) throw new Error('Action failed');
+      if (error) throw new Error(messageOf(error, 'Action failed'));
     },
     onSuccess: refresh,
   });
@@ -200,7 +201,7 @@ export function useAdjustUser(userId: string | null) {
         params: { path: { user_id: userId! } },
         body: input,
       });
-      if (error) throw new Error('Adjustment failed');
+      if (error) throw new Error(messageOf(error, 'Adjustment failed'));
     },
     onSuccess: refresh,
   });
@@ -241,7 +242,7 @@ export function useResettleMatch() {
       const { error } = await api.POST('/api/v1/admin/matches/{match_id}/resettle', {
         params: { path: { match_id: matchId } },
       });
-      if (error) throw new Error('Resettle failed');
+      if (error) throw new Error(messageOf(error, 'Resettle failed'));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   });
@@ -255,7 +256,7 @@ export function useVoidMatch() {
         params: { path: { match_id: input.matchId } },
         body: { reason: input.reason },
       });
-      if (error) throw new Error('Void failed');
+      if (error) throw new Error(messageOf(error, 'Void failed'));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
   });
@@ -302,7 +303,7 @@ export function useClearFlag() {
       const { error } = await api.POST('/api/v1/admin/risk/flags/{flag_id}/clear', {
         params: { path: { flag_id: flagId } },
       });
-      if (error) throw new Error('Clear failed');
+      if (error) throw new Error(messageOf(error, 'Clear failed'));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'risk'] }),
   });
@@ -344,7 +345,7 @@ export function useResolveDispute() {
         params: { path: { dispute_id: input.dispute_id } },
         body: { status: input.status, note: input.note ?? null },
       });
-      if (error) throw new Error('Resolve failed');
+      if (error) throw new Error(messageOf(error, 'Resolve failed'));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'disputes'] }),
   });
