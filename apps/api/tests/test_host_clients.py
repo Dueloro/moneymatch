@@ -105,8 +105,17 @@ async def test_lichess_get_user_closed_account_is_none():
 
 
 @respx.mock
-async def test_lichess_games_fail_soft_on_outage():
+async def test_lichess_games_outage_raises_so_it_cannot_read_as_no_games():
     respx.get(url__regex=r"https://lichess\.org/api/games/user/.*").mock(
-        return_value=httpx.Response(500)
+        return_value=httpx.Response(429)
     )
-    assert await lichess.get_user_games("magnus", 0) == []
+    with pytest.raises(HostUnavailable):
+        await lichess.get_user_games("magnus", 0)
+
+
+@respx.mock
+async def test_lichess_games_missing_account_is_empty():
+    respx.get(url__regex=r"https://lichess\.org/api/games/user/.*").mock(
+        return_value=httpx.Response(404)
+    )
+    assert await lichess.get_user_games("ghost", 0) == []

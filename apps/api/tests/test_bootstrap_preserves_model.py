@@ -13,6 +13,7 @@ from moneymatch_api.adapters.base import NormGame
 from moneymatch_api.constants import GAME_CHESS_LICHESS
 from moneymatch_api.models.skill import MetricModel
 from moneymatch_api.services import metric_models_service
+from moneymatch_api.services.hosts.errors import HostUnavailable
 
 from .factories import chess_profile, create_linked_account, create_user
 
@@ -97,3 +98,21 @@ async def test_first_bootstrap_with_no_history_still_creates_a_model(
 
     model = await _model(session, user)
     assert model is not None and model.n == 0
+
+
+class _DownAdapter:
+    async def poll_eligible_games(self, _host_account_id, _since_ms, _filters):
+        raise HostUnavailable("lichess", "down")
+
+
+async def test_a_raised_host_outage_keeps_the_model_and_does_not_propagate(
+    session, monkeypatch
+):
+    user = await _linked_user(session, "outage_raises")
+    monkeypatch.setattr(registry, "get", lambda _g: _FakeAdapter([32.0] * 50))
+    await metric_models_service.bootstrap(session, user.id, GAME_CHESS_LICHESS, HOST)
+
+    monkeypatch.setattr(registry, "get", lambda _g: _DownAdapter())
+    await metric_models_service.bootstrap(session, user.id, GAME_CHESS_LICHESS, HOST)
+
+    assert (await _model(session, user)).n == 50

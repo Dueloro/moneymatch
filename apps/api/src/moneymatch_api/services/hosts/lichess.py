@@ -48,7 +48,10 @@ async def get_user_games(
     max_games: int = 50,
     rated_only: bool = True,
 ) -> list[dict]:
-    """Fetch a user's games since ``since_ms`` (epoch ms), newest first."""
+    """Fetch a user's games since ``since_ms`` (epoch ms), newest first. A missing
+    account is empty; an outage or rate limit raises, so callers can tell "played
+    nothing" from "could not read".
+    """
     params = {
         "since": str(int(since_ms)),
         "max": str(max_games),
@@ -71,7 +74,7 @@ async def get_user_games(
             params=params,
             timeout_s=12.0,
         )
-    except HostError:
+    except HostNotFound:
         return []
     return _parse_ndjson(response.text)
 

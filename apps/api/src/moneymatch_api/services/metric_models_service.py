@@ -16,6 +16,7 @@ from ..constants import (
     rated_only_game,
 )
 from ..models.skill import MetricModel
+from .hosts.errors import HostError
 
 _BOOTSTRAP_MATCH_LIMIT = 50
 
@@ -85,11 +86,15 @@ async def bootstrap(
         return []
 
     adapter = registry.get(game)
-    games: list[NormGame] = await adapter.poll_eligible_games(
-        host_account_id,
-        0,
-        GameFilters(rated_only=rated_only_game(game)),
-    )
+    games: list[NormGame]
+    try:
+        games = await adapter.poll_eligible_games(
+            host_account_id,
+            0,
+            GameFilters(rated_only=rated_only_game(game)),
+        )
+    except HostError:
+        games = []  # no evidence: existing models stay as they are
     games = games[-_BOOTSTRAP_MATCH_LIMIT:]
 
     written: list[MetricModel] = []

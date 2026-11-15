@@ -5,9 +5,12 @@ refresh.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
+import respx
 from sqlalchemy import select, update
 
 from moneymatch_api.adapters import registry
@@ -18,6 +21,7 @@ from moneymatch_api.services import (
     live_activity_service,
     pool_engine,
     reconciliation_service,
+    telemetry_fetch,
     tournament_engine,
     wallet_service,
 )
@@ -369,3 +373,27 @@ async def test_tournament_standings_refresh_during_window(monkeypatch):
         rows = tournament.standings_cache["rows"]
         assert len(rows) == 10 and rows[0]["rank"] == 1
         assert rows[0]["score"] is not None
+
+
+@respx.mock
+async def test_host_outage_at_tournament_settlement_refunds_instead_of_forfeiting():
+    """Through the real adapter: a rate-limited games read is unverifiable (refund),
+    never an empty window (forfeit).
+    """
+    respx.get(url__regex=r"https://lichess\.org/api/games/user/.*").mock(
+        return_value=httpx.Response(429)
+    )
+    now = datetime.now(UTC)
+    tournament = Tournament(
+        game=CHESS,
+        ranking_metric=WINS,
+        window_starts_at=now - timedelta(hours=48),
+        window_ends_at=now,
+    )
+    entry = TournamentEntry(
+        id=uuid.uuid4(), user_id=uuid.uuid4(), host_account_id="rate_limited"
+    )
+
+    grades = await telemetry_fetch.grade_tournament(None, tournament, [entry])
+
+    assert grades[entry.id].values is None
