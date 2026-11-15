@@ -124,6 +124,51 @@ export function ProfilePage() {
 }
 
 function ChangePassword() {
+  const { session } = useAuth();
+  const providers = session?.user.app_metadata?.providers as string[] | undefined;
+  // A Google-only account has no current password to confirm.
+  if (providers && !providers.includes('email')) {
+    return <SetPasswordByEmail email={session?.user.email} />;
+  }
+  return <ChangePasswordForm />;
+}
+
+function SetPasswordByEmail({ email }: { email: string | undefined }) {
+  const { sendPasswordReset } = useAuth();
+  const [state, setState] = useState<'idle' | 'busy' | 'sent' | 'failed'>('idle');
+
+  const send = async () => {
+    if (!email) return;
+    setState('busy');
+    try {
+      await sendPasswordReset(email);
+      setState('sent');
+    } catch {
+      setState('failed');
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-text-secondary">You sign in with Google.</p>
+      <PillButton
+        variant="outline"
+        onClick={() => void send()}
+        disabled={!email || state === 'busy'}
+      >
+        Set a password by email
+      </PillButton>
+      {state === 'sent' && (
+        <p className="text-xs text-live">Check your email for a link to set one.</p>
+      )}
+      {state === 'failed' && (
+        <p className="text-xs text-red">Could not send the email. Try again.</p>
+      )}
+    </div>
+  );
+}
+
+function ChangePasswordForm() {
   const { verifyCurrentPassword, changePassword } = useAuth();
   const [step, setStep] = useState<'closed' | 'current' | 'new'>('closed');
 
@@ -261,7 +306,7 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   const [entry, setEntry] = useState('');
   const [deposit, setDeposit] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<'no' | 'now' | 'later'>('no');
 
   useEffect(() => {
     setLoss(formatPointsValue(limits.daily_loss_cap_cents));
@@ -291,7 +336,11 @@ function LimitsEditor({ limits }: { limits: Limits }) {
   const save = () => {
     if (!valid || !changed) return;
     setError(null);
-    setSaved(false);
+    setSaved('no');
+    const raised =
+      lossCents > limits.daily_loss_cap_cents ||
+      entryCents > limits.daily_entry_cap_cents ||
+      depositCents > limits.daily_deposit_cap_cents;
     update.mutate(
       {
         daily_loss_cap_cents: lossCents,
@@ -299,7 +348,17 @@ function LimitsEditor({ limits }: { limits: Limits }) {
         daily_deposit_cap_cents: depositCents,
       },
       {
-        onSuccess: () => setSaved(true),
+        onSuccess: () => {
+          // A raise stays pending, so the fields go back to the caps in force.
+          setLoss(formatPointsValue(Math.min(lossCents, limits.daily_loss_cap_cents)));
+          setEntry(
+            formatPointsValue(Math.min(entryCents, limits.daily_entry_cap_cents)),
+          );
+          setDeposit(
+            formatPointsValue(Math.min(depositCents, limits.daily_deposit_cap_cents)),
+          );
+          setSaved(raised ? 'later' : 'now');
+        },
         onError: () => setError('Could not update your limits. Try again.'),
       },
     );
@@ -341,8 +400,12 @@ function LimitsEditor({ limits }: { limits: Limits }) {
         >
           {update.isPending ? 'Saving…' : 'Save limits'}
         </PillButton>
-        {saved && !changed && (
-          <span className="text-sm text-text-secondary">Saved.</span>
+        {saved !== 'no' && !changed && (
+          <span className="text-sm text-text-secondary">
+            {saved === 'later'
+              ? 'Saved. Increases take effect after 24 hours.'
+              : 'Saved.'}
+          </span>
         )}
         {error && <span className="text-sm text-red">{error}</span>}
       </div>

@@ -9,7 +9,12 @@ vi.mock('../auth/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('../hooks/useMe', async () => {
   const actual =
     await vi.importActual<typeof import('../hooks/useMe')>('../hooks/useMe');
-  return { ...actual, useMe: vi.fn(), useSelfExclude: vi.fn() };
+  return {
+    ...actual,
+    useMe: vi.fn(),
+    useSelfExclude: vi.fn(),
+    useUpdateLimits: vi.fn(),
+  };
 });
 
 vi.mock('../hooks/useLinks', async () => {
@@ -24,7 +29,7 @@ vi.mock('../hooks/useLinks', async () => {
 });
 
 import { useAuth } from '../auth/useAuth';
-import { useMe, useSelfExclude } from '../hooks/useMe';
+import { useMe, useSelfExclude, useUpdateLimits } from '../hooks/useMe';
 import {
   useConnectLichess,
   useLinks,
@@ -36,6 +41,8 @@ const connectMutate = vi.fn();
 const selfExcludeMutate = vi.fn();
 const verifyCurrentPassword = vi.fn();
 const changePassword = vi.fn();
+const sendPasswordReset = vi.fn();
+const updateLimits = vi.fn();
 
 function gameLink(over: Partial<GameLink>): GameLink {
   return {
@@ -92,6 +99,10 @@ describe('ProfilePage', () => {
         },
       },
     } as unknown as ReturnType<typeof useMe>);
+    vi.mocked(useUpdateLimits).mockReturnValue({
+      mutate: updateLimits,
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateLimits>);
     vi.mocked(useSelfExclude).mockReturnValue({
       mutate: selfExcludeMutate,
       isPending: false,
@@ -186,5 +197,46 @@ describe('ProfilePage', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
     expect(changePassword).toHaveBeenCalledWith('newpass1');
+  });
+
+  it('offers a Google-only account a set-password email instead of the current-password step', async () => {
+    sendPasswordReset.mockResolvedValue(undefined);
+    vi.mocked(useAuth).mockReturnValue({
+      signOut: vi.fn(),
+      verifyCurrentPassword,
+      changePassword,
+      sendPasswordReset,
+      session: {
+        user: { email: 'g@example.com', app_metadata: { providers: ['google'] } },
+      },
+    } as unknown as ReturnType<typeof useAuth>);
+    renderWithProviders(<ProfilePage />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Change password' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Set a password by email' }));
+    expect(sendPasswordReset).toHaveBeenCalledWith('g@example.com');
+    expect(await screen.findByText(/Check your email/)).toBeInTheDocument();
+  });
+
+  it('confirms a raised limit and says when it starts', () => {
+    updateLimits.mockImplementation((_caps, opts) => opts.onSuccess());
+    renderWithProviders(<ProfilePage />);
+
+    fireEvent.change(screen.getByDisplayValue('20,000'), {
+      target: { value: '30000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save limits' }));
+
+    expect(updateLimits).toHaveBeenCalledWith(
+      expect.objectContaining({ daily_loss_cap_cents: 30_000 }),
+      expect.anything(),
+    );
+    expect(
+      screen.getByText(/Increases take effect after 24 hours/),
+    ).toBeInTheDocument();
+    expect(screen.getByDisplayValue('20,000')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save limits' })).toBeDisabled();
   });
 });
