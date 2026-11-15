@@ -306,3 +306,37 @@ async def test_friendly_count_excludes_friendlies(session, monkeypatch):
         )
     await session.flush()
     assert await challenge_service.pair_over_cap(session, a.id, b.id) is False
+
+
+async def test_geo_blocked_resident_cannot_send_a_challenge(session):
+    a, b = await _pair(session)
+    a.residence_state = "FL"
+    with pytest.raises(APIError) as exc:
+        await challenge_service.create_direct(
+            session,
+            a,
+            challengee_id=b.id,
+            game=CHESS,
+            market_key=MARKET,
+            speed=SPEED,
+            entry_cents=ENTRY,
+        )
+    assert exc.value.code == "region_blocked"
+
+
+async def test_geo_blocked_resident_cannot_accept_a_challenge(session):
+    a, b = await _pair(session)
+    ch = await challenge_service.create_direct(
+        session,
+        a,
+        challengee_id=b.id,
+        game=CHESS,
+        market_key=MARKET,
+        speed=SPEED,
+        entry_cents=ENTRY,
+    )
+    b.residence_state = "FL"
+    with pytest.raises(APIError) as exc:
+        await challenge_service.accept_direct(session, b, ch.id)
+    assert exc.value.code == "region_blocked"
+    assert ch.state == "sent" and ch.match_id is None

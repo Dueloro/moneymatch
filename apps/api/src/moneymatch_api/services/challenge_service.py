@@ -28,6 +28,7 @@ from ..models.user import User
 from . import (
     chat_service,
     friends_service,
+    geo_service,
     linking_service,
     matchmaking,
     notifications_service,
@@ -139,6 +140,7 @@ async def _require_challenger_ready(
             f"Account is {challenger.status}; play is disabled.",
             status_code=409,
         )
+    await geo_service.assert_can_enter(session, challenger.residence_state)
     await _assert_game_enabled(session, game)
     link = await _link_for(session, challenger.id, game)
     if link is None or link.status != "active":
@@ -348,6 +350,7 @@ async def _accept(
             f"Account is {challengee.status}; play is disabled.",
             status_code=409,
         )
+    await geo_service.assert_can_enter(session, challengee.residence_state)
     await _assert_game_enabled(session, challenge.game)
 
     challengee_link = await _link_for(session, challengee.id, challenge.game)

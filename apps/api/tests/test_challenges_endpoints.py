@@ -25,6 +25,7 @@ async def _onboard(client, auth_id, name, *, link=True):
     async with sm() as s:
         user = await s.scalar(select(User).where(User.auth_id == auth_id))
         user.username = name
+        user.residence_state = "MA"
         if link:
             await create_linked_account(s, user, CHESS, host_account_id=f"host_{name}")
         await s.commit()

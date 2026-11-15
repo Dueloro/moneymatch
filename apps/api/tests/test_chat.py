@@ -25,6 +25,7 @@ async def _onboard(client, auth_id: str, name: str) -> str:
     async with sm() as s:
         user = await s.scalar(select(User).where(User.auth_id == auth_id))
         user.username = name
+        user.residence_state = "MA"
         linked = await s.scalar(
             select(LinkedAccount).where(
                 LinkedAccount.user_id == user.id, LinkedAccount.game == GAME
