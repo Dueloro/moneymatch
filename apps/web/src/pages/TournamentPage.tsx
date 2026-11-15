@@ -150,7 +150,7 @@ export function TournamentPage() {
                     payoutFor={(entry) => firstPlace(entry * fieldSize)}
                     payoutLabel="1st place if full"
                     // Rake is taken off the full pot before the top places
-                    // split it (money_math.split_by_weights).
+                    // split it (money_math.split_weighted).
                     feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
                     buttonLabel="Join tournament"
                     disabled={busy}
