@@ -123,6 +123,9 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
             )
         await session.commit()
     yield
+    from moneymatch_api.services import notifications_service
+
+    await notifications_service.drain()
 
 
 @pytest.fixture(autouse=True)

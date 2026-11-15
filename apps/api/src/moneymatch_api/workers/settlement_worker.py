@@ -37,6 +37,7 @@ from ..services import (
     match_lifecycle,
     matchmaking,
     metric_models_service,
+    notifications_service,
     pool_engine,
     raw_payload_service,
     telemetry_fetch,
@@ -633,6 +634,7 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
             await maybe_run_nightly(sm)
         except Exception:  # noqa: BLE001 — never let the loop die on one bad cycle
             log.exception("settlement_worker.cycle_failed")
+        await notifications_service.drain()
         await asyncio.sleep(interval)
 
 
