@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from moneymatch_api.models.admin_audit import AdminAudit
 from moneymatch_api.models.user import User
-from moneymatch_api.services import wallet_service
+from moneymatch_api.services import admin_service, wallet_service
 
 from . import factories
 from .conftest import auth_headers, new_sessionmaker
@@ -58,6 +58,15 @@ async def test_search_and_detail(client):
     assert body["limits"]["max_concurrent_contests"] == 3
     assert body["linked_accounts"] == []
     assert body["contests"] == []
+
+
+async def test_search_with_a_query_is_still_capped(session):
+    for i in range(3):
+        await factories.create_user(session, username=f"capped_{i}")
+
+    found = await admin_service.search_users(session, "capped_", limit=2)
+
+    assert len(found) == 2
 
 
 async def test_freeze_unfreeze_audited(client):
