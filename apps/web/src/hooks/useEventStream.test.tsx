@@ -65,6 +65,7 @@ describe('useEventStream', () => {
     es.emit(JSON.stringify({ user_id: 'u1', kind: 'settled' }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['activity'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['pool-status'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['tournament-status'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['wallet'] });
   });
 

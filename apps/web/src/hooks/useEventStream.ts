@@ -8,6 +8,7 @@ import { env } from '../lib/env';
 const REFRESH_KEYS = [
   ['activity'],
   ['pool-status'],
+  ['tournament-status'],
   ['queue-status'],
   ['waiting'],
   ['wallet'],
