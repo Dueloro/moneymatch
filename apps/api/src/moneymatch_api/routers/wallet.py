@@ -53,7 +53,7 @@ def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
         ) from exc
 
 
-async def _page(
+async def ledger_page(
     session: AsyncSession, wallet_id: UUID, cursor: str | None, size: int
 ) -> tuple[list[LedgerEntry], str | None]:
     """One descending page of ledger rows, newest first, plus the next cursor."""
@@ -78,7 +78,7 @@ async def get_wallet(
     user: CurrentUser, session: AsyncSession = Depends(get_session)
 ) -> WalletResponse:
     wallet = await wallet_service.get_wallet(session, user.id)
-    recent, _ = await _page(session, wallet.id, cursor=None, size=RECENT_SIZE)
+    recent, _ = await ledger_page(session, wallet.id, cursor=None, size=RECENT_SIZE)
     return WalletResponse(
         currency=wallet.currency,
         available_cents=wallet.available_cents,
@@ -95,7 +95,7 @@ async def get_ledger(
     session: AsyncSession = Depends(get_session),
 ) -> WalletLedgerPage:
     wallet = await wallet_service.get_wallet(session, user.id)
-    rows, next_cursor = await _page(session, wallet.id, cursor, size=PAGE_SIZE)
+    rows, next_cursor = await ledger_page(session, wallet.id, cursor, size=PAGE_SIZE)
     return WalletLedgerPage(
         entries=[LedgerEntryResponse.model_validate(r) for r in rows],
         next_cursor=next_cursor,

@@ -18,7 +18,7 @@ log = structlog.get_logger(__name__)
 
 _DEFAULT_LIMIT = 50
 
-_EVENTS_CHANNEL = "moneymatch_events"
+EVENTS_CHANNEL = "moneymatch_events"
 
 # Kinds absent here (refund / system) stay in-app only.
 _PUSH_COPY: dict[str, tuple[str, str, str]] = {
@@ -83,7 +83,7 @@ async def emit(
     await session.execute(
         text("SELECT pg_notify(:channel, :payload)"),
         {
-            "channel": _EVENTS_CHANNEL,
+            "channel": EVENTS_CHANNEL,
             "payload": json.dumps({"user_id": str(user_id), "kind": kind}),
         },
     )

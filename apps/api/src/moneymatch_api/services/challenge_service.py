@@ -44,7 +44,7 @@ class ChallengeError(APIError):
     """A challenge-flow failure (RFC-7807 via APIError)."""
 
 
-async def _pair_rake_count(
+async def pair_rake_count(
     session: AsyncSession, a: uuid.UUID, b: uuid.UUID, since: datetime
 ) -> int:
     """Rake-bearing (non-friendly, non-canceled) matches between two users since a
@@ -77,10 +77,10 @@ async def pair_over_cap(
     friendly).
     """
     now = now or clock.now()
-    day = await _pair_rake_count(session, a, b, now - timedelta(days=1))
+    day = await pair_rake_count(session, a, b, now - timedelta(days=1))
     if day >= PAIR_RAKE_CONTESTS_PER_DAY:
         return True
-    week = await _pair_rake_count(session, a, b, now - timedelta(days=7))
+    week = await pair_rake_count(session, a, b, now - timedelta(days=7))
     return week >= PAIR_RAKE_CONTESTS_PER_WEEK
 
 

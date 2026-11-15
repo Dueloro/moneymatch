@@ -5,18 +5,14 @@ unfreeze, force-unbind a linked account, manual ledger adjustment.
 
 from __future__ import annotations
 
-import base64
-import binascii
-from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, tuple_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.session import get_session
 from ...dependencies import AdminUser
-from ...errors import APIError
 from ...models.linked_account import LinkedAccount
 from ...models.wallet import LedgerEntry, Limit
 from ...schemas.admin import (
@@ -32,6 +28,7 @@ from ...schemas.admin import (
 )
 from ...schemas.wallet import LedgerEntryResponse
 from ...services import admin_audit_service, admin_service, wallet_service
+from ..wallet import ledger_page
 
 router = APIRouter(tags=["admin"])
 
@@ -211,36 +208,8 @@ async def user_ledger(
     wallet = await wallet_service.get_wallet_or_none(session, user)
     if wallet is None:
         return AdminLedgerPage(entries=[], next_cursor=None)
-    stmt = (
-        select(LedgerEntry)
-        .where(LedgerEntry.wallet_id == wallet.id)
-        .order_by(LedgerEntry.created_at.desc(), LedgerEntry.id.desc())
-        .limit(PAGE_SIZE + 1)
-    )
-    if cursor:
-        ts, last_id = _decode_cursor(cursor)
-        stmt = stmt.where(
-            tuple_(LedgerEntry.created_at, LedgerEntry.id) < (ts, last_id)
-        )
-    rows = list(await session.scalars(stmt))
-    next_cursor = _encode_cursor(rows[PAGE_SIZE - 1]) if len(rows) > PAGE_SIZE else None
+    rows, next_cursor = await ledger_page(session, wallet.id, cursor, PAGE_SIZE)
     return AdminLedgerPage(
-        entries=[LedgerEntryResponse.model_validate(r) for r in rows[:PAGE_SIZE]],
+        entries=[LedgerEntryResponse.model_validate(r) for r in rows],
         next_cursor=next_cursor,
     )
-
-
-def _encode_cursor(entry: LedgerEntry) -> str:
-    raw = f"{entry.created_at.isoformat()}|{entry.id}"
-    return base64.urlsafe_b64encode(raw.encode()).decode()
-
-
-def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode()).decode()
-        ts_str, id_str = raw.split("|", 1)
-        return datetime.fromisoformat(ts_str), UUID(id_str)
-    except (ValueError, binascii.Error) as exc:
-        raise APIError(
-            "invalid_cursor", "Malformed pagination cursor.", status_code=422
-        ) from exc

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +15,15 @@ from ..models.wallet import SIGNUP_GRANT_CENTS, SIGNUP_GRANT_MEMO, Limit, Wallet
 from . import wallet_service
 
 _FRIEND_CODE_ATTEMPTS = 5
+
+
+async def usernames_by_id(
+    session: AsyncSession, ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    if not ids:
+        return {}
+    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
+    return {user_id: username for user_id, username in rows}
 
 
 async def get_or_create_user(session: AsyncSession, identity: AuthedIdentity) -> User:

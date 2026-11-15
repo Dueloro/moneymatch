@@ -16,12 +16,12 @@ from fastapi.responses import StreamingResponse
 from ..config import get_settings
 from ..dependencies import CurrentUser
 from ..errors import APIError
+from ..services.notifications_service import EVENTS_CHANNEL
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["events"])
 
-_CHANNEL = "moneymatch_events"
 _HEARTBEAT_SECONDS = 15
 _TICKET_TTL_SECONDS = 30
 
@@ -72,7 +72,7 @@ async def stream(request: Request, ticket: str = Query(...)) -> StreamingRespons
         def _on_notify(_conn: object, _pid: int, _channel: str, payload: str) -> None:
             queue.put_nowait(payload)
 
-        await conn.add_listener(_CHANNEL, _on_notify)
+        await conn.add_listener(EVENTS_CHANNEL, _on_notify)
         try:
             yield ": connected\n\n"
             while True:
@@ -94,7 +94,7 @@ async def stream(request: Request, ticket: str = Query(...)) -> StreamingRespons
                 yield f"data: {payload}\n\n"
         finally:
             try:
-                await conn.remove_listener(_CHANNEL, _on_notify)
+                await conn.remove_listener(EVENTS_CHANNEL, _on_notify)
             finally:
                 await conn.close()
 

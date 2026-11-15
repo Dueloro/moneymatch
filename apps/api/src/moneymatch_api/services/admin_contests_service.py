@@ -19,6 +19,7 @@ from ..models.user import User
 from ..models.wallet import LedgerEntry, PlatformLedgerEntry, Wallet
 from . import match_lifecycle, reconciliation_service
 from .match_states import is_terminal
+from .user_service import usernames_by_id
 
 REF_TYPES = ("match", "solo_pool", "tournament")
 
@@ -164,15 +165,6 @@ async def list_contests(
     return rows[:limit]
 
 
-async def _usernames(
-    session: AsyncSession, ids: list[uuid.UUID]
-) -> dict[uuid.UUID, str | None]:
-    if not ids:
-        return {}
-    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
-    return {uid: name for uid, name in rows}
-
-
 async def _money_trail(
     session: AsyncSession, ref_type: str, ref_id: uuid.UUID
 ) -> tuple[list[dict], list[dict]]:
@@ -253,7 +245,7 @@ async def _match_detail(session: AsyncSession, match_id: uuid.UUID) -> ContestDe
             select(MatchPlayer).where(MatchPlayer.match_id == match_id)
         )
     )
-    names = await _usernames(session, [s.user_id for s in seats])
+    names = await usernames_by_id(session, [s.user_id for s in seats])
     participants = [
         {
             "user_id": str(s.user_id),
@@ -291,7 +283,7 @@ async def _pool_detail(session: AsyncSession, pool_id: uuid.UUID) -> ContestDeta
     entries = list(
         await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool_id))
     )
-    names = await _usernames(session, [e.user_id for e in entries])
+    names = await usernames_by_id(session, [e.user_id for e in entries])
     participants = [
         {
             "user_id": str(e.user_id),
@@ -332,7 +324,7 @@ async def _tournament_detail(session: AsyncSession, tid: uuid.UUID) -> ContestDe
             select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
         )
     )
-    names = await _usernames(session, [e.user_id for e in entries])
+    names = await usernames_by_id(session, [e.user_id for e in entries])
     participants = [
         {
             "user_id": str(e.user_id),

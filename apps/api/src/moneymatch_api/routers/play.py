@@ -50,6 +50,7 @@ from ..services.markets import for_game as markets_for_game
 from ..services.markets import get as get_market
 from ..services.match_lifecycle import cancel_pending, confirm, players
 from ..services.match_states import is_terminal
+from ..services.user_service import usernames_by_id
 
 router = APIRouter(prefix="/play", tags=["play"])
 
@@ -90,16 +91,9 @@ async def _live_view(session: AsyncSession, match: Match, user: User) -> dict | 
     return live_activity_service.view_for("match", row.data, user.id, board=True)
 
 
-async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
-    if not ids:
-        return {}
-    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
-    return {uid: uname for uid, uname in rows}
-
-
 async def _match_view(session: AsyncSession, match: Match, user: User) -> MatchView:
     seats = await players(session, match.id)
-    names = await _usernames(session, [s.user_id for s in seats])
+    names = await usernames_by_id(session, [s.user_id for s in seats])
     market = get_market(match.game, match.market)
 
     your_seat: MatchPlayer | None = None
@@ -311,7 +305,7 @@ async def get_match_grading(
         raise APIError("not_a_player", "You are not in this match.", status_code=403)
     opp_seat = next((s for s in seats if s.user_id != user.id), None)
     market = get_market(match.game, match.market)
-    names = await _usernames(session, [s.user_id for s in seats])
+    names = await usernames_by_id(session, [s.user_id for s in seats])
 
     if match.state == "SETTLED":
         result = "you_won" if match.winner_user_id == user.id else "you_lost"
@@ -392,7 +386,7 @@ async def get_waiting(
     session: AsyncSession = Depends(get_session),
 ) -> WaitingResponse:
     tickets = await matchmaking.list_waiting(session, user, game=game)
-    names = await _usernames(session, [t.user_id for t in tickets])
+    names = await usernames_by_id(session, [t.user_id for t in tickets])
     now = clock.now()
     rows = []
     for t in tickets:
