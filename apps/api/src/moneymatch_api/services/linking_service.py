@@ -197,9 +197,9 @@ async def refresh(session: AsyncSession, user: User, game: str) -> LinkedAccount
 
 
 async def unlink(session: AsyncSession, user_id: uuid.UUID, game: str) -> None:
-    """Remove a binding."""
+    """Soft-unbind: past matches still point at the row, so it is never deleted."""
     link = await get_link(session, user_id, game)
     if link is None:
         raise LinkError("not_linked", f"No {game} account is linked.", status_code=404)
-    await session.delete(link)
+    link.status = "unbound"
     await session.flush()
