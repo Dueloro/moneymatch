@@ -57,11 +57,10 @@ async def search_users(
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserListResponse:
     users = await admin_service.search_users(session, q, limit=PAGE_SIZE)
-    out: list[AdminUserSummary] = []
-    for user in users:
-        wallet = await wallet_service.get_wallet_or_none(session, user.id)
-        out.append(_summary(user, wallet))
-    return AdminUserListResponse(users=out)
+    wallets = await wallet_service.wallets_by_user(session, [u.id for u in users])
+    return AdminUserListResponse(
+        users=[_summary(user, wallets.get(user.id)) for user in users]
+    )
 
 
 @router.get("/users/{user_id}", response_model=AdminUserDetail)

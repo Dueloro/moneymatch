@@ -65,17 +65,22 @@ async def list_threads(session: AsyncSession) -> list[SupportThreadSummary]:
             )
         ).all()
     )
-    summaries: list[SupportThreadSummary] = []
-    for conversation, user in rows:
-        last = await session.scalar(
+    # Latest text message per thread, in one query (DISTINCT ON).
+    latest = {
+        m.conversation_id: m
+        for m in await session.scalars(
             select(Message)
+            .distinct(Message.conversation_id)
             .where(
-                Message.conversation_id == conversation.id,
+                Message.conversation_id.in_([c.id for c, _ in rows]),
                 Message.kind == "text",
             )
-            .order_by(Message.created_at.desc())
-            .limit(1)
+            .order_by(Message.conversation_id, Message.created_at.desc())
         )
+    }
+    summaries: list[SupportThreadSummary] = []
+    for conversation, user in rows:
+        last = latest.get(conversation.id)
         summaries.append(
             SupportThreadSummary(
                 conversation_id=conversation.id,

@@ -72,6 +72,18 @@ async def get_wallet_or_none(
     )
 
 
+async def wallets_by_user(
+    session: AsyncSession, user_ids: list[uuid.UUID], *, currency: str = DEMO
+) -> dict[uuid.UUID, Wallet]:
+    """Wallets for many users in one query (admin lists)."""
+    if not user_ids:
+        return {}
+    rows = await session.scalars(
+        select(Wallet).where(Wallet.user_id.in_(user_ids), Wallet.currency == currency)
+    )
+    return {w.user_id: w for w in rows}
+
+
 async def lock_wallet(
     session: AsyncSession, user_id: uuid.UUID, *, currency: str = DEMO
 ) -> Wallet:
