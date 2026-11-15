@@ -299,7 +299,7 @@ function CredentialsForm({
 }
 
 function CheckEmailNotice({ email }: { email: string }) {
-  const { signUpWithEmail } = useAuth();
+  const { resendVerification } = useAuth();
   const [resent, setResent] = useState(false);
 
   return (
@@ -316,9 +316,9 @@ function CheckEmailNotice({ email }: { email: string }) {
           className="text-text-secondary underline hover:text-text"
           onClick={async () => {
             try {
-              await signUpWithEmail(email, crypto.randomUUID());
+              await resendVerification(email);
             } catch {
-              // already-registered / rate-limit are fine here.
+              // already-verified / rate-limit are fine here.
             }
             setResent(true);
           }}

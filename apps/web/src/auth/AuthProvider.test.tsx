@@ -11,6 +11,7 @@ const auth = vi.hoisted(() => ({
     data: { subscription: { unsubscribe: vi.fn() } },
   }),
   signUp: vi.fn(),
+  resend: vi.fn(),
   signInWithPassword: vi.fn(),
   signInWithOtp: vi.fn(),
   verifyOtp: vi.fn(),
@@ -48,6 +49,19 @@ describe('AuthProvider email methods', () => {
       options: { emailRedirectTo: `${window.location.origin}/signin` },
     });
     expect(out.needsVerification).toBe(true);
+  });
+
+  it('resendVerification resends the signup email without touching the password', async () => {
+    auth.resend.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.resendVerification('a@b.com'));
+    expect(auth.resend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'a@b.com',
+      options: { emailRedirectTo: `${window.location.origin}/signin` },
+    });
+    expect(auth.signUp).not.toHaveBeenCalled();
   });
 
   it('sendLoginCode requests an OTP without creating a user', async () => {

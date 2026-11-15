@@ -74,6 +74,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
         return { needsVerification: data.session === null };
       },
+      resendVerification: async (email: string) => {
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email,
+          options: { emailRedirectTo: `${window.location.origin}/signin` },
+        });
+        if (error) throw error;
+      },
       signInWithEmail: async (email: string, password: string) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
