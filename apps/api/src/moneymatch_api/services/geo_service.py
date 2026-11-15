@@ -20,7 +20,7 @@ class GeoFenceMisconfigured(RuntimeError):
 
 
 class RegionBlockedError(APIError):
-    """Residence state is geo-fenced out of real-money play (403)."""
+    """Residence state is geo-fenced out of all play, free play included (403)."""
 
     def __init__(self, state: str | None) -> None:
         super().__init__(

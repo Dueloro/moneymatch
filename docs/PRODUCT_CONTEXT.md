@@ -136,7 +136,7 @@ Rules for agents:
 - Money Match runs **skill contests, not gambling.** Players compete against each other, results come from the game itself, and we take a fixed fee without ever taking a side.
 - Cash play is legal in **about 37 U.S. states.** We **geofence** the rest.
 - **Identity is verified before real money goes live.**
-- Free play can be available everywhere. Never imply cash play is available in an ineligible state.
+- **All play is geofenced, free play included.** Residents of the 14 excluded states can sign up but cannot enter any match, pool or tournament. Never imply any play is available in an excluded state.
 
 ---
 

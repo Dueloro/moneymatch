@@ -517,7 +517,7 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
           label="State of residence"
           hint={
             isExcludedState(state)
-              ? `Staked matches aren't available in ${stateName(state)} yet. Free matches are.`
+              ? `Matches aren't available in ${stateName(state)} yet. You can still create an account.`
               : undefined
           }
         >

@@ -54,8 +54,8 @@ function EligibilityBanner() {
   return (
     <Card className="mb-6 px-4 py-3">
       <p className="text-sm text-text-secondary">
-        Staked matches aren't available in {stateName(state)} yet. You can play every
-        match for free until it is.
+        Matches aren't available in {stateName(state)} yet. You can still link Lichess,
+        add friends and look around.
       </p>
     </Card>
   );
