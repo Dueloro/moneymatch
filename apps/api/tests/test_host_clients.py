@@ -119,3 +119,26 @@ async def test_lichess_games_missing_account_is_empty():
         return_value=httpx.Response(404)
     )
     assert await lichess.get_user_games("ghost", 0) == []
+
+
+@respx.mock
+async def test_requests_share_one_http_client(monkeypatch):
+    from moneymatch_api.services.hosts import _client
+
+    await _client.aclose()
+    built = 0
+    real = httpx.AsyncClient
+
+    def counting(*args, **kwargs):
+        nonlocal built
+        built += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(_client.httpx, "AsyncClient", counting)
+    respx.get("https://api.example.com/z").mock(return_value=httpx.Response(200))
+
+    await request_json("example", "GET", "https://api.example.com/z")
+    await request_json("example", "GET", "https://api.example.com/z")
+    await _client.aclose()
+
+    assert built == 1

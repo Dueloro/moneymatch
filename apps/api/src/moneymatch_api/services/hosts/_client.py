@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -27,6 +28,26 @@ def _slow_host_ms() -> int:
     from ...config import get_settings
 
     return get_settings().slow_host_ms
+
+
+_shared: tuple[asyncio.AbstractEventLoop, httpx.AsyncClient] | None = None
+
+
+def _http() -> httpx.AsyncClient:
+    """One pooled client per event loop, so calls reuse the TLS connection."""
+    global _shared
+    loop = asyncio.get_running_loop()
+    if _shared is None or _shared[0] is not loop or _shared[1].is_closed:
+        _shared = (loop, httpx.AsyncClient())
+    return _shared[1]
+
+
+async def aclose() -> None:
+    global _shared
+    if _shared is not None:
+        shared, _shared = _shared, None
+        if shared[0] is asyncio.get_running_loop():
+            await shared[1].aclose()
 
 
 async def request_json(
@@ -55,10 +76,14 @@ async def request_json(
             started = time.perf_counter()
             status_code: int | None = None
             try:
-                async with httpx.AsyncClient(headers=headers) as client:
-                    response = await client.request(
-                        method, url, params=params, data=data, timeout=timeout_s
-                    )
+                response = await _http().request(
+                    method,
+                    url,
+                    headers=headers,
+                    params=params,
+                    data=data,
+                    timeout=timeout_s,
+                )
                 status_code = response.status_code
             except httpx.HTTPError as exc:
                 raise HostUnavailable(host, f"request failed: {exc}") from exc
