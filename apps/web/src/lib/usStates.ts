@@ -52,27 +52,6 @@ export const US_STATES: { code: string; name: string }[] = [
   { code: 'WY', name: 'Wyoming' },
 ];
 
-export const EXCLUDED_STATES = new Set([
-  'AZ',
-  'AR',
-  'CT',
-  'DE',
-  'FL',
-  'IN',
-  'LA',
-  'MD',
-  'MN',
-  'MT',
-  'SC',
-  'SD',
-  'TN',
-  'WY',
-]);
-
-export function isExcludedState(code: string | null | undefined): boolean {
-  return !!code && EXCLUDED_STATES.has(code);
-}
-
 export function stateName(code: string | null | undefined): string {
   if (!code) return '';
   return US_STATES.find((s) => s.code === code)?.name ?? code;

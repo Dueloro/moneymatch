@@ -4,8 +4,9 @@ import { useEventStream } from '../hooks/useEventStream';
 import { ConnectPrompt } from './ConnectPrompt';
 import { SettlementCelebration } from './SettlementCelebration';
 import { SettlementProvider } from './SettlementProvider';
+import { useIsExcludedState } from '../hooks/useConfig';
 import { useMe } from '../hooks/useMe';
-import { isExcludedState, stateName } from '../lib/usStates';
+import { stateName } from '../lib/usStates';
 import { SideRail } from './rail/SideRail';
 import { Card } from './ui/Card';
 import { MobileTabBar, MobileTopBar } from './ui/MobileNav';
@@ -49,7 +50,8 @@ export function AppShell() {
 function EligibilityBanner() {
   const me = useMe();
   const state = me.data?.user.residence_state;
-  if (!isExcludedState(state)) return null;
+  const excluded = useIsExcludedState(state);
+  if (!excluded) return null;
 
   return (
     <Card className="mb-6 px-4 py-3">

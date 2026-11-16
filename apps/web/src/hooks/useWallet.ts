@@ -36,8 +36,6 @@ interface LedgerPage {
   next_cursor: string | null;
 }
 
-export const DEPOSIT_PRESETS_CENTS = [1000, 2500, 5000, 10000] as const;
-
 const walletKey = (userId?: string) => ['wallet', userId];
 
 export function useWallet() {

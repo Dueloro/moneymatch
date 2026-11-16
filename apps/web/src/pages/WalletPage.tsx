@@ -8,12 +8,12 @@ import { ExpandableCard } from '../components/ui/ExpandableCard';
 import { PillButton } from '../components/ui/PillButton';
 import { PresetSelector } from '../components/ui/PresetSelector';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { useConfig } from '../hooks/useConfig';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Skeleton, SkeletonList } from '../components/ui/Skeleton';
 import { formatPoints, formatRelativeTime } from '../lib/format';
 import { ledgerLabel } from '../lib/labels';
 import {
-  DEPOSIT_PRESETS_CENTS,
   usePlayMoneyDeposit,
   useWallet,
   useWalletLedger,
@@ -36,6 +36,7 @@ export function WalletPage() {
   const ledger = useWalletLedger();
   const deposit = usePlayMoneyDeposit();
   const [pick, setPick] = useState<number | null>(null);
+  const presets = useConfig().data?.deposit_presets_cents ?? [];
 
   const available = wallet?.available_cents ?? 0;
   const escrow = wallet?.escrow_cents ?? 0;
@@ -95,7 +96,7 @@ export function WalletPage() {
               data-testid="deposit-presets"
             >
               <PresetSelector
-                presetsCents={DEPOSIT_PRESETS_CENTS}
+                presetsCents={presets}
                 selectedCents={pick}
                 onSelect={(cents) => setPick(cents === pick ? null : cents)}
                 disabled={deposit.isPending}

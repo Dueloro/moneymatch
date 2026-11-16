@@ -11,6 +11,7 @@ import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
 import { ListRow } from '../components/ui/ListRow';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { useConfig } from '../hooks/useConfig';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
@@ -34,6 +35,7 @@ export function TournamentPage() {
     refetch: refetchMarkets,
   } = useTournamentMarkets();
   const { data: status } = useTournamentStatus();
+  const rakeBps = useConfig().data?.rake_bps;
   const enter = useEnterTournament();
 
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
@@ -80,7 +82,9 @@ export function TournamentPage() {
   const split = markets?.prize_split ?? [];
   const splitTotal = split.reduce((a, b) => a + b, 0);
   const firstPlace = (pot: number) =>
-    splitTotal > 0 ? Math.floor(((pot - rakeOnPot(pot)) * split[0]) / splitTotal) : 0;
+    splitTotal > 0
+      ? Math.floor(((pot - rakeOnPot(pot, rakeBps ?? 0)) * split[0]) / splitTotal)
+      : 0;
 
   const filteredMetrics = openMetrics.filter(
     (m) => metricFilter === ALL || m.metric === metricFilter,
@@ -122,7 +126,7 @@ export function TournamentPage() {
         Tournaments
       </SectionHeader>
 
-      {marketsLoading ? (
+      {marketsLoading || rakeBps == null ? (
         <SkeletonList rows={3} />
       ) : openMetrics.length === 0 ? (
         <EmptyState
@@ -151,7 +155,9 @@ export function TournamentPage() {
                     payoutLabel="1st place if full"
                     // Rake is taken off the full pot before the top places
                     // split it (money_math.split_weighted).
-                    feeNote={(entry) => platformFeeNote(rakeOnPot(entry * fieldSize))}
+                    feeNote={(entry) =>
+                      platformFeeNote(rakeOnPot(entry * fieldSize, rakeBps ?? 0))
+                    }
                     buttonLabel="Join tournament"
                     disabled={busy}
                     joining={enter.isPending}

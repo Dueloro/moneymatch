@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Client Config */
+        get: operations["client_config_api_v1_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -1877,6 +1894,15 @@ export interface components {
             /** Unread Total */
             unread_total: number;
         };
+        /** ClientConfig */
+        ClientConfig: {
+            /** Excluded States */
+            excluded_states: string[];
+            /** Rake Bps */
+            rake_bps: number;
+            /** Deposit Presets Cents */
+            deposit_presets_cents: number[];
+        };
         /**
          * ContestRequest
          * @description File a dispute against any contest type (match | pool | tournament).
@@ -3297,6 +3323,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    client_config_api_v1_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientConfig"];
                 };
             };
         };

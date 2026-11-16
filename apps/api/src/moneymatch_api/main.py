@@ -20,6 +20,7 @@ from .routers import (
     admin,
     challenges,
     chat,
+    config,
     disputes,
     events,
     friends,
@@ -106,6 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_error_handlers(app)
 
     app.include_router(health.router, prefix=API_V1_PREFIX)
+    app.include_router(config.router, prefix=API_V1_PREFIX)
     app.include_router(me.router, prefix=API_V1_PREFIX)
     app.include_router(wallet.router, prefix=API_V1_PREFIX)
     app.include_router(links.router, prefix=API_V1_PREFIX)
