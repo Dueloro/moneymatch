@@ -72,22 +72,26 @@ async def test_file_dispute_and_dedupe(session, client):
     await session.commit()
 
     r = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "My last round wasn't counted."},
+        f"{V1}/disputes",
+        json={
+            "ref_type": "match",
+            "ref_id": str(match.id),
+            "reason": "My last round wasn't counted.",
+        },
         headers=auth_headers("auth_da"),
     )
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "open"
 
     r2 = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "again"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "again"},
         headers=auth_headers("auth_da"),
     )
     assert r2.status_code == 409 and r2.json()["code"] == "already_disputed"
 
     r3 = await client.get(
-        f"{V1}/play/matches/{match.id}/dispute", headers=auth_headers("auth_da")
+        f"{V1}/disputes/match/{match.id}", headers=auth_headers("auth_da")
     )
     assert r3.status_code == 200 and r3.json()["status"] == "open"
 
@@ -100,8 +104,8 @@ async def test_non_participant_cannot_dispute(session, client):
     await session.commit()
 
     r = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "not mine"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "not mine"},
         headers=auth_headers("auth_de"),
     )
     assert r.status_code == 403
@@ -114,8 +118,8 @@ async def test_cannot_dispute_unsettled(session, client):
     await session.commit()
 
     r = await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "too early"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "too early"},
         headers=auth_headers("auth_df"),
     )
     assert r.status_code == 409 and r.json()["code"] == "not_disputable"
@@ -129,8 +133,8 @@ async def test_admin_resolves_and_notifies(session, client):
     await session.commit()
 
     await client.post(
-        f"{V1}/play/matches/{match.id}/dispute",
-        json={"reason": "regrade please"},
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "regrade please"},
         headers=auth_headers("auth_dh"),
     )
     lst = await client.get(f"{V1}/admin/disputes", headers=auth_headers("auth_admin_d"))
@@ -266,3 +270,51 @@ async def test_file_tournament_dispute(session, client):
         f"{V1}/disputes/tournament/{t.id}", headers=auth_headers("auth_dta")
     )
     assert g.status_code == 200 and g.json()["status"] == "open"
+
+
+async def test_a_resolved_dispute_cannot_be_resolved_again(session, client):
+    a, la = await _user(session, "auth_dr1", "dr1")
+    b, lb = await _user(session, "auth_dr2", "dr2")
+    await _user(session, "auth_admin_r", "adminr", role="admin")
+    match = await _settled_match(session, [(a, la), (b, lb)], winner=b.id)
+    await session.commit()
+
+    filed = await client.post(
+        f"{V1}/disputes",
+        json={"ref_type": "match", "ref_id": str(match.id), "reason": "regrade"},
+        headers=auth_headers("auth_dr1"),
+    )
+    assert filed.status_code in (200, 201), filed.text
+    dispute = await session.scalar(select(Dispute).where(Dispute.ref_id == match.id))
+    url = f"{V1}/admin/disputes/{dispute.id}/resolve"
+    admin = auth_headers("auth_admin_r")
+
+    first = await client.post(url, json={"status": "resolved"}, headers=admin)
+    assert first.status_code == 200
+    again = await client.post(url, json={"status": "rejected"}, headers=admin)
+    assert again.status_code == 409 and again.json()["code"] == "already_resolved"
+
+    notes = list(
+        await session.scalars(
+            select(Notification).where(
+                Notification.user_id == a.id, Notification.kind == "dispute_resolved"
+            )
+        )
+    )
+    assert len(notes) == 1
+
+
+async def test_unlink_keeps_the_row_a_past_match_points_at(session):
+    from moneymatch_api.models.linked_account import LinkedAccount
+    from moneymatch_api.services import linking_service
+
+    a, la = await _user(session, "auth_ul1", "ul1")
+    b, lb = await _user(session, "auth_ul2", "ul2")
+    await _settled_match(session, [(a, la), (b, lb)], winner=b.id)
+    await session.flush()
+
+    await linking_service.unlink(session, a.id, CHESS)
+
+    assert await linking_service.get_link(session, a.id, CHESS) is None
+    kept = await session.get(LinkedAccount, la.id)
+    assert kept is not None and kept.status == "unbound"

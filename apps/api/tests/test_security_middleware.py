@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from moneymatch_api import security
 from moneymatch_api.config import get_settings
 from moneymatch_api.main import create_app
 
@@ -76,3 +77,20 @@ async def test_invalid_token_falls_back_to_ip(hardened_client: AsyncClient) -> N
         assert r.status_code != 429
     anon = await hardened_client.post("/api/v1/x", content=b"{}")
     assert anon.status_code == 429
+
+
+async def test_rate_limit_buckets_are_dropped_when_the_window_rolls(
+    hardened_client: AsyncClient, monkeypatch
+) -> None:
+    clock = {"now": 1_000_020.0}
+    monkeypatch.setattr(security.time, "time", lambda: clock["now"])
+    for i in range(5):
+        await hardened_client.post(f"/api/v1/thing/{i}", content=b"{}")
+
+    clock["now"] += security.RateLimitMiddleware.WINDOW_SECONDS
+    await hardened_client.post("/api/v1/thing/next", content=b"{}")
+
+    node = hardened_client._transport.app.middleware_stack
+    while not isinstance(node, security.RateLimitMiddleware):
+        node = node.app
+    assert len(node._buckets) == 1

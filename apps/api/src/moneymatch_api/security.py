@@ -70,7 +70,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.per_minute = per_minute
         self.settings = settings
-        self._buckets: dict[str, tuple[int, int]] = {}
+        # Every bucket shares one window, so the map is dropped whole when it rolls.
+        self._window = 0
+        self._buckets: dict[str, int] = {}
 
     def _client(self, request: Request) -> str:
         authorization = request.headers.get("authorization")
@@ -88,12 +90,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         now = int(time.time())
         window = now - (now % self.WINDOW_SECONDS)
+        if window != self._window:
+            self._window = window
+            self._buckets.clear()
         key = f"{self._client(request)}:{request.method}:{request.url.path}"
-        start, count = self._buckets.get(key, (window, 0))
-        if start != window:
-            start, count = window, 0
-        count += 1
-        self._buckets[key] = (start, count)
+        count = self._buckets.get(key, 0) + 1
+        self._buckets[key] = count
 
         if count > self.per_minute:
             resp = _error(429, "rate_limited", "Too many requests; slow down.")

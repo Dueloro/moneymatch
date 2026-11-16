@@ -35,22 +35,16 @@ from ..schemas.pools import (
 )
 from ..services import live_activity_service, money_math, pool_engine
 from ..services.pool_engine import PoolEnqueueResult
+from ..services.user_service import usernames_by_id
 
 router = APIRouter(prefix="/pools", tags=["pools"])
-
-
-async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
-    if not ids:
-        return {}
-    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
-    return {uid: uname for uid, uname in rows}
 
 
 async def _pool_view(session: AsyncSession, pool: SoloPool, user: User) -> PoolView:
     entries = list(
         await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool.id))
     )
-    names = await _usernames(session, [e.user_id for e in entries])
+    names = await usernames_by_id(session, [e.user_id for e in entries])
     your = next((e for e in entries if e.user_id == user.id), None)
     members = [
         PoolMemberView(

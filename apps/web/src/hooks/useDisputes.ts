@@ -1,20 +1,13 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { track } from '../lib/telemetry';
 
 export type ContestRefType = 'match' | 'pool' | 'tournament';
 
-export interface ContestVars {
-  ref_type: ContestRefType;
-  ref_id: string;
-  reason: string;
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
-}
+export type ContestVars = components['schemas']['ContestRequest'];
 
 export function useFileDispute() {
   const qc = useQueryClient();

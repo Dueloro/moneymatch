@@ -1,6 +1,5 @@
-"""`Bracket` and `Forecast` are the honest, no-odds pairing disclosures shown on the
-matched card ("Even duel — model gives you 52%"), the P2P analog of rake
-disclosure.
+"""`Forecast` is the honest, no-odds pairing disclosure shown on the matched card
+("Even duel — model gives you 52%"), the P2P analog of rake disclosure.
 """
 
 from __future__ import annotations
@@ -9,16 +8,6 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-
-
-class Bracket(BaseModel):
-    """How fair a chess pairing is, for honest pre-match disclosure (Elo-based)."""
-
-    your_rating: int
-    band_low: int
-    band_high: int
-    match_quality: float
-    label: str
 
 
 class Forecast(BaseModel):
@@ -110,29 +99,6 @@ class MatchView(BaseModel):
     # The viewer-oriented board (moves, clocks, turn, result); null when stale or
     # unavailable.
     live: dict | None = None
-
-
-class GradingExplanation(BaseModel):
-    """ "Why this result" — the transparent grading record for a contest the viewer
-    was in: the rule, what each side produced, and the decision.
-    """
-
-    match_id: UUID
-    state: str
-    settled: bool
-    result: str
-    market_label: str
-    rule: str
-    engine_version: str | None
-    resolved_at: datetime | None
-    winner_username: str | None
-    your_stat_line: dict | None
-    opponent_stat_line: dict | None
-    outcome_detail: dict | None
-
-
-class FileDisputeRequest(BaseModel):
-    reason: str = Field(..., min_length=1, max_length=1000)
 
 
 class ContestRequest(BaseModel):

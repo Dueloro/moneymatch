@@ -1,67 +1,20 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { CHESS } from '../lib/games';
 
-export interface TournamentMetric {
-  metric: string;
-  label: string;
-  provisional: boolean;
-}
+export type TournamentMetric = components['schemas']['TournamentMetric'];
 
-export interface TournamentMarkets {
-  game: string;
-  linked: boolean;
-  entry_presets_cents: number[];
-  prize_split: number[];
-  field_size: number;
-  metrics: TournamentMetric[];
-}
+export type TournamentMarkets = components['schemas']['TournamentMarketsResponse'];
 
-export interface StandingRow {
-  user_id: string;
-  username: string | null;
-  score: number | null;
-  matches: number;
-  rank: number | null;
-  is_you: boolean;
-  payout_cents: number;
-}
+export type StandingRow = components['schemas']['StandingRow'];
 
-export interface TournamentView {
-  id: string;
-  game: string;
-  metric: string;
-  metric_label: string;
-  entry_cents: number;
-  pot_cents: number;
-  prize_cents: number;
-  rake_cents: number;
-  prize_split: number[];
-  field_size: number;
-  state: string;
-  window_starts_at: string;
-  window_ends_at: string;
-  field_mu_low: number | null;
-  field_mu_high: number | null;
-  standings: StandingRow[];
-  your_rank: number | null;
-  your_payout_cents: number | null;
-  resolved_at: string | null;
-}
+export type TournamentView = components['schemas']['TournamentView'];
 
-export interface TournamentStatus {
-  status: 'idle' | 'searching' | 'formed';
-  tournament: TournamentView | null;
-  metric: string | null;
-  waited_seconds: number | null;
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
-}
+export type TournamentStatus = components['schemas']['TournamentStatusResponse'];
 
 export function useTournamentMarkets(game: string = CHESS) {
   const { session } = useAuth();
@@ -73,7 +26,7 @@ export function useTournamentMarkets(game: string = CHESS) {
         params: { query: { game } },
       });
       if (error) throw new Error('Failed to load tournament markets');
-      return data as TournamentMarkets;
+      return data;
     },
   });
 }
@@ -88,7 +41,7 @@ export function useTournamentStatus() {
     queryFn: async (): Promise<TournamentStatus> => {
       const { data, error } = await api.GET('/api/v1/tournaments/queue/status');
       if (error) throw new Error('Failed to load tournament status');
-      return data as TournamentStatus;
+      return data;
     },
   });
 }
@@ -114,7 +67,7 @@ export function useTournament(tournamentId: string | null) {
         params: { path: { tournament_id: tournamentId as string } },
       });
       if (error) throw new Error('Failed to load the tournament');
-      return data as TournamentView;
+      return data;
     },
   });
 }
@@ -131,7 +84,7 @@ export function useEnterTournament() {
         body: vars,
       });
       if (error) throw new Error(messageOf(error, 'Could not enter the tournament.'));
-      return data as TournamentStatus;
+      return data;
     },
     onSuccess: invalidate,
   });
@@ -143,7 +96,7 @@ export function useLeaveTournament() {
     mutationFn: async (): Promise<TournamentStatus> => {
       const { data, error } = await api.DELETE('/api/v1/tournaments/queue');
       if (error) throw new Error('Could not leave the tournament queue.');
-      return data as TournamentStatus;
+      return data;
     },
     onSuccess: invalidate,
   });

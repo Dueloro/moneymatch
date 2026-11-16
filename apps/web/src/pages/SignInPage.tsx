@@ -9,12 +9,13 @@ import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
 import { Loader } from '../components/ui/Loader';
 import { PillButton } from '../components/ui/PillButton';
 import { StepProgress } from '../components/ui/StepProgress';
+import { useIsExcludedState } from '../hooks/useConfig';
 import { useLinks } from '../hooks/useLinks';
 import { useMe } from '../hooks/useMe';
 import { api } from '../lib/api';
 import { clearReturnTo, peekReturnTo, takeReturnTo } from '../lib/returnTo';
 import { emailToUsername } from '../lib/usernameAuth';
-import { US_STATES, isExcludedState, stateName } from '../lib/usStates';
+import { US_STATES, stateName } from '../lib/usStates';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -299,7 +300,7 @@ function CredentialsForm({
 }
 
 function CheckEmailNotice({ email }: { email: string }) {
-  const { signUpWithEmail } = useAuth();
+  const { resendVerification } = useAuth();
   const [resent, setResent] = useState(false);
 
   return (
@@ -316,9 +317,9 @@ function CheckEmailNotice({ email }: { email: string }) {
           className="text-text-secondary underline hover:text-text"
           onClick={async () => {
             try {
-              await signUpWithEmail(email, crypto.randomUUID());
+              await resendVerification(email);
             } catch {
-              // already-registered / rate-limit are fine here.
+              // already-verified / rate-limit are fine here.
             }
             setResent(true);
           }}
@@ -456,6 +457,7 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
   const derived = emailToUsername(session?.user.email);
   const [username, setUsername] = useState(derived ?? '');
   const [state, setState] = useState('');
+  const excluded = useIsExcludedState(state);
   const [attested, setAttested] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -516,8 +518,8 @@ function OnboardingStep({ onDone }: { onDone: () => void }) {
         <Field
           label="State of residence"
           hint={
-            isExcludedState(state)
-              ? `Staked matches aren't available in ${stateName(state)} yet. Free matches are.`
+            excluded
+              ? `Matches aren't available in ${stateName(state)} yet. You can still create an account.`
               : undefined
           }
         >

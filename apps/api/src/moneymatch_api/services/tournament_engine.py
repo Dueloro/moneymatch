@@ -634,14 +634,6 @@ async def _cancel(
     return tournament
 
 
-async def cancel_tournament(
-    session: AsyncSession, tournament: Tournament, *, reason: str
-) -> Tournament:
-    if tournament.state in ("SETTLED", "CANCELED"):
-        return tournament
-    return await _cancel(session, tournament, reason=reason)
-
-
 async def _notify(
     session: AsyncSession,
     user_id: uuid.UUID,

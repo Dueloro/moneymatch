@@ -56,8 +56,6 @@ SIGNUP_GRANT_MEMO = "signup grant"
 
 DEMO_DEPOSIT_PRESETS_CENTS = (1_000, 2_500, 5_000, 10_000)
 
-DEMO_WITHDRAWAL_DAILY_LIMIT = 5
-
 
 class Wallet(Base, TimestampMixin):
     __tablename__ = "wallets"

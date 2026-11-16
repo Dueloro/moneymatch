@@ -25,6 +25,7 @@ async def _onboard(client, auth_id, name, *, link=True):
     async with sm() as s:
         user = await s.scalar(select(User).where(User.auth_id == auth_id))
         user.username = name
+        user.residence_state = "MA"
         if link:
             await create_linked_account(s, user, CHESS, host_account_id=f"host_{name}")
         await s.commit()
@@ -73,6 +74,23 @@ async def test_direct_challenge_and_accept(client):
     )
     assert r.status_code == 200
     assert r.json()["state"] == "PENDING"
+
+
+async def test_invite_rejects_an_unoffered_time_control(client):
+    await _onboard(client, "auth_a", "alice")
+
+    r = await client.post(
+        f"{V1}/challenges",
+        headers=auth_headers("auth_a"),
+        json={
+            "game": CHESS,
+            "market": "win_h2h",
+            "speed": "ultrabullet",
+            "entry_preset_cents": 1000,
+        },
+    )
+    assert r.status_code == 422
+    assert r.json()["code"] == "invalid_speed"
 
 
 async def test_invite_link_preview_is_public_and_acceptable(client):

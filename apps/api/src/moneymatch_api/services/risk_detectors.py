@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..constants import (
     PAIR_RAKE_CONTESTS_PER_DAY,
     PAIR_RAKE_CONTESTS_PER_WEEK,
@@ -15,6 +16,7 @@ from ..constants import (
 from ..models.play import Match, MatchPlayer
 from ..models.risk import RiskFlag
 from ..services.match_states import CANCELED, SETTLED
+from .challenge_service import pair_rake_count
 
 log = structlog.get_logger(__name__)
 
@@ -90,32 +92,6 @@ async def detect_win_streaks(session: AsyncSession) -> int:
     return written
 
 
-async def _pair_rake_count(
-    session: AsyncSession, a: uuid.UUID, b: uuid.UUID, since: datetime
-) -> int:
-    """Rake-bearing (non-friendly, non-canceled) matches between two users since a
-    cutoff.
-    """
-    p1 = MatchPlayer.__table__.alias("rp1")
-    p2 = MatchPlayer.__table__.alias("rp2")
-    stmt = (
-        select(func.count())
-        .select_from(
-            Match.__table__.join(p1, p1.c.match_id == Match.id).join(
-                p2, p2.c.match_id == Match.id
-            )
-        )
-        .where(
-            p1.c.user_id == a,
-            p2.c.user_id == b,
-            Match.friendly.is_(False),
-            Match.state != CANCELED,
-            Match.created_at >= since,
-        )
-    )
-    return int(await session.scalar(stmt) or 0)
-
-
 async def _has_open_pair_cap(session: AsyncSession, a: uuid.UUID, b: uuid.UUID) -> bool:
     existing = await session.scalar(
         select(RiskFlag.id).where(
@@ -134,7 +110,7 @@ async def detect_pair_cap_breaches(
     """Flag pairs whose rake-bearing contest count strictly *exceeds* the pair cap in
     the daily or weekly window.
     """
-    now = now or datetime.now(UTC)
+    now = now or clock.now()
     day_since = now - timedelta(days=1)
     week_since = now - timedelta(days=7)
 
@@ -159,8 +135,8 @@ async def detect_pair_cap_breaches(
     for a, b in pairs.all():
         if await _has_open_pair_cap(session, a, b):
             continue
-        day = await _pair_rake_count(session, a, b, day_since)
-        week = await _pair_rake_count(session, a, b, week_since)
+        day = await pair_rake_count(session, a, b, day_since)
+        week = await pair_rake_count(session, a, b, week_since)
         if day <= PAIR_RAKE_CONTESTS_PER_DAY and week <= PAIR_RAKE_CONTESTS_PER_WEEK:
             continue
         session.add(

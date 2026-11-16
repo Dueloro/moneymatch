@@ -5,12 +5,13 @@ a live Supabase project.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import jwt
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from .. import clock
 from ..config import Settings, get_settings
 from ..errors import APIError
 
@@ -45,7 +46,7 @@ async def mint_e2e_token(
             status_code=409,
         )
 
-    now = datetime.now(UTC)
+    now = clock.now()
     claims: dict[str, object] = {
         "sub": body.auth_id,
         "aud": settings.supabase_jwt_audience,

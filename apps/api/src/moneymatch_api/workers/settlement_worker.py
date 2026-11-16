@@ -30,7 +30,6 @@ from ..models.live import LiveSnapshot
 from ..models.play import Match, MatchPlayer
 from ..models.pools import SoloEntry, SoloPool
 from ..models.tournaments import Tournament, TournamentEntry
-from ..models.user import User
 from ..services import (
     challenge_service,
     grading,
@@ -38,6 +37,7 @@ from ..services import (
     match_lifecycle,
     matchmaking,
     metric_models_service,
+    notifications_service,
     pool_engine,
     raw_payload_service,
     telemetry_fetch,
@@ -52,6 +52,7 @@ from ..services.match_lifecycle import (
     SettlementResult,
 )
 from ..services.match_states import ACTIVE, AWAITING_RESULT, PENDING
+from ..services.user_service import usernames_by_id
 
 log = structlog.get_logger(__name__)
 
@@ -214,13 +215,7 @@ async def _process_due_matches(
                 await session.commit()
             except ReconciliationError as exc:
                 await session.rollback()
-                log.error(
-                    "settlement.reconciliation_breach",
-                    match_id=str(match_id),
-                    violations=exc.detail,
-                )
-                await _set_flag(sm, FLAG_SETTLEMENT_PAUSED, True)
-                report.paused = True
+                await _halt_on_breach(sm, report, "match", match_id, exc)
                 raise SettlementHalted from exc
             _tally(report, result)
             if result in ("settled", "pushed"):
@@ -437,7 +432,7 @@ async def _refresh_tournament_standings(
                     select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
                 )
             )
-            names = await _usernames(session, [e.user_id for e in entries])
+            names = await usernames_by_id(session, [e.user_id for e in entries])
             standings = await telemetry_fetch.live_standings(
                 session, tournament, entries, names
             )
@@ -537,15 +532,6 @@ async def _refresh_live_snapshots(
             await _upsert_live(session, "match", mid, match_snapshot, now)
             await session.commit()
             report.live_refreshed += 1
-
-
-async def _usernames(
-    session: AsyncSession, ids: list[uuid.UUID]
-) -> dict[uuid.UUID, str | None]:
-    if not ids:
-        return {}
-    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
-    return {uid: uname for uid, uname in rows}
 
 
 async def _halt_on_breach(
@@ -648,6 +634,7 @@ async def run_forever(interval: int = WORKER_POLL_INTERVAL_SECONDS) -> None:
             await maybe_run_nightly(sm)
         except Exception:  # noqa: BLE001 — never let the loop die on one bad cycle
             log.exception("settlement_worker.cycle_failed")
+        await notifications_service.drain()
         await asyncio.sleep(interval)
 
 

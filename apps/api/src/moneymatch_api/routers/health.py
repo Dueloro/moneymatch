@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import __version__
+from .. import __version__, clock
 from ..adapters import registry
 from ..config import get_settings
 from ..constants import WORKER_HEARTBEAT_STALE_SECONDS
@@ -27,7 +25,7 @@ async def health(session: AsyncSession = Depends(get_session)) -> HealthResponse
     stale = True
     if heartbeat is not None:
         stale = (
-            datetime.now(UTC) - heartbeat
+            clock.now() - heartbeat
         ).total_seconds() > WORKER_HEARTBEAT_STALE_SECONDS
     return HealthResponse(
         status="ok",

@@ -39,9 +39,8 @@ describe('SignInPage', () => {
       loading: false,
       isPasswordRecovery: false,
       signUpWithEmail: vi.fn(),
+      resendVerification: vi.fn(),
       signInWithEmail,
-      sendLoginCode: vi.fn(),
-      verifyLoginCode: vi.fn(),
       sendPasswordReset: vi.fn(),
       setNewPassword: vi.fn(),
       signInWithGoogle,
@@ -118,15 +117,15 @@ describe('SignInPage', () => {
 
   it('shows check-your-email after a signup that needs verification', async () => {
     const signUpWithEmail = vi.fn().mockResolvedValue({ needsVerification: true });
+    const resendVerification = vi.fn().mockResolvedValue(undefined);
     mockUseAuth.mockReturnValue({
       ...mockUseAuth.mock.results[0]?.value,
       session: null,
       loading: false,
       isPasswordRecovery: false,
       signUpWithEmail,
+      resendVerification,
       signInWithEmail,
-      sendLoginCode: vi.fn(),
-      verifyLoginCode: vi.fn(),
       sendPasswordReset: vi.fn(),
       setNewPassword: vi.fn(),
       signInWithGoogle,
@@ -141,6 +140,10 @@ describe('SignInPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Create account' }));
     expect(await screen.findByText(/check your email/i)).toBeInTheDocument();
     expect(screen.getByText(/new@example.com/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'resend it' }));
+    expect(resendVerification).toHaveBeenCalledWith('new@example.com');
+    expect(signUpWithEmail).toHaveBeenCalledTimes(1);
   });
 
   it('requests a password reset email', async () => {
@@ -150,9 +153,8 @@ describe('SignInPage', () => {
       loading: false,
       isPasswordRecovery: false,
       signUpWithEmail: vi.fn(),
+      resendVerification: vi.fn(),
       signInWithEmail,
-      sendLoginCode: vi.fn(),
-      verifyLoginCode: vi.fn(),
       sendPasswordReset,
       setNewPassword: vi.fn(),
       signInWithGoogle,
@@ -175,9 +177,8 @@ describe('SignInPage', () => {
       loading: false,
       isPasswordRecovery: true,
       signUpWithEmail: vi.fn(),
+      resendVerification: vi.fn(),
       signInWithEmail,
-      sendLoginCode: vi.fn(),
-      verifyLoginCode: vi.fn(),
       sendPasswordReset: vi.fn(),
       setNewPassword,
       signInWithGoogle,

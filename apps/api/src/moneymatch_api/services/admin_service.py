@@ -65,7 +65,7 @@ async def search_users(
     session: AsyncSession, q: str | None, *, limit: int = 50
 ) -> list[User]:
     """Find users by username / email / friend code (or id), for the users table."""
-    stmt = select(User).order_by(User.member_since.desc()).limit(limit)
+    stmt = select(User)
     if q:
         needle = q.strip()
         clauses: list[ColumnElement[bool]] = [
@@ -77,8 +77,10 @@ async def search_users(
             clauses.append(User.id == uuid.UUID(needle))
         except ValueError:
             pass
-        stmt = select(User).where(or_(*clauses)).order_by(User.member_since.desc())
-    return list(await session.scalars(stmt))
+        stmt = stmt.where(or_(*clauses))
+    return list(
+        await session.scalars(stmt.order_by(User.member_since.desc()).limit(limit))
+    )
 
 
 async def freeze(session: AsyncSession, user: User) -> User:

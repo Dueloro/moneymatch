@@ -130,9 +130,14 @@ function UserDetail({ userId }: { userId: string }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
         <button
           style={styles.button}
+          disabled={d.status === 'self_excluded'}
           onClick={() => freeze.mutate(d.status === 'active')}
         >
-          {d.status === 'active' ? 'Freeze' : 'Unfreeze'}
+          {d.status === 'self_excluded'
+            ? 'Self-excluded'
+            : d.status === 'active'
+              ? 'Freeze'
+              : 'Unfreeze'}
         </button>
         <input
           style={{ ...styles.input, width: 120 }}

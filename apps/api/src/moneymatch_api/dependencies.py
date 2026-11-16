@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .auth import verify_token
+from .auth import extract_bearer_token, verify_token
 from .db.session import get_session
 from .errors import APIError
 from .models.user import User
@@ -20,7 +20,7 @@ async def get_current_user(
     session: AsyncSession = Depends(get_session),
 ) -> User:
     """Verify the Supabase JWT and resolve/create the user row (first authed call)."""
-    identity = verify_token(_bearer(authorization))
+    identity = verify_token(extract_bearer_token(authorization))
     user = await get_or_create_user(session, identity)
     request.state.user = user
     request.state.user_id = str(user.id)
@@ -35,12 +35,6 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
             status_code=403,
         )
     return user
-
-
-def _bearer(authorization: str | None) -> str:
-    from .auth import extract_bearer_token
-
-    return extract_bearer_token(authorization)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

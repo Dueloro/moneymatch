@@ -36,15 +36,9 @@ from ..services import (
     tournament_engine,
 )
 from ..services.tournament_engine import TournamentEnqueueResult
+from ..services.user_service import usernames_by_id
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
-
-
-async def _usernames(session: AsyncSession, ids: list[UUID]) -> dict[UUID, str | None]:
-    if not ids:
-        return {}
-    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
-    return {uid: uname for uid, uname in rows}
 
 
 def _standings(
@@ -100,7 +94,7 @@ async def _view(
             )
         )
     )
-    names = await _usernames(session, [e.user_id for e in entries])
+    names = await usernames_by_id(session, [e.user_id for e in entries])
     mus = [
         float(e.baseline_snapshot["mu"])
         for e in entries

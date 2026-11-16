@@ -14,6 +14,11 @@ Don't push money through.
 | Web | Vercel, builds `apps/web` | `apps/web/vercel.json` |
 | Auth | Supabase | Supabase dashboard |
 
+**Run exactly one API instance.** The rate limiter, live-event tickets, the
+live-event listener and support-alert batching keep their state in the API
+process. A second instance would hand out tickets the other can't redeem and
+double the rate limit. Move that state to Postgres before scaling out.
+
 Admin endpoints below are under `/api/v1/admin` and need an admin user's
 token. The `/admin` web pages call the same endpoints.
 

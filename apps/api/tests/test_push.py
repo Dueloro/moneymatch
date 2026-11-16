@@ -34,7 +34,27 @@ async def test_emit_pushes_to_subscription(session, monkeypatch):
         session, user.id, endpoint="https://push/ep1", p256dh="k", auth="a"
     )
     await notifications_service.emit(session, user.id, "settled", {"match_id": "m"})
+    assert sent == []
+    await session.commit()
+    await notifications_service.drain()
     assert len(sent) == 1 and sent[0]["endpoint"] == "https://push/ep1"
+
+
+async def test_rolled_back_emit_sends_nothing(session, monkeypatch):
+    _enable_vapid(monkeypatch)
+    sent = []
+    monkeypatch.setattr(push_service, "_send_one", lambda info, data: sent.append(info))
+
+    user = await create_user(session)
+    await push_service.subscribe(
+        session, user.id, endpoint="https://push/ep-rb", p256dh="k", auth="a"
+    )
+    await session.commit()
+    await notifications_service.emit(session, user.id, "settled", {"match_id": "m"})
+    await session.rollback()
+    await session.commit()
+    await notifications_service.drain()
+    assert sent == []
 
 
 async def test_non_push_kind_is_in_app_only(session, monkeypatch):
@@ -46,6 +66,8 @@ async def test_non_push_kind_is_in_app_only(session, monkeypatch):
         session, user.id, endpoint="https://push/ep2", p256dh="k", auth="a"
     )
     await notifications_service.emit(session, user.id, "refund", {})
+    await session.commit()
+    await notifications_service.drain()
     assert sent == []
 
 
@@ -68,6 +90,8 @@ async def test_dead_subscription_is_pruned(session, monkeypatch):
     )
     assert await _count(session, user.id) == 1
     await notifications_service.emit(session, user.id, "settled", {})
+    await session.commit()
+    await notifications_service.drain()
     assert await _count(session, user.id) == 0
 
 

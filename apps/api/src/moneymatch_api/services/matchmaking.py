@@ -14,6 +14,7 @@ from .. import clock
 from ..constants import (
     CHESS_BAND_GROWTH_PER_SEC,
     CHESS_BASE_BAND,
+    CHESS_CLOCKS,
     CHESS_MAX_BAND,
     ENTRY_PRESETS_CENTS,
     FLAG_QUEUE_PAUSED,
@@ -76,6 +77,13 @@ def _resolve_market(game: str, market_key: str, speed: str | None) -> MarketDef:
             "speed_required",
             "This market needs a time control.",
             status_code=422,
+        )
+    if market.requires_speed and speed not in CHESS_CLOCKS:
+        raise MatchmakingError(
+            "invalid_speed",
+            "That time control isn't offered.",
+            status_code=422,
+            detail={"allowed": list(CHESS_CLOCKS)},
         )
     return market
 

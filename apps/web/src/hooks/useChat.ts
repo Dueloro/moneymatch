@@ -1,7 +1,9 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { track } from '../lib/telemetry';
 import { useNotifications } from './useNotifications';
 
@@ -37,31 +39,13 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export interface Conversation {
-  id: string;
-  kind: 'dm' | 'support';
-  title: string;
-  peer_user_id: string | null;
-  peer_username: string | null;
-  online: boolean;
-  unread: number;
-  last_message_at: string | null;
-  last_message_preview: string | null;
-}
+export type Conversation = components['schemas']['ConversationView'];
 
-export interface ConversationsResponse {
-  unread_total: number;
-  conversations: Conversation[];
-}
+export type ConversationsResponse = components['schemas']['ConversationsResponse'];
 
 export interface Thread {
   conversation: Conversation;
   messages: ChatMessage[];
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
 }
 
 function useChatKeys() {
@@ -82,7 +66,7 @@ export function useConversations() {
     queryFn: async (): Promise<ConversationsResponse> => {
       const { data, error } = await api.GET('/api/v1/chat/conversations');
       if (error) throw new Error('Failed to load messages');
-      return data as ConversationsResponse;
+      return data;
     },
   });
 }
@@ -135,7 +119,7 @@ export function useOpenConversation() {
           : { kind: 'dm' as const, user_id: target.userId };
       const { data, error } = await api.POST('/api/v1/chat/conversations', { body });
       if (error) throw new Error(messageOf(error, 'Could not open that conversation.'));
-      return data as Conversation;
+      return data;
     },
     onSuccess: (conversation) => invalidate(conversation.id),
   });

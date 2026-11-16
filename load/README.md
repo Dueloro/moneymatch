@@ -1,7 +1,7 @@
 # Load sanity
 
 Load-sanity harness. Drives ~50 concurrent users through chess head-to-head (markets → queue →
-confirm, blitz at $10) against a **staging** deployment. k6 enforces:
+confirm, blitz at 1,000 points) against a **staging** deployment. k6 enforces:
 
 - `http_req_duration` **p95 < 300 ms**
 - zero failed queue writes (`write_errors` rate 0)

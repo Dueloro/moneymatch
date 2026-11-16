@@ -20,6 +20,7 @@ from .routers import (
     admin,
     challenges,
     chat,
+    config,
     disputes,
     events,
     friends,
@@ -40,6 +41,8 @@ from .security import (
     RateLimitMiddleware,
     SecurityHeadersMiddleware,
 )
+from .services import notifications_service
+from .services.hosts import _client as host_http
 
 log = structlog.get_logger(__name__)
 
@@ -63,6 +66,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await notifications_service.drain()
+        await host_http.aclose()
         await dispose_engine()
         log.info("api.shutdown")
 
@@ -102,6 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_error_handlers(app)
 
     app.include_router(health.router, prefix=API_V1_PREFIX)
+    app.include_router(config.router, prefix=API_V1_PREFIX)
     app.include_router(me.router, prefix=API_V1_PREFIX)
     app.include_router(wallet.router, prefix=API_V1_PREFIX)
     app.include_router(links.router, prefix=API_V1_PREFIX)

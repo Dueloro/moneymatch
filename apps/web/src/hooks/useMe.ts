@@ -1,7 +1,9 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { HttpError } from '../lib/apiError';
 
 export interface Limits {
   daily_loss_cap_cents: number;
@@ -13,11 +15,7 @@ export interface Limits {
   timeout_until: string | null;
 }
 
-export interface GettingStarted {
-  linked_game: boolean;
-  placed_wager: boolean;
-  complete: boolean;
-}
+export type GettingStarted = components['schemas']['GettingStarted'];
 
 export interface Me {
   user: {
@@ -45,8 +43,8 @@ export function useMe() {
     queryKey: ['me', session?.user.id],
     enabled: !!session,
     queryFn: async (): Promise<Me> => {
-      const { data, error } = await api.GET('/api/v1/me');
-      if (error) throw new Error('Failed to load profile');
+      const { data, error, response } = await api.GET('/api/v1/me');
+      if (error) throw new HttpError('Failed to load profile', response.status);
       return data as Me;
     },
   });

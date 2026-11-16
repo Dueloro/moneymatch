@@ -29,7 +29,7 @@ From `PRODUCT_CONTEXT.md` §6. Any change to money, matches or settlement keeps 
 |---|---|---|
 | 1 | `sum(payouts) + fee = sum(entries)` on every settlement | `services/money_math.py:Split.__post_init__`; `services/reconciliation_service.py:check`, called after each settle by `_assert_reconciled` in `services/match_lifecycle.py`, `services/pool_engine.py`, `services/tournament_engine.py` |
 | 2 | The server owns every number | Request schemas carry ids and preset choices only (`schemas/`); entries must be in `ENTRY_PRESETS_CENTS` (`services/matchmaking.py:enqueue`, `_validate_bucket` in `services/pool_engine.py` and `services/tournament_engine.py`); amounts come from `services/money_math.py` |
-| 3 | Results come from the game's API | `services/grading.py:grade` (head-to-head, via the adapter's `match_winner`); `services/telemetry_fetch.py:grade_pool` / `grade_tournament`. No endpoint accepts a result |
+| 3 | Results come from the game's API | `services/grading.py:grade` (head-to-head, via the adapter's `match_result`); `services/telemetry_fetch.py:grade_pool` / `grade_tournament`. No endpoint accepts a result |
 | 4 | Fee only when a pot pays out | `services/match_lifecycle.py:settle` (push/cancel/friendly refund, no rake); `services/pool_engine.py:settle_pool` (nobody clears → full refund, zero rake) |
 | 5 | Integer cents, append-only ledger | `BigInteger` money columns and `mm_reject_mutation` triggers on `ledger_entries`, `platform_ledger`, `raw_payloads` (`apps/api/migrations/versions/0001_baseline.py`); all writes through `services/wallet_service.py:_apply`; `apps/api/tests/test_no_floats_in_money_path.py` |
 | 6 | The platform never plays against users | The only platform accounts are `platform:rake` and `platform:promo` (`models/wallet.py:PLATFORM_ACCOUNTS`); payouts come only from escrowed entries |
@@ -59,7 +59,7 @@ entrants are refunded, never guessed.
 ## Adapter seam
 
 Every game plugs in through `adapters/base.py:GameAdapter`: `link_account`,
-`fetch_profile`, `poll_eligible_games`, `create_match`, `match_winner`,
+`fetch_profile`, `poll_eligible_games`, `create_match`, `match_result`,
 `live_match`. Callers resolve adapters with `adapters/registry.py:get(game_id)`,
 never by import. Settlement sees normalized `NormGame` / `TelemetrySample`,
 never raw host JSON.
@@ -121,7 +121,9 @@ re-claimable and nothing double-settles. `run_cycle`:
 1. Write the heartbeat (`worker_heartbeat` flag).
 2. Stop here if `settlement_paused` is on.
 3. Grade and settle due matches, pools, tournaments. A Lichess outage extends
-   the window; past the hard ceiling the contest cancels and refunds.
+   a match's window; past the hard ceiling the match cancels and refunds. A
+   pool or tournament entrant whose games can't be read at the window's end
+   is refunded.
 4. Refresh tournament standings and live snapshots. A brokered chess match
    needs no extra call: grading reads the Lichess export with moves and clocks
    (`/game/export/{id}?moves=true&clocks=true`) and writes the board to

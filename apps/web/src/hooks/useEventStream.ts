@@ -4,10 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { env } from '../lib/env';
+import { setStreamConnected } from '../lib/streamStatus';
 
 const REFRESH_KEYS = [
   ['activity'],
   ['pool-status'],
+  ['tournament-status'],
   ['queue-status'],
   ['waiting'],
   ['wallet'],
@@ -57,7 +59,9 @@ export function useEventStream() {
           `${env.apiBaseUrl}/api/v1/events/stream?ticket=${encodeURIComponent(ticket)}`,
         );
         source.onmessage = refresh;
+        source.onopen = () => setStreamConnected(true);
         source.onerror = () => {
+          setStreamConnected(false);
           source?.close();
           source = null;
           scheduleReconnect();
@@ -72,6 +76,7 @@ export function useEventStream() {
     return () => {
       stopped = true;
       clearTimeout(reconnect);
+      setStreamConnected(false);
       source?.close();
     };
   }, [token, queryClient]);

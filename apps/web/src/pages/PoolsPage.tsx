@@ -10,6 +10,7 @@ import { ErrorState } from '../components/ui/ErrorState';
 import { ALL, FilterBar, FilterChips } from '../components/ui/FilterBar';
 import { PillButton } from '../components/ui/PillButton';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { useConfig } from '../hooks/useConfig';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { WagerCard } from '../components/ui/WagerCard';
@@ -42,6 +43,7 @@ export function PoolsPage() {
     refetch: refetchMarkets,
   } = usePoolMarkets();
   const { data: status } = usePoolStatus();
+  const rakeBps = useConfig().data?.rake_bps;
   const enter = useEnterPool();
 
   const [metricFilter, setMetricFilter] = useState<string>(ALL);
@@ -157,7 +159,7 @@ export function PoolsPage() {
         Solo pools
       </SectionHeader>
 
-      {marketsLoading ? (
+      {marketsLoading || rakeBps == null ? (
         <SkeletonList rows={3} />
       ) : openMetrics.length === 0 ? (
         <EmptyState title="No pools open right now" subline="Check back shortly." />
@@ -190,7 +192,10 @@ export function PoolsPage() {
                         payoutLabel="Est. win"
                         feeNote={(entry) =>
                           platformFeeNote(
-                            feeOnNetWinnings(estPrize(entry, c.est_multiplier_bps)),
+                            feeOnNetWinnings(
+                              estPrize(entry, c.est_multiplier_bps),
+                              rakeBps ?? 0,
+                            ),
                           )
                         }
                         buttonLabel="Join pool"

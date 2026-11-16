@@ -20,7 +20,6 @@ TEST_DB_URL = os.environ.get(
 )
 TEST_JWT_SECRET = "test-jwt-secret-at-least-32-bytes-long!"
 
-os.environ.setdefault("DATABASE_URL", TEST_DB_URL)
 os.environ["DATABASE_URL"] = TEST_DB_URL
 os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
 os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
@@ -124,6 +123,9 @@ async def _clean(request, _schema: None) -> AsyncIterator[None]:
             )
         await session.commit()
     yield
+    from moneymatch_api.services import notifications_service
+
+    await notifications_service.drain()
 
 
 @pytest.fixture(autouse=True)

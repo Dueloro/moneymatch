@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import clock
 from ..constants import (
     CHALLENGE_TTL_SECONDS,
+    CHESS_CLOCKS,
     ENTRY_PRESETS_CENTS,
     PAIR_RAKE_CONTESTS_PER_DAY,
     PAIR_RAKE_CONTESTS_PER_WEEK,
@@ -27,6 +28,7 @@ from ..models.user import User
 from . import (
     chat_service,
     friends_service,
+    geo_service,
     linking_service,
     matchmaking,
     notifications_service,
@@ -43,7 +45,7 @@ class ChallengeError(APIError):
     """A challenge-flow failure (RFC-7807 via APIError)."""
 
 
-async def _pair_rake_count(
+async def pair_rake_count(
     session: AsyncSession, a: uuid.UUID, b: uuid.UUID, since: datetime
 ) -> int:
     """Rake-bearing (non-friendly, non-canceled) matches between two users since a
@@ -76,10 +78,10 @@ async def pair_over_cap(
     friendly).
     """
     now = now or clock.now()
-    day = await _pair_rake_count(session, a, b, now - timedelta(days=1))
+    day = await pair_rake_count(session, a, b, now - timedelta(days=1))
     if day >= PAIR_RAKE_CONTESTS_PER_DAY:
         return True
-    week = await _pair_rake_count(session, a, b, now - timedelta(days=7))
+    week = await pair_rake_count(session, a, b, now - timedelta(days=7))
     return week >= PAIR_RAKE_CONTESTS_PER_WEEK
 
 
@@ -94,6 +96,13 @@ def _resolve_market(game: str, market_key: str, speed: str | None) -> MarketDef:
     if market.requires_speed and not speed:
         raise ChallengeError(
             "speed_required", "This market needs a time control.", status_code=422
+        )
+    if market.requires_speed and speed not in CHESS_CLOCKS:
+        raise ChallengeError(
+            "invalid_speed",
+            "That time control isn't offered.",
+            status_code=422,
+            detail={"allowed": list(CHESS_CLOCKS)},
         )
     return market
 
@@ -131,6 +140,7 @@ async def _require_challenger_ready(
             f"Account is {challenger.status}; play is disabled.",
             status_code=409,
         )
+    await geo_service.assert_can_enter(session, challenger.residence_state)
     await _assert_game_enabled(session, game)
     link = await _link_for(session, challenger.id, game)
     if link is None or link.status != "active":
@@ -340,6 +350,7 @@ async def _accept(
             f"Account is {challengee.status}; play is disabled.",
             status_code=409,
         )
+    await geo_service.assert_can_enter(session, challengee.residence_state)
     await _assert_game_enabled(session, challenge.game)
 
     challengee_link = await _link_for(session, challengee.id, challenge.game)

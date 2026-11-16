@@ -29,16 +29,3 @@ export function Logo({
     </div>
   );
 }
-
-export function GlowBackdrop({ className = '' }: { className?: string }) {
-  return (
-    <div
-      aria-hidden
-      className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}
-      style={{
-        background:
-          'radial-gradient(55% 40% at 85% -10%, rgba(198,244,64,0.12), transparent 60%), radial-gradient(45% 30% at -5% -5%, rgba(198,244,64,0.06), transparent 60%)',
-      }}
-    />
-  );
-}

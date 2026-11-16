@@ -59,6 +59,22 @@ describe('AppShell', () => {
     expect(screen.getByText('kvem_')).toBeInTheDocument();
   });
 
+  it('tells a resident of an excluded state that no play is available', () => {
+    const normal = vi.mocked(useMe).getMockImplementation();
+    vi.mocked(useMe).mockReturnValue({
+      data: {
+        user: { username: 'kvem_', residence_state: 'FL' },
+        needs_onboarding: false,
+      },
+      isLoading: false,
+    } as ReturnType<typeof useMe>);
+    renderShell();
+    vi.mocked(useMe).mockImplementation(normal!);
+
+    expect(screen.getByText(/Matches aren't available in Florida/)).toBeInTheDocument();
+    expect(screen.queryByText(/for free/i)).not.toBeInTheDocument();
+  });
+
   it('points Play and the logo at /play, the one home', () => {
     renderShell();
     for (const el of screen.getAllByRole('link', { name: 'Play' })) {

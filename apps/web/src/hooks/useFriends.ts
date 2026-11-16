@@ -1,27 +1,14 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { track } from '../lib/telemetry';
 
-export interface FriendItem {
-  friendship_id: string;
-  user_id: string;
-  username: string | null;
-  online: boolean;
-}
+export type FriendItem = components['schemas']['FriendItem'];
 
-export interface FriendsResponse {
-  your_friend_code: string;
-  friends: FriendItem[];
-  incoming: FriendItem[];
-  outgoing: FriendItem[];
-}
-
-function messageOf(error: unknown, fallback: string): string {
-  const msg = (error as { message?: string } | undefined)?.message;
-  return typeof msg === 'string' && msg ? msg : fallback;
-}
+export type FriendsResponse = components['schemas']['FriendsResponse'];
 
 export function useFriends() {
   const { session } = useAuth();
@@ -32,7 +19,7 @@ export function useFriends() {
     queryFn: async (): Promise<FriendsResponse> => {
       const { data, error } = await api.GET('/api/v1/friends');
       if (error) throw new Error('Failed to load friends');
-      return data as FriendsResponse;
+      return data;
     },
   });
 }

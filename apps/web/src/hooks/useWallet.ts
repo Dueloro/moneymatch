@@ -1,3 +1,4 @@
+import type { components } from '@moneymatch/api-client';
 import {
   useInfiniteQuery,
   useMutation,
@@ -7,35 +8,15 @@ import {
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
+import { messageOf } from '../lib/apiError';
 import { formatPoints } from '../lib/format';
 import { toast } from '../lib/toast';
 
-export interface LedgerEntry {
-  id: string;
-  entry_type: string;
-  amount_cents: number;
-  escrow_delta_cents: number;
-  ref_type: string;
-  ref_id: string | null;
-  balance_after_cents: number;
-  memo: string | null;
-  created_at: string;
-}
+export type LedgerEntry = components['schemas']['LedgerEntryResponse'];
 
-export interface Wallet {
-  currency: string;
-  available_cents: number;
-  escrow_cents: number;
-  lifetime_net_cents: number;
-  recent: LedgerEntry[];
-}
+export type Wallet = components['schemas']['WalletResponse'];
 
-interface LedgerPage {
-  entries: LedgerEntry[];
-  next_cursor: string | null;
-}
-
-export const DEPOSIT_PRESETS_CENTS = [1000, 2500, 5000, 10000] as const;
+type LedgerPage = components['schemas']['WalletLedgerPage'];
 
 const walletKey = (userId?: string) => ['wallet', userId];
 
@@ -47,7 +28,7 @@ export function useWallet() {
     queryFn: async (): Promise<Wallet> => {
       const { data, error } = await api.GET('/api/v1/wallet');
       if (error) throw new Error('Failed to load wallet');
-      return data as Wallet;
+      return data;
     },
   });
 }
@@ -63,7 +44,7 @@ export function useWalletLedger() {
         params: { query: pageParam ? { cursor: pageParam } : {} },
       });
       if (error) throw new Error('Failed to load ledger');
-      return data as LedgerPage;
+      return data;
     },
     getNextPageParam: (last) => last.next_cursor,
   });
@@ -85,8 +66,8 @@ export function usePlayMoneyDeposit() {
       const { data, error } = await api.POST('/api/v1/wallet/demo-deposit', {
         body: { amount_preset_cents: amountPresetCents },
       });
-      if (error) throw new Error('Could not add points');
-      return data as Wallet;
+      if (error) throw new Error(messageOf(error, 'Could not add points'));
+      return data;
     },
     onSuccess: (_data, amountPresetCents) => {
       invalidate();

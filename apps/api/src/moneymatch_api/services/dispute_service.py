@@ -6,12 +6,12 @@ records the decision, it does not itself move funds.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import clock
 from ..errors import APIError
 from ..models.dispute import Dispute
 from ..models.play import Match, MatchPlayer
@@ -165,10 +165,16 @@ async def resolve(
     dispute = await session.get(Dispute, dispute_id)
     if dispute is None:
         raise APIError("not_found", "Dispute not found.", status_code=404)
+    if dispute.status != "open":
+        raise APIError(
+            "already_resolved",
+            f"This dispute is already {dispute.status}.",
+            status_code=409,
+        )
 
     dispute.status = status
     dispute.admin_note = (note or "").strip() or None
-    dispute.resolved_at = datetime.now(UTC)
+    dispute.resolved_at = clock.now()
     await session.flush()
 
     await notifications_service.emit(

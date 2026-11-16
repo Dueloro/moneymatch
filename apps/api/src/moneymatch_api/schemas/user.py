@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from uuid import UUID
 
@@ -94,8 +95,6 @@ class UpdateMeRequest(BaseModel):
     def _validate_username(cls, v: str | None) -> str | None:
         if v is None:
             return None
-        import re
-
         v = v.strip().lower()
         if not re.match(USERNAME_PATTERN, v):
             raise ValueError(
@@ -109,8 +108,6 @@ class UpdateMeRequest(BaseModel):
     def _validate_state(cls, v: str | None) -> str | None:
         if v is None:
             return None
-        import re
-
         v = v.strip().upper()
         if not re.match(STATE_PATTERN, v):
             raise ValueError("Residence state must be a 2-letter code.")

@@ -1,32 +1,14 @@
+import type { components } from '@moneymatch/api-client';
 import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 
-export interface LeaderboardRow {
-  rank: number;
-  user_id: string;
-  username: string | null;
-  roi_bps: number;
-  net_cents: number;
-  staked_cents: number;
-  contests: number;
-  is_you: boolean;
-}
+export type LeaderboardRow = components['schemas']['LeaderboardRowView'];
 
-export interface YouSummary {
-  qualified: boolean;
-  contests: number;
-  contests_needed: number;
-  row: LeaderboardRow | null;
-}
+export type YouSummary = components['schemas']['YouSummaryView'];
 
-export interface LeaderboardResponse {
-  rows: LeaderboardRow[];
-  you: YouSummary;
-  window_days: number;
-  min_contests: number;
-}
+export type LeaderboardResponse = components['schemas']['LeaderboardResponse'];
 
 export function useLeaderboard() {
   const { session } = useAuth();
@@ -37,7 +19,7 @@ export function useLeaderboard() {
     queryFn: async (): Promise<LeaderboardResponse> => {
       const { data, error } = await api.GET('/api/v1/leaderboard');
       if (error) throw new Error('Failed to load leaderboard');
-      return data as LeaderboardResponse;
+      return data;
     },
   });
 }

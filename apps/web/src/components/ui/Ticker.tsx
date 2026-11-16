@@ -1,9 +1,10 @@
 import { formatPoints } from '../../lib/format';
+import { CHESS } from '../../lib/games';
 import { lookingFor } from '../../lib/tickerCopy';
 import { useWaiting } from '../../hooks/useMatchmaking';
 
 export function Ticker() {
-  const { data } = useWaiting(undefined);
+  const { data } = useWaiting(CHESS);
   const items = data?.waiting ?? [];
   if (items.length === 0) return null;
 

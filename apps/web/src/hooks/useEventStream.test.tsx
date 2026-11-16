@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { isStreamConnected, queuePollMs } from '../lib/streamStatus';
 import { useEventStream } from './useEventStream';
 
 vi.mock('../auth/useAuth', () => ({
@@ -16,6 +17,7 @@ class FakeEventSource {
   url: string;
   onmessage: ((e: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
+  onopen: (() => void) | null = null;
   closed = false;
   constructor(url: string) {
     this.url = url;
@@ -65,7 +67,32 @@ describe('useEventStream', () => {
     es.emit(JSON.stringify({ user_id: 'u1', kind: 'settled' }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['activity'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['pool-status'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['tournament-status'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['wallet'] });
+  });
+
+  it('reports the stream as connected only while it is open', async () => {
+    const { view } = setup();
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const es = FakeEventSource.instances[0];
+    expect(isStreamConnected()).toBe(false);
+
+    es.onopen?.();
+    expect(isStreamConnected()).toBe(true);
+    es.onerror?.();
+    expect(isStreamConnected()).toBe(false);
+
+    es.onopen?.();
+    view.unmount();
+    expect(isStreamConnected()).toBe(false);
+  });
+
+  it('slows the queue poll only for an idle player with a live stream', () => {
+    expect(queuePollMs('idle', true)).toBe(15_000);
+    expect(queuePollMs('idle', false)).toBe(2000);
+    expect(queuePollMs('searching', true)).toBe(2000);
+    expect(queuePollMs('matched', true)).toBe(2000);
+    expect(queuePollMs(undefined, true)).toBe(2000);
   });
 
   it('closes the stream on unmount', async () => {

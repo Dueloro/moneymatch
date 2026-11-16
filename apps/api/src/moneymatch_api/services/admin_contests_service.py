@@ -19,6 +19,7 @@ from ..models.user import User
 from ..models.wallet import LedgerEntry, PlatformLedgerEntry, Wallet
 from . import match_lifecycle, reconciliation_service
 from .match_states import is_terminal
+from .user_service import usernames_by_id
 
 REF_TYPES = ("match", "solo_pool", "tournament")
 
@@ -62,6 +63,18 @@ class ContestDetail:
     reconciliation: dict[str, Any] = field(default_factory=dict)
 
 
+async def _counts(
+    session: AsyncSession, column: Any, ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Participant count per contest id, in one grouped query."""
+    if not ids:
+        return {}
+    rows = await session.execute(
+        select(column, func.count()).where(column.in_(ids)).group_by(column)
+    )
+    return {ref_id: int(n) for ref_id, n in rows}
+
+
 async def list_contests(
     session: AsyncSession,
     *,
@@ -79,14 +92,11 @@ async def list_contests(
             stmt_m = stmt_m.where(Match.state == state)
         if game:
             stmt_m = stmt_m.where(Match.game == game)
-        for m in await session.scalars(
-            stmt_m.order_by(Match.created_at.desc()).limit(limit)
-        ):
-            count = await session.scalar(
-                select(func.count())
-                .select_from(MatchPlayer)
-                .where(MatchPlayer.match_id == m.id)
-            )
+        found_m = list(
+            await session.scalars(stmt_m.order_by(Match.created_at.desc()).limit(limit))
+        )
+        counts = await _counts(session, MatchPlayer.match_id, [x.id for x in found_m])
+        for m in found_m:
             rows.append(
                 ContestListItem(
                     ref_type="match",
@@ -96,7 +106,7 @@ async def list_contests(
                     state=m.state,
                     entry_cents=m.entry_cents,
                     pot_cents=m.pot_cents,
-                    participants=int(count or 0),
+                    participants=counts.get(m.id, 0),
                     created_at=m.created_at,
                     resolved_at=m.resolved_at,
                 )
@@ -108,14 +118,13 @@ async def list_contests(
             stmt_p = stmt_p.where(SoloPool.state == state)
         if game:
             stmt_p = stmt_p.where(SoloPool.game == game)
-        for p in await session.scalars(
-            stmt_p.order_by(SoloPool.created_at.desc()).limit(limit)
-        ):
-            count = await session.scalar(
-                select(func.count())
-                .select_from(SoloEntry)
-                .where(SoloEntry.pool_id == p.id)
+        found_p = list(
+            await session.scalars(
+                stmt_p.order_by(SoloPool.created_at.desc()).limit(limit)
             )
+        )
+        counts = await _counts(session, SoloEntry.pool_id, [x.id for x in found_p])
+        for p in found_p:
             rows.append(
                 ContestListItem(
                     ref_type="solo_pool",
@@ -125,7 +134,7 @@ async def list_contests(
                     state=p.state,
                     entry_cents=p.entry_cents,
                     pot_cents=p.pot_cents,
-                    participants=int(count or 0),
+                    participants=counts.get(p.id, 0),
                     created_at=p.created_at,
                     resolved_at=p.resolved_at,
                 )
@@ -137,14 +146,15 @@ async def list_contests(
             stmt_t = stmt_t.where(Tournament.state == state)
         if game:
             stmt_t = stmt_t.where(Tournament.game == game)
-        for t in await session.scalars(
-            stmt_t.order_by(Tournament.created_at.desc()).limit(limit)
-        ):
-            count = await session.scalar(
-                select(func.count())
-                .select_from(TournamentEntry)
-                .where(TournamentEntry.tournament_id == t.id)
+        found_t = list(
+            await session.scalars(
+                stmt_t.order_by(Tournament.created_at.desc()).limit(limit)
             )
+        )
+        counts = await _counts(
+            session, TournamentEntry.tournament_id, [x.id for x in found_t]
+        )
+        for t in found_t:
             rows.append(
                 ContestListItem(
                     ref_type="tournament",
@@ -154,7 +164,7 @@ async def list_contests(
                     state=t.state,
                     entry_cents=t.entry_cents,
                     pot_cents=t.pot_cents,
-                    participants=int(count or 0),
+                    participants=counts.get(t.id, 0),
                     created_at=t.created_at,
                     resolved_at=t.resolved_at,
                 )
@@ -162,15 +172,6 @@ async def list_contests(
 
     rows.sort(key=lambda r: r.created_at, reverse=True)
     return rows[:limit]
-
-
-async def _usernames(
-    session: AsyncSession, ids: list[uuid.UUID]
-) -> dict[uuid.UUID, str | None]:
-    if not ids:
-        return {}
-    rows = await session.execute(select(User.id, User.username).where(User.id.in_(ids)))
-    return {uid: name for uid, name in rows}
 
 
 async def _money_trail(
@@ -253,7 +254,7 @@ async def _match_detail(session: AsyncSession, match_id: uuid.UUID) -> ContestDe
             select(MatchPlayer).where(MatchPlayer.match_id == match_id)
         )
     )
-    names = await _usernames(session, [s.user_id for s in seats])
+    names = await usernames_by_id(session, [s.user_id for s in seats])
     participants = [
         {
             "user_id": str(s.user_id),
@@ -291,7 +292,7 @@ async def _pool_detail(session: AsyncSession, pool_id: uuid.UUID) -> ContestDeta
     entries = list(
         await session.scalars(select(SoloEntry).where(SoloEntry.pool_id == pool_id))
     )
-    names = await _usernames(session, [e.user_id for e in entries])
+    names = await usernames_by_id(session, [e.user_id for e in entries])
     participants = [
         {
             "user_id": str(e.user_id),
@@ -332,7 +333,7 @@ async def _tournament_detail(session: AsyncSession, tid: uuid.UUID) -> ContestDe
             select(TournamentEntry).where(TournamentEntry.tournament_id == tid)
         )
     )
-    names = await _usernames(session, [e.user_id for e in entries])
+    names = await usernames_by_id(session, [e.user_id for e in entries])
     participants = [
         {
             "user_id": str(e.user_id),
