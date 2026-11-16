@@ -1,20 +1,12 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 
-export interface NotificationItem {
-  id: string;
-  kind: string;
-  payload: Record<string, unknown>;
-  read: boolean;
-  created_at: string;
-}
+export type NotificationItem = components['schemas']['NotificationItem'];
 
-export interface NotificationsResponse {
-  unread: number;
-  items: NotificationItem[];
-}
+export type NotificationsResponse = components['schemas']['NotificationsResponse'];
 
 export function useNotifications() {
   const { session } = useAuth();
@@ -25,7 +17,7 @@ export function useNotifications() {
     queryFn: async (): Promise<NotificationsResponse> => {
       const { data, error } = await api.GET('/api/v1/notifications');
       if (error) throw new Error('Failed to load notifications');
-      return data as NotificationsResponse;
+      return data;
     },
   });
 }
@@ -39,7 +31,7 @@ export function useMarkNotificationsRead() {
         body: ids ? { ids } : {},
       });
       if (error) throw new Error('Could not mark read');
-      return data as { unread: number };
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications', session?.user.id] });

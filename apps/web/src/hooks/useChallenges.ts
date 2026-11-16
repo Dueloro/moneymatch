@@ -1,54 +1,17 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../lib/api';
 import { messageOf } from '../lib/apiError';
 import { track } from '../lib/telemetry';
 
-export interface ChallengeView {
-  id: string;
-  challenger_id: string;
-  challenger_username: string | null;
-  challengee_id: string | null;
-  game: string;
-  market: string;
-  market_label: string;
-  kind: string;
-  speed: string | null;
-  entry_cents: number;
-  friendly: boolean;
-  state: string;
-  match_id: string | null;
-  is_invite: boolean;
-  expires_at: string;
-}
+export type ChallengeView = components['schemas']['ChallengeView'];
 
-export interface ChallengeCreated {
-  challenge: ChallengeView;
-  invite_token: string | null;
-  invite_path: string | null;
-}
+export type ChallengeCreated = components['schemas']['ChallengeCreatedResponse'];
 
-export interface ChallengePreview {
-  game: string;
-  market: string;
-  market_label: string;
-  kind: string;
-  speed: string | null;
-  entry_cents: number;
-  challenger_username: string | null;
-  state: string;
-  valid: boolean;
-  expires_at: string;
-}
+export type ChallengePreview = components['schemas']['ChallengePreviewResponse'];
 
-export interface CreateChallengeVars {
-  challengee_id?: string;
-  rematch_of?: string;
-  game?: string;
-  market?: string;
-  speed?: string;
-  entry_preset_cents?: number;
-}
+export type CreateChallengeVars = components['schemas']['CreateChallengeRequest'];
 
 function useInvalidate() {
   const qc = useQueryClient();
@@ -65,7 +28,7 @@ export function useCreateChallenge() {
     mutationFn: async (vars: CreateChallengeVars): Promise<ChallengeCreated> => {
       const { data, error } = await api.POST('/api/v1/challenges', { body: vars });
       if (error) throw new Error(messageOf(error, 'Could not create the challenge.'));
-      return data as ChallengeCreated;
+      return data;
     },
     onSuccess: (_data, vars) => {
       if (vars.rematch_of) track('rematch_sent');
@@ -118,7 +81,7 @@ export function useInvitePreview(token: string | undefined) {
         params: { path: { token: token! } },
       });
       if (error) throw new Error('This invite link is invalid or expired.');
-      return data as ChallengePreview;
+      return data;
     },
   });
 }

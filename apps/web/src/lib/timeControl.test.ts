@@ -38,8 +38,8 @@ describe('defaultSpeed', () => {
 
 describe('ratingForSpeed', () => {
   const formats = [
-    { speed: 'blitz', rating: 1712, games: 900, provisional: false },
-    { speed: 'rapid', rating: 1790, games: 40, provisional: true },
+    { speed: 'blitz' as const, rating: 1712, games: 900, provisional: false },
+    { speed: 'rapid' as const, rating: 1790, games: 40, provisional: true },
   ];
 
   it('uses the rating for that speed', () => {

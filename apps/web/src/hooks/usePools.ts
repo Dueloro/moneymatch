@@ -1,3 +1,4 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
@@ -5,68 +6,17 @@ import { api } from '../lib/api';
 import { messageOf } from '../lib/apiError';
 import { CHESS } from '../lib/games';
 
-export interface DifficultyCard {
-  difficulty: string;
-  bar: number;
-  clear_rate: number;
-  est_multiplier_bps: number;
-}
+export type DifficultyCard = components['schemas']['DifficultyCard'];
 
-export interface PoolMetric {
-  metric: string;
-  label: string;
-  provisional: boolean;
-  cards: DifficultyCard[];
-}
+export type PoolMetric = components['schemas']['PoolMetric'];
 
-export interface PoolMarkets {
-  game: string;
-  linked: boolean;
-  entry_presets_cents: number[];
-  metrics: PoolMetric[];
-}
+export type PoolMarkets = components['schemas']['PoolMarketsResponse'];
 
-export interface PoolMember {
-  user_id: string;
-  username: string | null;
-  personal_bar: number;
-  status: string;
-  payout_cents: number;
-  is_you: boolean;
-  result_value?: number | null;
-}
+export type PoolMember = components['schemas']['PoolMemberView'];
 
-export interface PoolView {
-  id: string;
-  game: string;
-  metric: string;
-  metric_label: string;
-  difficulty: string;
-  room_bar: number;
-  your_bar: number | null;
-  bar_delta: number | null;
-  your_cleared: boolean | null;
-  your_current: number | null;
-  entry_cents: number;
-  pot_cents: number;
-  prize_cents: number;
-  rake_cents: number;
-  room_size: number;
-  state: string;
-  window_starts_at: string;
-  window_ends_at: string;
-  members: PoolMember[];
-  your_payout_cents: number | null;
-  resolved_at: string | null;
-}
+export type PoolView = components['schemas']['PoolView'];
 
-export interface PoolStatus {
-  status: 'idle' | 'searching' | 'formed';
-  pool: PoolView | null;
-  difficulty: string | null;
-  metric: string | null;
-  waited_seconds: number | null;
-}
+export type PoolStatus = components['schemas']['PoolStatusResponse'];
 
 export function estPrize(entryCents: number, multiplierBps: number): number {
   return Math.floor((entryCents * multiplierBps) / 10000);
@@ -82,7 +32,7 @@ export function usePoolMarkets(game: string = CHESS) {
         params: { query: { game } },
       });
       if (error) throw new Error('Failed to load pool markets');
-      return data as PoolMarkets;
+      return data;
     },
   });
 }
@@ -97,7 +47,7 @@ export function usePoolStatus() {
     queryFn: async (): Promise<PoolStatus> => {
       const { data, error } = await api.GET('/api/v1/pools/queue/status');
       if (error) throw new Error('Failed to load pool status');
-      return data as PoolStatus;
+      return data;
     },
   });
 }
@@ -113,7 +63,7 @@ export function usePool(poolId: string | null) {
         params: { path: { pool_id: poolId as string } },
       });
       if (error) throw new Error('Failed to load the room');
-      return data as PoolView;
+      return data;
     },
   });
 }
@@ -139,7 +89,7 @@ export function useEnterPool() {
     }): Promise<PoolStatus> => {
       const { data, error } = await api.POST('/api/v1/pools/queue', { body: vars });
       if (error) throw new Error(messageOf(error, 'Could not enter the pool.'));
-      return data as PoolStatus;
+      return data;
     },
     onSuccess: invalidate,
   });
@@ -151,7 +101,7 @@ export function useLeavePool() {
     mutationFn: async (): Promise<PoolStatus> => {
       const { data, error } = await api.DELETE('/api/v1/pools/queue');
       if (error) throw new Error('Could not leave the pool queue.');
-      return data as PoolStatus;
+      return data;
     },
     onSuccess: invalidate,
   });

@@ -1,46 +1,19 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 import { messageOf } from '../lib/apiError';
 import { queuePollMs, useStreamConnected } from '../lib/streamStatus';
-import type { SpeedClock } from '../lib/timeControl';
 import { toast } from '../lib/toast';
 
-export interface MarketRow {
-  key: string;
-  label: string;
-  kind: 'win_h2h';
-  requires_speed: boolean;
-  speeds: string[];
-  clocks: SpeedClock[];
-  multiplier_bps: number;
-  queue_depth: number;
-  resolution_note: string;
-}
+export type MarketRow = components['schemas']['MarketRow'];
 
-export interface MarketsResponse {
-  game: string;
-  linked: boolean;
-  entry_presets_cents: number[];
-  markets: MarketRow[];
-}
+export type MarketsResponse = components['schemas']['MarketsResponse'];
 
-export interface Forecast {
-  you_win_prob: number;
-  label: string;
-}
+export type Forecast = components['schemas']['Forecast'];
 
-export interface MatchPlayerView {
-  user_id: string;
-  username: string | null;
-  rating: number | null;
-  color: string | null;
-  confirmed: boolean;
-  payout_cents: number;
-  stat_line: Record<string, unknown> | null;
-  is_you: boolean;
-}
+export type MatchPlayerView = components['schemas']['MatchPlayerView'];
 
 export type Termination =
   | 'checkmate'
@@ -96,13 +69,7 @@ export interface MatchView {
   live?: MatchLive | null;
 }
 
-export interface QueueTicketView {
-  market: string;
-  speed: string | null;
-  clock: SpeedClock | null;
-  entry_cents: number;
-  rating: number | null;
-}
+export type QueueTicketView = components['schemas']['QueueTicketView'];
 
 export interface QueueStatus {
   status: 'idle' | 'searching' | 'matched';
@@ -112,17 +79,7 @@ export interface QueueStatus {
   can_cancel: boolean;
 }
 
-export interface WaitingRow {
-  ticket_id: string;
-  game: string;
-  market: string;
-  market_label: string;
-  speed: string | null;
-  entry_cents: number;
-  username: string | null;
-  rating: number | null;
-  waited_seconds: number;
-}
+export type WaitingRow = components['schemas']['WaitingRow'];
 
 /** Derived "You'd win" figure: entry × 2 × (1 − rake). */
 export function prizeForEntry(entryCents: number, multiplierBps: number): number {
@@ -139,7 +96,7 @@ export function useMarkets(game: string | undefined) {
         params: { query: { game: game! } },
       });
       if (error) throw new Error('Failed to load markets');
-      return data as MarketsResponse;
+      return data;
     },
   });
 }
@@ -191,7 +148,7 @@ export function useWaiting(game: string | undefined) {
         params: { query: game ? { game } : {} },
       });
       if (error) throw new Error('Failed to load waiting list');
-      return data as { waiting: WaitingRow[] };
+      return data;
     },
   });
 }

@@ -1,3 +1,4 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
@@ -14,11 +15,7 @@ export interface Limits {
   timeout_until: string | null;
 }
 
-export interface GettingStarted {
-  linked_game: boolean;
-  placed_wager: boolean;
-  complete: boolean;
-}
+export type GettingStarted = components['schemas']['GettingStarted'];
 
 export interface Me {
   user: {

@@ -1,65 +1,20 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../lib/api';
 import { messageOf } from '../lib/apiError';
 
-export interface FlagItem {
-  key: string;
-  enabled: boolean;
-  payload: Record<string, unknown>;
-}
+export type FlagItem = components['schemas']['FlagItem'];
 
-export interface AdminUserSummary {
-  id: string;
-  username: string | null;
-  email: string | null;
-  friend_code: string;
-  role: string;
-  status: string;
-  residence_state: string | null;
-  member_since: string;
-  available_cents: number;
-  escrow_cents: number;
-}
+export type AdminUserSummary = components['schemas']['AdminUserSummary'];
 
-export interface AdminContestListItem {
-  ref_type: string;
-  ref_id: string;
-  game: string;
-  market: string;
-  state: string;
-  entry_cents: number;
-  pot_cents: number;
-  participants: number;
-  created_at: string;
-  resolved_at: string | null;
-}
+export type AdminContestListItem = components['schemas']['AdminContestListItem'];
 
-export interface AdminSupportThread {
-  conversation_id: string;
-  user_id: string;
-  username: string | null;
-  email: string | null;
-  last_message_at: string | null;
-  last_message_preview: string | null;
-  awaiting_reply: boolean;
-}
+export type AdminSupportThread = components['schemas']['SupportThreadItem'];
 
-export interface AdminSupportMessage {
-  id: string;
-  sender: 'user' | 'support' | 'system';
-  body: string | null;
-  created_at: string;
-  source: string | null;
-}
+export type AdminSupportMessage = components['schemas']['SupportMessageItem'];
 
-export interface AdminSupportDetail {
-  conversation_id: string;
-  user_id: string;
-  username: string | null;
-  email: string | null;
-  messages: AdminSupportMessage[];
-}
+export type AdminSupportDetail = components['schemas']['SupportThreadDetail'];
 
 export function useAdminFlags() {
   return useQuery({
@@ -79,7 +34,7 @@ export function useAdminSupportThreads() {
     queryFn: async (): Promise<AdminSupportThread[]> => {
       const { data, error } = await api.GET('/api/v1/admin/support');
       if (error) throw new Error('Failed to load support threads');
-      return data as AdminSupportThread[];
+      return data;
     },
   });
 }
@@ -94,7 +49,7 @@ export function useAdminSupportThread(conversationId: string | null) {
         params: { path: { conversation_id: conversationId! } },
       });
       if (error) throw new Error('Failed to load support thread');
-      return data as AdminSupportDetail;
+      return data;
     },
   });
 }
@@ -114,7 +69,7 @@ export function useReplyToSupport() {
         },
       );
       if (error) throw new Error(messageOf(error, 'Reply failed'));
-      return data as AdminSupportDetail;
+      return data;
     },
     onSuccess: (data) => {
       qc.setQueryData(['admin', 'support', data.conversation_id], data);
@@ -309,17 +264,7 @@ export function useClearFlag() {
   });
 }
 
-export interface AdminDispute {
-  id: string;
-  ref_type: string;
-  ref_id: string;
-  user_id: string;
-  reason: string;
-  status: string;
-  admin_note: string | null;
-  created_at: string;
-  resolved_at: string | null;
-}
+export type AdminDispute = components['schemas']['AdminDisputeItem'];
 
 export function useAdminDisputes() {
   return useQuery({
@@ -328,7 +273,7 @@ export function useAdminDisputes() {
     queryFn: async (): Promise<AdminDispute[]> => {
       const { data, error } = await api.GET('/api/v1/admin/disputes');
       if (error) throw new Error('Failed to load disputes');
-      return data as AdminDispute[];
+      return data;
     },
   });
 }

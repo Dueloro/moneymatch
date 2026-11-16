@@ -1,11 +1,10 @@
+import type { components } from '@moneymatch/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../auth/useAuth';
 import { api } from '../lib/api';
 
-interface InboxBadge {
-  badge: number;
-}
+type InboxBadge = components['schemas']['InboxBadgeResponse'];
 
 function useBadgeKey() {
   const { session } = useAuth();
@@ -23,7 +22,7 @@ export function useInboxBadge(): number {
     queryFn: async (): Promise<InboxBadge> => {
       const { data, error } = await api.GET('/api/v1/inbox/badge');
       if (error) throw new Error('Failed to load inbox badge');
-      return data as InboxBadge;
+      return data;
     },
   });
   return query.data?.badge ?? 0;
@@ -36,7 +35,7 @@ export function useMarkInboxSeen() {
     mutationFn: async (): Promise<InboxBadge> => {
       const { data, error } = await api.POST('/api/v1/inbox/seen');
       if (error) throw new Error('Could not update inbox');
-      return data as InboxBadge;
+      return data;
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: key });
